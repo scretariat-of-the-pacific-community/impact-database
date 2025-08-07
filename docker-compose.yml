@@ -1,0 +1,61 @@
+
+version: "3.8"
+
+services:
+  web:
+    build: ./app
+    container_name: fastapi_app
+    command: uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./app:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - minio
+      - redis
+
+  db:
+    image: postgis/postgis:14-3.3
+    container_name: postgis_db
+    environment:
+      POSTGRES_DB: impactdb
+      POSTGRES_USER: impactuser
+      POSTGRES_PASSWORD: impactpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    volumes:
+      - minio_data:/data
+
+  redis:
+    image: redis:6
+    container_name: redis
+    ports:
+      - "6379:6379"
+
+  celery:
+    build: ./app
+    container_name: celery_worker
+    command: celery -A workers.tasks worker --loglevel=info
+    volumes:
+      - ./app:/app
+    depends_on:
+      - redis
+      - db
+
+volumes:
+  postgres_data:
+  minio_data:
