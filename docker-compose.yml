@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database with PostGIS extension
+  db:
+    image: postgis/postgis:14-3.2
+    environment:
+      POSTGRES_DB: impactdb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: changeme
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-postgis.sql:/docker-entrypoint-initdb.d/init-postgis.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Django web application
+  web:
+    build: .
+    command: /app/entrypoint.sh
+    volumes:
+      - .:/app
+      - media_files:/app/media
+    ports:
+      - "8000:8000"
+    environment:
+      # Database configuration
+      DATABASE_NAME: impactdb
+      DATABASE_USER: postgres
+      DATABASE_PASSWORD: changeme
+      DATABASE_HOST: db
+      DATABASE_PORT: 5432
+      
+      # Django configuration
+      SECRET_KEY: django-insecure-docker-development-key
+      DEBUG: "True"
+      ALLOWED_HOSTS: localhost,127.0.0.1,0.0.0.0
+      
+      # CORS configuration
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      
+      # PostGIS library paths (set in Dockerfile)
+      GDAL_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu/libgdal.so
+      GEOS_LIBRARY_PATH: /usr/lib/x86_64-linux-gnu/libgeos_c.so
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # pgAdmin for database administration (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@impactdb.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_LISTEN_PORT: 80
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  media_files:
