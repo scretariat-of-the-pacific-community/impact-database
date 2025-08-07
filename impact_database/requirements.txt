@@ -1,0 +1,25 @@
+# Core web stack
+Django>=4.2,<5.0
+djangorestframework>=3.14
+django-cors-headers>=4.0
+psycopg2-binary>=2.9  # PostgreSQL driver
+gunicorn
+
+# GeoDjango and GIS
+geopandas
+django-postgis
+GDAL==3.6.0  # Ensure it matches what's installed in your container
+
+# Microsoft Graph API
+msal>=1.23.0          # MSAL for auth
+requests>=2.31.0
+python-dotenv         # To load .env vars
+
+# Image upload + metadata
+Pillow
+django-storages[boto3]  # Optional: If using S3/MinIO
+exifread
+
+# Optional extras
+drf-yasg               # Swagger / OpenAPI
+whitenoise             # For static file serving

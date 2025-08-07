@@ -1,0 +1,43 @@
+{
+  "name": "Impact Database Dev",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/postgres:1": {
+      "version": "15",
+      "database": "impactdb",
+      "user": "postgres",
+      "password": "postgres"
+    }
+  },
+  "postCreateCommand": "pip install -r requirements.txt && npm install --prefix frontend",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode",
+        "msjsdiag.debugger-for-chrome"
+      ]
+    }
+  },
+  "forwardPorts": [8000, 3000, 5432]
+}
+
+{
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "PYTHONPATH": "/workspace/src"
+  },
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=/path/to/your/local/data,target=/workspace/data,type=bind,consistency=cached"
+  ]
+}
