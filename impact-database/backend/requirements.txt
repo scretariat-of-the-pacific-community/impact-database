@@ -1,0 +1,19 @@
+# Web framework
+fastapi[all]
+uvicorn[standard]
+
+# Database
+sqlalchemy
+asyncpg  # PostgreSQL driver
+alembic  # For migrations
+geoalchemy2  # PostGIS support
+
+# Environment & config
+python-dotenv
+
+# MS Graph API
+msal
+requests
+
+# Data handling
+pydantic
