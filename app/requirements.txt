@@ -1,4 +1,5 @@
 
+<<<<<<< HEAD
 fastapi
 uvicorn[standard]
 sqlalchemy
@@ -25,3 +26,17 @@ flake8
 bandit
 
 fastapi-sqlalchemy
+=======
+fastapi==0.110.0
+uvicorn[standard]==0.29.0
+sqlalchemy==2.0.29
+asyncpg==0.29.0
+alembic==1.13.1
+pydantic==2.6.4
+python-multipart==0.0.9
+geoalchemy2==0.14.3
+psycopg2-binary==2.9.9
+boto3==1.34.79
+celery==5.3.6
+redis==5.0.1
+>>>>>>> bdfc7e2d7b308aef7a453ea98a1183c4ca378862
