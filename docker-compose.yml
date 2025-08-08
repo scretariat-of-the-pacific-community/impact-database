@@ -1,11 +1,44 @@
-
-version: "3.8"
-
+# This docker-compose.yml file defines a multi-service environment for the Impact Database project.
+#
+# Services:
+#   web:
+#     - FastAPI application server.
+#     - Built from ./app directory.
+#     - Exposes port 8000.
+#     - Depends on db, minio, and redis services.
+#     - Mounts local ./app directory for live code updates.
+#
+#   db:
+#     - PostgreSQL database with PostGIS extension.
+#     - Uses official postgis/postgis image.
+#     - Database credentials and name set via environment variables.
+#     - Persists data in a named Docker volume.
+#     - Exposes port 5432.
+#
+#   minio:
+#     - MinIO object storage server.
+#     - Accessible via ports 9000 (API) and 9001 (console).
+#     - Credentials set via environment variables.
+#     - Persists data in a named Docker volume.
+#
+#   redis:
+#     - Redis in-memory data store.
+#     - Exposes port 6379.
+#
+#   celery:
+#     - Celery worker for background task processing.
+#     - Uses same build context and code as web service.
+#     - Depends on redis and db services.
+#
+# Volumes:
+#   impact-database_postgres_data:
+#     - Persists PostgreSQL data.
+#   minio_data:
+#     - Persists MinIO data.
 services:
   web:
     build: ./app
     container_name: fastapi_app
-    command: uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./app:/app
     ports:
@@ -14,6 +47,7 @@ services:
       - db
       - minio
       - redis
+    restart: unless-stopped
 
   db:
     image: postgis/postgis:14-3.3
@@ -25,37 +59,40 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - impact-database_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   minio:
     image: minio/minio
     container_name: minio
     command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password123
+    volumes:
+      - minio_data:/data
     ports:
       - "9000:9000"
       - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password
-    volumes:
-      - minio_data:/data
+    restart: unless-stopped
 
   redis:
-    image: redis:6
+    image: redis:7
     container_name: redis
     ports:
       - "6379:6379"
+    restart: unless-stopped
 
   celery:
     build: ./app
-    container_name: celery_worker
     command: celery -A workers.tasks worker --loglevel=info
-    volumes:
-      - ./app:/app
     depends_on:
       - redis
       - db
+    volumes:
+      - ./app:/app
+    restart: unless-stopped
 
 volumes:
-  postgres_data:
+  impact-database_postgres_data:
   minio_data:

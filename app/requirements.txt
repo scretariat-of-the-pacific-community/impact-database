@@ -11,3 +11,17 @@ psycopg2-binary
 boto3
 celery
 redis
+boto3
+Pillow
+python-dotenv
+pytest
+pytest-asyncio
+httpx
+pytest-cov
+black
+isort
+mypy
+flake8
+bandit
+
+fastapi-sqlalchemy
