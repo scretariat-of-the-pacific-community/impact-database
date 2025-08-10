@@ -15,7 +15,7 @@ test('fetches and displays metadata', async () => {
 
   render(<MetadataPreview filename="sample.jpg" />);
 
-  expect(fetch).toHaveBeenCalledWith('/api/images/sample.jpg');
+  expect(fetch).toHaveBeenCalledWith('/api/images/sample.jpg', expect.any(Object));
   await waitFor(() => screen.getByText('Sample Image'));
   expect(screen.getByText('Hazard: Flood')).toBeInTheDocument();
   expect(screen.getByText('Coordinates: 1, 2')).toBeInTheDocument();

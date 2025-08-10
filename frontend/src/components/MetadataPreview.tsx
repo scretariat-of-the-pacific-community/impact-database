@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { apiFetch } from '../utils/api';
 
 interface Metadata {
   title: string;
@@ -19,7 +20,7 @@ const MetadataPreview: React.FC<Props> = ({ filename }) => {
     if (!filename) return;
     setLoading(true);
     setError(null);
-    fetch(`/api/images/${filename}`)
+    apiFetch(`/api/images/${filename}`)
       .then((res) => {
         if (!res.ok) {
           throw new Error('Network response was not ok');

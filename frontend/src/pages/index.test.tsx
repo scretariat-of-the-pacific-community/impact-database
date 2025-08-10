@@ -16,7 +16,7 @@ test('clicking image loads metadata preview', async () => {
   render(<IndexPage />);
   fireEvent.click(screen.getByText('image1.jpg'));
 
-  expect(fetch).toHaveBeenCalledWith('/api/images/image1.jpg');
+  expect(fetch).toHaveBeenCalledWith('/api/images/image1.jpg', expect.any(Object));
   await waitFor(() => screen.getByText('Image One'));
   expect(screen.getByText('Hazard: Fire')).toBeInTheDocument();
 });
