@@ -1,0 +1,48 @@
+{
+  "filename": "example.jpg",
+  "hazard_type": "flood",
+  "location": "Port Vila, Vanuatu",
+  "timestamp": "2023-01-15T10:00:00Z",
+  "latitude": -17.7333,
+  "longitude": 168.3167,
+
+  "title": "Flood Impact Assessment - Downtown Area",
+  "abstract": "Post-event imagery showing flood damage to commercial buildings.",
+  "purpose": "Damage assessment",
+  "status": "Completed",
+  "point_of_contact": "SPC DRM Team",
+  "date_stamp": "2023-01-16T00:00:00Z",
+  "maintenance_frequency": "AsNeeded",
+
+  "geographic_bounding_box": {
+    "west": 168.30,
+    "east": 168.33,
+    "south": -17.74,
+    "north": -17.72
+  },
+  "geographic_identifier": "Port Vila",
+  "temporal_extent_start": "2023-01-15T09:00:00Z",
+  "temporal_extent_end": "2023-01-15T11:00:00Z",
+  "vertical_extent": 5.0,
+
+  "topic_category": ["environment", "imageryBaseMapsEarthCover"],
+  "keywords": ["flood", "damage"],
+  "keyword_thesaurus": "SPC Hazard Vocabulary",
+
+  "resource_locator": "http://example.com/image.jpg",
+  "format_name": "JPEG",
+  "format_version": "1.0",
+
+  "lineage_statement": "Captured with mobile phone during field survey.",
+  "source": "Field survey",
+  "positional_accuracy": 5.0,
+
+  "use_constraints": "CC-BY-SA",
+  "access_constraints": "Public",
+  "security_classification": "Unclassified",
+
+  "metadata_language": "eng",
+  "metadata_standard_name": "ISO 19115:2003",
+  "metadata_standard_version": "1.0",
+  "metadata_date": "2023-01-16T00:00:00Z"
+}
