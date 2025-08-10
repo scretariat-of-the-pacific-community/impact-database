@@ -1,13 +1,15 @@
-from typing import Optional, Dict
+from typing import Optional, Dict, Any
+from datetime import datetime
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 from io import BytesIO
+
 
 def extract_exif_metadata(file_bytes: bytes) -> Dict[str, Optional[str]]:
     result = {
         "datetime": None,
         "gps_latitude": None,
-        "gps_longitude": None
+        "gps_longitude": None,
     }
 
     try:
@@ -43,6 +45,36 @@ def extract_exif_metadata(file_bytes: bytes) -> Dict[str, Optional[str]]:
 
     return result
 
+
 def _convert_to_degrees(value):
     d, m, s = value
-    return float(d[0]/d[1]) + float(m[0]/m[1]) / 60.0 + float(s[0]/s[1]) / 3600.0
+    return float(d[0] / d[1]) + float(m[0] / m[1]) / 60.0 + float(s[0] / s[1]) / 3600.0
+
+
+def extract_gps_from_exif(path: str) -> Dict[str, Optional[Any]]:
+    result: Dict[str, Optional[Any]] = {
+        "timestamp": None,
+        "latitude": None,
+        "longitude": None,
+    }
+
+    try:
+        with open(path, "rb") as image_file:
+            file_bytes = image_file.read()
+
+        metadata = extract_exif_metadata(file_bytes)
+
+        result["latitude"] = metadata.get("gps_latitude")
+        result["longitude"] = metadata.get("gps_longitude")
+
+        dt_str = metadata.get("datetime")
+        if dt_str:
+            try:
+                result["timestamp"] = datetime.strptime(dt_str, "%Y:%m:%d %H:%M:%S")
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"EXIF extraction failed: {e}")
+
+    return result
+
