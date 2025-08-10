@@ -27,6 +27,7 @@ class ImageMetadata(Base):
     # Original fields
     hazard_type = Column(String, nullable=False)
     location = Column(String, nullable=False)
+    country = Column(String, nullable=True)
     timestamp = Column(DateTime, nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
@@ -83,6 +84,7 @@ class ImageMetadata(Base):
             'filename': self.filename,
             'hazard_type': self.hazard_type,
             'location': self.location,
+            'country': self.country,
             'timestamp': self.timestamp.isoformat() if self.timestamp else None,
             'latitude': self.latitude,
             'longitude': self.longitude,

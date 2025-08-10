@@ -1,10 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import create_engine, or_
+from sqlalchemy import create_engine, or_, inspect, text
 from typing import Optional, Dict, Any
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import sys
 from jsonschema import ValidationError
@@ -54,6 +54,15 @@ router = APIRouter()
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://impactuser:impactpass@db:5432/impactdb")
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args)
+
+# Ensure the "country" column exists; add it if missing
+with engine.begin() as conn:
+    inspector = inspect(conn)
+    if "image_metadata" in inspector.get_table_names():
+        cols = [c["name"] for c in inspector.get_columns("image_metadata")]
+        if "country" not in cols:
+            conn.execute(text("ALTER TABLE image_metadata ADD COLUMN country VARCHAR"))
+
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -88,6 +97,7 @@ async def upload_image(
     file: UploadFile = File(...),
     hazard_type: str = Form(...),
     location: str = Form(...),
+    country: Optional[str] = Form(None),
     manual_latitude: Optional[float] = Form(None),
     manual_longitude: Optional[float] = Form(None),
     title: Optional[str] = Form(None),
@@ -187,6 +197,7 @@ async def upload_image(
         filename=file.filename,
         hazard_type=hazard_type,
         location=location,
+        country=country,
         timestamp=exif_data.get("timestamp"),
         latitude=final_latitude,
         longitude=final_longitude,
@@ -214,6 +225,34 @@ async def upload_image(
         }
     )
     return response_data
+
+
+@router.get("/hazards")
+async def list_hazards(
+    hazard_type: Optional[str] = Query(None, alias="type"),
+    date: Optional[str] = Query(None),
+    country: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """List hazards with optional filtering by type, date, and country."""
+    query = db.query(ImageMetadata)
+
+    if hazard_type:
+        query = query.filter(ImageMetadata.hazard_type == hazard_type)
+
+    if country:
+        query = query.filter(ImageMetadata.country == country)
+
+    if date:
+        try:
+            start_date = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Expected YYYY-MM-DD")
+        end_date = start_date + timedelta(days=1)
+        query = query.filter(ImageMetadata.timestamp >= start_date, ImageMetadata.timestamp < end_date)
+
+    hazards = query.all()
+    return {"count": len(hazards), "hazards": [h.to_dict() for h in hazards]}
 
 @router.get("/images")
 async def list_images(
