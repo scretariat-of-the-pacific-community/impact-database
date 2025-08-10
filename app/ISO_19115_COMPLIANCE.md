@@ -103,6 +103,11 @@ curl "http://localhost:8000/api/images?access_constraints=Public"
 curl "http://localhost:8000/api/vocabularies"
 ```
 
+### Get Image Metadata
+```bash
+curl "http://localhost:8000/api/images/flood_1.jpg"
+```
+
 ## Database Migration
 
 To upgrade existing databases to ISO compliance:
