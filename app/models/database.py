@@ -62,6 +62,10 @@ class ImageMetadata(Base):
     format_name = Column(String, default="JPEG")  # gmd:name
     format_version = Column(String, default="1.0")  # gmd:version
     
+    # Thumbnail information
+    thumbnail_url = Column(String, nullable=True)  # URL to thumbnail image
+    thumbnail_key = Column(String, nullable=True)  # MinIO object key for thumbnail
+    
     # ISO 19115 Data Quality & Lineage
     lineage_statement = Column(Text, nullable=True)  # gmd:lineage
     source = Column(String, nullable=True)  # gmd:source
@@ -110,6 +114,8 @@ class ImageMetadata(Base):
             'resource_locator': self.resource_locator,
             'format_name': self.format_name,
             'format_version': self.format_version,
+            'thumbnail_url': self.thumbnail_url,
+            'thumbnail_key': self.thumbnail_key,
             'lineage_statement': self.lineage_statement,
             'source': self.source,
             'positional_accuracy': self.positional_accuracy,

@@ -280,6 +280,165 @@ paths:
                       type: integer
                   iso_compliance:
                     type: string
+  /presign/upload:
+    get:
+      summary: Generate presigned URL for file upload
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: filename
+          required: true
+          schema:
+            type: string
+          description: Name of the file to upload
+        - in: query
+          name: content_type
+          schema:
+            type: string
+          description: MIME type of the file
+        - in: query
+          name: expires_in
+          schema:
+            type: integer
+            minimum: 60
+            maximum: 604800
+            default: 3600
+          description: URL expiration time in seconds
+      responses:
+        '200':
+          description: Presigned upload URL and form data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedUploadResponse'
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Authentication required
+  /presign/download:
+    get:
+      summary: Generate presigned URL for file download
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: object_key
+          required: true
+          schema:
+            type: string
+          description: Object key of the file to download
+        - in: query
+          name: expires_in
+          schema:
+            type: integer
+            minimum: 60
+            maximum: 604800
+            default: 3600
+          description: URL expiration time in seconds
+        - in: query
+          name: response_content_disposition
+          schema:
+            type: string
+          description: Content-Disposition header value for download
+      responses:
+        '200':
+          description: Presigned download URL and metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignedDownloadResponse'
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Authentication required
+        '404':
+          description: Object not found
+  /presign/upload/multipart/initiate:
+    get:
+      summary: Initiate multipart upload for large files
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: filename
+          required: true
+          schema:
+            type: string
+          description: Name of the file for multipart upload
+        - in: query
+          name: content_type
+          schema:
+            type: string
+          description: MIME type of the file
+      responses:
+        '200':
+          description: Multipart upload initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultipartInitiateResponse'
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Authentication required
+  /presign/upload/multipart/part:
+    get:
+      summary: Generate presigned URL for multipart upload part
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: object_key
+          required: true
+          schema:
+            type: string
+          description: Object key from multipart initiation
+        - in: query
+          name: upload_id
+          required: true
+          schema:
+            type: string
+          description: Upload ID from multipart initiation
+        - in: query
+          name: part_number
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10000
+          description: Part number for the upload
+        - in: query
+          name: expires_in
+          schema:
+            type: integer
+            minimum: 60
+            maximum: 604800
+            default: 3600
+          description: URL expiration time in seconds
+      responses:
+        '200':
+          description: Presigned URL for part upload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MultipartPartResponse'
+        '400':
+          description: Invalid request parameters
+        '401':
+          description: Authentication required
+  /presign/health:
+    get:
+      summary: Health check for presign service
+      responses:
+        '200':
+          description: Presign service status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignHealthResponse'
+        '503':
+          description: Service unhealthy
 components:
   securitySchemes:
     BearerAuth:
@@ -356,3 +515,160 @@ components:
       required:
         - access_token
         - token_type
+    PresignedUploadResponse:
+      type: object
+      properties:
+        upload_url:
+          type: string
+          description: URL for uploading the file
+        fields:
+          type: object
+          description: Form fields required for the upload
+        object_key:
+          type: string
+          description: Object key for the uploaded file
+        bucket_name:
+          type: string
+          description: MinIO bucket name
+        expires_in:
+          type: integer
+          description: URL expiration time in seconds
+        max_file_size:
+          type: integer
+          description: Maximum allowed file size
+        instructions:
+          type: object
+          properties:
+            method:
+              type: string
+              example: POST
+            enctype:
+              type: string
+              example: multipart/form-data
+            note:
+              type: string
+      required:
+        - upload_url
+        - fields
+        - object_key
+        - bucket_name
+        - expires_in
+    PresignedDownloadResponse:
+      type: object
+      properties:
+        download_url:
+          type: string
+          description: URL for downloading the file
+        object_key:
+          type: string
+          description: Object key of the file
+        bucket_name:
+          type: string
+          description: MinIO bucket name
+        expires_in:
+          type: integer
+          description: URL expiration time in seconds
+        file_size:
+          type: integer
+          description: Size of the file in bytes
+        content_type:
+          type: string
+          description: MIME type of the file
+        last_modified:
+          type: string
+          format: date-time
+          description: Last modification time
+        etag:
+          type: string
+          description: ETag of the file
+        instructions:
+          type: object
+          properties:
+            method:
+              type: string
+              example: GET
+            note:
+              type: string
+      required:
+        - download_url
+        - object_key
+        - bucket_name
+        - expires_in
+    MultipartInitiateResponse:
+      type: object
+      properties:
+        upload_id:
+          type: string
+          description: Unique identifier for the multipart upload
+        object_key:
+          type: string
+          description: Object key for the upload
+        bucket_name:
+          type: string
+          description: MinIO bucket name
+        instructions:
+          type: object
+          properties:
+            note:
+              type: string
+            next_step:
+              type: string
+      required:
+        - upload_id
+        - object_key
+        - bucket_name
+    MultipartPartResponse:
+      type: object
+      properties:
+        upload_url:
+          type: string
+          description: URL for uploading the part
+        object_key:
+          type: string
+          description: Object key for the upload
+        upload_id:
+          type: string
+          description: Multipart upload ID
+        part_number:
+          type: integer
+          description: Part number
+        expires_in:
+          type: integer
+          description: URL expiration time in seconds
+        instructions:
+          type: object
+          properties:
+            method:
+              type: string
+              example: PUT
+            note:
+              type: string
+      required:
+        - upload_url
+        - object_key
+        - upload_id
+        - part_number
+        - expires_in
+    PresignHealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        minio_endpoint:
+          type: string
+        bucket_name:
+          type: string
+        bucket_exists:
+          type: boolean
+        max_file_size:
+          type: integer
+        allowed_extensions:
+          type: array
+          items:
+            type: string
+      required:
+        - status
+        - minio_endpoint
+        - bucket_name
+        - bucket_exists

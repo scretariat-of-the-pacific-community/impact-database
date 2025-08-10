@@ -81,16 +81,17 @@ const withPWA = require('next-pwa')({
 });
 
 const nextConfig = {
-  experimental: {
-    appDir: true,
-  },
   env: {
     NEXT_PUBLIC_API_URL: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api`,
   },
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', '127.0.0.1', '0.0.0.0'],
     unoptimized: true
-  }
+  },
+  // Fix cross-origin warnings in development
+  allowedDevOrigins: ['127.0.0.1'],
+  // Enable strict mode for better performance
+  reactStrictMode: true,
 };
 
 module.exports = withPWA(nextConfig);

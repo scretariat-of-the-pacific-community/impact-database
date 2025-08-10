@@ -1,3 +1,5 @@
+version: '3.8'
+
 # This docker-compose.yml file defines a multi-service environment for the Impact Database project.
 #
 # Services:
@@ -41,75 +43,146 @@
 #     - Persists PostgreSQL data.
 #   minio_data:
 #     - Persists MinIO data.
-services:
-  web:
-    build: ./app
-    container_name: fastapi_app
-    volumes:
-      - ./app:/app
-    ports:
-      - "8000:8000"
-    depends_on:
-      - db
-      - minio
-      - redis
-    restart: unless-stopped
 
-  db:
-    image: postgis/postgis:14-3.3
-    container_name: postgis_db
+
+services:
+  postgis_db:
+    image: postgis/postgis:14-3.2
     environment:
-      POSTGRES_DB: impactdb
-      POSTGRES_USER: impactuser
-      POSTGRES_PASSWORD: impactpass
+      POSTGRES_DB: impact_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
     ports:
       - "5432:5432"
     volumes:
-      - impact-database_postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - impact-network
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - impact-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
 
   minio:
-    image: minio/minio
-    container_name: minio
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: password123
-    volumes:
-      - minio_data:/data
+    image: minio/minio:latest
     ports:
       - "9000:9000"
       - "9001:9001"
-    restart: unless-stopped
-
-  redis:
-    image: redis:7
-    container_name: redis
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-
-  celery:
-    build: ./app
-    command: celery -A workers.tasks worker --loglevel=info
-    depends_on:
-      - redis
-      - db
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
     volumes:
-      - ./app:/app
-    restart: unless-stopped
+      - minio_data:/data
+    networks:
+      - impact-network
+    command: server /data --console-address ":9001"
 
-  frontend:
-    build:
-      context: ./frontend
+  web:
+    build: 
+      context: ./app
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "8000:8000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - DATABASE_URL=postgresql://postgres:password@postgis_db:5432/impact_db
+      - REDIS_URL=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_SECURE=false
+      - MINIO_BUCKET_NAME=impact-images
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - MAX_FILE_SIZE=52428800
     depends_on:
-      - web
+      - postgis_db
+      - redis
+      - minio
+    networks:
+      - impact-network
+    volumes:
+      - ./app:/app
+    command: uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
+
+  celery_worker:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgis_db:5432/impact_db
+      - REDIS_URL=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_SECURE=false
+      - MINIO_BUCKET_NAME=impact-images
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - SECRET_KEY=dev-secret-key-change-in-production
+    depends_on:
+      - postgis_db
+      - redis
+      - minio
+    networks:
+      - impact-network
+    volumes:
+      - ./app:/app
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=2
+
+  celery_beat:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@postgis_db:5432/impact_db
+      - REDIS_URL=redis://redis:6379/0
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_SECURE=false
+      - MINIO_BUCKET_NAME=impact-images
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - SECRET_KEY=dev-secret-key-change-in-production
+    depends_on:
+      - postgis_db
+      - redis
+      - minio
+    networks:
+      - impact-network
+    volumes:
+      - ./app:/app
+    command: celery -A workers.celery_app beat --loglevel=info
+
+  flower:
+    build:
+      context: ./app
+      dockerfile: Dockerfile
+    ports:
+      - "5555:5555"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=development
+    depends_on:
+      - redis
+    networks:
+      - impact-network
+    volumes:
+      - ./app:/app
+    command: celery -A workers.celery_app flower --port=5555
 
 volumes:
-  impact-database_postgres_data:
+  postgres_data:
+  redis_data:
   minio_data:
+
+networks:
+  impact-network:
+    driver: bridge

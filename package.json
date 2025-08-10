@@ -9,6 +9,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "@types/minimatch": "^6.0.0",
     "@types/node": "^24.2.1"
   }
 }
