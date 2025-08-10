@@ -79,3 +79,29 @@ def test_validate_metadata_title_i18n_non_string_value():
     }
     with pytest.raises(ValidationError):
         validate_metadata(metadata)
+
+
+def test_validate_metadata_multilingual_fields():
+    metadata = {
+        "filename": "image.jpg",
+        "hazard_type": list(HAZARD_TYPES.keys())[0],
+        "location": "Test Location",
+        "timestamp": datetime.utcnow().isoformat(),
+        "title_i18n": {"eng": "Title", "fra": "Titre"},
+        "abstract_i18n": {"eng": "Desc", "fra": "Description"},
+        "purpose_i18n": {"eng": "Purpose", "fra": "But"},
+        "keywords_i18n": {"eng": ["flood"], "fra": ["inondation"]},
+    }
+    validate_metadata(metadata)
+
+
+def test_validate_metadata_keywords_i18n_invalid_code():
+    metadata = {
+        "filename": "image.jpg",
+        "hazard_type": list(HAZARD_TYPES.keys())[0],
+        "location": "Test Location",
+        "timestamp": datetime.utcnow().isoformat(),
+        "keywords_i18n": {"english": ["flood"]},
+    }
+    with pytest.raises(ValidationError):
+        validate_metadata(metadata)
