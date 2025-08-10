@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft/2020-12/schema",
+  "title": "Image Metadata",
+  "type": "object",
+  "properties": {
+    "filename": {"type": "string"},
+    "hazard_type": {"type": "string", "enum": []},
+    "location": {"type": "string"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "status": {"type": "string", "enum": []},
+    "maintenance_frequency": {"type": "string", "enum": []},
+    "capture_method": {"type": "string", "enum": []},
+    "access_constraints": {"type": "string", "enum": []},
+    "security_classification": {"type": "string", "enum": []}
+  },
+  "required": ["filename", "hazard_type", "location", "timestamp"],
+  "additionalProperties": false
+}
