@@ -280,12 +280,39 @@ async def list_images(
             query = query.filter(
                 or_(ImageMetadata.latitude.is_(None), ImageMetadata.longitude.is_(None))
             )
-    
+
     images = query.all()
     return {
         "count": len(images),
         "images": [img.to_dict() for img in images],
     }
+
+
+@router.get("/geojson")
+async def get_geojson(db: Session = Depends(get_db)):
+    """Return image metadata as GeoJSON FeatureCollection for entries with coordinates."""
+    images = db.query(ImageMetadata).filter(
+        ImageMetadata.latitude.isnot(None),
+        ImageMetadata.longitude.isnot(None)
+    ).all()
+
+    features = []
+    for img in images:
+        props = img.to_dict()
+        props.pop("latitude", None)
+        props.pop("longitude", None)
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [img.longitude, img.latitude],
+                },
+                "properties": props,
+            }
+        )
+
+    return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/images/{filename}")
