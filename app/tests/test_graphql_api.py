@@ -1,23 +1,27 @@
-import os
-import sys
 import json
-from datetime import datetime
+import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
+# Ensure repository root is on sys.path for fixture import
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+# Reuse the REST API fixture to seed the database
+from app.tests.test_hazards_endpoint import client as seeded_client
+
 
 @pytest.fixture
-def client(tmp_path):
-    os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path}/test.db"
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+def client(seeded_client):
+    _ = seeded_client  # trigger fixture for DB setup
+
+    # Replace the GraphQL router with file upload support
     from core.main import app
     from api.graphql_schema import schema, get_context
     from strawberry.fastapi import GraphQLRouter
     from fastapi.routing import APIRoute
 
-    # replace GraphQL router with file upload support
     app.router.routes = [
         r for r in app.router.routes if not (isinstance(r, APIRoute) and r.path == "/graphql")
     ]
@@ -26,48 +30,7 @@ def client(tmp_path):
         prefix="/graphql",
     )
 
-    os.makedirs("/app/uploads", exist_ok=True)
-    client = TestClient(app)
-
-    from models.database import SessionLocal, Base, ImageMetadata
-
-    session = SessionLocal()
-    Base.metadata.drop_all(bind=session.get_bind())
-    Base.metadata.create_all(bind=session.get_bind())
-
-    entries = [
-        ImageMetadata(
-            filename="img1.jpg",
-            hazard_type="flood",
-            location="Location1",
-            country="USA",
-            timestamp=datetime(2021, 1, 1),
-            latitude=10.0,
-            longitude=20.0,
-        ),
-        ImageMetadata(
-            filename="img2.jpg",
-            hazard_type="cyclone",
-            location="Location2",
-            country="USA",
-            timestamp=datetime(2021, 1, 2),
-        ),
-        ImageMetadata(
-            filename="img3.jpg",
-            hazard_type="flood",
-            location="Location3",
-            country="CAN",
-            timestamp=datetime(2021, 1, 1),
-            latitude=11.0,
-            longitude=21.0,
-        ),
-    ]
-
-    session.add_all(entries)
-    session.commit()
-    session.close()
-
-    return client
+    return TestClient(app)
 
 
 def graphql(client: TestClient, query: str, variables: dict | None = None):
