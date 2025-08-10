@@ -10,6 +10,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from api import upload
+from api.graphql_schema import graphql_router
 
 app = FastAPI(
     title="Impact Database API",
@@ -28,6 +29,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(graphql_router, prefix="/graphql", tags=["graphql"])
 
 
 @app.get("/")
