@@ -1,0 +1,260 @@
+openapi: 3.1.0
+info:
+  title: Impact Database API
+  version: 1.0.0
+  description: API for uploading and querying hazard-related images and metadata.
+servers:
+  - url: http://localhost:8000
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  timestamp:
+                    type: string
+                    format: date-time
+  /vocabularies:
+    get:
+      summary: Get supported vocabularies
+      responses:
+        '200':
+          description: Controlled vocabularies for metadata fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hazard_types:
+                    type: array
+                    items:
+                      type: string
+                  status_values:
+                    type: array
+                    items:
+                      type: string
+                  maintenance_frequency:
+                    type: array
+                    items:
+                      type: string
+                  capture_methods:
+                    type: array
+                    items:
+                      type: string
+                  access_constraints:
+                    type: array
+                    items:
+                      type: string
+                  security_classifications:
+                    type: array
+                    items:
+                      type: string
+                  language_codes:
+                    type: array
+                    items:
+                      type: string
+                  iso_enabled:
+                    type: boolean
+  /upload:
+    post:
+      summary: Upload an image with metadata
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+                - hazard_type
+                - location
+              properties:
+                file:
+                  type: string
+                  format: binary
+                hazard_type:
+                  type: string
+                location:
+                  type: string
+                manual_latitude:
+                  type: number
+                manual_longitude:
+                  type: number
+                title:
+                  type: string
+                title_i18n:
+                  type: object
+                  additionalProperties:
+                    type: string
+                abstract:
+                  type: string
+                abstract_i18n:
+                  type: object
+                  additionalProperties:
+                    type: string
+                purpose:
+                  type: string
+                purpose_i18n:
+                  type: object
+                  additionalProperties:
+                    type: string
+                keywords:
+                  type: array
+                  items:
+                    type: string
+                keywords_i18n:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items:
+                      type: string
+                metadata_language:
+                  type: string
+      responses:
+        '200':
+          description: Upload success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageMetadata'
+        '400':
+          description: Validation error
+  /images:
+    get:
+      summary: List images
+      parameters:
+        - in: query
+          name: hazard_type
+          schema:
+            type: string
+        - in: query
+          name: location
+          schema:
+            type: string
+        - in: query
+          name: has_coordinates
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  images:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImageMetadata'
+  /images/{filename}:
+    get:
+      summary: Get single image metadata
+      parameters:
+        - in: path
+          name: filename
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Image metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageMetadata'
+        '404':
+          description: Image not found
+  /statistics:
+    get:
+      summary: Get database statistics
+      responses:
+        '200':
+          description: Overview of stored images
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_images:
+                    type: integer
+                  images_with_coordinates:
+                    type: integer
+                  coordinate_coverage:
+                    type: string
+                  hazard_type_distribution:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                  iso_compliance:
+                    type: string
+components:
+  schemas:
+    ImageMetadata:
+      type: object
+      properties:
+        filename:
+          type: string
+        hazard_type:
+          type: string
+        location:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        title_i18n:
+          type: object
+          additionalProperties:
+            type: string
+        abstract:
+          type: string
+          nullable: true
+        abstract_i18n:
+          type: object
+          additionalProperties:
+            type: string
+        purpose:
+          type: string
+          nullable: true
+        purpose_i18n:
+          type: object
+          additionalProperties:
+            type: string
+        keywords:
+          type: array
+          items:
+            type: string
+        keywords_i18n:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+        metadata_language:
+          type: string
+      required:
+        - filename
+        - hazard_type
+        - location
+        - timestamp
+        - metadata_language
