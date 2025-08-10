@@ -33,8 +33,11 @@ class ImageMetadata(Base):
     
     # ISO 19115 Identification Information
     title = Column(String, nullable=True)  # gmd:title
+    title_i18n = Column(JSON, nullable=True)  # title translations keyed by ISO 639-2 codes
     abstract = Column(Text, nullable=True)  # gmd:abstract
+    abstract_i18n = Column(JSON, nullable=True)  # abstract translations
     purpose = Column(String, nullable=True)  # gmd:purpose
+    purpose_i18n = Column(JSON, nullable=True)  # purpose translations
     status = Column(String, default="Completed")  # gmd:status
     point_of_contact = Column(String, nullable=True)  # gmd:pointOfContact
     date_stamp = Column(DateTime, default=datetime.utcnow)  # gmd:dateStamp
@@ -50,6 +53,7 @@ class ImageMetadata(Base):
     # ISO 19115 Content Information
     topic_category = Column(JSON, default=["environment", "disaster", "imageryBaseMapsEarthCover"])  # gmd:topicCategory
     keywords = Column(JSON, nullable=True)  # gmd:descriptiveKeywords
+    keywords_i18n = Column(JSON, nullable=True)  # keyword translations keyed by ISO 639-2 codes
     keyword_thesaurus = Column(String, default="SPC Hazard Vocabulary")  # gmd:thesaurusName
     
     # ISO 19115 Distribution Information
@@ -83,8 +87,11 @@ class ImageMetadata(Base):
             'latitude': self.latitude,
             'longitude': self.longitude,
             'title': self.title,
+            'title_i18n': self.title_i18n,
             'abstract': self.abstract,
+            'abstract_i18n': self.abstract_i18n,
             'purpose': self.purpose,
+            'purpose_i18n': self.purpose_i18n,
             'status': self.status,
             'point_of_contact': self.point_of_contact,
             'date_stamp': self.date_stamp.isoformat() if self.date_stamp else None,
@@ -96,6 +103,7 @@ class ImageMetadata(Base):
             'vertical_extent': self.vertical_extent,
             'topic_category': self.topic_category,
             'keywords': self.keywords,
+            'keywords_i18n': self.keywords_i18n,
             'keyword_thesaurus': self.keyword_thesaurus,
             'resource_locator': self.resource_locator,
             'format_name': self.format_name,

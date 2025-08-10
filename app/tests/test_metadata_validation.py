@@ -18,6 +18,7 @@ def test_validate_metadata_valid():
         "hazard_type": list(HAZARD_TYPES.keys())[0],
         "location": "Test Location",
         "timestamp": datetime.utcnow().isoformat(),
+        "metadata_language": "eng",
     }
     validate_metadata(metadata)  # Should not raise
 
@@ -27,6 +28,7 @@ def test_validate_metadata_missing_field():
         "filename": "image.jpg",
         "hazard_type": list(HAZARD_TYPES.keys())[0],
         "timestamp": datetime.utcnow().isoformat(),
+        "metadata_language": "eng",
     }
     with pytest.raises(ValidationError):
         validate_metadata(metadata)
@@ -38,6 +40,7 @@ def test_validate_metadata_invalid_enum():
         "hazard_type": "invalid",
         "location": "Test Location",
         "timestamp": datetime.utcnow().isoformat(),
+        "metadata_language": "eng",
     }
     with pytest.raises(ValidationError):
         validate_metadata(metadata)
