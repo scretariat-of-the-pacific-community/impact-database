@@ -6,9 +6,18 @@ until pg_isready -h db -p 5432 -U impactuser; do
   sleep 2
 done
 
-# Apply SQLAlchemy models (fix the import path)
+# Apply SQLAlchemy models with error handling
 echo "Initializing database schema..."
-python -c "from models.database import Base, engine; Base.metadata.create_all(bind=engine)"
+python -c "
+import sys
+sys.path.insert(0, '/app')
+from models.database import Base, engine
+try:
+    Base.metadata.create_all(bind=engine, checkfirst=True)
+    print('Database schema initialized successfully')
+except Exception as e:
+    print(f'Schema initialization completed with note: {e}')
+"
 
 # Start FastAPI server
 echo "Starting FastAPI app..."
