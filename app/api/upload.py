@@ -51,8 +51,9 @@ except ImportError:
 router = APIRouter()
 
 # Database setup
-DATABASE_URL = "postgresql://impactuser:impactpass@db:5432/impactdb"
-engine = create_engine(DATABASE_URL)
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://impactuser:impactpass@db:5432/impactdb")
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+engine = create_engine(DATABASE_URL, connect_args=connect_args)
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -246,6 +247,14 @@ async def list_images(
         "count": len(images),
         "images": [img.to_dict() for img in images],
     }
+
+
+@router.get("/images/{filename}")
+async def get_image(filename: str, db: Session = Depends(get_db)):
+    img = db.query(ImageMetadata).filter(ImageMetadata.filename == filename).first()
+    if not img:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return img.to_dict()
 
 @router.get("/statistics")
 async def get_statistics(db: Session = Depends(get_db)):
