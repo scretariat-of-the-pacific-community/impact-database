@@ -7,12 +7,14 @@ import shutil
 from datetime import datetime
 import json
 import sys
+from jsonschema import ValidationError
 
 # Add the app directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.database import ImageMetadata, Base
 from api.services.exif_utils import extract_gps_from_exif
+from api.services.metadata_validation import validate_metadata
 
 # Import ISO vocabulary if available
 try:
@@ -111,11 +113,23 @@ async def upload_image(
     
     # Extract EXIF data
     exif_data = extract_gps_from_exif(file_path)
-    
+
     # Use manual coordinates if provided, otherwise use EXIF
     final_latitude = manual_latitude if manual_latitude is not None else exif_data.get("latitude")
     final_longitude = manual_longitude if manual_longitude is not None else exif_data.get("longitude")
-    
+
+    metadata = {
+        "filename": file.filename,
+        "hazard_type": hazard_type,
+        "location": location,
+        "timestamp": exif_data.get("timestamp").isoformat() if exif_data.get("timestamp") else datetime.utcnow().isoformat(),
+    }
+
+    try:
+        validate_metadata(metadata)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=e.message)
+
     # Create database record
     image_metadata = ImageMetadata(
         filename=file.filename,
