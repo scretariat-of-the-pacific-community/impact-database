@@ -19,8 +19,13 @@ from api.services.metadata_validation import validate_metadata
 # Import ISO vocabulary if available
 try:
     from api.services.iso_vocabulary import (
-        HAZARD_TYPES, STATUS_VALUES, MAINTENANCE_FREQUENCY, 
-        CAPTURE_METHODS, ACCESS_CONSTRAINTS, SECURITY_CLASSIFICATIONS
+        HAZARD_TYPES,
+        STATUS_VALUES,
+        MAINTENANCE_FREQUENCY,
+        CAPTURE_METHODS,
+        ACCESS_CONSTRAINTS,
+        SECURITY_CLASSIFICATIONS,
+        LANGUAGE_CODES,
     )
     ISO_ENABLED = True
 except ImportError:
@@ -40,6 +45,7 @@ except ImportError:
     CAPTURE_METHODS = ["Mobile phone camera", "Digital camera", "Drone/UAV"]
     ACCESS_CONSTRAINTS = ["Public", "Restricted"]
     SECURITY_CLASSIFICATIONS = ["Unclassified", "Restricted"]
+    LANGUAGE_CODES = ["eng"]
     ISO_ENABLED = False
 
 router = APIRouter()
@@ -72,7 +78,8 @@ async def get_vocabularies():
         "capture_methods": CAPTURE_METHODS,
         "access_constraints": ACCESS_CONSTRAINTS,
         "security_classifications": SECURITY_CLASSIFICATIONS,
-        "iso_enabled": ISO_ENABLED
+        "language_codes": LANGUAGE_CODES,
+        "iso_enabled": ISO_ENABLED,
     }
 
 @router.post("/upload")

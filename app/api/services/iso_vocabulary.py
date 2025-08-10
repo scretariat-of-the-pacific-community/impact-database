@@ -26,39 +26,190 @@ ISO_TOPIC_CATEGORIES = [
 ]
 
 # SPC Hazard Vocabulary - aligned with international standards
+# Supported ISO 639-2 language codes
+LANGUAGE_CODES = ["eng", "fra"]
+
 HAZARD_TYPES = {
     "cyclone": {
-        "keywords": ["tropical cyclone", "hurricane", "typhoon", "storm surge", "wind damage"],
-        "topic_categories": ["climatologyMeteorologyAtmosphere", "environment"]
+        "name": {
+            "eng": "Cyclone",
+            "fra": "Cyclone",
+        },
+        "keywords": {
+            "eng": [
+                "tropical cyclone",
+                "hurricane",
+                "typhoon",
+                "storm surge",
+                "wind damage",
+            ],
+            "fra": [
+                "cyclone tropical",
+                "ouragan",
+                "typhon",
+                "onde de tempête",
+                "dommages causés par le vent",
+            ],
+        },
+        "topic_categories": ["climatologyMeteorologyAtmosphere", "environment"],
     },
     "flood": {
-        "keywords": ["flooding", "inundation", "riverine flood", "coastal flood", "flash flood"],
-        "topic_categories": ["inlandWaters", "environment"]
+        "name": {
+            "eng": "Flood",
+            "fra": "Inondation",
+        },
+        "keywords": {
+            "eng": [
+                "flooding",
+                "inundation",
+                "riverine flood",
+                "coastal flood",
+                "flash flood",
+            ],
+            "fra": [
+                "inondation",
+                "submersion",
+                "crue fluviale",
+                "inondation côtière",
+                "crue éclair",
+            ],
+        },
+        "topic_categories": ["inlandWaters", "environment"],
     },
     "drought": {
-        "keywords": ["drought", "water scarcity", "agricultural drought", "meteorological drought"],
-        "topic_categories": ["climatologyMeteorologyAtmosphere", "farming", "environment"]
+        "name": {
+            "eng": "Drought",
+            "fra": "Sécheresse",
+        },
+        "keywords": {
+            "eng": [
+                "drought",
+                "water scarcity",
+                "agricultural drought",
+                "meteorological drought",
+            ],
+            "fra": [
+                "sécheresse",
+                "pénurie d'eau",
+                "sécheresse agricole",
+                "sécheresse météorologique",
+            ],
+        },
+        "topic_categories": [
+            "climatologyMeteorologyAtmosphere",
+            "farming",
+            "environment",
+        ],
     },
     "landslide": {
-        "keywords": ["landslide", "mass movement", "slope failure", "debris flow"],
-        "topic_categories": ["geoscientificInformation", "environment"]
+        "name": {
+            "eng": "Landslide",
+            "fra": "Glissement de terrain",
+        },
+        "keywords": {
+            "eng": [
+                "landslide",
+                "mass movement",
+                "slope failure",
+                "debris flow",
+            ],
+            "fra": [
+                "glissement de terrain",
+                "mouvement de masse",
+                "rupture de pente",
+                "coulée de débris",
+            ],
+        },
+        "topic_categories": ["geoscientificInformation", "environment"],
     },
     "tsunami": {
-        "keywords": ["tsunami", "seismic sea wave", "coastal inundation", "wave damage"],
-        "topic_categories": ["oceans", "geoscientificInformation", "environment"]
+        "name": {
+            "eng": "Tsunami",
+            "fra": "Tsunami",
+        },
+        "keywords": {
+            "eng": [
+                "tsunami",
+                "seismic sea wave",
+                "coastal inundation",
+                "wave damage",
+            ],
+            "fra": [
+                "tsunami",
+                "vague sismique",
+                "inondation côtière",
+                "dommages causés par les vagues",
+            ],
+        },
+        "topic_categories": [
+            "oceans",
+            "geoscientificInformation",
+            "environment",
+        ],
     },
     "earthquake": {
-        "keywords": ["earthquake", "seismic activity", "ground shaking", "structural damage"],
-        "topic_categories": ["geoscientificInformation", "environment"]
+        "name": {
+            "eng": "Earthquake",
+            "fra": "Tremblement de terre",
+        },
+        "keywords": {
+            "eng": [
+                "earthquake",
+                "seismic activity",
+                "ground shaking",
+                "structural damage",
+            ],
+            "fra": [
+                "tremblement de terre",
+                "activité sismique",
+                "secousses du sol",
+                "dommages structurels",
+            ],
+        },
+        "topic_categories": ["geoscientificInformation", "environment"],
     },
     "volcano": {
-        "keywords": ["volcanic eruption", "lava flow", "ash fall", "pyroclastic flow"],
-        "topic_categories": ["geoscientificInformation", "environment"]
+        "name": {
+            "eng": "Volcano",
+            "fra": "Volcan",
+        },
+        "keywords": {
+            "eng": [
+                "volcanic eruption",
+                "lava flow",
+                "ash fall",
+                "pyroclastic flow",
+            ],
+            "fra": [
+                "éruption volcanique",
+                "coulée de lave",
+                "retombée de cendres",
+                "coulée pyroclastique",
+            ],
+        },
+        "topic_categories": ["geoscientificInformation", "environment"],
     },
     "wildfire": {
-        "keywords": ["wildfire", "bushfire", "forest fire", "vegetation fire"],
-        "topic_categories": ["biota", "environment"]
-    }
+        "name": {
+            "eng": "Wildfire",
+            "fra": "Feu de forêt",
+        },
+        "keywords": {
+            "eng": [
+                "wildfire",
+                "bushfire",
+                "forest fire",
+                "vegetation fire",
+            ],
+            "fra": [
+                "feu de forêt",
+                "feu de brousse",
+                "incendie de forêt",
+                "feu de végétation",
+            ],
+        },
+        "topic_categories": ["biota", "environment"],
+    },
 }
 
 # ISO 19115 Status values
@@ -122,9 +273,22 @@ SECURITY_CLASSIFICATIONS = [
     "TopSecret"
 ]
 
-def get_hazard_keywords(hazard_type: str) -> list:
+def get_hazard_name(hazard_type: str, language: str = "eng") -> str:
+    """Get the localized hazard name"""
+    return (
+        HAZARD_TYPES.get(hazard_type, {})
+        .get("name", {})
+        .get(language, hazard_type)
+    )
+
+
+def get_hazard_keywords(hazard_type: str, language: str = "eng") -> list:
     """Get ISO-compliant keywords for a hazard type"""
-    return HAZARD_TYPES.get(hazard_type, {}).get("keywords", [])
+    return (
+        HAZARD_TYPES.get(hazard_type, {})
+        .get("keywords", {})
+        .get(language, [])
+    )
 
 def get_hazard_topic_categories(hazard_type: str) -> list:
     """Get ISO topic categories for a hazard type"""
@@ -156,5 +320,5 @@ def generate_iso_abstract(hazard_type: str, location: str, timestamp, purpose: s
     
     if purpose:
         base_abstract += f" Purpose: {purpose}."
-        
+
     return base_abstract
