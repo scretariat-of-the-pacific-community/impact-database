@@ -13,7 +13,11 @@ import uvicorn
 import json
 
 from core.config import settings
-from api import upload, auth, graphql_schema, presign, curation, admin
+from api import upload, auth, graphql_schema, presign, curation, admin, stac, ogc_records
+from services.monitoring import setup_monitoring, monitoring_background_tasks
+from services.performance import initialize_performance_optimizations
+from services.minio_lifecycle import setup_minio_lifecycle_and_backup
+import asyncio
 
 # Configure logging
 logging.basicConfig(
@@ -26,7 +30,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
-    description=settings.DESCRIPTION,
+    description=settings.DESCRIPTION + " - Enhanced with STAC and OGC API - Records support",
     debug=settings.DEBUG,
     openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
 )
@@ -47,6 +51,38 @@ app.include_router(graphql_schema.router, prefix="/graphql", tags=["graphql"])
 app.include_router(presign.router, prefix="/presign", tags=["presign"])
 app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+
+# STAC and OGC API - Records
+app.include_router(stac.router, prefix="/stac", tags=["stac"])
+app.include_router(ogc_records.router, prefix="/ogc", tags=["ogc-records"])
+
+# Setup monitoring
+setup_monitoring(app)
+
+# Application startup event
+@app.on_event("startup")
+async def startup_event():
+    """Initialize application on startup"""
+    try:
+        # Initialize database and performance optimizations
+        from models.database import get_db
+        db = next(get_db())
+        await initialize_performance_optimizations(db)
+        
+        # Setup MinIO lifecycle and backup policies
+        setup_minio_lifecycle_and_backup()
+        
+        # Start background monitoring tasks
+        asyncio.create_task(monitoring_background_tasks())
+        
+        logger.info(f"{settings.PROJECT_NAME} started successfully")
+        logger.info("STAC API available at /stac")
+        logger.info("OGC API - Records available at /ogc")
+        logger.info("Monitoring endpoints available at /health, /metrics")
+        
+    except Exception as e:
+        logger.error(f"Startup error: {e}")
+        # Don't raise exception to allow app to start even if some features fail
 
 
 @app.get("/")
