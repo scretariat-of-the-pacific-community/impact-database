@@ -79,4 +79,5 @@ export const imageApi = {
   getMetadata: (filename: string) => {
     return apiClient.get(`/images/${encodeURIComponent(filename)}/metadata`);
   },
+  vocabularies: () => apiClient.get('/vocabularies'),
 };
