@@ -7,8 +7,20 @@
   "longitude": 168.3167,
 
   "title": "Flood Impact Assessment - Downtown Area",
+  "title_i18n": {
+    "eng": "Flood Impact Assessment - Downtown Area",
+    "fra": "\u00c9valuation des impacts d'inondation - centre-ville"
+  },
   "abstract": "Post-event imagery showing flood damage to commercial buildings.",
+  "abstract_i18n": {
+    "eng": "Post-event imagery showing flood damage to commercial buildings.",
+    "fra": "Imagerie post-\u00e9v\u00e9nement montrant les d\u00e9g\u00e2ts d'inondation sur les b\u00e2timents commerciaux."
+  },
   "purpose": "Damage assessment",
+  "purpose_i18n": {
+    "eng": "Damage assessment",
+    "fra": "\u00c9valuation des dommages"
+  },
   "status": "Completed",
   "point_of_contact": "SPC DRM Team",
   "date_stamp": "2023-01-16T00:00:00Z",
@@ -27,6 +39,10 @@
 
   "topic_category": ["environment", "imageryBaseMapsEarthCover"],
   "keywords": ["flood", "damage"],
+  "keywords_i18n": {
+    "eng": ["flood", "damage"],
+    "fra": ["inondation", "d\u00e9g\u00e2ts"]
+  },
   "keyword_thesaurus": "SPC Hazard Vocabulary",
 
   "resource_locator": "http://example.com/image.jpg",
