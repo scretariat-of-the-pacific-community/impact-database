@@ -7,12 +7,46 @@
     "hazard_type": {"type": "string", "enum": []},
     "location": {"type": "string"},
     "timestamp": {"type": "string", "format": "date-time"},
+    "title": {"type": "string"},
+    "title_i18n": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "abstract": {"type": "string"},
+    "abstract_i18n": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
+    "purpose": {"type": "string"},
+    "purpose_i18n": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    },
     "status": {"type": "string", "enum": []},
     "maintenance_frequency": {"type": "string", "enum": []},
     "capture_method": {"type": "string", "enum": []},
     "access_constraints": {"type": "string", "enum": []},
-    "security_classification": {"type": "string", "enum": []}
+    "security_classification": {"type": "string", "enum": []},
+    "keywords": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "keywords_i18n": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {"type": "string"}
+      }
+    },
+    "metadata_language": {"type": "string"}
   },
   "required": ["filename", "hazard_type", "location", "timestamp"],
+  "anyOf": [
+    {"required": ["metadata_language"]},
+    {"required": ["title_i18n"]},
+    {"required": ["abstract_i18n"]},
+    {"required": ["purpose_i18n"]},
+    {"required": ["keywords_i18n"]}
+  ],
   "additionalProperties": false
 }
