@@ -76,7 +76,6 @@ export const imageApi = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   getGeoJSON: () => apiClient.get('/geojson'),
-  getMetadata: (filename: string) => {
-    return apiClient.get(`/images/${encodeURIComponent(filename)}/metadata`);
-  },
+  getMetadata: (filename: string) =>
+    apiClient.get(`/images/${encodeURIComponent(filename)}/metadata`),
 };

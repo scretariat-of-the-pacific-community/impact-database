@@ -117,13 +117,13 @@ export default function ImageDetailPage() {
   // Fetch single image metadata
   const { data: imageData, isLoading, error } = useQuery({
     queryKey: ['image', filename],
-    queryFn: () => imageApi.getMetadata(filename).then(res => res.data),
+    queryFn: async () => (await imageApi.getMetadata(filename)).data,
   });
 
   // Fetch all images for related images
   const { data: allImages } = useQuery({
     queryKey: ['images'],
-    queryFn: () => imageApi.getAll().then(res => res.data),
+    queryFn: async () => (await imageApi.getAll()).data,
   });
 
   // Find related images
