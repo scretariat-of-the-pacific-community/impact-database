@@ -16,6 +16,12 @@ def client(tmp_path):
 
 
 def test_get_single_image_metadata(client):
+    token_resp = client.post(
+        "/api/token", data={"username": "johndoe", "password": "secret"}
+    )
+    token = token_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
     image_path = Path(__file__).resolve().parents[1] / "hazard_test_images" / "flood_1.jpg"
     with image_path.open("rb") as img:
         response = client.post(
@@ -29,6 +35,7 @@ def test_get_single_image_metadata(client):
                 "purpose": "Testing",
                 "keywords": '["flood"]',
             },
+            headers=headers,
         )
     assert response.status_code == 200
 
