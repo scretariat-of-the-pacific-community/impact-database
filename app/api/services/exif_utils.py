@@ -13,32 +13,32 @@ def extract_exif_metadata(file_bytes: bytes) -> Dict[str, Optional[str]]:
     }
 
     try:
-        img = Image.open(BytesIO(file_bytes))
-        exif_data = img._getexif()
-        if not exif_data:
-            return result
+        with Image.open(BytesIO(file_bytes)) as img:
+            exif_data = img._getexif()
+            if not exif_data:
+                return result
 
-        gps_info = {}
-        for tag, value in exif_data.items():
-            decoded = TAGS.get(tag, tag)
-            if decoded == "DateTimeOriginal":
-                result["datetime"] = value
-            elif decoded == "GPSInfo":
-                for t in value:
-                    sub_decoded = GPSTAGS.get(t, t)
-                    gps_info[sub_decoded] = value[t]
+            gps_info = {}
+            for tag, value in exif_data.items():
+                decoded = TAGS.get(tag, tag)
+                if decoded == "DateTimeOriginal":
+                    result["datetime"] = value
+                elif decoded == "GPSInfo":
+                    for t in value:
+                        sub_decoded = GPSTAGS.get(t, t)
+                        gps_info[sub_decoded] = value[t]
 
-        if "GPSLatitude" in gps_info and "GPSLatitudeRef" in gps_info:
-            lat = _convert_to_degrees(gps_info["GPSLatitude"])
-            if gps_info["GPSLatitudeRef"] != "N":
-                lat = -lat
-            result["gps_latitude"] = lat
+            if "GPSLatitude" in gps_info and "GPSLatitudeRef" in gps_info:
+                lat = _convert_to_degrees(gps_info["GPSLatitude"])
+                if gps_info["GPSLatitudeRef"] != "N":
+                    lat = -lat
+                result["gps_latitude"] = lat
 
-        if "GPSLongitude" in gps_info and "GPSLongitudeRef" in gps_info:
-            lon = _convert_to_degrees(gps_info["GPSLongitude"])
-            if gps_info["GPSLongitudeRef"] != "E":
-                lon = -lon
-            result["gps_longitude"] = lon
+            if "GPSLongitude" in gps_info and "GPSLongitudeRef" in gps_info:
+                lon = _convert_to_degrees(gps_info["GPSLongitude"])
+                if gps_info["GPSLongitudeRef"] != "E":
+                    lon = -lon
+                result["gps_longitude"] = lon
 
     except Exception as e:
         print(f"EXIF extraction failed: {e}")
