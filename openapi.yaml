@@ -64,9 +64,35 @@ paths:
                       type: string
                   iso_enabled:
                     type: boolean
+  /api/token:
+    post:
+      summary: Obtain access token
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
   /upload:
     post:
       summary: Upload an image with metadata
+      security:
+        - BearerAuth: []
       requestBody:
         required: true
         content:
@@ -164,6 +190,8 @@ paths:
   /images:
     get:
       summary: List images
+      security:
+        - BearerAuth: []
       parameters:
         - in: query
           name: hazard_type
@@ -212,6 +240,8 @@ paths:
   /images/{filename}:
     get:
       summary: Get single image metadata
+      security:
+        - BearerAuth: []
       parameters:
         - in: path
           name: filename
@@ -251,6 +281,11 @@ paths:
                   iso_compliance:
                     type: string
 components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
   schemas:
     ImageMetadata:
       type: object
@@ -311,3 +346,13 @@ components:
         - location
         - timestamp
         - metadata_language
+    Token:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+      required:
+        - access_token
+        - token_type
