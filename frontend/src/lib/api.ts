@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -76,6 +76,6 @@ export const imageApi = {
   }),
   getGeoJSON: () => apiClient.get('/geojson'),
   getMetadata: (filename: string) => {
-    return axios.get(`/images/${encodeURIComponent(filename)}/metadata`);
+    return apiClient.get(`/images/${encodeURIComponent(filename)}/metadata`);
   },
 };
