@@ -85,6 +85,8 @@ paths:
                   type: string
                 location:
                   type: string
+                country:
+                  type: string
                 manual_latitude:
                   type: number
                 manual_longitude:
@@ -128,6 +130,37 @@ paths:
                 $ref: '#/components/schemas/ImageMetadata'
         '400':
           description: Validation error
+  /hazards:
+    get:
+      summary: Query hazards
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: country
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of hazards
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  hazards:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ImageMetadata'
   /images:
     get:
       summary: List images
@@ -209,6 +242,8 @@ components:
         hazard_type:
           type: string
         location:
+          type: string
+        country:
           type: string
         timestamp:
           type: string
