@@ -30,6 +30,12 @@
 #     - Uses same build context and code as web service.
 #     - Depends on redis and db services.
 #
+#   frontend:
+#     - Next.js frontend application.
+#     - Built from ./frontend directory.
+#     - Exposes port 3000.
+#     - Depends on web service.
+#
 # Volumes:
 #   impact-database_postgres_data:
 #     - Persists PostgreSQL data.
@@ -92,6 +98,17 @@ services:
     volumes:
       - ./app:/app
     restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - web
 
 volumes:
   impact-database_postgres_data:
