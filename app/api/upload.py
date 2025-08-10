@@ -9,6 +9,8 @@ import json
 import sys
 from jsonschema import ValidationError
 
+from api.auth import get_current_user, User
+
 # Add the app directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -109,7 +111,8 @@ async def upload_image(
     keywords: Optional[str] = Form(None),
     keywords_i18n: Optional[str] = Form(None),
     metadata_language: str = Form("eng"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Upload image with metadata"""
     

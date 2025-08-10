@@ -9,7 +9,7 @@ import os
 # Add the app directory to Python path to fix import issues
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from api import upload
+from api import upload, auth
 from api.graphql_schema import graphql_router
 
 app = FastAPI(
@@ -29,6 +29,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(upload.router, prefix="/api", tags=["upload"])
+app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(graphql_router, prefix="/graphql", tags=["graphql"])
 
 
