@@ -10,17 +10,26 @@
     "title": {"type": "string"},
     "title_i18n": {
       "type": "object",
-      "additionalProperties": {"type": "string"}
+      "patternProperties": {
+        "^[a-z]{3}$": {"type": "string"}
+      },
+      "additionalProperties": false
     },
     "abstract": {"type": "string"},
     "abstract_i18n": {
       "type": "object",
-      "additionalProperties": {"type": "string"}
+      "patternProperties": {
+        "^[a-z]{3}$": {"type": "string"}
+      },
+      "additionalProperties": false
     },
     "purpose": {"type": "string"},
     "purpose_i18n": {
       "type": "object",
-      "additionalProperties": {"type": "string"}
+      "patternProperties": {
+        "^[a-z]{3}$": {"type": "string"}
+      },
+      "additionalProperties": false
     },
     "status": {"type": "string", "enum": []},
     "maintenance_frequency": {"type": "string", "enum": []},
@@ -33,10 +42,13 @@
     },
     "keywords_i18n": {
       "type": "object",
-      "additionalProperties": {
-        "type": "array",
-        "items": {"type": "string"}
-      }
+      "patternProperties": {
+        "^[a-z]{3}$": {
+          "type": "array",
+          "items": {"type": "string"}
+        }
+      },
+      "additionalProperties": false
     },
     "metadata_language": {"type": "string"}
   },

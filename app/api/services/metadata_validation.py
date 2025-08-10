@@ -1,7 +1,7 @@
 """Metadata validation utilities using JSON Schema."""
 import json
 import os
-from jsonschema import validate
+from jsonschema import Draft202012Validator
 
 from api.services.iso_vocabulary import (
     HAZARD_TYPES,
@@ -20,22 +20,29 @@ _SCHEMA_PATH = os.path.join(
 )
 
 
-def _load_schema() -> dict:
-    """Load the JSON schema and populate enums from vocabularies."""
-    with open(_SCHEMA_PATH, "r", encoding="utf-8") as f:
-        schema = json.load(f)
+_validator = None
 
-    schema["properties"]["hazard_type"]["enum"] = list(HAZARD_TYPES.keys())
-    schema["properties"]["status"]["enum"] = STATUS_VALUES
-    schema["properties"]["maintenance_frequency"]["enum"] = MAINTENANCE_FREQUENCY
-    schema["properties"]["capture_method"]["enum"] = CAPTURE_METHODS
-    schema["properties"]["access_constraints"]["enum"] = ACCESS_CONSTRAINTS
-    schema["properties"]["security_classification"]["enum"] = SECURITY_CLASSIFICATIONS
 
-    return schema
+def _load_schema() -> Draft202012Validator:
+    """Load the JSON schema, populate enums and return a validator instance."""
+    global _validator
+    if _validator is None:
+        with open(_SCHEMA_PATH, "r", encoding="utf-8") as f:
+            schema = json.load(f)
+
+        schema["properties"]["hazard_type"]["enum"] = list(HAZARD_TYPES.keys())
+        schema["properties"]["status"]["enum"] = STATUS_VALUES
+        schema["properties"]["maintenance_frequency"]["enum"] = MAINTENANCE_FREQUENCY
+        schema["properties"]["capture_method"]["enum"] = CAPTURE_METHODS
+        schema["properties"]["access_constraints"]["enum"] = ACCESS_CONSTRAINTS
+        schema["properties"]["security_classification"]["enum"] = SECURITY_CLASSIFICATIONS
+
+        _validator = Draft202012Validator(schema)
+
+    return _validator
 
 
 def validate_metadata(metadata: dict) -> None:
     """Validate metadata dictionary against the schema."""
-    schema = _load_schema()
-    validate(instance=metadata, schema=schema)
+    validator = _load_schema()
+    validator.validate(metadata)
