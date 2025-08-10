@@ -1,31 +1,49 @@
-<<<<<<< HEAD
-=======
 """FastAPI application entry point with health check endpoint."""
 
->>>>>>> bdfc7e2d7b308aef7a453ea98a1183c4ca378862
 from fastapi import FastAPI
-from api.upload import router as upload_router
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+import sys
+import os
 
-app = FastAPI(title="Impact Database API")
+# Add the app directory to Python path to fix import issues
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-<<<<<<< HEAD
-app.include_router(upload_router, prefix="/api", tags=["upload"])
+from api import upload
+
+app = FastAPI(
+    title="Impact Database API",
+    description="API for collecting and managing hazard impact images with ISO 19115 compliant metadata",
+    version="1.0.0",
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(upload.router, prefix="/api", tags=["upload"])
+
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Impact Database API"}
+    return {
+        "message": "Impact Database API",
+        "version": "1.0.0",
+        "docs": "/docs",
+        "iso_compliance": "ISO 19115:2003 compatible",
+    }
+
 
 @app.get("/health")
-async def health_check():
-=======
+async def health():
+    return {"status": "healthy", "service": "Impact Database API"}
 
-@app.get("/health")
-def health_check() -> dict[str, str]:
-    """Return a basic health status."""
->>>>>>> bdfc7e2d7b308aef7a453ea98a1183c4ca378862
-    return {"status": "ok"}
 
-@app.get("/images/")
-async def list_images():
-    # Placeholder: return empty list or implement listing logic
-    return {"images": []}
+if __name__ == "__main__":
+    uvicorn.run("core.main:app", host="0.0.0.0", port=8000, reload=True)

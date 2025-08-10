@@ -1,32 +1,3 @@
-
-<<<<<<< HEAD
-fastapi
-uvicorn[standard]
-sqlalchemy
-asyncpg
-alembic
-pydantic
-python-multipart
-geoalchemy2
-psycopg2-binary
-boto3
-celery
-redis
-boto3
-Pillow
-python-dotenv
-pytest
-pytest-asyncio
-httpx
-pytest-cov
-black
-isort
-mypy
-flake8
-bandit
-
-fastapi-sqlalchemy
-=======
 fastapi==0.110.0
 uvicorn[standard]==0.29.0
 sqlalchemy==2.0.29
@@ -39,4 +10,10 @@ psycopg2-binary==2.9.9
 boto3==1.34.79
 celery==5.3.6
 redis==5.0.1
->>>>>>> bdfc7e2d7b308aef7a453ea98a1183c4ca378862
+Pillow==10.1.0
+python-dateutil==2.8.2
+jinja2==3.1.2
+pytest==8.1.1
+pytest-asyncio==0.23.6
+httpx==0.27.0
+pytest-cov==5.0.0
