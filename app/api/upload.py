@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, or_
-from typing import Optional, List
+from typing import Optional, Dict, Any
 import os
 import shutil
 from datetime import datetime
@@ -82,6 +82,15 @@ async def upload_image(
     location: str = Form(...),
     manual_latitude: Optional[float] = Form(None),
     manual_longitude: Optional[float] = Form(None),
+    title: Optional[str] = Form(None),
+    title_i18n: Optional[str] = Form(None),
+    abstract: Optional[str] = Form(None),
+    abstract_i18n: Optional[str] = Form(None),
+    purpose: Optional[str] = Form(None),
+    purpose_i18n: Optional[str] = Form(None),
+    keywords: Optional[str] = Form(None),
+    keywords_i18n: Optional[str] = Form(None),
+    metadata_language: str = Form("eng"),
     db: Session = Depends(get_db)
 ):
     """Upload image with metadata"""
@@ -118,11 +127,46 @@ async def upload_image(
     final_latitude = manual_latitude if manual_latitude is not None else exif_data.get("latitude")
     final_longitude = manual_longitude if manual_longitude is not None else exif_data.get("longitude")
 
+    def parse_json_field(value: Optional[str], field_name: str) -> Optional[Any]:
+        """Parse a JSON string field, raising HTTPException on failure."""
+        if value is None:
+            return None
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON for {field_name}")
+
+    def merge_i18n(default_val: Optional[Any], translations: Optional[Dict[str, Any]], lang: str) -> Optional[Dict[str, Any]]:
+        translations = translations or {}
+        if default_val is not None:
+            translations[lang] = default_val
+        return translations or None
+
+    keywords_list = parse_json_field(keywords, "keywords")
+    title_trans = parse_json_field(title_i18n, "title_i18n")
+    abstract_trans = parse_json_field(abstract_i18n, "abstract_i18n")
+    purpose_trans = parse_json_field(purpose_i18n, "purpose_i18n")
+    keywords_trans = parse_json_field(keywords_i18n, "keywords_i18n")
+
+    title_trans = merge_i18n(title, title_trans, metadata_language)
+    abstract_trans = merge_i18n(abstract, abstract_trans, metadata_language)
+    purpose_trans = merge_i18n(purpose, purpose_trans, metadata_language)
+    keywords_trans = merge_i18n(keywords_list, keywords_trans, metadata_language)
+
     metadata = {
         "filename": file.filename,
         "hazard_type": hazard_type,
         "location": location,
         "timestamp": exif_data.get("timestamp").isoformat() if exif_data.get("timestamp") else datetime.utcnow().isoformat(),
+        "title": title,
+        "title_i18n": title_trans,
+        "abstract": abstract,
+        "abstract_i18n": abstract_trans,
+        "purpose": purpose,
+        "purpose_i18n": purpose_trans,
+        "keywords": keywords_list,
+        "keywords_i18n": keywords_trans,
+        "metadata_language": metadata_language,
     }
 
     try:
@@ -137,24 +181,31 @@ async def upload_image(
         location=location,
         timestamp=exif_data.get("timestamp"),
         latitude=final_latitude,
-        longitude=final_longitude
+        longitude=final_longitude,
+        title=title,
+        title_i18n=title_trans,
+        abstract=abstract,
+        abstract_i18n=abstract_trans,
+        purpose=purpose,
+        purpose_i18n=purpose_trans,
+        keywords=keywords_list,
+        keywords_i18n=keywords_trans,
+        metadata_language=metadata_language,
     )
     
     db.add(image_metadata)
     db.commit()
     db.refresh(image_metadata)
     
-    return {
-        "message": "Image uploaded successfully",
-        "filename": file.filename,
-        "hazard_type": hazard_type,
-        "location": location,
-        "latitude": final_latitude,
-        "longitude": final_longitude,
-        "timestamp": exif_data.get("timestamp").isoformat() if exif_data.get("timestamp") else None,
-        "exif_extracted": bool(exif_data),
-        "coordinates_source": "manual" if manual_latitude is not None else "exif" if final_latitude else "none"
-    }
+    response_data = image_metadata.to_dict()
+    response_data.update(
+        {
+            "message": "Image uploaded successfully",
+            "exif_extracted": bool(exif_data),
+            "coordinates_source": "manual" if manual_latitude is not None else "exif" if final_latitude else "none",
+        }
+    )
+    return response_data
 
 @router.get("/images")
 async def list_images(
@@ -186,17 +237,7 @@ async def list_images(
     images = query.all()
     return {
         "count": len(images),
-        "images": [
-            {
-                "filename": img.filename,
-                "hazard_type": img.hazard_type,
-                "location": img.location,
-                "latitude": img.latitude,
-                "longitude": img.longitude,
-                "timestamp": img.timestamp.isoformat() if img.timestamp else None
-            }
-            for img in images
-        ]
+        "images": [img.to_dict() for img in images],
     }
 
 @router.get("/statistics")
