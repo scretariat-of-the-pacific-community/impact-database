@@ -1,6 +1,5 @@
 from sqlalchemy import create_engine, Column, String, Float, DateTime, Text, JSON, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
 import uuid
