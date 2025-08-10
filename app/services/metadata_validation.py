@@ -136,3 +136,17 @@ def clean_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
                 cleaned[key] = value
     
     return cleaned
+
+class MetadataValidator:
+    """Metadata validation service class."""
+    
+    def __init__(self):
+        self.schema = METADATA_SCHEMA
+    
+    def validate(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Validate metadata."""
+        return validate_metadata(metadata)
+    
+    def clean(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Clean metadata."""
+        return clean_metadata(metadata)

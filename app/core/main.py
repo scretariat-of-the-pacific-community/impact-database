@@ -13,7 +13,7 @@ import uvicorn
 import json
 
 from core.config import settings
-from api import upload, auth, graphql_schema, presign
+from api import upload, auth, graphql_schema, presign, curation, admin
 
 # Configure logging
 logging.basicConfig(
@@ -45,6 +45,8 @@ app.include_router(upload.router, prefix="/upload", tags=["upload"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(graphql_schema.router, prefix="/graphql", tags=["graphql"])
 app.include_router(presign.router, prefix="/presign", tags=["presign"])
+app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])
+app.include_router(admin.router, prefix="/admin", tags=["admin"])
 
 
 @app.get("/")
