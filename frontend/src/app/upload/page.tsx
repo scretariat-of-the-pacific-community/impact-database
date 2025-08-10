@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
 import { Upload, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
@@ -24,6 +24,11 @@ export default function UploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const queryClient = useQueryClient();
   const router = useRouter();
+
+  const { data: vocabData } = useQuery({
+    queryKey: ['vocabularies'],
+    queryFn: () => imageApi.vocabularies().then(res => res.data),
+  });
   
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<UploadForm>();
 
@@ -135,13 +140,11 @@ export default function UploadPage() {
                   {...register('hazard_type', { required: 'Hazard type is required' })}
                 >
                   <option value="">Select hazard type</option>
-                  <option value="flood">Flood</option>
-                  <option value="cyclone">Cyclone</option>
-                  <option value="drought">Drought</option>
-                  <option value="landslide">Landslide</option>
-                  <option value="tsunami">Tsunami</option>
-                  <option value="earthquake">Earthquake</option>
-                  <option value="wildfire">Wildfire</option>
+                  {vocabData?.hazard_types?.map((type: string) => (
+                    <option key={type} value={type}>
+                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </option>
+                  ))}
                 </select>
                 {errors.hazard_type && <p className="mt-1 text-sm text-red-600">{errors.hazard_type.message}</p>}
               </div>
