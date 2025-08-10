@@ -70,7 +70,8 @@ export interface ImageMetadata {
 export const imageApi = {
   getAll: () => apiClient.get<ImageMetadata[]>('/images'),
   getById: (filename: string) => apiClient.get<ImageMetadata>(`/images/${filename}`),
-  getByHazard: (hazardType: string) => apiClient.get<ImageMetadata[]>(`/hazards/${hazardType}`),
+  getByHazard: (hazardType: string) =>
+    apiClient.get('/hazards', { params: { type: hazardType } }),
   upload: (formData: FormData) => apiClient.post('/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
