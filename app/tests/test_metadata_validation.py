@@ -44,3 +44,38 @@ def test_validate_metadata_invalid_enum():
     }
     with pytest.raises(ValidationError):
         validate_metadata(metadata)
+
+
+def test_validate_metadata_title_i18n_valid():
+    metadata = {
+        "filename": "image.jpg",
+        "hazard_type": list(HAZARD_TYPES.keys())[0],
+        "location": "Test Location",
+        "timestamp": datetime.utcnow().isoformat(),
+        "title_i18n": {"eng": "Title"},
+    }
+    validate_metadata(metadata)
+
+
+def test_validate_metadata_title_i18n_invalid_code():
+    metadata = {
+        "filename": "image.jpg",
+        "hazard_type": list(HAZARD_TYPES.keys())[0],
+        "location": "Test Location",
+        "timestamp": datetime.utcnow().isoformat(),
+        "title_i18n": {"english": "Title"},
+    }
+    with pytest.raises(ValidationError):
+        validate_metadata(metadata)
+
+
+def test_validate_metadata_title_i18n_non_string_value():
+    metadata = {
+        "filename": "image.jpg",
+        "hazard_type": list(HAZARD_TYPES.keys())[0],
+        "location": "Test Location",
+        "timestamp": datetime.utcnow().isoformat(),
+        "title_i18n": {"eng": 123},
+    }
+    with pytest.raises(ValidationError):
+        validate_metadata(metadata)
