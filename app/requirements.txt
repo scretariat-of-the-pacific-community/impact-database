@@ -4,7 +4,7 @@ sqlalchemy==2.0.29
 asyncpg==0.29.0
 alembic==1.13.1
 pydantic[email]==2.6.4
-python-multipart==0.0.9
+python-multipart==0.0.18
 geoalchemy2==0.14.3
 psycopg2-binary==2.9.9
 boto3==1.40.6
