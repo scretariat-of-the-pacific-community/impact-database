@@ -27,9 +27,15 @@ class MinIOStorage:
     """MinIO storage service for handling file operations."""
     
     def __init__(self):
-        self.client = get_minio_client()
+        self.client = None
         self.bucket_name = MINIO_BUCKET
-        self._ensure_bucket_exists()
+    
+    def _get_client(self):
+        """Get MinIO client instance, creating it if needed."""
+        if self.client is None:
+            self.client = get_minio_client()
+            self._ensure_bucket_exists()
+        return self.client
     
     def _ensure_bucket_exists(self):
         """Ensure the bucket exists, create if it doesn't."""
@@ -39,11 +45,13 @@ class MinIOStorage:
                 logger.info(f"Created bucket: {self.bucket_name}")
         except S3Error as e:
             logger.error(f"Error ensuring bucket exists: {e}")
+            # Don't raise the error to allow the app to start
     
     def upload_file(self, file_path: str, object_name: str, content_type: str = None):
         """Upload a file to MinIO."""
         try:
-            self.client.fput_object(
+            client = self._get_client()
+            client.fput_object(
                 self.bucket_name,
                 object_name,
                 file_path,
@@ -58,7 +66,8 @@ class MinIOStorage:
     def delete_file(self, object_name: str):
         """Delete a file from MinIO."""
         try:
-            self.client.remove_object(self.bucket_name, object_name)
+            client = self._get_client()
+            client.remove_object(self.bucket_name, object_name)
             logger.info(f"Deleted {object_name}")
             return True
         except S3Error as e:
@@ -69,7 +78,8 @@ class MinIOStorage:
         """Get a presigned URL for downloading a file."""
         try:
             from datetime import timedelta
-            url = self.client.presigned_get_object(
+            client = self._get_client()
+            url = client.presigned_get_object(
                 self.bucket_name,
                 object_name,
                 expires=timedelta(seconds=expires_in_seconds)
@@ -83,7 +93,8 @@ class MinIOStorage:
         """Get a presigned URL for uploading a file."""
         try:
             from datetime import timedelta
-            url = self.client.presigned_put_object(
+            client = self._get_client()
+            url = client.presigned_put_object(
                 self.bucket_name,
                 object_name,
                 expires=timedelta(seconds=expires_in_seconds)
@@ -93,5 +104,40 @@ class MinIOStorage:
             logger.error(f"Error generating upload URL: {e}")
             return None
 
-# Global instance
-minio_storage = MinIOStorage()
+    def upload_object(self, object_name: str, data, length: int, content_type: str = None):
+        """Upload object data to MinIO."""
+        try:
+            client = self._get_client()
+            client.put_object(
+                self.bucket_name,
+                object_name,
+                data,
+                length,
+                content_type=content_type
+            )
+            logger.info(f"Uploaded object {object_name}")
+            return True
+        except S3Error as e:
+            logger.error(f"Error uploading object: {e}")
+            return False
+    
+    def delete_object(self, object_name: str):
+        """Delete an object from MinIO."""
+        try:
+            client = self._get_client()
+            client.remove_object(self.bucket_name, object_name)
+            logger.info(f"Deleted object {object_name}")
+            return True
+        except S3Error as e:
+            logger.error(f"Error deleting object: {e}")
+            return False
+
+# Global instance - lazy loaded
+_minio_storage = None
+
+def get_minio_storage():
+    """Get the global MinIO storage instance."""
+    global _minio_storage
+    if _minio_storage is None:
+        _minio_storage = MinIOStorage()
+    return _minio_storage

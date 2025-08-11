@@ -145,6 +145,131 @@ class APIClient {
     const response = await this.client.get('/health');
     return response.data;
   }
+
+  // Admin API Methods
+  async getDashboardStats(period: string = '7d'): Promise<any> {
+    const response = await this.client.get(`/api/admin/dashboard?period=${period}`);
+    return response.data;
+  }
+
+  async getCurationQueue(params: any = {}): Promise<any> {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, value.toString());
+    });
+    const response = await this.client.get(`/api/admin/curation/queue?${queryParams}`);
+    return response.data;
+  }
+
+  async getCurationItem(itemId: string): Promise<any> {
+    const response = await this.client.get(`/api/admin/curation/queue/${itemId}`);
+    return response.data;
+  }
+
+  async updateCurationStatus(itemId: string, data: any): Promise<any> {
+    const response = await this.client.put(`/api/admin/curation/queue/${itemId}`, data);
+    return response.data;
+  }
+
+  async getUsers(params: any = {}): Promise<any> {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, value.toString());
+    });
+    const response = await this.client.get(`/api/admin/users?${queryParams}`);
+    return response.data;
+  }
+
+  async createUser(userData: any): Promise<any> {
+    const response = await this.client.post('/api/admin/users', userData);
+    return response.data;
+  }
+
+  async updateUser(userId: string, userData: any): Promise<any> {
+    const response = await this.client.put(`/api/admin/users/${userId}`, userData);
+    return response.data;
+  }
+
+  async lockUser(userId: string): Promise<any> {
+    const response = await this.client.post(`/api/admin/users/${userId}/lock`);
+    return response.data;
+  }
+
+  async unlockUser(userId: string): Promise<any> {
+    const response = await this.client.post(`/api/admin/users/${userId}/unlock`);
+    return response.data;
+  }
+
+  async deleteUser(userId: string): Promise<any> {
+    const response = await this.client.delete(`/api/admin/users/${userId}`);
+    return response.data;
+  }
+
+  async getRoles(): Promise<any> {
+    const response = await this.client.get('/api/admin/roles');
+    return response.data;
+  }
+
+  async getImportJobs(): Promise<any> {
+    const response = await this.client.get('/api/admin/imports');
+    return response.data;
+  }
+
+  async startImport(formData: FormData): Promise<any> {
+    const response = await this.client.post('/api/admin/imports', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+
+  async getExportJobs(): Promise<any> {
+    const response = await this.client.get('/api/admin/exports');
+    return response.data;
+  }
+
+  async startExport(exportData: any): Promise<any> {
+    const response = await this.client.post('/api/admin/exports', exportData);
+    return response.data;
+  }
+
+  async getComments(itemId: string, params: any = {}): Promise<any> {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) queryParams.append(key, value.toString());
+    });
+    const response = await this.client.get(`/api/admin/curation/comments/${itemId}?${queryParams}`);
+    return response.data;
+  }
+
+  async createComment(commentData: any): Promise<any> {
+    const response = await this.client.post('/api/admin/curation/comments', commentData);
+    return response.data;
+  }
+
+  async updateComment(commentId: string, commentData: any): Promise<any> {
+    const response = await this.client.put(`/api/admin/curation/comments/${commentId}`, commentData);
+    return response.data;
+  }
+
+  async deleteComment(commentId: string): Promise<any> {
+    const response = await this.client.delete(`/api/admin/curation/comments/${commentId}`);
+    return response.data;
+  }
+
+  async flagComment(commentId: string, reason: string): Promise<any> {
+    const response = await this.client.post(`/api/admin/curation/comments/${commentId}/flag`, { reason });
+    return response.data;
+  }
+
+  async getImageMetadata(imageId: string): Promise<any> {
+    const response = await this.client.get(`/api/images/${imageId}/metadata`);
+    return response.data;
+  }
+
+  async updateImageMetadata(imageId: string, metadataData: any): Promise<any> {
+    const response = await this.client.put(`/api/admin/curation/metadata/${imageId}`, metadataData);
+    return response.data;
+  }
 }
 
 // Legacy compatibility

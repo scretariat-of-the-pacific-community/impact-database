@@ -61,33 +61,20 @@ class ImageMetadataUpdate(BaseModel):
 
 class ImageResponse(BaseModel):
     """Schema for image response"""
-    id: int
+    success: bool
     filename: str
-    title: str
-    abstract: str
-    object_key: str
-    bucket_name: str
-    resource_locator: str
-    upload_date: datetime
-    file_size: int
-    latitude: Optional[float]
-    longitude: Optional[float]
-    hazard_type: Optional[str]
-    keywords: Optional[List[str]]
+    metadata: Dict[str, Any]
     
     class Config:
         from_attributes = True
 
 class DeleteResponse(BaseModel):
     """Schema for delete operation response"""
-    message: str
-    deleted_image_id: int
-    deleted_object_key: str
     success: bool
+    message: str
 
 class UpdateResponse(BaseModel):
     """Schema for update operation response"""
-    message: str
-    updated_image_id: int
-    updated_fields: List[str]
     success: bool
+    message: str
+    updated_fields: List[str]

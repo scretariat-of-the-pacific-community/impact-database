@@ -22,7 +22,7 @@ from models.curation import (
 )
 from api.auth import get_current_user, User
 from services.metadata_validation import MetadataValidator
-from services.minio_client import MinIOClient
+from services.minio_client import get_minio_storage
 
 router = APIRouter()
 

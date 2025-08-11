@@ -11,7 +11,7 @@ import json
 
 from services.exif_utils import extract_exif_data, get_image_hash
 from services.metadata_validation import validate_metadata
-from services.minio_client import get_minio_storage
+from services.minio_client import minio_storage
 from models.database import get_db, ImageMetadata
 from sqlalchemy.orm import Session
 from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumbnail
@@ -134,14 +134,13 @@ async def delete_image(
         # Delete from MinIO first
         try:
             object_key = f"images/{filename}"
-            minio_client = get_minio_storage()
-            minio_client.delete_object(object_key)
+            minio_storage.delete_object(object_key)
             logger.info(f"Deleted object from MinIO: {object_key}")
             
             # Also try to delete thumbnail if it exists
             if image.thumbnail_key:
                 try:
-                    minio_client.delete_object(image.thumbnail_key)
+                    minio_storage.delete_object(image.thumbnail_key)
                     logger.info(f"Deleted thumbnail from MinIO: {image.thumbnail_key}")
                 except Exception as e:
                     logger.warning(f"Could not delete thumbnail {image.thumbnail_key}: {e}")
@@ -203,8 +202,7 @@ async def upload_image(
         object_key = f"images/{file.filename}"
         
         # Upload to MinIO
-        minio_client = get_minio_storage()
-        minio_client.upload_object(object_key, io.BytesIO(content), len(content))
+        minio_storage.upload_object(object_key, io.BytesIO(content), len(content))
         
         # Create metadata record
         image_metadata = ImageMetadata(

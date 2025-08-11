@@ -14,9 +14,10 @@ import json
 
 from core.config import settings
 from api import upload, auth, graphql_schema, presign, curation, admin, stac, ogc_records
-from services.monitoring import setup_monitoring, monitoring_background_tasks
-from services.performance import initialize_performance_optimizations
-from services.minio_lifecycle import setup_minio_lifecycle_and_backup
+# Temporarily disable advanced features for basic startup
+# from services.monitoring import setup_monitoring, monitoring_background_tasks
+# from services.performance import initialize_performance_optimizations
+# from services.minio_lifecycle import setup_minio_lifecycle_and_backup
 import asyncio
 
 # Configure logging
@@ -47,7 +48,7 @@ app.add_middleware(
 # Include routers
 app.include_router(upload.router, prefix="/upload", tags=["upload"])
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(graphql_schema.router, prefix="/graphql", tags=["graphql"])
+app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["graphql"])
 app.include_router(presign.router, prefix="/presign", tags=["presign"])
 app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
@@ -56,29 +57,29 @@ app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(stac.router, prefix="/stac", tags=["stac"])
 app.include_router(ogc_records.router, prefix="/ogc", tags=["ogc-records"])
 
-# Setup monitoring
-setup_monitoring(app)
+# Setup monitoring - temporarily disabled
+# setup_monitoring(app)
 
 # Application startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
     try:
-        # Initialize database and performance optimizations
+        # Initialize database 
         from models.database import get_db
         db = next(get_db())
-        await initialize_performance_optimizations(db)
+        # await initialize_performance_optimizations(db)  # Temporarily disabled
         
         # Setup MinIO lifecycle and backup policies
-        setup_minio_lifecycle_and_backup()
+        # setup_minio_lifecycle_and_backup()  # Temporarily disabled
         
         # Start background monitoring tasks
-        asyncio.create_task(monitoring_background_tasks())
+        # asyncio.create_task(monitoring_background_tasks())  # Temporarily disabled
         
         logger.info(f"{settings.PROJECT_NAME} started successfully")
         logger.info("STAC API available at /stac")
         logger.info("OGC API - Records available at /ogc")
-        logger.info("Monitoring endpoints available at /health, /metrics")
+        # logger.info("Monitoring endpoints available at /health, /metrics")  # Temporarily disabled
         
     except Exception as e:
         logger.error(f"Startup error: {e}")

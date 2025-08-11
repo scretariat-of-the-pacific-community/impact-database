@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 from models.database import Base
 import sys
 
-DATABASE_URL = "postgresql://impactuser:impactpass@db:5432/impactdb"
+DATABASE_URL = "postgresql://postgres:password@postgis_db:5432/impact_db"
 
 def migrate_database():
     """Add ISO 19115 fields to existing ImageMetadata table"""

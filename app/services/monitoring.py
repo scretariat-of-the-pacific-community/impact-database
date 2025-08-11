@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response, Depends
-from fastapi.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from sqlalchemy.orm import Session
 from sqlalchemy import text

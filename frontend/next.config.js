@@ -3,6 +3,8 @@ const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
+  disable: process.env.NODE_ENV === 'development', // Disable PWA in development to reduce warnings
+  buildExcludes: [/middleware-manifest\.json$/],
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -92,6 +94,10 @@ const nextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   // Enable strict mode for better performance
   reactStrictMode: true,
+  // Improve Fast Refresh performance
+  experimental: {
+    optimizeCss: false, // Disable CSS optimization in development
+  },
 };
 
 module.exports = withPWA(nextConfig);

@@ -13,17 +13,22 @@ class MinIOStorage:
     
     def __init__(self):
         """Initialize MinIO client with settings"""
-        self.client = Minio(
-            settings.MINIO_ENDPOINT,
-            access_key=settings.MINIO_ACCESS_KEY,
-            secret_key=settings.MINIO_SECRET_KEY,
-            secure=settings.MINIO_SECURE
-        )
+        self.client = None
         self.bucket_name = settings.MINIO_BUCKET_NAME
-        
-        # Ensure bucket exists
-        self._ensure_bucket_exists()
-        logger.info(f"MinIO client initialized successfully for bucket: {self.bucket_name}")
+        logger.info(f"MinIO storage initialized (lazy loading enabled)")
+    
+    def _get_client(self):
+        """Get MinIO client, creating it if needed."""
+        if self.client is None:
+            self.client = Minio(
+                settings.MINIO_ENDPOINT,
+                access_key=settings.MINIO_ACCESS_KEY,
+                secret_key=settings.MINIO_SECRET_KEY,
+                secure=settings.MINIO_SECURE
+            )
+            self._ensure_bucket_exists()
+            logger.info(f"MinIO client initialized successfully for bucket: {self.bucket_name}")
+        return self.client
     
     def _ensure_bucket_exists(self):
         """Ensure the bucket exists, create if it doesn't"""
@@ -35,7 +40,10 @@ class MinIOStorage:
                 logger.debug(f"Bucket already exists: {self.bucket_name}")
         except S3Error as e:
             logger.error(f"Error ensuring bucket exists: {e}")
-            raise
+            # Don't raise the error to allow the app to start
+        except Exception as e:
+            logger.error(f"Unexpected error ensuring bucket exists: {e}")
+            # Don't raise the error to allow the app to start
     
     def upload_file(self, object_name: str, file_data, content_type: str = None):
         """
@@ -51,7 +59,8 @@ class MinIOStorage:
         """
         try:
             # Upload to MinIO
-            self.client.put_object(
+            client = self._get_client()
+            client.put_object(
                 self.bucket_name,
                 object_name,
                 file_data,
@@ -77,7 +86,8 @@ class MinIOStorage:
             True if successful, False otherwise
         """
         try:
-            self.client.remove_object(self.bucket_name, object_name)
+            client = self._get_client()
+            client.remove_object(self.bucket_name, object_name)
             logger.info(f"Deleted object: {object_name}")
             return True
         except S3Error as e:
@@ -96,7 +106,8 @@ class MinIOStorage:
             Presigned URL string
         """
         try:
-            url = self.client.presigned_put_object(
+            client = self._get_client()
+            url = client.presigned_put_object(
                 self.bucket_name,
                 object_name,
                 expires=expires_delta
@@ -119,7 +130,8 @@ class MinIOStorage:
             Presigned URL string
         """
         try:
-            url = self.client.presigned_get_object(
+            client = self._get_client()
+            url = client.presigned_get_object(
                 self.bucket_name,
                 object_name,
                 expires=expires_delta
@@ -141,14 +153,22 @@ class MinIOStorage:
             Object stat information
         """
         try:
-            return self.client.stat_object(self.bucket_name, object_name)
+            client = self._get_client()
+            return client.stat_object(self.bucket_name, object_name)
         except S3Error as e:
             logger.error(f"Error getting object info for {object_name}: {e}")
             raise
 
-# Global instance
-minio_storage = MinIOStorage()
+# Global instance - lazy loaded
+_minio_storage = None
+
+def get_minio_storage():
+    """Get the global MinIO storage instance."""
+    global _minio_storage
+    if _minio_storage is None:
+        _minio_storage = MinIOStorage()
+    return _minio_storage
 
 def get_minio_client():
     """Get MinIO client instance"""
-    return minio_storage.client
+    return get_minio_storage().client

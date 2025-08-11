@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 
 from .celery_app import celery_app
-from api.services.minio_client import get_minio_client, minio_storage
+from services.minio_client import get_minio_client, get_minio_storage
 from models.database import ImageMetadata
 from core.config import settings
 
