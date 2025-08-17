@@ -12,7 +12,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func, text
+from sqlalchemy import func, text
 from pydantic import BaseModel, Field
 from geojson import Point, Polygon, Feature, FeatureCollection
 
@@ -366,14 +366,8 @@ async def get_stac_collection_items(
     if bbox:
         try:
             minx, miny, maxx, maxy = map(float, bbox.split(','))
-            query = query.filter(
-                and_(
-                    ImageMetadata.longitude >= minx,
-                    ImageMetadata.longitude <= maxx,
-                    ImageMetadata.latitude >= miny,
-                    ImageMetadata.latitude <= maxy
-                )
-            )
+            envelope = func.ST_MakeEnvelope(minx, miny, maxx, maxy, 4326)
+            query = query.filter(func.ST_Intersects(ImageMetadata.geometry, envelope))
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid bbox format")
     
@@ -490,14 +484,8 @@ async def search_stac_items(
     if bbox:
         try:
             minx, miny, maxx, maxy = map(float, bbox.split(','))
-            db_query = db_query.filter(
-                and_(
-                    ImageMetadata.longitude >= minx,
-                    ImageMetadata.longitude <= maxx,
-                    ImageMetadata.latitude >= miny,
-                    ImageMetadata.latitude <= maxy
-                )
-            )
+            envelope = func.ST_MakeEnvelope(minx, miny, maxx, maxy, 4326)
+            db_query = db_query.filter(func.ST_Intersects(ImageMetadata.geometry, envelope))
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid bbox format")
     

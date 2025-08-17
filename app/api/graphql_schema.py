@@ -9,7 +9,6 @@ from strawberry.scalars import JSON
 from strawberry.types import Info
 from strawberry.exceptions import GraphQLError
 from fastapi import Depends
-from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from models.database import ImageMetadata
@@ -118,17 +117,9 @@ class Query:
 
         if has_coordinates is not None:
             if has_coordinates:
-                query = query.filter(
-                    ImageMetadata.latitude.isnot(None),
-                    ImageMetadata.longitude.isnot(None),
-                )
+                query = query.filter(ImageMetadata.geometry.isnot(None))
             else:
-                query = query.filter(
-                    or_(
-                        ImageMetadata.latitude.is_(None),
-                        ImageMetadata.longitude.is_(None),
-                    )
-                )
+                query = query.filter(ImageMetadata.geometry.is_(None))
 
         images = query.all()
         return [ImageMetadataType.from_orm(img) for img in images]
