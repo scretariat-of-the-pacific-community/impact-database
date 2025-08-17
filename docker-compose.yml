@@ -53,6 +53,10 @@ services:
       - db
       - minio
       - redis
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: password123
     restart: unless-stopped
 
   db:
@@ -97,6 +101,10 @@ services:
       - db
     volumes:
       - ./app:/app
+    environment:
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: admin
+      MINIO_SECRET_KEY: password123
     restart: unless-stopped
 
   frontend:

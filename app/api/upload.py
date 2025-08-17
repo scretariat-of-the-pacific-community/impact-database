@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, or_, inspect, text
 from typing import Optional, Dict, Any
 import os
-import shutil
 from datetime import datetime, timedelta
 import json
 import sys
@@ -15,8 +14,9 @@ from api.auth import get_current_user, User
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models.database import ImageMetadata, Base
-from api.services.exif_utils import extract_gps_from_exif
+from api.services.exif_utils import extract_exif_metadata
 from api.services.metadata_validation import validate_metadata
+from api.services.minio_client import minio_client
 
 # Import ISO vocabulary if available
 try:
@@ -134,15 +134,29 @@ async def upload_image(
     if existing_image:
         raise HTTPException(status_code=400, detail=f"Image {file.filename} already exists")
     
-    # Save file
-    file_path = f"/app/uploads/{file.filename}"
-    os.makedirs("/app/uploads", exist_ok=True)
-    
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    # Extract EXIF data
-    exif_data = extract_gps_from_exif(file_path)
+    # Upload file to MinIO
+    file_bytes = await file.read()
+    bucket_name = os.getenv("MINIO_BUCKET", "uploads")
+    minio_client.put_object(Bucket=bucket_name, Key=file.filename, Body=file_bytes)
+    endpoint = os.getenv("MINIO_ENDPOINT")
+    if endpoint:
+        object_url = f"{endpoint}/{bucket_name}/{file.filename}"
+    else:
+        object_url = f"/app/{bucket_name}/{file.filename}"
+
+    # Extract EXIF data from the uploaded file bytes
+    exif_raw = extract_exif_metadata(file_bytes)
+    timestamp = None
+    if exif_raw.get("datetime"):
+        try:
+            timestamp = datetime.strptime(exif_raw["datetime"], "%Y:%m:%d %H:%M:%S")
+        except Exception:
+            pass
+    exif_data = {
+        "timestamp": timestamp,
+        "latitude": exif_raw.get("gps_latitude"),
+        "longitude": exif_raw.get("gps_longitude"),
+    }
 
     # Use manual coordinates if provided, otherwise use EXIF
     final_latitude = manual_latitude if manual_latitude is not None else exif_data.get("latitude")
@@ -188,6 +202,7 @@ async def upload_image(
         "keywords": keywords_list,
         "keywords_i18n": keywords_trans,
         "metadata_language": metadata_language,
+        "resource_locator": object_url,
     }
 
     try:
@@ -213,6 +228,7 @@ async def upload_image(
         keywords=keywords_list,
         keywords_i18n=keywords_trans,
         metadata_language=metadata_language,
+        resource_locator=object_url,
     )
     
     db.add(image_metadata)
