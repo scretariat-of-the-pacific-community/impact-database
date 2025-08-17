@@ -15,26 +15,32 @@ A 3-tier web platform to collect, index, and serve images and metadata related t
 
 ### Using Docker (Recommended)
 
-1. **Start all services:**
+1. **Configure environment variables:**
+   ```bash
+   cp .env.example .env
+   # edit .env to provide local settings and secrets
+   ```
+
+2. **Start all services:**
    ```bash
    # Standard mode
    ./docker-start.sh
-   
+
    # Development mode (recommended for coding)
    ./docker-start.sh --dev
-   
+
    # Production mode
    ./docker-start.sh --prod
    ```
 
-2. **Access the applications:**
+3. **Access the applications:**
    - 🌐 **Frontend**: http://localhost:3000
    - ⚡ **Backend API**: http://localhost:8000
    - 📊 **API Documentation**: http://localhost:8000/docs
    - 🌸 **Flower (Celery Monitor)**: http://localhost:5555
    - 🗄️ **MinIO Console**: http://localhost:9001 (minioadmin/minioadmin)
 
-3. **Stop all services:**
+4. **Stop all services:**
    ```bash
    ./docker-stop.sh
    ```
