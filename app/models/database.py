@@ -1,6 +1,8 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, Text, JSON, Boolean
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import create_engine, Column, String, Float, DateTime, Text, JSON, Boolean, func
+from sqlalchemy.orm import declarative_base, sessionmaker, object_session
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.ext.hybrid import hybrid_property
+from geoalchemy2 import Geometry
 from datetime import datetime
 import uuid
 import os
@@ -29,8 +31,7 @@ class ImageMetadata(Base):
     location = Column(String, nullable=False)
     country = Column(String, nullable=True)
     timestamp = Column(DateTime, nullable=True)
-    latitude = Column(Float, nullable=True)
-    longitude = Column(Float, nullable=True)
+    geometry = Column(Geometry(geometry_type='POINT', srid=4326), nullable=True)
     
     # ISO 19115 Identification Information
     title = Column(String, nullable=True)  # gmd:title
@@ -81,6 +82,32 @@ class ImageMetadata(Base):
     metadata_standard_name = Column(String, default="ISO 19115:2003")  # gmd:metadataStandardName
     metadata_standard_version = Column(String, default="1.0")  # gmd:metadataStandardVersion
     metadata_date = Column(DateTime, default=datetime.utcnow)  # gmd:dateStamp
+
+    @hybrid_property
+    def latitude(self):
+        if self.geometry is None:
+            return None
+        session = object_session(self)
+        if session is None:
+            return None
+        return session.scalar(func.ST_Y(self.geometry))
+
+    @latitude.expression
+    def latitude(cls):
+        return func.ST_Y(cls.geometry)
+
+    @hybrid_property
+    def longitude(self):
+        if self.geometry is None:
+            return None
+        session = object_session(self)
+        if session is None:
+            return None
+        return session.scalar(func.ST_X(self.geometry))
+
+    @longitude.expression
+    def longitude(cls):
+        return func.ST_X(cls.geometry)
     
     def to_dict(self):
         """Convert model to dictionary for JSON serialization"""

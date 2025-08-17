@@ -18,6 +18,7 @@ from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumb
 from api.schemas.image_schemas import ImageMetadataUpdate, ImageResponse, DeleteResponse, UpdateResponse
 from core.config import settings
 from api.auth import get_current_user
+from geoalchemy2 import WKTElement
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -205,13 +206,17 @@ async def upload_image(
         minio_storage.upload_object(object_key, io.BytesIO(content), len(content))
         
         # Create metadata record
+        geom = None
+        lat = exif_data.get('latitude')
+        lon = exif_data.get('longitude')
+        if lat is not None and lon is not None:
+            geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
         image_metadata = ImageMetadata(
             filename=file.filename,
             hazard_type=hazard_type,
             location=location,
             country=country,
-            latitude=exif_data.get('latitude'),
-            longitude=exif_data.get('longitude'),
+            geometry=geom,
             timestamp=exif_data.get('datetime'),
             resource_locator=f"images/{file.filename}"
         )

@@ -118,11 +118,12 @@ class SpatialIndex:
     def create_indexes(db: Session):
         """Create spatial and other performance indexes"""
         try:
-            # Spatial index for lat/lon lookups
+            # Spatial index on geometry column
             db.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_image_metadata_spatial 
-                ON image_metadata (longitude, latitude) 
-                WHERE longitude IS NOT NULL AND latitude IS NOT NULL
+                CREATE INDEX IF NOT EXISTS idx_image_metadata_geometry
+                ON image_metadata
+                USING GIST (geometry)
+                WHERE geometry IS NOT NULL
             """))
             
             # Temporal index
@@ -146,16 +147,9 @@ class SpatialIndex:
                 WHERE country IS NOT NULL
             """))
             
-            # Composite index for common queries
-            db.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_image_metadata_composite 
-                ON image_metadata (hazard_type, country, timestamp) 
-                WHERE hazard_type IS NOT NULL
-            """))
-            
             # Full-text search index for titles and abstracts
             db.execute(text("""
-                CREATE INDEX IF NOT EXISTS idx_image_metadata_fulltext 
+                CREATE INDEX IF NOT EXISTS idx_image_metadata_fulltext
                 ON image_metadata USING gin(to_tsvector('english', COALESCE(title, '') || ' ' || COALESCE(abstract, '')))
             """))
             
@@ -354,11 +348,9 @@ class QueryOptimizer:
         """Optimize spatial queries using appropriate indexes"""
         minx, miny, maxx, maxy = bbox
         
-        # Use indexed columns for better performance
-        return query.filter(
-            ImageMetadata.longitude.between(minx, maxx),
-            ImageMetadata.latitude.between(miny, maxy)
-        )
+        # Use spatial intersection with geometry column
+        envelope = func.ST_MakeEnvelope(minx, miny, maxx, maxy, 4326)
+        return query.filter(func.ST_Intersects(ImageMetadata.geometry, envelope))
     
     @staticmethod
     def optimize_temporal_query(query, start_date: datetime = None, end_date: datetime = None):
