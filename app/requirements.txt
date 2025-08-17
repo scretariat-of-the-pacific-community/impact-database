@@ -33,3 +33,4 @@ psutil==5.9.8
 pystac==1.10.1
 # For interoperability testing
 owslib==0.31.0
+lxml==5.1.0

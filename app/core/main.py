@@ -13,7 +13,7 @@ import uvicorn
 import json
 
 from core.config import settings
-from api import upload, auth, graphql_schema, presign, curation, admin, stac, ogc_records
+from api import upload, auth, graphql_schema, presign, curation, admin, stac, ogc_records, metadata
 # Temporarily disable advanced features for basic startup
 # from services.monitoring import setup_monitoring, monitoring_background_tasks
 # from services.performance import initialize_performance_optimizations
@@ -52,6 +52,7 @@ app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["grap
 app.include_router(presign.router, prefix="/presign", tags=["presign"])
 app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(metadata.router, prefix="/api", tags=["metadata"])
 
 # STAC and OGC API - Records
 app.include_router(stac.router, prefix="/stac", tags=["stac"])

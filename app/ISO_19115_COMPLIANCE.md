@@ -108,6 +108,11 @@ curl "http://localhost:8000/api/vocabularies"
 curl "http://localhost:8000/api/images/flood_1.jpg"
 ```
 
+### Get ISO 19139 XML
+```bash
+curl "http://localhost:8000/api/metadata/flood_1.jpg/xml"
+```
+
 ## Database Migration
 
 To upgrade existing databases to ISO compliance:
@@ -129,10 +134,9 @@ chmod +x test_iso_compliance.sh
 ## Future Enhancements
 
 ### Planned Features
-1. **ISO 19139 XML Export**: Full XML metadata export for catalog integration
-2. **CSW Interface**: Catalog Service for Web (OGC CSW) endpoint
-3. **STAC Compliance**: SpatioTemporal Asset Catalog integration
-4. **Multilingual Support**: Metadata in multiple languages
+1. **CSW Interface**: Catalog Service for Web (OGC CSW) endpoint
+2. **STAC Compliance**: SpatioTemporal Asset Catalog integration
+3. **Multilingual Support**: Metadata in multiple languages
 
 ### Integration Opportunities
 - **GEOSS Portal**: Global Earth Observation System of Systems

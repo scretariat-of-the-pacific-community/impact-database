@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:gmd="http://www.isotc211.org/2005/gmd"
+           xmlns:gco="http://www.isotc211.org/2005/gco"
+           targetNamespace="http://www.isotc211.org/2005/gmd"
+           elementFormDefault="qualified">
+
+  <xs:import namespace="http://www.isotc211.org/2005/gco" schemaLocation="gco.xsd"/>
+
+  <xs:element name="MD_Metadata">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="gmd:fileIdentifier"/>
+        <xs:element ref="gmd:language"/>
+        <xs:element ref="gmd:dateStamp"/>
+        <xs:element ref="gmd:contact"/>
+        <xs:element ref="gmd:identificationInfo"/>
+        <xs:element ref="gmd:distributionInfo" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="fileIdentifier">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="gco:CharacterString"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="language">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="gco:CharacterString"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="dateStamp">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="gco:DateTime"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="contact">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="CI_ResponsibleParty" type="gmd:CI_ResponsibleParty"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="CI_ResponsibleParty">
+    <xs:sequence>
+      <xs:element name="individualName" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element ref="gco:CharacterString"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="organisationName" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element ref="gco:CharacterString"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="role">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element ref="gco:CharacterString"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:element name="identificationInfo">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MD_DataIdentification" type="gmd:MD_DataIdentification"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="MD_DataIdentification">
+    <xs:sequence>
+      <xs:element name="citation">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="CI_Citation">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="title">
+                    <xs:complexType>
+                      <xs:sequence>
+                        <xs:element ref="gco:CharacterString"/>
+                      </xs:sequence>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="abstract">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element ref="gco:CharacterString"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="purpose" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element ref="gco:CharacterString"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="extent">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="EX_Extent">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="geographicElement">
+                    <xs:complexType>
+                      <xs:sequence>
+                        <xs:element name="EX_GeographicBoundingBox">
+                          <xs:complexType>
+                            <xs:sequence>
+                              <xs:element name="westBoundLongitude">
+                                <xs:complexType>
+                                  <xs:sequence>
+                                    <xs:element ref="gco:Decimal"/>
+                                  </xs:sequence>
+                                </xs:complexType>
+                              </xs:element>
+                              <xs:element name="eastBoundLongitude">
+                                <xs:complexType>
+                                  <xs:sequence>
+                                    <xs:element ref="gco:Decimal"/>
+                                  </xs:sequence>
+                                </xs:complexType>
+                              </xs:element>
+                              <xs:element name="southBoundLatitude">
+                                <xs:complexType>
+                                  <xs:sequence>
+                                    <xs:element ref="gco:Decimal"/>
+                                  </xs:sequence>
+                                </xs:complexType>
+                              </xs:element>
+                              <xs:element name="northBoundLatitude">
+                                <xs:complexType>
+                                  <xs:sequence>
+                                    <xs:element ref="gco:Decimal"/>
+                                  </xs:sequence>
+                                </xs:complexType>
+                              </xs:element>
+                            </xs:sequence>
+                          </xs:complexType>
+                        </xs:element>
+                      </xs:sequence>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:element name="distributionInfo">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="MD_Distribution" type="gmd:MD_Distribution"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="MD_Distribution">
+    <xs:sequence>
+      <xs:element name="distributionFormat">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="MD_Format">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="name">
+                    <xs:complexType>
+                      <xs:sequence>
+                        <xs:element ref="gco:CharacterString"/>
+                      </xs:sequence>
+                    </xs:complexType>
+                  </xs:element>
+                  <xs:element name="version" minOccurs="0">
+                    <xs:complexType>
+                      <xs:sequence>
+                        <xs:element ref="gco:CharacterString"/>
+                      </xs:sequence>
+                    </xs:complexType>
+                  </xs:element>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
