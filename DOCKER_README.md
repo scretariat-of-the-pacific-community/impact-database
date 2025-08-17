@@ -86,6 +86,26 @@ MINIO_ACCESS_KEY=your-access-key
 MINIO_SECRET_KEY=your-secret-key
 ```
 
+### Production Secrets
+
+For production deployments, use Docker secrets to keep sensitive values out of version
+control:
+
+```bash
+mkdir -p secrets
+echo "choose-a-strong-password" > secrets/postgres_password
+echo "generate-a-secret-key" > secrets/secret_key
+echo "minio-access" > secrets/minio_access_key
+echo "minio-secret" > secrets/minio_secret_key
+```
+
+These files are referenced by `docker-compose.prod.yml` and mounted inside the
+containers. Start the stack in production mode with:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
 ## Services Architecture
 
 The application consists of the following services:
