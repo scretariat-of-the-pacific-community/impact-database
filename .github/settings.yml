@@ -1,0 +1,17 @@
+# Repository settings managed via probot/settings
+# Ensures branch protection requiring CI to pass
+
+repository:
+  default_branch: main
+
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - CI
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+
