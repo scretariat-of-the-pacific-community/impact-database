@@ -17,8 +17,8 @@ class Settings(BaseModel):
 
     # Database Configuration
     DATABASE_URL: Optional[str] = Field(
-        default=get_env("DATABASE_URL"),
-        description="PostgreSQL database connection URL",
+        default=get_env("DATABASE_URL", "sqlite:///./app.db"),
+        description="Database connection URL (SQLite for local dev)",
     )
 
     # Redis Configuration

@@ -2,8 +2,10 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Install dependencies
-RUN apk add --no-cache libc6-compat curl
+# Disable SSL verification for Alpine packages (development only)
+RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.18/main" > /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.18/community" >> /etc/apk/repositories && \
+    apk update && apk add --no-cache libc6-compat curl
 
 # Copy package files
 COPY package*.json ./

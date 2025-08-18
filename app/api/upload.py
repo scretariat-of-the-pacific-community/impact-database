@@ -12,6 +12,7 @@ import json
 from services.exif_utils import extract_exif_data, get_image_hash
 from services.metadata_validation import validate_metadata
 from services.minio_client import get_minio_storage
+from services.local_storage import get_local_storage
 from models.database import get_db, ImageMetadata
 from sqlalchemy.orm import Session
 from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumbnail
@@ -23,6 +24,18 @@ from geoalchemy2 import WKTElement
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def get_storage_client():
+    """Get storage client - try MinIO first, fallback to local storage."""
+    try:
+        minio_client = get_minio_storage()
+        # Test MinIO connection by trying to ensure bucket exists
+        minio_client._ensure_bucket_exists()
+        logger.info("Using MinIO storage")
+        return minio_client
+    except Exception as e:
+        logger.warning(f"MinIO not available ({e}), falling back to local storage")
+        return get_local_storage()
 
 router = APIRouter()
 

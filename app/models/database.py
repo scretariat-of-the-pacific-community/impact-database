@@ -7,7 +7,7 @@ from datetime import datetime
 import uuid
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://impactuser:impactpass@db:5432/impactdb")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://impact_user:impact_password123@localhost:5432/impact_database")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
