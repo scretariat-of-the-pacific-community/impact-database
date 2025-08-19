@@ -49,10 +49,10 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(upload.router, prefix="/upload", tags=["upload"])
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["graphql"])
-app.include_router(presign.router, prefix="/presign", tags=["presign"])
+app.include_router(presign.router, prefix="/api/presign", tags=["presign"])
 app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
 app.include_router(metadata.router, prefix="/api", tags=["metadata"])
