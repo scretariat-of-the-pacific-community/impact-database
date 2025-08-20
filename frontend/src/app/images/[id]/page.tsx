@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { 
-  ArrowLeft, 
+import {
+  ArrowLeft,
   MapPin, 
   Calendar, 
   Download, 
@@ -27,6 +27,15 @@ import Link from 'next/link';
 
 import { imageApi } from '@/lib/api';
 import { ImageMetadata, HAZARD_TYPE_LABELS, SOURCE_AGENCY_LABELS, TOPIC_CATEGORY_LABELS } from '@/lib/types';
+
+import dynamic from 'next/dynamic';
+import { configureLeafletIcons } from '@/lib/leaflet-config';
+import { createCustomIcon } from '@/lib/mapUtils';
+
+const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
+const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
+const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
+const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
 
 export default function ImageDetailPage() {
   const params = useParams();
@@ -472,6 +481,10 @@ function LocationTab({ image }: { image: ImageMetadata }) {
     );
   }
 
+  useEffect(() => {
+    configureLeafletIcons();
+  }, []);
+
   return (
     <div className="space-y-6">
       <div>
@@ -508,15 +521,23 @@ function LocationTab({ image }: { image: ImageMetadata }) {
         </div>
       </div>
 
-      {/* Map Placeholder */}
-      <div className="h-64 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-        <div className="text-center">
-          <MapPin className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-          <p className="text-gray-500">Interactive map coming soon</p>
-          <p className="text-xs text-gray-400 mt-1">
-            Location: {image.latitude.toFixed(4)}, {image.longitude.toFixed(4)}
-          </p>
-        </div>
+      <div className="h-64">
+        <MapContainer
+          center={[image.latitude, image.longitude] as [number, number]}
+          zoom={8}
+          className="h-full w-full rounded-lg overflow-hidden"
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution="&copy; OpenStreetMap contributors"
+          />
+          <Marker
+            position={[image.latitude, image.longitude] as [number, number]}
+            icon={createCustomIcon(image.hazard_type)}
+          >
+            <Popup>{image.title || image.filename}</Popup>
+          </Marker>
+        </MapContainer>
       </div>
 
       {/* External Links */}
