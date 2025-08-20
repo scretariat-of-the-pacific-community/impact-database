@@ -5,7 +5,8 @@ import {
   ImageMetadata, 
   User,
   APIError,
-  BoundingBox 
+  BoundingBox,
+  VocabulariesResponse 
 } from './types';
 
 class APIClient {
@@ -114,7 +115,7 @@ class APIClient {
   }
 
   async getImage(id: string): Promise<ImageMetadata> {
-    const response: AxiosResponse<ImageMetadata> = await this.client.get(`/upload/images/${id}`);
+    const response: AxiosResponse<ImageMetadata> = await this.client.get(`/upload/images/${id}/metadata`);
     return response.data;
   }
 
@@ -133,6 +134,11 @@ class APIClient {
 
   async getGeoJSON(): Promise<any> {
     const response = await this.client.get('/geojson');
+    return response.data;
+  }
+
+  async getVocabularies(): Promise<VocabulariesResponse> {
+    const response: AxiosResponse<VocabulariesResponse> = await this.client.get('/api/vocabularies');
     return response.data;
   }
 
@@ -280,16 +286,16 @@ export const oceanPortalApi = new APIClient();
 
 // Legacy image API for backward compatibility
 export const imageApi = {
-  getAll: () => apiClient.get<ImageMetadata[]>('/images'),
+  getAll: () => apiClient.get<ImageMetadata[]>('/api/images'),
   getById: (filename: string) => oceanPortalApi.getImage(filename),
-  getByHazard: (hazardType: string) => apiClient.get('/hazards', { params: { type: hazardType } }),
-  upload: (formData: FormData) => apiClient.post('/upload', formData, {
+  getByHazard: (hazardType: string) => apiClient.get('/api/hazards', { params: { type: hazardType } }),
+  upload: (formData: FormData) => apiClient.post('/upload/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getGeoJSON: () => apiClient.get('/geojson'),
+  getGeoJSON: () => apiClient.get('/api/geojson'),
   getMetadata: (filename: string) => {
-    return apiClient.get(`/images/${encodeURIComponent(filename)}/metadata`);
+    return apiClient.get(`/api/images/${encodeURIComponent(filename)}/metadata`);
   },
-  vocabularies: () => apiClient.get('/vocabularies'),
+  vocabularies: () => oceanPortalApi.getVocabularies(),
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
 };

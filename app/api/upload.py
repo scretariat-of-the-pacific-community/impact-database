@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status, Depends, Path
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 import shutil
@@ -24,6 +25,57 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+@router.get("/images/{filename}")
+async def serve_image(filename: str):
+    """Serve uploaded image files"""
+    # Define the upload directory path (absolute path within container)
+    upload_dir = "/app/uploads"  
+    file_path = os.path.join(upload_dir, filename)
+    
+    # Check if file exists
+    if not os.path.exists(file_path):
+        raise HTTPException(
+            status_code=404,
+            detail=f"Image '{filename}' not found"
+        )
+    
+    # Determine media type based on file extension
+    _, ext = os.path.splitext(filename.lower())
+    media_type_map = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg', 
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp'
+    }
+    media_type = media_type_map.get(ext, 'image/jpeg')
+    
+    # Return the file
+    return FileResponse(
+        path=file_path,
+        media_type=media_type,
+        filename=filename
+    )
+
+@router.get("/images/{filename}/thumbnail")
+async def serve_image_thumbnail(filename: str):
+    """Serve thumbnail versions of uploaded images"""
+    # Define the upload directory path for thumbnails
+    upload_dir = "/app/uploads"
+    thumbnail_name = f"thumb_{filename}"
+    file_path = os.path.join(upload_dir, thumbnail_name)
+    
+    # If thumbnail doesn't exist, serve the original image
+    if not os.path.exists(file_path):
+        return await serve_image(filename)
+    
+    # Return the thumbnail
+    return FileResponse(
+        path=file_path,
+        media_type="image/jpeg",
+        filename=thumbnail_name
+    )
 
 @router.put("/images/{filename}", response_model=UpdateResponse)
 async def update_image_metadata(
@@ -84,7 +136,7 @@ async def update_image_metadata(
             detail=f"Failed to update metadata: {str(e)}"
         )
 
-@router.get("/images/{filename}", response_model=ImageResponse)
+@router.get("/images/{filename}/metadata", response_model=ImageResponse)
 async def get_image_metadata(
     filename: str = Path(..., description="Image filename to retrieve"),
     db: Session = Depends(get_db)

@@ -61,6 +61,13 @@ except Exception as e:
     print(f'MinIO initialization error (continuing anyway): {e}')
 "
 
-# Start FastAPI server
-echo "Starting FastAPI app..."
-exec uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
+# Check if command is provided, otherwise start FastAPI server
+if [ $# -eq 0 ]; then
+    # Start FastAPI server
+    echo "Starting FastAPI app..."
+    exec uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
+else
+    # Execute the provided command
+    echo "Executing command: $@"
+    exec "$@"
+fi

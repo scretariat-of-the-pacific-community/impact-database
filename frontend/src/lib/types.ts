@@ -1,5 +1,17 @@
 // API Response Types for Ocean Portal
 
+// Vocabulary Types
+export interface VocabularyItem {
+  id: string;
+  label: string;
+}
+
+export interface VocabulariesResponse {
+  hazard_types: VocabularyItem[];
+  source_agencies: VocabularyItem[];
+  topic_categories: VocabularyItem[];
+}
+
 export interface ImageMetadata {
   id: string;
   filename: string;

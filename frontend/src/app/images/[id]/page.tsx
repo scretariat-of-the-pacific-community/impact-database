@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { 
   ArrowLeft, 
   MapPin, 
@@ -39,6 +40,9 @@ export default function ImageDetailPage() {
     queryFn: () => imageApi.getById(imageId),
     enabled: !!imageId
   });
+
+  // Construct the image URL
+  const imageUrl = image ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}` : '';
 
   if (isLoading) {
     return (
@@ -103,13 +107,27 @@ export default function ImageDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* Image Viewer */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              <div className="aspect-video bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center">
-                <div className="text-center text-blue-400">
-                  <Eye className="w-16 h-16 mx-auto mb-4" />
-                  <p className="text-sm">Image Viewer</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {image.format_name} • {(image.file_size / 1024 / 1024).toFixed(1)} MB
-                  </p>
+              <div className="aspect-video relative bg-gradient-to-br from-blue-50 to-blue-100">
+                {imageUrl && (
+                  <Image
+                    src={imageUrl}
+                    alt={image.title || image.filename}
+                    fill
+                    className="object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                )}
+                <div className="absolute bottom-4 right-4 flex space-x-2">
+                  <button className="bg-white/80 hover:bg-white text-gray-700 px-3 py-1.5 rounded-md text-sm font-medium transition-colors">
+                    <Download className="w-4 h-4 mr-1 inline" />
+                    Download
+                  </button>
+                </div>
+                <div className="absolute bottom-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-xs">
+                  {image.format_name} • {(image.file_size / 1024 / 1024).toFixed(1)} MB
                 </div>
               </div>
             </div>

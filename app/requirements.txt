@@ -9,6 +9,7 @@ geoalchemy2==0.14.3
 psycopg2-binary==2.9.9
 boto3==1.40.6
 celery==5.3.6
+flower==2.0.1
 redis==5.0.1
 Pillow==10.1.0
 python-dateutil==2.8.2

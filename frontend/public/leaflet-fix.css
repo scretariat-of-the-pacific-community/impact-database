@@ -1,0 +1,23 @@
+/* Download the React DevTools for a better development experience: https://react.dev/link/react-devtools */
+
+/* Override the default Leaflet marker icons */
+.leaflet-default-icon-path {
+  background-image: url('');
+}
+
+/* Custom marker styles */
+.custom-hazard-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Fix for missing Leaflet marker icons */
+.leaflet-marker-icon {
+  margin-left: -12px !important;
+  margin-top: -41px !important;
+}
+
+.leaflet-marker-shadow {
+  margin-left: -12px !important;
+  margin-top: -41px !important;
+}

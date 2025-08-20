@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
 import { ArrowLeft, MapPin, Calendar, Eye, X, Download, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
+import * as React from 'react';
 import { useState, useMemo } from 'react';
 import Image from 'next/image';
 import ImageFilters, { FilterState } from '@/components/ImageFilters';
@@ -32,7 +33,7 @@ interface QuickViewModalProps {
 function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
   if (!isOpen) return null;
 
-  const imageUrl = `${process.env.NEXT_PUBLIC_API_URL}/images/${encodeURIComponent(image.filename)}`;
+  const imageUrl = `${process.env.NEXT_PUBLIC_API_URL}/upload/images/${encodeURIComponent(image.filename)}`;
   const downloadUrl = `${imageUrl}?download=true`;
 
   return (
@@ -77,8 +78,7 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
                 alt={image.title || image.filename}
                 width={800}
                 height={600}
-                className="max-w-full max-h-full object-contain rounded-md"
-                onError={(e) => {
+                onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                   const target = e.target as HTMLImageElement;
                   target.src = '/placeholder-image.svg';
                 }}
@@ -178,7 +178,7 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
 }
 
 function ImageThumbnail({ image, onClick }: { image: ImageData; onClick: () => void }) {
-  const imageUrl = `${process.env.NEXT_PUBLIC_API_URL}/images/${encodeURIComponent(image.filename)}`;
+  const imageUrl = `${process.env.NEXT_PUBLIC_API_URL}/upload/images/${encodeURIComponent(image.filename)}`;
 
   return (
     <div 
@@ -244,7 +244,7 @@ function ImageThumbnail({ image, onClick }: { image: ImageData; onClick: () => v
     </div>
   );
 }
-
+// Ensure the file is treated as a module with JSX support
 export default function ImagesPage() {
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [filters, setFilters] = useState<FilterState>({
@@ -255,49 +255,59 @@ export default function ImagesPage() {
     sortBy: 'date',
     sortOrder: 'desc',
   });
-  
+
   const { data: images, isLoading, error } = useQuery<ImageData[]>({
     queryKey: ['images'],
-    queryFn: () => imageApi.getAll().then(res => res.data),
+    queryFn: async (): Promise<ImageData[]> => {
+      const res = await imageApi.getAll();
+      // Filter out any items that do not have required fields
+      return (res.data as ImageData[]).filter(
+        (img: any) => img.filename && img.location && img.hazard_type
+      );
+    },
   });
 
-  // Extract unique values for filter options
   const availableHazardTypes = useMemo(() => {
-    return [...new Set(images?.map(img => img.hazard_type) || [])].sort();
+    return [...new Set((images ?? []).map((img: ImageData) => img.hazard_type))].sort();
   }, [images]);
 
   const availableCountries = useMemo(() => {
-    return [...new Set(images?.map(img => img.country).filter((c): c is string => typeof c === 'string') || [])].sort();
+    return [
+      ...new Set(
+        (images ?? [])
+          .map((img: ImageData) => img.country)
+          .filter((c) => !!c)
+      ),
+    ].sort();
   }, [images]);
 
-  // Apply filters and sorting
   const filteredAndSortedImages = useMemo(() => {
     if (!images) return [];
-    
-    let filtered = images.filter(image => {
+
+    let filtered = (images as ImageData[]).filter((image: ImageData) => {
       // Search filter
       if (filters.searchTerm) {
         const searchLower = filters.searchTerm.toLowerCase();
-        const matchesSearch = 
+        const matchesSearch =
           image.filename.toLowerCase().includes(searchLower) ||
           image.location.toLowerCase().includes(searchLower) ||
           image.country?.toLowerCase().includes(searchLower) ||
           image.title?.toLowerCase().includes(searchLower) ||
           image.abstract?.toLowerCase().includes(searchLower);
-        
+
         if (!matchesSearch) return false;
       }
-      
+
       // Hazard type filter
       if (filters.hazardTypes.length > 0 && !filters.hazardTypes.includes(image.hazard_type)) {
         return false;
       }
-      
+
       // Country filter
       if (filters.countries.length > 0 && image.country && !filters.countries.includes(image.country)) {
         return false;
       }
-      
+
       // Date range filter
       if (filters.dateRange.start || filters.dateRange.end) {
         const imageDate = image.timestamp || image.acquisitionDate;
@@ -311,19 +321,19 @@ export default function ImagesPage() {
           }
         }
       }
-      
+
       return true;
     });
 
     // Apply sorting
-    filtered.sort((a, b) => {
+    filtered.sort((a: ImageData, b: ImageData) => {
       let aValue: string | number | Date;
       let bValue: string | number | Date;
 
       switch (filters.sortBy) {
         case 'date':
-          aValue = new Date(a.timestamp || (a as ImageData).acquisitionDate || '');
-          bValue = new Date(b.timestamp || (b as ImageData).acquisitionDate || '');
+          aValue = new Date(a.timestamp || a.acquisitionDate || '');
+          bValue = new Date(b.timestamp || b.acquisitionDate || '');
           break;
         case 'location':
           aValue = a.location.toLowerCase();
@@ -371,7 +381,11 @@ export default function ImagesPage() {
           </div>
         </div>
       </header>
-
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Enhanced Filters */}
+        <div className="mb-6">
+          <ImageFilters
+            filters={filters}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Enhanced Filters */}
         <div className="mb-6">
@@ -387,31 +401,26 @@ export default function ImagesPage() {
 
         {/* Images Grid */}
         {isLoading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading images...</p>
-          </div>
+          <div className="text-center py-12 text-gray-500">Loading images...</div>
         ) : error ? (
-          <div className="bg-red-50 border border-red-200 rounded-md p-6 text-center">
-            <p className="text-red-800">Error loading images: {error.message}</p>
+          <div className="text-center py-12 text-red-500">Failed to load images.</div>
+        ) : Array.isArray(images) && images.length === 0 ? (
+          <div className="bg-gray-50 border border-gray-200 rounded-md p-12 text-center">
+            No images uploaded yet.
+            <Link 
+              href="/upload" 
+              className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
+            >
+              Upload Your First Image
+            </Link>
           </div>
         ) : filteredAndSortedImages.length === 0 ? (
           <div className="bg-gray-50 border border-gray-200 rounded-md p-12 text-center">
-            <p className="text-gray-600">
-              {images?.length === 0 ? 'No images uploaded yet.' : 'No images match your search criteria.'}
-            </p>
-            {images?.length === 0 && (
-              <Link 
-                href="/upload" 
-                className="mt-4 inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
-              >
-                Upload Your First Image
-              </Link>
-            )}
+            No images match your search criteria.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {filteredAndSortedImages.map((image) => (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {filteredAndSortedImages.map((image: ImageData) => (
               <ImageThumbnail
                 key={image.filename}
                 image={image}
@@ -424,7 +433,7 @@ export default function ImagesPage() {
 
       {/* Quick View Modal */}
       <QuickViewModal
-        image={selectedImage!}
+        image={selectedImage as ImageData}
         isOpen={!!selectedImage}
         onClose={() => setSelectedImage(null)}
       />

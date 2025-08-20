@@ -4,7 +4,20 @@ import { useQuery } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
 import { ArrowLeft, BarChart3, MapPin, Calendar, TrendingUp, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import type { ImageMetadata as SharedImageMetadata } from '@/lib/types';
+
+// Extend ImageMetadata to include all required properties for this page
+type ImageMetadata = SharedImageMetadata & {
+  country?: string;
+  location?: string;
+  latitude?: number;
+  longitude?: number;
+  timestamp?: string;
+  filename: string;
+  title?: string;
+  hazard_type: string;
+};
 
 interface HazardStats {
   hazard_type: string;
@@ -12,24 +25,14 @@ interface HazardStats {
   countries: string[];
   latestDate?: string;
   locations: string[];
-}
-
-export default function HazardsPage() {
-  const [selectedHazard, setSelectedHazard] = useState<string>('');
-  
-  const { data: images, isLoading, error } = useQuery({
-    queryKey: ['images'],
-    queryFn: () => imageApi.getAll().then(res => res.data),
-  });
-
   const hazardStats = useMemo(() => {
     if (!images) return [];
-    
+
     const statsMap = new Map<string, HazardStats>();
-    
-    images.forEach(image => {
+
+    images.forEach((image: ImageMetadata) => {
       const hazard = image.hazard_type;
-      
+
       if (!statsMap.has(hazard)) {
         statsMap.set(hazard, {
           hazard_type: hazard,
@@ -38,18 +41,18 @@ export default function HazardsPage() {
           locations: [],
         });
       }
-      
+
       const stats = statsMap.get(hazard)!;
       stats.count++;
-      
+
       if (image.country && !stats.countries.includes(image.country)) {
         stats.countries.push(image.country);
       }
-      
-      if (!stats.locations.includes(image.location)) {
+
+      if (image.location && !stats.locations.includes(image.location)) {
         stats.locations.push(image.location);
       }
-      
+
       if (image.timestamp) {
         const imageDate = new Date(image.timestamp);
         if (!stats.latestDate || imageDate > new Date(stats.latestDate)) {
@@ -57,26 +60,37 @@ export default function HazardsPage() {
         }
       }
     });
-    
-    return Array.from(statsMap.values()).sort((a, b) => b.count - a.count);
+
+    return Array.from(statsMap.values());
   }, [images]);
+        stats.locations.push(image.location);
+      }
+      
+      if (image.timestamp) {
+        const imageDate = new Date(image.timestamp);
+        if (!stats.latestDate || imageDate > new Date(stats.latestDate)) {
+  const totalImages = images?.length || 0;
+  const totalCountries = new Set(images?.map((img: ImageMetadata) => img.country).filter(Boolean)).size;
+  const geolocatedImages = images?.filter((img: ImageMetadata) => img.latitude && img.longitude).length || 0;
 
   const selectedHazardImages = useMemo(() => {
     if (!images || !selectedHazard) return [];
-    return images.filter(img => img.hazard_type === selectedHazard);
+    return images.filter((img: ImageMetadata) => img.hazard_type === selectedHazard);
   }, [images, selectedHazard]);
 
-  const totalImages = images?.length || 0;
-  const totalCountries = new Set(images?.map(img => img.country).filter(Boolean)).size;
-  const geolocatedImages = images?.filter(img => img.latitude && img.longitude).length || 0;
-
+  // Helper for hazard color
   const getHazardColor = (hazard: string) => {
     const colors: Record<string, string> = {
       flood: 'bg-blue-100 text-blue-800 border-blue-200',
-      cyclone: 'bg-purple-100 text-purple-800 border-purple-200',
+      cyclone: 'bg-cyan-100 text-cyan-800 border-cyan-200',
       drought: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      earthquake: 'bg-red-100 text-red-800 border-red-200',
-      tsunami: 'bg-cyan-100 text-cyan-800 border-cyan-200',
+      earthquake: 'bg-gray-100 text-gray-800 border-gray-200',
+      tsunami: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      landslide: 'bg-orange-100 text-orange-800 border-orange-200',
+      wildfire: 'bg-red-100 text-red-800 border-red-200',
+    };
+    return colors[hazard] || 'bg-gray-100 text-gray-800 border-gray-200';
+  };
       landslide: 'bg-orange-100 text-orange-800 border-orange-200',
       wildfire: 'bg-red-100 text-red-800 border-red-200',
     };
@@ -171,7 +185,7 @@ export default function HazardsPage() {
             <div className="bg-white p-6 rounded-lg shadow mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-6">Hazard Types Overview</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {hazardStats.map((hazard) => (
+                {hazardStats.map((hazard: HazardStats) => (
                   <div
                     key={hazard.hazard_type}
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
@@ -212,7 +226,7 @@ export default function HazardsPage() {
                       <Link
                         href={`/hazards/${hazard.hazard_type}`}
                         className="text-sm font-medium hover:underline"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e: React.MouseEvent) => e.stopPropagation()}
                       >
                         View Details →
                       </Link>
@@ -233,7 +247,7 @@ export default function HazardsPage() {
                     </h2>
                     <p className="text-gray-600">
                       {selectedHazardImages.length} images from {
-                        new Set(selectedHazardImages.map(img => img.location)).size
+                        new Set(selectedHazardImages.map((img: ImageMetadata) => img.location)).size
                       } locations
                     </p>
                   </div>
@@ -244,7 +258,7 @@ export default function HazardsPage() {
                   <h3 className="text-lg font-medium text-gray-900 mb-3">Affected Locations</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.entries(
-                      selectedHazardImages.reduce((acc, img) => {
+                      selectedHazardImages.reduce((acc: Record<string, number>, img: ImageMetadata) => {
                         const key = img.country ? `${img.location}, ${img.country}` : img.location;
                         acc[key] = (acc[key] || 0) + 1;
                         return acc;
@@ -263,14 +277,14 @@ export default function HazardsPage() {
                   <h3 className="text-lg font-medium text-gray-900 mb-3">Recent Images</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {selectedHazardImages
-                      .sort((a, b) => {
+                      .sort((a: ImageMetadata, b: ImageMetadata) => {
                         if (!a.timestamp && !b.timestamp) return 0;
                         if (!a.timestamp) return 1;
                         if (!b.timestamp) return -1;
-                        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+                        return new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime();
                       })
                       .slice(0, 6)
-                      .map((image) => (
+                      .map((image: ImageMetadata) => (
                         <div key={image.filename} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                           <h4 className="font-medium text-gray-900 mb-2 truncate">
                             {image.title || image.filename}

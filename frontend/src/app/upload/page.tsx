@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
+import { VocabulariesResponse } from '@/lib/types';
 import { Upload, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -25,9 +26,9 @@ export default function UploadPage() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const { data: vocabData } = useQuery({
+  const { data: vocabData }: { data: VocabulariesResponse | undefined } = useQuery({
     queryKey: ['vocabularies'],
-    queryFn: () => imageApi.vocabularies().then(res => res.data),
+    queryFn: () => imageApi.vocabularies(),
   });
   
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<UploadForm>();
@@ -140,9 +141,9 @@ export default function UploadPage() {
                   {...register('hazard_type', { required: 'Hazard type is required' })}
                 >
                   <option value="">Select hazard type</option>
-                  {vocabData?.hazard_types?.map((type: string) => (
-                    <option key={type} value={type}>
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
+                  {vocabData?.hazard_types?.map((type: any) => (
+                    <option key={type.id} value={type.id}>
+                      {type.label}
                     </option>
                   ))}
                 </select>
