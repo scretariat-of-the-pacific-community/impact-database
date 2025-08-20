@@ -127,13 +127,13 @@ class APIClient {
     return response.data;
   }
 
-  async getHazardTypeSummary(): Promise<Array<{hazard_type: string; count: number}>> {
-    const response = await this.client.get('/hazards');
+  async getHazards(): Promise<any[]> {
+    const response = await this.client.get('/api/hazards');
     return response.data;
   }
 
   async getGeoJSON(): Promise<any> {
-    const response = await this.client.get('/geojson');
+    const response = await this.client.get('/api/geojson');
     return response.data;
   }
 
@@ -143,12 +143,12 @@ class APIClient {
   }
 
   async getCurrentUser(): Promise<User> {
-    const response: AxiosResponse<User> = await this.client.get('/auth/me');
+    const response: AxiosResponse<User> = await this.client.get('/api/auth/me');
     return response.data;
   }
 
-  async healthCheck(): Promise<{status: string}> {
-    const response = await this.client.get('/health');
+  async checkHealth(): Promise<any> {
+    const response = await this.client.get('/api/health');
     return response.data;
   }
 
@@ -289,13 +289,24 @@ export const imageApi = {
   getAll: () => apiClient.get<ImageMetadata[]>('/api/images'),
   getById: (filename: string) => oceanPortalApi.getImage(filename),
   getByHazard: (hazardType: string) => apiClient.get('/api/hazards', { params: { type: hazardType } }),
-  upload: (formData: FormData) => apiClient.post('/upload/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  }),
+  upload: (formData: FormData) => {
+    // Create a new client without /api prefix for the upload endpoint
+    const uploadClient = axios.create({
+      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+      timeout: 30000,
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    // Add auth token if available
+    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+    if (token) {
+      uploadClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+    return uploadClient.post('/upload/upload', formData);
+  },
   getGeoJSON: () => apiClient.get('/api/geojson'),
   getMetadata: (filename: string) => {
-    return apiClient.get(`/api/images/${encodeURIComponent(filename)}/metadata`);
+    return apiClient.get(`/upload/images/${encodeURIComponent(filename)}`);
   },
-  vocabularies: () => oceanPortalApi.getVocabularies(),
+  vocabularies: () => apiClient.get('/api/vocabularies'),
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
 };

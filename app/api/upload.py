@@ -13,16 +13,30 @@ import json
 from services.exif_utils import extract_exif_data, get_image_hash
 from services.metadata_validation import validate_metadata
 from services.minio_client import get_minio_storage
+from services.local_storage import get_local_storage
 from models.database import get_db, ImageMetadata
 from sqlalchemy.orm import Session
 from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumbnail
 from api.schemas.image_schemas import ImageMetadataUpdate, ImageResponse, DeleteResponse, UpdateResponse
 from core.config import settings
 from api.auth import get_current_user
+from geoalchemy2 import WKTElement
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+def get_storage_client():
+    """Get storage client - try MinIO first, fallback to local storage."""
+    try:
+        minio_client = get_minio_storage()
+        # Test MinIO connection by trying to ensure bucket exists
+        minio_client._ensure_bucket_exists()
+        logger.info("Using MinIO storage")
+        return minio_client
+    except Exception as e:
+        logger.warning(f"MinIO not available ({e}), falling back to local storage")
+        return get_local_storage()
 
 router = APIRouter()
 
@@ -259,13 +273,17 @@ async def upload_image(
         minio_client.upload_object(object_key, io.BytesIO(content), len(content))
         
         # Create metadata record
+        geom = None
+        lat = exif_data.get('latitude')
+        lon = exif_data.get('longitude')
+        if lat is not None and lon is not None:
+            geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
         image_metadata = ImageMetadata(
             filename=file.filename,
             hazard_type=hazard_type,
             location=location,
             country=country,
-            latitude=exif_data.get('latitude'),
-            longitude=exif_data.get('longitude'),
+            geometry=geom,
             timestamp=exif_data.get('datetime'),
             resource_locator=f"images/{file.filename}"
         )

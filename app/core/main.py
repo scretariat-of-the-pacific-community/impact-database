@@ -13,7 +13,7 @@ import uvicorn
 import json
 
 from core.config import settings
-from api import upload, auth, graphql_schema, presign, curation, admin, stac, ogc_records, images
+from api import upload, auth, graphql_schema, presign, curation, admin, stac, ogc_records, images, metadata
 # Temporarily disable advanced features for basic startup
 # from services.monitoring import setup_monitoring, monitoring_background_tasks
 # from services.performance import initialize_performance_optimizations
@@ -29,29 +29,33 @@ logger = logging.getLogger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    version=settings.VERSION,
-    description=settings.DESCRIPTION + " - Enhanced with STAC and OGC API - Records support",
-    debug=settings.DEBUG,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DEBUG else None,
+    title="Impact Database API",
+    description="API for disaster impact image database",
+    version="1.0.0"
 )
 
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:3001"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # Include routers
-app.include_router(upload.router, prefix="/upload", tags=["upload"])
-app.include_router(auth.router, prefix="/auth", tags=["auth"])
+app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["graphql"])
-app.include_router(presign.router, prefix="/presign", tags=["presign"])
+app.include_router(presign.router, prefix="/api/presign", tags=["presign"])
 app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])
 app.include_router(admin.router, prefix="/admin", tags=["admin"])
+app.include_router(metadata.router, prefix="/api", tags=["metadata"])
 
 # API endpoints for frontend compatibility
 app.include_router(images.router, prefix="/api", tags=["api", "images"])

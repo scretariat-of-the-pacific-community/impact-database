@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt -r app/requirements-test.txt
+          pip install flake8 pytest pip-audit
+
+      - name: Lint Python
+        run: flake8 app
+
+      - name: Test Python
+        working-directory: app
+        run: pytest
+
+      - name: Python dependency audit
+        working-directory: app
+        run: pip-audit -r requirements.txt -r requirements-test.txt
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Node dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint Node
+        working-directory: frontend
+        run: npm run lint --if-present
+
+      - name: Test Node
+        working-directory: frontend
+        run: npm test --if-present
+
+      - name: Node dependency audit
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+      - name: Build app image
+        run: docker build -t impact-app ./app
+
+      - name: Build frontend image
+        run: docker build -t impact-frontend ./frontend
+
+      - name: Scan app image
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: impact-app
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@v0.20.0
+        with:
+          image-ref: impact-frontend
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+
