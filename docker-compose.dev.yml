@@ -23,6 +23,8 @@ services:
       - NEXT_PUBLIC_SUPPORT_EMAIL=ocean-portal@spc.int
       - NEXT_PUBLIC_CACHE_TTL=60  # Shorter cache for development
       - NEXT_PUBLIC_IMAGE_PROXY_URL=http://localhost:8000/api/v1/images/proxy
+      - NEXT_PUBLIC_SPC_SSO_ISSUER=https://sso.spc.int
+      - NEXT_PUBLIC_SPC_SSO_CLIENT_ID=ocean-portal
       - FAST_REFRESH=true
     volumes:
       # Mount source code for hot reloading
