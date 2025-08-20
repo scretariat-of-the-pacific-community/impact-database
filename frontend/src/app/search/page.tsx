@@ -3,24 +3,33 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { 
-  Search, 
-  Filter, 
-  MapPin, 
-  Calendar, 
+import {
+  Search,
+  Filter,
+  MapPin,
+  Calendar,
   Download,
   Grid,
   List,
-  Map,
+  Map as MapIcon,
   X,
   ChevronDown,
   ChevronUp,
   SlidersHorizontal
 } from 'lucide-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+import { configureLeafletIcons } from '@/lib/leaflet-config';
+import { createCustomIcon } from '@/lib/mapUtils';
 
 import { imageApi } from '@/lib/api';
 import { SearchFilters, ImageMetadata, HazardType, SourceAgency, HAZARD_TYPE_LABELS, SOURCE_AGENCY_LABELS } from '@/lib/types';
+
+const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
+const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
+const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
+const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
 
 interface SearchPageState {
   searchQuery: string;
@@ -37,6 +46,10 @@ interface SearchPageState {
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  useEffect(() => {
+    configureLeafletIcons();
+  }, []);
   
   const [state, setState] = useState<SearchPageState>({
     searchQuery: searchParams.get('q') || '',
@@ -183,7 +196,7 @@ export default function SearchPage() {
                 onClick={() => setState(prev => ({ ...prev, viewMode: 'map' }))}
                 className={`p-2 border-l border-gray-300 ${state.viewMode === 'map' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
               >
-                <Map className="w-5 h-5" />
+                <MapIcon className="w-5 h-5" />
               </button>
             </div>
           </div>
@@ -378,11 +391,28 @@ export default function SearchPage() {
                   ))}
                 </div>
               ) : (
-                <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <Map className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">Map view coming soon</p>
-                  </div>
+                <div className="h-96">
+                  <MapContainer center={[0, 0]} zoom={2} className="h-full w-full rounded-lg">
+                    <TileLayer
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                      attribution="&copy; OpenStreetMap contributors"
+                    />
+                    {images.filter(img => img.latitude && img.longitude).map(image => (
+                      <Marker
+                        key={image.id}
+                        position={[image.latitude, image.longitude] as [number, number]}
+                        icon={createCustomIcon(image.hazard_type)}
+                      >
+                        <Popup>
+                          <div className="text-sm">
+                            <Link href={`/images/${image.id}`} className="text-blue-600 hover:underline">
+                              {image.title || image.filename}
+                            </Link>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  </MapContainer>
                 </div>
               )}
             </div>
