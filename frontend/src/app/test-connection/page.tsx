@@ -1,10 +1,10 @@
-'use client'
+'use client';
 
 import { useState, useEffect } from 'react';
 
-export default function TestConnection() {
+function DevTestConnection() {
   const [backendStatus, setBackendStatus] = useState<string>('Testing...');
-  const [apiResponse, setApiResponse] = useState<any>(null);
+  const [apiResponse, setApiResponse] = useState<unknown>(null);
 
   useEffect(() => {
     testBackendConnection();
@@ -38,7 +38,7 @@ export default function TestConnection() {
   return (
     <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
       <h1>Frontend ↔ Backend Connection Test</h1>
-      
+
       <div style={{ marginBottom: '20px' }}>
         <h2>Connection Status:</h2>
         <p style={{ fontSize: '18px' }}>{backendStatus}</p>
@@ -54,14 +54,14 @@ export default function TestConnection() {
       )}
 
       <div>
-        <button 
+        <button
           onClick={testBackendConnection}
           style={{ marginRight: '10px', padding: '10px 20px', cursor: 'pointer' }}
         >
           Test Connection Again
         </button>
-        
-        <button 
+
+        <button
           onClick={testAPIEndpoint}
           style={{ padding: '10px 20px', cursor: 'pointer' }}
         >
@@ -72,7 +72,7 @@ export default function TestConnection() {
       <div style={{ marginTop: '30px', padding: '15px', background: '#e3f2fd', borderRadius: '5px' }}>
         <h3>Expected Results:</h3>
         <ul>
-          <li>✅ Status should show "Connected successfully!"</li>
+          <li>✅ Status should show Connected successfully!</li>
           <li>✅ Backend response should show API info</li>
           <li>✅ No CORS errors in browser console</li>
           <li>✅ API endpoint test should return data</li>
@@ -81,3 +81,9 @@ export default function TestConnection() {
     </div>
   );
 }
+
+function Empty() {
+  return null;
+}
+
+export default process.env.NODE_ENV === 'development' ? DevTestConnection : Empty;
