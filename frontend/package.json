@@ -22,7 +22,7 @@
     "leaflet": "^1.9.4",
     "leaflet-draw": "^1.0.4",
     "lucide-react": "^0.263.1",
-    "next": "15.4.6",
+    "next": "15.5.2",
     "next-pwa": "^5.6.0",
     "react": "19.1.0",
     "react-datepicker": "^4.25.0",
