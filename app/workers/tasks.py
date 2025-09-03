@@ -79,7 +79,7 @@ def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_s
         Dict with status and thumbnail information
     """
     if bucket_name is None:
-        bucket_name = settings.MINIO_BUCKET_NAME
+        bucket_name = settings.minio.MINIO_BUCKET_NAME
     if thumbnail_size is None:
         thumbnail_size = settings.THUMBNAIL_SIZE
         
@@ -144,7 +144,7 @@ def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_s
             )
             
             # Generate thumbnail URL
-            thumbnail_url = f"http://{settings.MINIO_ENDPOINT}/{bucket_name}/{thumbnail_key}"
+            thumbnail_url = f"http://{settings.minio.MINIO_ENDPOINT}/{bucket_name}/{thumbnail_key}"
             logger.info(f"Thumbnail uploaded successfully: {thumbnail_key}")
             
         except Exception as e:

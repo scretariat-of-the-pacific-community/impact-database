@@ -8,17 +8,18 @@ import {
   BoundingBox,
   VocabulariesResponse 
 } from './types';
+import { config, getApiUrl } from './config';
 
 class APIClient {
   private client: AxiosInstance;
   private baseURL: string;
 
   constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    this.baseURL = config.API.BASE_URL;
     
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 30000,
+      timeout: config.API.TIMEOUT,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -289,24 +290,53 @@ export const imageApi = {
   getAll: () => apiClient.get<ImageMetadata[]>('/api/images'),
   getById: (filename: string) => oceanPortalApi.getImage(filename),
   getByHazard: (hazardType: string) => apiClient.get('/api/hazards', { params: { type: hazardType } }),
-  upload: (formData: FormData) => {
-    // Create a new client without /api prefix for the upload endpoint
-    const uploadClient = axios.create({
-      baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
-      timeout: 30000,
-      headers: { 'Content-Type': 'multipart/form-data' }
+  upload: (formData: FormData, onProgress?: (progress: number) => void) => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Setup progress tracking
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = (e.loaded / e.total) * 100;
+            onProgress(Math.round(percentComplete));
+          }
+        });
+      }
+      
+      // Setup response handlers
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            resolve(xhr.responseText);
+          }
+        } else {
+          reject(new Error(`Upload failed: ${xhr.statusText}`));
+        }
+      };
+      
+      xhr.onerror = () => reject(new Error('Upload failed'));
+      
+      // Add auth token if available
+      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+      
+      // Send request
+      xhr.open('POST', getApiUrl('/api/upload/upload'));
+      xhr.send(formData);
     });
-    // Add auth token if available
-    const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-    if (token) {
-      uploadClient.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-    return uploadClient.post('/upload/upload', formData);
   },
   getGeoJSON: () => apiClient.get('/api/geojson'),
   getMetadata: (filename: string) => {
     return apiClient.get(`/upload/images/${encodeURIComponent(filename)}`);
   },
-  vocabularies: () => apiClient.get('/api/vocabularies'),
+  vocabularies: async () => {
+    const response = await apiClient.get('/api/vocabularies');
+    return response.data;
+  },
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
 };

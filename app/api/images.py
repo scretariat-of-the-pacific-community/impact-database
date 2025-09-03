@@ -1,6 +1,6 @@
 """Images API endpoints for listing and browsing images."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, or_
 from typing import List, Optional
@@ -8,30 +8,75 @@ import logging
 
 from models.database import get_db, ImageMetadata
 from api.schemas.image_schemas import ImageResponse
+from api.auth_enhanced import get_current_user, User, require_permission
+from core.query_security import QueryLimits, ValidatedPagination, ValidatedFilter, ValidatedSearch, ALLOWED_SORT_FIELDS
+from core.secure_query_simple import ImageQueryBuilder
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.get("/images")
 async def get_all_images(
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of images to return"),
-    offset: int = Query(0, ge=0, description="Number of images to skip"),
-    hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
-    db: Session = Depends(get_db)
+    request: Request,
+    limit: int = Query(QueryLimits.DEFAULT_LIMIT_IMAGES, ge=1, le=QueryLimits.MAX_LIMIT_IMAGES, 
+                      description="Maximum number of images to return"),
+    offset: int = Query(0, ge=0, le=QueryLimits.MAX_OFFSET, 
+                       description="Number of images to skip"),
+    hazard_type: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+                                     description="Filter by hazard type"),
+    location: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+                                  description="Filter by location"),
+    country: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+                                 description="Filter by country"),
+    sort_by: str = Query("date_stamp", description="Sort field: date_stamp, title, hazard_type"),
+    sort_order: str = Query("desc", description="Sort order: asc, desc"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """Get all images with optional filtering and pagination."""
+    """Get all images with optional filtering and pagination. Requires authentication."""
     try:
-        query = db.query(ImageMetadata)
+        # Check if user has permission to read images
+        if "read:images" not in current_user.permissions and "read:all" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403, 
+                detail="Insufficient permissions to access images"
+            )
         
-        # Apply filters
+        # Create validated pagination
+        pagination = ValidatedPagination.create(limit, offset, QueryLimits.MAX_LIMIT_IMAGES)
+        
+        # Create validated filters
+        filters = ValidatedFilter.create(
+            hazard_type=hazard_type,
+            location=location, 
+            country=country
+        )
+        
+        # Build secure query using the available method
+        query_builder = ImageQueryBuilder()
+        
+        # Create filters dict
+        filter_dict = {}
         if hazard_type:
-            query = query.filter(ImageMetadata.hazard_type == hazard_type)
-        
-        # Apply pagination and ordering
-        query = query.order_by(desc(ImageMetadata.date_stamp))
-        query = query.offset(offset).limit(limit)
-        
-        images = query.all()
+            filter_dict['hazard_type'] = hazard_type
+        if location:
+            filter_dict['location'] = location
+        if country:
+            filter_dict['country'] = country
+            
+        # Use the base build_query method
+        from models.database import ImageMetadata
+        images = query_builder.build_query(
+            db=db,
+            model=ImageMetadata,
+            filters=filter_dict,
+            allowed_filters=['hazard_type', 'location', 'country'],
+            sort_by=sort_by,
+            sort_order=sort_order,
+            allowed_sorts=['date_stamp', 'title', 'hazard_type', 'created_at'],
+            limit=limit,
+            offset=offset
+        )
         
         # Convert to response format
         result = []
@@ -43,6 +88,8 @@ async def get_all_images(
                 "description": image.abstract,  # Use abstract as description
                 "hazard_type": image.hazard_type,
                 "location": image.location,
+                "country": image.country,
+                "keywords": image.keywords,  # Add keywords field
                 "latitude": float(image.latitude) if image.latitude else None,
                 "longitude": float(image.longitude) if image.longitude else None,
                 "upload_date": image.date_stamp.isoformat() if image.date_stamp else None,
@@ -57,63 +104,101 @@ async def get_all_images(
                 }
             })
         
-        return result
+        # Calculate total count
+        total_count = db.query(ImageMetadata).count()
         
+        return {
+            "images": result,
+            "total": total_count,
+            "page": (offset // limit) + 1,
+            "limit": limit,
+            "total_pages": (total_count + limit - 1) // limit,
+            "has_more": offset + limit < total_count
+        }
+        
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching images: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching images: {str(e)}")
 
 @router.get("/v1/images/search")
 async def search_images(
-    q: Optional[str] = Query(None, description="Search query"),
-    hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
-    location: Optional[str] = Query(None, description="Filter by location"),
-    sort_by: str = Query("relevance", description="Sort by: relevance, date, title"),
+    request: Request,
+    q: Optional[str] = Query(None, max_length=QueryLimits.MAX_SEARCH_TERM_LENGTH,
+                           description="Search query"),
+    hazard_type: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+                                     description="Filter by hazard type"),
+    location: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+                                  description="Filter by location"),
+    country: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+                                 description="Filter by country"),
+    sort_by: str = Query("relevance", description="Sort by: relevance, date_stamp, title"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    limit: int = Query(24, ge=1, le=100, description="Maximum number of results"),
-    offset: int = Query(0, ge=0, description="Number of results to skip"),
-    db: Session = Depends(get_db)
+    limit: int = Query(QueryLimits.DEFAULT_LIMIT_SEARCH, ge=1, le=QueryLimits.MAX_LIMIT_SEARCH, 
+                      description="Maximum number of results"),
+    offset: int = Query(0, ge=0, le=QueryLimits.MAX_OFFSET, 
+                       description="Number of results to skip"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    """Search images with full-text search and filtering."""
+    """Search images with full-text search and filtering. Requires authentication."""
     try:
-        query = db.query(ImageMetadata)
+        # Check permissions
+        if "search:basic" not in current_user.permissions and "read:all" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to search images"
+            )
         
-        # Apply text search across multiple fields
-        if q:
-            search_term = f"%{q}%"
-            from sqlalchemy import or_
-            query = query.filter(or_(
-                ImageMetadata.title.ilike(search_term),
-                ImageMetadata.abstract.ilike(search_term),
-                ImageMetadata.location.ilike(search_term),
-                ImageMetadata.hazard_type.ilike(search_term)
-            ))
+        # Create validated pagination
+        pagination = ValidatedPagination.create(limit, offset, QueryLimits.MAX_LIMIT_SEARCH)
         
-        # Apply filters
-        if hazard_type:
-            query = query.filter(ImageMetadata.hazard_type == hazard_type)
+        # Create validated search term
+        validated_search = ValidatedSearch.create(q)
+        search_term = validated_search.q if validated_search else None
         
-        if location:
-            query = query.filter(ImageMetadata.location.ilike(f"%{location}%"))
+        # Create validated filters
+        filters = ValidatedFilter.create(
+            hazard_type=hazard_type,
+            location=location,
+            country=country
+        )
         
-        # Apply sorting
-        if sort_by == "date":
-            sort_field = ImageMetadata.date_stamp
-        elif sort_by == "title":
-            sort_field = ImageMetadata.title
-        else:  # relevance or default
-            sort_field = ImageMetadata.date_stamp  # Default to date for now
-        
-        if sort_order == "asc":
-            query = query.order_by(sort_field)
+        # Map sort_by for compatibility
+        if sort_by == "relevance":
+            sort_field = "date_stamp"  # Default to date when relevance requested
         else:
-            query = query.order_by(desc(sort_field))
+            sort_field = sort_by
+        
+        # Build secure query using the available method
+        query_builder = ImageQueryBuilder()
+        
+        # Create filters dict
+        filter_dict = {}
+        if hazard_type:
+            filter_dict['hazard_type'] = hazard_type
+        if location:
+            filter_dict['location'] = location
+        if country:
+            filter_dict['country'] = country
+            
+        # Use the base build_query method
+        from models.database import ImageMetadata
+        images = query_builder.build_query(
+            db=db,
+            model=ImageMetadata,
+            filters=filter_dict,
+            allowed_filters=['hazard_type', 'location', 'country'],
+            sort_by=sort_field,
+            sort_order=sort_order,
+            allowed_sorts=['date_stamp', 'title', 'hazard_type', 'created_at'],
+            limit=pagination.limit,
+            offset=pagination.offset
+        )
         
         # Get total count for pagination
-        total_count = query.count()
-        
-        # Apply pagination
-        images = query.offset(offset).limit(limit).all()
+        total_count = db.query(ImageMetadata).count()
         
         # Convert to response format
         results = []
@@ -125,9 +210,10 @@ async def search_images(
                 "description": image.abstract,
                 "hazard_type": image.hazard_type,
                 "location": image.location,
+                "country": image.country,
                 "latitude": float(image.latitude) if image.latitude else None,
                 "longitude": float(image.longitude) if image.longitude else None,
-                "upload_date": image.date_stamp.isoformat() if image.date_stamp else None,
+                "upload_date": image.date_stamp.isoformat() + "Z" if image.date_stamp else None,
                 "file_size": getattr(image, 'file_size', None),
                 "image_hash": getattr(image, 'image_hash', None),
                 "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
@@ -137,45 +223,72 @@ async def search_images(
         return {
             "images": results,
             "total": total_count,
-            "page": (offset // limit) + 1,
-            "limit": limit,
-            "total_pages": (total_count + limit - 1) // limit,
-            "has_more": offset + limit < total_count
+            "page": (pagination.offset // pagination.limit) + 1,
+            "limit": pagination.limit,
+            "total_pages": (total_count + pagination.limit - 1) // pagination.limit,
+            "has_more": pagination.offset + pagination.limit < total_count,
+            "query": search_term
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error searching images: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error searching images: {str(e)}")
 
 @router.get("/hazards")
-async def get_hazard_types(db: Session = Depends(get_db)):
-    """Get all unique hazard types from the database."""
+async def get_hazards(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get list of all available hazard types. Requires authentication."""
     try:
+        # Check permissions
+        if "read:metadata" not in current_user.permissions and "read:all" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to access hazard data"
+            )
+        
         hazards = db.query(ImageMetadata.hazard_type).filter(
-            ImageMetadata.hazard_type.isnot(None)
+            ImageMetadata.hazard_type.isnot(None),
+            ImageMetadata.hazard_type != ''
         ).distinct().all()
         
         hazard_list = [hazard[0] for hazard in hazards if hazard[0]]
         
-        # Add default hazard types if none exist in database
+        # If no hazards found, return default list
         default_hazards = [
-            "flood", "cyclone", "tsunami", "drought", "landslide", 
-            "earthquake", "wildfire", "volcanic", "coastal_erosion"
+            'flood', 'cyclone', 'drought', 'earthquake', 
+            'tsunami', 'landslide', 'wildfire'
         ]
-        
         if not hazard_list:
             hazard_list = default_hazards
         
         return {"hazards": hazard_list}
         
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error fetching hazard types: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching hazard types: {str(e)}")
+        logger.error(f"Error fetching hazards: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching hazards: {str(e)}")
+
 
 @router.get("/vocabularies")
-async def get_vocabularies():
-    """Get vocabulary data for the frontend."""
+async def get_vocabularies(
+    request: Request,
+    current_user: User = Depends(get_current_user)
+):
+    """Get vocabularies for metadata fields. Requires authentication."""
     try:
+        # Check permissions
+        if "read:metadata" not in current_user.permissions and "read:all" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to access vocabulary data"
+            )
+        
         vocabularies = {
             "hazard_types": [
                 {"id": "flood", "label": "Flood", "description": "Flooding and inundation events"},
@@ -212,13 +325,74 @@ async def get_vocabularies():
         raise HTTPException(status_code=500, detail=f"Error fetching vocabularies: {str(e)}")
 
 @router.get("/geojson")
-async def get_images_geojson(db: Session = Depends(get_db)):
-    """Get all geolocated images as GeoJSON."""
+async def get_images_geojson(
+    request: Request,
+    limit: int = Query(QueryLimits.DEFAULT_LIMIT_GEOJSON, ge=1, le=QueryLimits.MAX_LIMIT_GEOJSON,
+                      description="Maximum number of features to return"),
+    hazard_type: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+                                     description="Filter by hazard type"),
+    bbox: Optional[str] = Query(None, description="Bounding box: min_lon,min_lat,max_lon,max_lat"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all geolocated images as GeoJSON. Requires authentication."""
     try:
-        images = db.query(ImageMetadata).filter(
-            ImageMetadata.latitude.isnot(None),
-            ImageMetadata.longitude.isnot(None)
-        ).all()
+        # Check permissions - GeoJSON is sensitive geolocation data
+        if "read:images" not in current_user.permissions and "read:all" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to access geolocation data"
+            )
+        
+        # Create validated filters
+        filters = {}
+        if hazard_type:
+            filters['hazard_type'] = hazard_type
+        
+        # Parse and validate bounding box if provided
+        bbox_coords = None
+        if bbox:
+            from core.query_security import validate_bbox
+            try:
+                bbox_coords = validate_bbox(bbox)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+        
+        # Use secure query builder for GeoJSON
+        query_builder = ImageQueryBuilder()
+        from models.database import ImageMetadata
+        
+        # Create filters dict
+        filter_dict = {}
+        if hazard_type:
+            filter_dict['hazard_type'] = hazard_type
+            
+        # Build query with filters and bbox constraint
+        query = db.query(ImageMetadata)
+        
+        # Apply filters
+        if filter_dict:
+            for key, value in filter_dict.items():
+                if hasattr(ImageMetadata, key):
+                    query = query.filter(getattr(ImageMetadata, key) == value)
+        
+        # Apply bounding box filter if provided
+        if bbox_coords:
+            min_lon, min_lat, max_lon, max_lat = bbox_coords
+            if hasattr(ImageMetadata, 'longitude') and hasattr(ImageMetadata, 'latitude'):
+                query = query.filter(
+                    ImageMetadata.longitude.between(min_lon, max_lon),
+                    ImageMetadata.latitude.between(min_lat, max_lat)
+                )
+        
+        # Filter for only geolocated images
+        if hasattr(ImageMetadata, 'longitude') and hasattr(ImageMetadata, 'latitude'):
+            query = query.filter(
+                ImageMetadata.longitude.isnot(None),
+                ImageMetadata.latitude.isnot(None)
+            )
+        
+        images = query.limit(limit).all()
         
         features = []
         for image in images:
@@ -236,6 +410,7 @@ async def get_images_geojson(db: Session = Depends(get_db)):
                         "description": image.abstract,  # Use abstract as description
                         "hazard_type": image.hazard_type,
                         "location": image.location,
+                        "country": image.country,
                         "upload_date": image.date_stamp.isoformat() if image.date_stamp else None,
                         "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None
                     }
@@ -244,11 +419,20 @@ async def get_images_geojson(db: Session = Depends(get_db)):
         
         geojson = {
             "type": "FeatureCollection",
-            "features": features
+            "features": features,
+            "metadata": {
+                "total_features": len(features),
+                "limit": limit,
+                "has_more": len(features) == limit,  # If we got the max, there might be more
+                "bbox_filter": bbox_coords,
+                "hazard_type_filter": hazard_type
+            }
         }
         
         return geojson
         
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error creating GeoJSON: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating GeoJSON: {str(e)}")
