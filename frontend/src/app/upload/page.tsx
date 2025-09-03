@@ -31,6 +31,7 @@ export default function UploadPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
 
@@ -50,7 +51,12 @@ export default function UploadPage() {
 
   // File validation function
   const validateFile = useCallback((file: File): string | null => {
-    // Check file size
+    // Check file size minimum
+    if (file.size < 1024) {
+      return 'File size too small. Minimum size is 1KB';
+    }
+    
+    // Check file size maximum
     if (file.size > MAX_FILE_SIZE) {
       return `File size exceeds ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB limit`;
     }
@@ -61,6 +67,12 @@ export default function UploadPage() {
       return `Invalid file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`;
     }
     
+    // Check for potentially dangerous filenames
+    const filename = file.name.toLowerCase();
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return 'Invalid filename. Please rename your file and try again';
+    }
+    
     return null;
   }, []);
 
@@ -68,10 +80,17 @@ export default function UploadPage() {
   const handleFileSelect = useCallback((file: File) => {
     const error = validateFile(file);
     if (error) {
-      alert(error);
+      setValidationError(error);
+      setSelectedFile(null);
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
       return;
     }
 
+    // Clear any previous validation errors
+    setValidationError(null);
     setSelectedFile(file);
     
     // Create preview URL
@@ -91,6 +110,7 @@ export default function UploadPage() {
   // Remove selected file
   const removeSelectedFile = useCallback(() => {
     setSelectedFile(null);
+    setValidationError(null);
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
@@ -120,16 +140,20 @@ export default function UploadPage() {
       queryClient.invalidateQueries({ queryKey: ['images'] });
       setTimeout(() => router.push('/'), 1000); // Small delay to show completion
     },
-    onError: () => {
+    onError: (error) => {
       setUploadProgress(0);
+      console.error('Upload failed:', error);
     },
   });
 
   const onSubmit = (data: UploadForm) => {
     if (!selectedFile) {
-      alert('Please select a file');
+      setValidationError('Please select a file to upload');
       return;
     }
+
+    // Clear validation errors before upload
+    setValidationError(null);
 
     const formData = new FormData();
     formData.append('file', selectedFile);
@@ -294,6 +318,13 @@ export default function UploadPage() {
               </div>
             )}
             
+            {/* Validation Error Display */}
+            {validationError && (
+              <div className="mt-4 bg-red-50 border border-red-200 rounded-md p-4">
+                <p className="text-red-800 text-sm">{validationError}</p>
+              </div>
+            )}
+            
             {errors.file && <p className="mt-1 text-sm text-red-600">{errors.file.message}</p>}
           </div>
 
@@ -437,6 +468,31 @@ export default function UploadPage() {
               )}
             </button>
           </div>
+
+          {/* Upload Progress */}
+          {uploadProgress > 0 && uploadProgress < 100 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-800">Uploading...</span>
+                <span className="text-sm text-blue-600">{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-blue-200 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out" 
+                  style={{ width: `${uploadProgress}%` }}
+                ></div>
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {uploadProgress === 100 && (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+              <p className="text-green-800 text-sm">
+                ✅ Upload completed successfully! Redirecting...
+              </p>
+            </div>
+          )}
 
           {uploadMutation.isError && (
             <div className="bg-red-50 border border-red-200 rounded-md p-4">
