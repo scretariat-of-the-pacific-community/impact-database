@@ -4,11 +4,11 @@ import React, { useState, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
-import { VocabulariesResponse } from '@/lib/types';
 import { Upload, ArrowLeft, X, FileImage } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { config } from '@/lib/config';
 
 interface UploadForm {
   file: FileList;
@@ -22,9 +22,9 @@ interface UploadForm {
   keywords?: string;
 }
 
-// File size constants
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
-const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.tiff', '.tif', '.gif'];
+// File size constants (synchronized with backend and config)
+const MAX_FILE_SIZE = config.UPLOAD.MAX_FILE_SIZE;
+const ALLOWED_EXTENSIONS = config.UPLOAD.ALLOWED_EXTENSIONS;
 
 export default function UploadPage() {
   const [dragActive, setDragActive] = useState(false);
@@ -46,7 +46,7 @@ export default function UploadPage() {
     console.log('Upload page - error:', error);
   }, [vocabData, isLoading, error]);
   
-  const { register, handleSubmit, formState: { errors }, setValue, watch, clearErrors } = useForm<UploadForm>();
+  const { register, handleSubmit, formState: { errors }, setValue, clearErrors } = useForm<UploadForm>();
 
   // File validation function
   const validateFile = useCallback((file: File): string | null => {
@@ -217,7 +217,7 @@ export default function UploadPage() {
                       type="file"
                       className="sr-only"
                       accept="image/*"
-                      onChange={(e: any) => {
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                         const file = e.target.files?.[0];
                         if (file) handleFileSelect(file);
                       }}
