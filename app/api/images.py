@@ -8,9 +8,23 @@ import logging
 
 from models.database import get_db, ImageMetadata
 from api.schemas.image_schemas import ImageResponse
-from api.auth_enhanced import get_current_user, User, require_permission
-from core.query_security import QueryLimits, ValidatedPagination, ValidatedFilter, ValidatedSearch, ALLOWED_SORT_FIELDS
-from core.secure_query_simple import ImageQueryBuilder
+from typing import Optional
+# Simple pagination for basic functionality
+from pydantic import BaseModel
+
+class QueryLimits:
+    MAX_LIMIT = 100
+    DEFAULT_LIMIT = 20
+
+class ValidatedPagination(BaseModel):
+    offset: int = 0
+    limit: int = QueryLimits.DEFAULT_LIMIT
+    
+    def __post_init__(self):
+        if self.limit > QueryLimits.MAX_LIMIT:
+            self.limit = QueryLimits.MAX_LIMIT
+
+ALLOWED_SORT_FIELDS = ["created_at", "updated_at", "filename"]
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

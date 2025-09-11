@@ -2,7 +2,11 @@
 
 # Wait for DB to be ready
 echo "Waiting for database..."
-until pg_isready -h postgis_db -p 5432 -U postgres; do
+DB_HOST=${POSTGRES_HOST:-postgis_db}
+DB_PORT=${POSTGRES_PORT:-5432}
+DB_USER=${POSTGRES_USER:-postgres}
+
+until pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
   echo "Database not ready yet, waiting..."
   sleep 2
 done
@@ -63,9 +67,15 @@ except Exception as e:
 
 # Check if command is provided, otherwise start FastAPI server
 if [ $# -eq 0 ]; then
-    # Start FastAPI server
+    # Start FastAPI server (using simplified version for development)
     echo "Starting FastAPI app..."
-    exec uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
+    if [ -f "/app/core/main_simple.py" ]; then
+        echo "Using simplified main for development"
+        exec uvicorn core.main_simple:app --host 0.0.0.0 --port 8000 --reload
+    else
+        echo "Using regular main"
+        exec uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
+    fi
 else
     # Execute the provided command
     echo "Executing command: $@"

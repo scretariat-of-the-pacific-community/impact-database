@@ -337,15 +337,21 @@ export default function UploadPage() {
                   Hazard Type *
                 </label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 appearance-none"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.5em 1.5em'
+                  }}
                   {...register('hazard_type', { required: 'Hazard type is required' })}
                   disabled={isLoading}
                 >
-                  <option value="">
+                  <option value="" style={{ backgroundColor: 'white', color: '#374151' }}>
                     {isLoading ? 'Loading hazard types...' : 'Select hazard type'}
                   </option>
                   {vocabData?.hazard_types?.map((type: { id: string; label: string; description: string }) => (
-                    <option key={type.id} value={type.id}>
+                    <option key={type.id} value={type.id} style={{ backgroundColor: 'white', color: '#374151' }}>
                       {type.label}
                     </option>
                   ))}
@@ -375,15 +381,21 @@ export default function UploadPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 appearance-none"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.5em 1.5em'
+                  }}
                   {...register('country')}
                   disabled={isLoading}
                 >
-                  <option value="">
+                  <option value="" style={{ backgroundColor: 'white', color: '#374151' }}>
                     {isLoading ? 'Loading countries...' : 'Select country'}
                   </option>
                   {vocabData?.countries?.map((country: { id: string; label: string }) => (
-                    <option key={country.id} value={country.id}>
+                    <option key={country.id} value={country.id} style={{ backgroundColor: 'white', color: '#374151' }}>
                       {country.label}
                     </option>
                   ))}

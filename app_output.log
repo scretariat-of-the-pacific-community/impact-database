@@ -1,0 +1,38 @@
+nohup: ignoring input
+🚀 Starting Impact Database Application (Simplified Mode)
+==========================================================
+✅ Virtual environment activated: /home/kishank/impact-database/fresh_venv
+📝 Configuration:
+  Environment: development
+  Database: SQLite (local file)
+  Debug: true
+📁 Created local storage directory: uploads/
+🔍 Validating application modules...
+INFO:core.config:Initializing Impact Database API v1.0.0
+INFO:core.config:Environment: development
+INFO:core.config:Debug mode: True
+INFO:core.config:Configuration validation completed successfully
+✅ Configuration loaded successfully
+  Environment: development
+  Database URL: sqlite:///./app.db
+
+🎯 Starting FastAPI server...
+   API: http://localhost:8000
+   Docs: http://localhost:8000/docs
+   Health: http://localhost:8000/health
+
+Press Ctrl+C to stop the server
+
+INFO:     Will watch for changes in these directories: ['/home/kishank/impact-database/app']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [13033] using StatReload
+WARNING:core.main_simple:Could not import routers: No module named 'geoalchemy2'
+INFO:     Started server process [13038]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:47406 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:48428 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60685 - "GET /docs?id=78134fea-a52a-4939-8677-40a9eae55287&vscodeBrowserReqId=1757476654349 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60685 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44990 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44998 - "GET /health HTTP/1.1" 200 OK

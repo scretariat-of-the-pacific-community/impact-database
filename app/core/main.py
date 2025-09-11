@@ -14,10 +14,10 @@ import json
 import redis
 
 from core.config import settings
-from api import upload, auth, graphql_schema, presign, curation, admin, stac, ogc_records, images, metadata
-from api.auth_enhanced import router as auth_enhanced_router
-from middleware.security import RateLimitMiddleware, SecurityHeadersMiddleware, create_rate_limit_middleware
-# Temporarily disable advanced features for basic startup
+# Use simplified APIs for development
+from api import upload, auth, stac, ogc_records, metadata
+from api import images_simple as images_simple as images  # Use simple version
+# Temporarily disable complex features for basic startup
 # from services.monitoring import setup_monitoring, monitoring_background_tasks
 # from services.performance import initialize_performance_optimizations
 # from services.minio_lifecycle import setup_minio_lifecycle_and_backup

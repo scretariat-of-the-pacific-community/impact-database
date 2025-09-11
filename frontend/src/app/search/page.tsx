@@ -20,9 +20,6 @@ import {
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
-import { configureLeafletIcons } from '@/lib/leaflet-config';
-import { createCustomIcon } from '@/lib/mapUtils';
-
 import { imageApi } from '@/lib/api';
 import { SearchFilters, ImageMetadata, HazardType, SourceAgency, HAZARD_TYPE_LABELS, SOURCE_AGENCY_LABELS } from '@/lib/types';
 
@@ -30,6 +27,41 @@ const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContai
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
 const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
 const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+
+// Simple icon creation function that's safe for SSR
+const createSimpleIcon = (hazardType: string) => {
+  if (typeof window === 'undefined') return null;
+  
+  const L = require('leaflet');
+  
+  const colors: Record<string, string> = {
+    flood: '#3b82f6',
+    cyclone: '#8b5cf6',
+    drought: '#eab308',
+    earthquake: '#ef4444',
+    tsunami: '#06b6d4',
+    landslide: '#f97316',
+    wildfire: '#dc2626',
+  };
+
+  const color = colors[hazardType] || '#6b7280';
+  
+  return L.divIcon({
+    className: 'custom-div-icon',
+    html: `
+      <div style="
+        background-color: ${color};
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        border: 2px solid white;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      "></div>
+    `,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+};
 
 interface SearchPageState {
   searchQuery: string;
@@ -46,10 +78,6 @@ interface SearchPageState {
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  useEffect(() => {
-    configureLeafletIcons();
-  }, []);
   
   const [state, setState] = useState<SearchPageState>({
     searchQuery: searchParams.get('q') || '',
@@ -401,7 +429,7 @@ export default function SearchPage() {
                       <Marker
                         key={image.id}
                         position={[image.latitude, image.longitude] as [number, number]}
-                        icon={createCustomIcon(image.hazard_type)}
+                        icon={createSimpleIcon(image.hazard_type)}
                       >
                         <Popup>
                           <div className="text-sm">

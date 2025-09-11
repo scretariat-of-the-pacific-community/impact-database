@@ -287,7 +287,7 @@ export const oceanPortalApi = new APIClient();
 
 // Legacy image API for backward compatibility
 export const imageApi = {
-  getAll: () => apiClient.get<ImageMetadata[]>('/api/images'),
+  getAll: () => apiClient.get<ImageMetadata[]>('/api/images/list'),  // Use the new list endpoint
   getById: (filename: string) => oceanPortalApi.getImage(filename),
   getByHazard: (hazardType: string) => apiClient.get('/api/hazards', { params: { type: hazardType } }),
   upload: (formData: FormData, onProgress?: (progress: number) => void) => {
@@ -326,7 +326,7 @@ export const imageApi = {
       }
       
       // Send request
-      xhr.open('POST', getApiUrl('/api/upload/upload'));
+      xhr.open('POST', getApiUrl('/upload/upload'));
       xhr.send(formData);
     });
   },

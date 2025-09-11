@@ -59,7 +59,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -74,7 +74,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
     networks:
@@ -90,8 +90,8 @@ services:
   minio:
     image: minio/minio:latest
     ports:
-      - "9010:9000"
-      - "9011:9001"
+      - "9020:9000"
+      - "9021:9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
@@ -112,7 +112,7 @@ services:
       context: ./app
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8001:8000"
     env_file:
       - .env
     environment:
@@ -244,9 +244,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8001
       - NEXT_PUBLIC_API_VERSION=v1
       - NEXT_PUBLIC_ENABLE_GUEST_ACCESS=true
       - NEXT_PUBLIC_ENABLE_MAP_VIEW=true
@@ -260,7 +260,7 @@ services:
       - NEXT_PUBLIC_CACHE_TTL=300
       - NEXT_PUBLIC_SPC_SSO_ISSUER=https://sso.spc.int
       - NEXT_PUBLIC_SPC_SSO_CLIENT_ID=ocean-portal
-      - NEXT_PUBLIC_IMAGE_PROXY_URL=http://localhost:8000/api/v1/images/proxy
+      - NEXT_PUBLIC_IMAGE_PROXY_URL=http://localhost:8001/api/v1/images/proxy
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
     depends_on:

@@ -6,8 +6,23 @@ from geoalchemy2 import Geometry
 from datetime import datetime
 import uuid
 import os
+import logging
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://impact_user:impact_password123@localhost:5432/impact_database")
+logger = logging.getLogger(__name__)
+
+# Get database URL from unified configuration
+def get_database_url():
+    """Get database URL from environment with fallback"""
+    try:
+        from core.config import Settings
+        settings = Settings()
+        return settings.DATABASE_URL
+    except Exception as e:
+        logger.warning(f"Could not load settings: {e}, using fallback")
+        return os.getenv("DATABASE_URL", "sqlite:///./app.db")
+
+DATABASE_URL = get_database_url()
+logger.info(f"Using database: {DATABASE_URL.split('@')[0] if '@' in DATABASE_URL else DATABASE_URL}")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

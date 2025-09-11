@@ -44,10 +44,25 @@ export default function ImageDetailPage() {
   
   const imageId = params.id as string;
   
+  // Handle invalid image IDs
+  if (!imageId || imageId === 'undefined' || imageId === 'null') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 text-xl mb-2">Invalid Image ID</div>
+          <p className="text-gray-500 mb-4">No valid image ID was provided</p>
+          <Link href="/search" className="text-blue-600 hover:text-blue-700">
+            Back to search
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  
   const { data: image, isLoading, error } = useQuery({
     queryKey: ['image', imageId],
     queryFn: () => imageApi.getById(imageId),
-    enabled: !!imageId
+    enabled: !!imageId && imageId !== 'undefined' && imageId !== 'null'
   });
 
   // Construct the image URL
