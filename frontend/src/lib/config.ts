@@ -2,9 +2,19 @@
  * Configuration settings for the frontend application
  */
 
+// Helper to determine the correct API URL based on execution context
+const getBaseApiUrl = (): string => {
+  // Server-side (SSR/SSG) in Docker: use internal service name
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL_INTERNAL || process.env.NEXT_PUBLIC_API_URL || 'http://api:8000';
+  }
+  // Client-side (browser): use external URL accessible from host
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+};
+
 const config = {
   API: {
-    BASE_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
+    BASE_URL: getBaseApiUrl(),
     TIMEOUT: 30000,
   },
   UPLOAD: {
