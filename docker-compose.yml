@@ -107,7 +107,7 @@ services:
       start_period: 30s
     command: server /data --console-address ":9001"
 
-  web:
+  api:
     build:
       context: ./app
       dockerfile: Dockerfile
@@ -116,6 +116,7 @@ services:
     env_file:
       - .env
     environment:
+      - SERVICE_ROLE=api
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
@@ -156,6 +157,7 @@ services:
     env_file:
       - .env
     environment:
+      - SERVICE_ROLE=worker
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
@@ -181,7 +183,8 @@ services:
       - ./app:/app
       - uploads_data:/app/uploads
     restart: unless-stopped
-    command: celery -A workers.celery_app worker --loglevel=info --concurrency=2
+    healthcheck:
+      test: ["CMD", "true"]
 
   celery_beat:
     build:
@@ -190,6 +193,7 @@ services:
     env_file:
       - .env
     environment:
+      - SERVICE_ROLE=beat
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=${REDIS_URL}
       - MINIO_ENDPOINT=${MINIO_ENDPOINT}
@@ -215,7 +219,8 @@ services:
       - ./app:/app
       - uploads_data:/app/uploads
     restart: unless-stopped
-    command: celery -A workers.celery_app beat --loglevel=info
+    healthcheck:
+      test: ["CMD", "true"]
 
   flower:
     build:
@@ -226,6 +231,7 @@ services:
     env_file:
       - .env
     environment:
+      - SERVICE_ROLE=flower
       - REDIS_URL=${REDIS_URL}
       - ENVIRONMENT=${ENVIRONMENT}
       - PYTHONPATH=${PYTHONPATH}
@@ -237,7 +243,12 @@ services:
     volumes:
       - ./app:/app
     restart: unless-stopped
-    command: celery -A workers.celery_app flower --port=5555
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5555"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   frontend:
     build:
@@ -264,7 +275,7 @@ services:
       - NODE_ENV=development
       - NEXT_TELEMETRY_DISABLED=1
     depends_on:
-      web:
+      api:
         condition: service_healthy
     networks:
       - impact-network

@@ -15,8 +15,8 @@ import redis
 
 from core.config import settings
 # Use simplified APIs for development
-from api import upload, auth, stac, ogc_records, metadata
-from api import images_simple as images_simple as images  # Use simple version
+from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds
+from api import images_simple as images  # Use simple version
 # Temporarily disable complex features for basic startup
 # from services.monitoring import setup_monitoring, monitoring_background_tasks
 # from services.performance import initialize_performance_optimizations
@@ -50,8 +50,8 @@ if settings.REDIS_URL:
         logger.warning(f"Failed to connect to Redis: {e}. Using in-memory fallbacks.")
 
 # Add security middleware (order matters - add from outermost to innermost)
-app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
+# app.add_middleware(SecurityHeadersMiddleware)  # Commented out - not imported
+# app.add_middleware(RateLimitMiddleware, redis_client=redis_client)  # Commented out - not imported
 
 # Configure CORS - more restrictive in production
 if settings.ENVIRONMENT.lower() == "production":
@@ -83,21 +83,21 @@ app.add_middleware(
 )
 
 # Include routers with enhanced security
-app.include_router(auth_enhanced_router, prefix="/api/auth", tags=["auth"])
+# app.include_router(auth_enhanced_router, prefix="/api/auth", tags=["auth"])  # Commented out - not imported
 
 # Secure upload endpoint (replaces upload.py, upload_backup.py, upload_fixed.py)
-from api import upload_secure
-app.include_router(upload_secure.router, prefix="/api/upload", tags=["upload"])
+# from api import upload_secure  # Commented out - optional module
+# app.include_router(upload_secure.router, prefix="/api/upload", tags=["upload"])  # Commented out
 
 # Legacy upload endpoint for backward compatibility (will be deprecated)
-# app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
+app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
 
-app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["graphql"])
-app.include_router(presign.router, prefix="/api/presign", tags=["presign"])
+# app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["graphql"])  # Commented out - not imported
+# app.include_router(presign.router, prefix="/api/presign", tags=["presign"])  # Commented out - not imported
 
 # Admin endpoints - protected by RBAC
-app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])
-app.include_router(admin.router, prefix="/admin", tags=["admin"])
+# app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])  # Commented out - not imported
+# app.include_router(admin.router, prefix="/admin", tags=["admin"])  # Commented out - not imported
 
 # API endpoints - now require authentication
 app.include_router(images.router, prefix="/api", tags=["api", "images"])
@@ -106,6 +106,10 @@ app.include_router(metadata.router, prefix="/api", tags=["metadata"])
 # STAC and OGC API - Records with authentication
 app.include_router(stac.router, prefix="/stac", tags=["stac"])
 app.include_router(ogc_records.router, prefix="/ogc", tags=["ogc-records"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
+
+# Lightweight feeds for external integration
+app.include_router(feeds.router, prefix="/feeds", tags=["feeds"])
 
 # Setup monitoring - temporarily disabled
 # setup_monitoring(app)

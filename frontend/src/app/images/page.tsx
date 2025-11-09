@@ -5,9 +5,11 @@ import { imageApi } from '@/lib/api';
 import { ArrowLeft, MapPin, Calendar, Eye, X, Download, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import ImageFilters, { FilterState } from '@/components/ImageFilters';
+import { sanitizeText } from '@/lib/sanitize';
+import { Skeleton } from '@/components/design-system';
 
 interface ImageData {
   filename: string;
@@ -30,25 +32,94 @@ interface QuickViewModalProps {
   onClose: () => void;
 }
 
+const focusableSelectors =
+  'a[href], area[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"]), [role="button"]';
+
 function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const activeElementBeforeOpen = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (event.key === 'Tab' && modalRef.current) {
+        const focusable = Array.from(
+          modalRef.current.querySelectorAll<HTMLElement>(focusableSelectors)
+        ).filter((el) => !el.hasAttribute('disabled') && !el.getAttribute('aria-hidden'));
+
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        } else if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      }
+    };
+
+    activeElementBeforeOpen.current = document.activeElement as HTMLElement | null;
+    document.addEventListener('keydown', handleKeyDown);
+
+    // Focus the first interactive element inside the modal
+    const firstFocusable = modalRef.current?.querySelector<HTMLElement>(focusableSelectors);
+    firstFocusable?.focus();
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      activeElementBeforeOpen.current?.focus();
+      activeElementBeforeOpen.current = null;
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const imageUrl = `${process.env.NEXT_PUBLIC_API_URL}/upload/images/${encodeURIComponent(image.filename)}`;
   const downloadUrl = `${imageUrl}?download=true`;
+  const titleId = `quick-view-title-${image.filename}`;
+  const safeTitle = sanitizeText(image.title || image.filename);
+  const safeLocation = sanitizeText(image.location || 'Location not specified');
+  const safeCountry = sanitizeText(image.country || '');
+  const safeAbstract = sanitizeText(image.abstract || '');
+  const safeKeywords = (image.keywords || []).map((keyword) => sanitizeText(keyword));
+  const safeFilename = sanitizeText(image.filename);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+      role="presentation"
+      aria-hidden={!isOpen}
+    >
+      <div
+        ref={modalRef}
+        className="bg-white rounded-lg max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
+      >
         {/* Modal Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 truncate">
-            {image.title || image.filename}
+          <h2 id={titleId} className="text-xl font-semibold text-gray-900 truncate">
+            {safeTitle}
           </h2>
           <div className="flex items-center space-x-2">
             <a
               href={downloadUrl}
               className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-md"
               title="Download image"
+              aria-label="Download image"
             >
               <Download className="w-5 h-5" />
             </a>
@@ -56,12 +127,14 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
               href={`/images/${encodeURIComponent(image.filename)}`}
               className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-100 rounded-md"
               title="View full details"
+              aria-label="Open image details in a new page"
             >
               <ExternalLink className="w-5 h-5" />
             </Link>
             <button
               onClick={onClose}
               className="p-2 text-gray-600 hover:text-red-600 hover:bg-gray-100 rounded-md"
+              aria-label="Close quick view"
             >
               <X className="w-5 h-5" />
             </button>
@@ -75,7 +148,7 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
             <div className="relative max-w-full max-h-full">
               <Image
                 src={imageUrl}
-                alt={image.title || image.filename}
+                alt={safeTitle}
                 width={800}
                 height={600}
                 onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
@@ -100,9 +173,9 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
               <div className="flex items-start">
                 <MapPin className="w-5 h-5 mr-2 text-gray-400 mt-0.5" />
                 <div>
-                  <div className="font-medium text-gray-900">{image.location}</div>
+                  <div className="font-medium text-gray-900">{safeLocation}</div>
                   {image.country && (
-                    <div className="text-sm text-gray-600">{image.country}</div>
+                    <div className="text-sm text-gray-600">{safeCountry}</div>
                   )}
                   {image.latitude && image.longitude && (
                     <div className="text-xs text-gray-500 mt-1">
@@ -138,7 +211,7 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
               {image.abstract && (
                 <div>
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Description</h4>
-                  <p className="text-sm text-gray-600 leading-relaxed">{image.abstract}</p>
+                  <p className="text-sm text-gray-600 leading-relaxed">{safeAbstract}</p>
                 </div>
               )}
 
@@ -147,7 +220,7 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
                 <div>
                   <h4 className="text-sm font-medium text-gray-900 mb-2">Keywords</h4>
                   <div className="flex flex-wrap gap-1">
-                    {image.keywords.map((keyword, index) => (
+                    {safeKeywords.map((keyword, index) => (
                       <span
                         key={index}
                         className="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded"
@@ -163,7 +236,7 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
               <div>
                 <h4 className="text-sm font-medium text-gray-900 mb-2">File Information</h4>
                 <div className="text-xs text-gray-600 space-y-1">
-                  <div>Filename: {image.filename}</div>
+                  <div>Filename: {safeFilename}</div>
                   {image.file_size && (
                     <div>Size: {(image.file_size / (1024 * 1024)).toFixed(2)} MB</div>
                   )}
@@ -179,17 +252,22 @@ function QuickViewModal({ image, isOpen, onClose }: QuickViewModalProps) {
 
 function ImageThumbnail({ image, onClick }: { image: ImageData; onClick: () => void }) {
   const imageUrl = `${process.env.NEXT_PUBLIC_API_URL}/upload/images/${encodeURIComponent(image.filename)}`;
+  const safeTitle = sanitizeText(image.title || image.filename);
+  const safeLocation = sanitizeText(image.location || 'Location not specified');
+  const safeAbstract = sanitizeText(image.abstract || '');
 
   return (
-    <div 
-      className="bg-white rounded-lg shadow hover:shadow-lg transition-all duration-200 cursor-pointer group"
+    <button
+      type="button"
+      className="bg-white rounded-lg shadow hover:shadow-lg transition-all duration-200 group text-left w-full focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
       onClick={onClick}
+      aria-label={`Open quick view for ${safeTitle}`}
     >
       {/* Thumbnail Image */}
       <div className="aspect-video relative overflow-hidden rounded-t-lg bg-gray-100">
         <Image
           src={imageUrl}
-          alt={image.title || image.filename}
+          alt={safeTitle}
           fill
           className="object-cover group-hover:scale-105 transition-transform duration-200"
           onError={(e) => {
@@ -211,13 +289,13 @@ function ImageThumbnail({ image, onClick }: { image: ImageData; onClick: () => v
       {/* Card Content */}
       <div className="p-4">
         <h3 className="font-semibold text-gray-900 truncate mb-2">
-          {image.title || image.filename}
+          {safeTitle}
         </h3>
         
         <div className="space-y-2 text-sm text-gray-600">
           <div className="flex items-center">
             <MapPin className="w-4 h-4 mr-2 text-gray-400 flex-shrink-0" />
-            <span className="truncate">{image.location}</span>
+            <span className="truncate">{safeLocation}</span>
             {image.country && <span className="text-gray-400 ml-1">({image.country})</span>}
           </div>
           
@@ -235,26 +313,46 @@ function ImageThumbnail({ image, onClick }: { image: ImageData; onClick: () => v
           )}
         </div>
         
-        {image.abstract && (
-          <p className="mt-3 text-sm text-gray-600 line-clamp-2 leading-relaxed">
-            {image.abstract}
-          </p>
-        )}
+          {image.abstract && (
+            <p className="mt-3 text-sm text-gray-600 line-clamp-2 leading-relaxed">
+            {safeAbstract}
+            </p>
+          )}
       </div>
-    </div>
+    </button>
   );
 }
+const IMAGES_PAGE_SIZE = 24;
+
 // Ensure the file is treated as a module with JSX support
+const IMAGE_FILTER_STORAGE_KEY = 'gallery_filters_v1';
+
 export default function ImagesPage() {
+  const persistedFilters =
+    typeof window !== 'undefined'
+      ? JSON.parse(localStorage.getItem(IMAGE_FILTER_STORAGE_KEY) ?? 'null')
+      : null;
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [filters, setFilters] = useState<FilterState>({
-    searchTerm: '',
-    hazardTypes: [],
-    countries: [],
-    dateRange: {},
-    sortBy: 'date',
-    sortOrder: 'desc',
+    searchTerm: persistedFilters?.searchTerm || '',
+    hazardTypes: persistedFilters?.hazardTypes || [],
+    countries: persistedFilters?.countries || [],
+    dateRange: persistedFilters?.dateRange || {},
+    sortBy: persistedFilters?.sortBy || 'date',
+    sortOrder: persistedFilters?.sortOrder || 'desc',
   });
+  const [currentPage, setCurrentPage] = useState(1);
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(
+      IMAGE_FILTER_STORAGE_KEY,
+      JSON.stringify({ ...filters })
+    );
+  }, [filters]);
 
   const { data: images, isLoading, error } = useQuery<ImageData[]>({
     queryKey: ['images'],
@@ -322,8 +420,8 @@ export default function ImagesPage() {
         }
       }
 
-      return true;
-    });
+    return true;
+  });
 
     // Apply sorting
     filtered.sort((a: ImageData, b: ImageData) => {
@@ -359,6 +457,25 @@ export default function ImagesPage() {
     return filtered;
   }, [images, filters]);
 
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedImages.length / IMAGES_PAGE_SIZE));
+  const paginatedImages = useMemo(() => {
+    const start = (currentPage - 1) * IMAGES_PAGE_SIZE;
+    return filteredAndSortedImages.slice(start, start + IMAGES_PAGE_SIZE);
+  }, [filteredAndSortedImages, currentPage]);
+  const showingFrom =
+    filteredAndSortedImages.length === 0 ? 0 : (currentPage - 1) * IMAGES_PAGE_SIZE + 1;
+  const showingTo = Math.min(
+    currentPage * IMAGES_PAGE_SIZE,
+    filteredAndSortedImages.length
+  );
+
+  const handleImagePageChange = (page: number) => {
+    setCurrentPage(page);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -386,11 +503,6 @@ export default function ImagesPage() {
         <div className="mb-6">
           <ImageFilters
             filters={filters}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Enhanced Filters */}
-        <div className="mb-6">
-          <ImageFilters
-            filters={filters}
             onFiltersChange={setFilters}
             availableHazardTypes={availableHazardTypes}
             availableCountries={availableCountries}
@@ -401,7 +513,11 @@ export default function ImagesPage() {
 
         {/* Images Grid */}
         {isLoading ? (
-          <div className="text-center py-12 text-gray-500">Loading images...</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <Skeleton key={index} className="h-48 w-full rounded-2xl" />
+            ))}
+          </div>
         ) : error ? (
           <div className="text-center py-12 text-red-500">Failed to load images.</div>
         ) : Array.isArray(images) && images.length === 0 ? (
@@ -419,14 +535,45 @@ export default function ImagesPage() {
             No images match your search criteria.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredAndSortedImages.map((image: ImageData) => (
-              <ImageThumbnail
-                key={image.filename}
-                image={image}
-                onClick={() => setSelectedImage(image)}
-              />
-            ))}
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm text-gray-600 mb-4 gap-2">
+              <span>
+                Showing {showingFrom}-{showingTo} of {filteredAndSortedImages.length.toLocaleString()} images
+              </span>
+              <span className="text-xs text-gray-500">
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {paginatedImages.map((image: ImageData) => (
+                <ImageThumbnail
+                  key={image.filename}
+                  image={image}
+                  onClick={() => setSelectedImage(image)}
+                />
+              ))}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 mt-8">
+                <button
+                  onClick={() => handleImagePageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2 border rounded-md text-sm disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-600">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handleImagePageChange(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2 border rounded-md text-sm disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </main>

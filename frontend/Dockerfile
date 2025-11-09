@@ -2,10 +2,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Disable SSL verification for Alpine packages (development only)
-RUN echo "http://dl-cdn.alpinelinux.org/alpine/v3.18/main" > /etc/apk/repositories && \
-    echo "http://dl-cdn.alpinelinux.org/alpine/v3.18/community" >> /etc/apk/repositories && \
-    apk update && apk add --no-cache libc6-compat curl
+# Use default HTTPS repositories and install ca-certificates
+RUN apk update && apk add --no-cache ca-certificates libc6-compat curl
 
 # Copy package files
 COPY package*.json ./

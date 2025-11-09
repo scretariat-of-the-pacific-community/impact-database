@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
 import {
   FunnelIcon,
   MagnifyingGlassIcon,
@@ -19,6 +20,8 @@ import {
   ArrowsRightLeftIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import ErrorBanner from './ErrorBanner';
+import { sanitizeText } from '@/lib/sanitize';
 
 interface CurationItem {
   id: string;
@@ -68,7 +71,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
 
   const queryClient = useQueryClient();
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['curation-queue', filters, sortBy, sortOrder, currentPage, pageSize],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -173,16 +176,18 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
   }
 
   if (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'We were unable to contact the admin API. This might be a temporary issue.';
     return (
-      <div className="bg-red-50 border border-red-200 rounded-md p-4">
-        <div className="flex">
-          <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800">Error loading curation queue</h3>
-            <p className="text-sm text-red-700 mt-1">Please try refreshing the page.</p>
-          </div>
-        </div>
-      </div>
+      <ErrorBanner
+        title="Error loading curation queue"
+        message={message}
+        tone="error"
+        onRetry={() => refetch()}
+        retryLabel="Retry"
+      />
     );
   }
 
@@ -285,6 +290,17 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
         </div>
 
         <AnimatePresence>
+          {data?.items?.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-center py-12"
+            >
+              <QueueListIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">The queue is empty</h3>
+              <p className="text-gray-500">There are no submissions to review at this time.</p>
+            </motion.div>
+          )}
           {data?.items?.map((item: CurationItem) => (
             <motion.div
               key={item.id}
@@ -295,16 +311,30 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
                 selectedItemId === item.id ? 'bg-blue-50 border-blue-200' : ''
               }`}
               onClick={() => onItemSelect?.(item)}
+              role="button"
+              tabIndex={0}
+              aria-label={`Open submission ${sanitizeText(item.title || item.imageId)}`}
+              onKeyDown={(event) => {
+                if ((event.key === 'Enter' || event.key === ' ') && onItemSelect) {
+                  event.preventDefault();
+                  onItemSelect(item);
+                }
+              }}
             >
               <div className="flex items-start space-x-4">
                 {/* Thumbnail */}
                 <div className="flex-shrink-0">
                   {item.thumbnailUrl ? (
-                    <img
-                      src={item.thumbnailUrl}
-                      alt={item.title}
-                      className="h-16 w-16 rounded-lg object-cover"
-                    />
+                    <div className="relative h-16 w-16">
+                      <Image
+                        src={item.thumbnailUrl}
+                        alt={item.title || 'Submission thumbnail'}
+                        fill
+                        sizes="64px"
+                        className="rounded-lg object-cover"
+                        unoptimized
+                      />
+                    </div>
                   ) : (
                     <div className="h-16 w-16 bg-gray-200 rounded-lg flex items-center justify-center">
                       <span className="text-gray-400 text-xs">No image</span>
@@ -317,18 +347,18 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
                   <div className="flex items-start justify-between">
                     <div>
                       <h3 className="text-lg font-medium text-gray-900 truncate">
-                        {item.title || 'Untitled'}
+                        {sanitizeText(item.title || 'Untitled')}
                       </h3>
                       <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                        {item.description || 'No description'}
+                        {sanitizeText(item.description || 'No description')}
                       </p>
                       <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                        <span>ID: {item.imageId}</span>
-                        <span>Hazard: {item.metadata.hazardType}</span>
+                        <span>ID: {sanitizeText(item.imageId)}</span>
+                        <span>Hazard: {sanitizeText(item.metadata.hazardType)}</span>
                         {item.location && (
-                          <span>📍 {item.location.address}</span>
+                          <span>📍 {sanitizeText(item.location.address)}</span>
                         )}
-                        <span>👤 {item.submittedBy}</span>
+                        <span>👤 {sanitizeText(item.submittedBy)}</span>
                       </div>
                     </div>
 
@@ -336,7 +366,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
                     <div className="flex flex-col items-end space-y-2">
                       <div className="flex items-center space-x-2">
                         {item.flagged && (
-                          <FlagIcon className="h-4 w-4 text-red-500" title={item.flagReason} />
+                          <FlagIcon className="h-4 w-4 text-red-500" title={sanitizeText(item.flagReason || 'Flagged')} />
                         )}
                         {item.commentsCount > 0 && (
                           <div className="flex items-center text-gray-500">
@@ -365,6 +395,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
                           }}
                           className="p-1 text-green-600 hover:bg-green-100 rounded"
                           title="Approve"
+                          aria-label="Approve submission"
                         >
                           <CheckCircleIcon className="h-4 w-4" />
                         </button>
@@ -375,6 +406,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
                           }}
                           className="p-1 text-red-600 hover:bg-red-100 rounded"
                           title="Reject"
+                          aria-label="Reject submission"
                         >
                           <XCircleIcon className="h-4 w-4" />
                         </button>
@@ -385,6 +417,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
                           }}
                           className="p-1 text-orange-600 hover:bg-orange-100 rounded"
                           title="Flag"
+                          aria-label="Flag submission for review"
                         >
                           <FlagIcon className="h-4 w-4" />
                         </button>

@@ -2,11 +2,11 @@ import { render, screen } from '@testing-library/react';
 import HomePage from '@/app/page';
 
 jest.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: [], isLoading: false, error: null }),
+  useQuery: () => ({ data: { images: [] }, isLoading: false, error: null }),
 }));
 
 jest.mock('@/lib/api', () => ({
-  imageApi: { getAll: jest.fn() },
+  imageApi: { search: jest.fn() },
 }));
 
 describe('Home page', () => {
@@ -15,4 +15,3 @@ describe('Home page', () => {
     expect(screen.getByText(/SPC Ocean Portal/i)).toBeInTheDocument();
   });
 });
-

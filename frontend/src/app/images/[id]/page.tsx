@@ -160,7 +160,7 @@ export default function ImageDetailPage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200">
               {/* Tab Navigation */}
               <div className="border-b border-gray-200">
-                <nav className="flex space-x-8 px-6">
+                <nav className="flex space-x-8 px-6" role="navigation" aria-label="Image detail sections">
                   <button
                     onClick={() => setActiveTab('overview')}
                     className={`py-4 border-b-2 font-medium text-sm transition-colors ${

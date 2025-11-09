@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 # Import your models
 from models.database import Base
 from models.curation import *
+from models.webhook import *
 from services.admin_service import *
 
 # this is the Alembic Config object, which provides

@@ -1,6 +1,13 @@
 from pydantic import BaseModel, Field, validator
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from enum import Enum
+
+class StatusEnum(str, Enum):
+    """Status values for image metadata"""
+    PENDING_REVIEW = "pending_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 class ImageMetadataUpdate(BaseModel):
     """Schema for updating image metadata"""
@@ -28,6 +35,14 @@ class ImageMetadataUpdate(BaseModel):
     photographer: Optional[str] = Field(None, max_length=255)
     date_taken: Optional[str] = Field(None, description="Date when photo was taken")
     camera_model: Optional[str] = Field(None, max_length=255)
+    
+    # Core metadata fields
+    event_id: Optional[str] = Field(None, max_length=255, description="Event identifier")
+    positional_accuracy: Optional[float] = Field(None, ge=0, description="Positional accuracy in meters")
+    
+    # Status and review (admin only)
+    status: Optional[StatusEnum] = Field(None, description="Review status (admin only)")
+    review_notes: Optional[str] = Field(None, max_length=2000, description="Review notes (admin only)")
     
     # Contact and citation info
     metadata_contact: Optional[Dict[str, Any]] = Field(None)

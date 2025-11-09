@@ -1,0 +1,23 @@
+# Compose overrides for production mode.
+# Currently mirrors the base services but maps canonical public ports.
+# Future steps can swap in optimized images/commands.
+
+services:
+  postgis_db:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  api:
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENV: prod
+      MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:-impact-images}"
+
+  frontend:
+    ports:
+      - "3000:3000"

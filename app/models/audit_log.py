@@ -1,9 +1,9 @@
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
-Base = declarative_base()
+# Import Base from database module to ensure same declarative base
+from models.database import Base
 
 class AuditLog(Base):
     """Audit log for tracking all metadata changes"""
@@ -14,18 +14,18 @@ class AuditLog(Base):
     # What was changed
     table_name = Column(String(50), nullable=False, index=True)
     record_id = Column(String(255), nullable=False, index=True)
-    action = Column(String(20), nullable=False, index=True)  # CREATE, UPDATE, DELETE
+    action = Column(String(20), nullable=False, index=True)  # CREATE, UPDATE, DELETE, STATUS_CHANGE
     field_name = Column(String(100), nullable=True)
     
     # Change details
     old_value = Column(Text, nullable=True)
     new_value = Column(Text, nullable=True)
-    change_summary = Column(JSON, nullable=True)
+    change_summary = Column(JSON, nullable=True)  # {field: {old: value, new: value}}
     
     # Who and when
     user_id = Column(String(255), nullable=False, index=True)
     username = Column(String(255), nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc), nullable=False, index=True)
     
     # Additional context
     session_id = Column(String(255), nullable=True)
@@ -33,9 +33,35 @@ class AuditLog(Base):
     user_agent = Column(String(500), nullable=True)
     api_endpoint = Column(String(255), nullable=True)
     
-    # Validation status at time of change
+    # Review notes (for status changes)
+    review_notes = Column(Text, nullable=True)
+    
+    # Validation status at time of change (optional)
     validation_status = Column(String(20), nullable=True)  # VALID, INVALID, QUARANTINED
     validation_errors = Column(JSON, nullable=True)
+    
+    def to_dict(self):
+        """Convert to dictionary for JSON serialization"""
+        return {
+            'id': self.id,
+            'table_name': self.table_name,
+            'record_id': self.record_id,
+            'action': self.action,
+            'field_name': self.field_name,
+            'old_value': self.old_value,
+            'new_value': self.new_value,
+            'change_summary': self.change_summary,
+            'user_id': self.user_id,
+            'username': self.username,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None,
+            'session_id': self.session_id,
+            'ip_address': self.ip_address,
+            'user_agent': self.user_agent,
+            'api_endpoint': self.api_endpoint,
+            'review_notes': self.review_notes,
+            'validation_status': self.validation_status,
+            'validation_errors': self.validation_errors
+        }
 
 class QuarantinedRecord(Base):
     """Records that failed validation and are quarantined"""

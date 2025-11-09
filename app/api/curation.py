@@ -8,6 +8,9 @@ import zipfile
 import json
 import xml.etree.ElementTree as ET
 from xml.dom import minidom
+import logging
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -23,6 +26,7 @@ from models.curation import (
 from api.auth import get_current_user, User
 from services.metadata_validation import MetadataValidator
 from services.minio_client import get_minio_storage
+from workers.tasks import trigger_webhooks_on_approval
 
 router = APIRouter()
 
@@ -295,6 +299,20 @@ async def update_curation_item(
         if update_data.status in ['approved', 'rejected']:
             item.reviewed_by = current_user.username
             item.reviewed_at = datetime.utcnow()
+
+            # Also update the status of the associated ImageMetadata
+            image_metadata = item.image
+            if image_metadata:
+                # Store old status for logging
+                old_image_status = image_metadata.status
+                image_metadata.status = update_data.status
+                db.add(image_metadata)
+                
+                # If status transitioned to approved, trigger webhooks
+                if old_image_status != "approved" and image_metadata.status == "approved":
+                    trigger_webhooks_on_approval.delay(str(image_metadata.id))
+                    logger.info(f"Queued webhook trigger for approved image: {image_metadata.id}")
+
     
     if update_data.priority and update_data.priority != item.priority.value:
         changes['priority'] = {'from': item.priority.value, 'to': update_data.priority}
@@ -563,6 +581,14 @@ async def edit_image_metadata(
     if changes:
         image.metadata_date = datetime.utcnow()
         db.commit()
+
+        # If status changed to approved, trigger webhooks
+        if 'status' in changes and changes['status']['to'] == CurationStatus.APPROVED.value:
+            # Ensure image is loaded to get its ID
+            db.refresh(item) # Refresh item to ensure image relationship is loaded
+            if item.image and item.image.id:
+                trigger_webhooks_on_approval.delay(str(item.image.id))
+                logger.info(f"Queued webhook trigger for approved image: {item.image.id}")
         
         # Log to curation queue if exists
         queue_item = db.query(CurationQueue).filter(

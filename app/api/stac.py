@@ -17,6 +17,11 @@ from pydantic import BaseModel, Field
 from geojson import Point, Polygon, Feature, FeatureCollection
 
 from models.database import get_db, ImageMetadata
+from services.stac_generator import (
+    image_to_stac_item,
+    batch_images_to_stac_items,
+    get_collection_id_for_image,
+)
 from core.config import settings
 
 router = APIRouter()
@@ -126,97 +131,21 @@ def build_stac_links(request: Request, item_id: str = None, collection_id: str =
     
     return links
 
-def iso_to_stac_item(image: ImageMetadata, request: Request) -> STACItem:
-    """Convert ISO 19115 metadata to STAC Item"""
-    
-    # Build geometry
-    geometry = None
-    bbox = None
-    if image.latitude is not None and image.longitude is not None:
-        geometry = {
-            "type": "Point",
-            "coordinates": [image.longitude, image.latitude]
-        }
-        bbox = [image.longitude, image.latitude, image.longitude, image.latitude]
-    
-    # Map properties from ISO 19115 to STAC
-    properties = {
-        "datetime": image.timestamp.isoformat() if image.timestamp else None,
-        "title": image.title or image.filename,
-        "description": image.abstract,
-        "created": image.date_stamp.isoformat() if image.date_stamp else None,
-        "updated": image.metadata_date.isoformat() if image.metadata_date else None,
-        
-        # Custom properties from ISO 19115
-        "hazard:type": image.hazard_type,
-        "location:country": image.country,
-        "location:region": image.location,
-        "location:site": image.geographic_identifier,
-        
-        # ISO 19115 specific fields
-        "iso:purpose": image.purpose,
-        "iso:status": image.status,
-        "iso:maintenance_frequency": image.maintenance_frequency,
-        "iso:topic_category": image.topic_category,
-        "iso:keywords": image.keywords,
-        "iso:keyword_thesaurus": image.keyword_thesaurus,
-        "iso:lineage": image.lineage_statement,
-        "iso:source": image.source,
-        "iso:positional_accuracy": image.positional_accuracy,
-        "iso:use_constraints": image.use_constraints,
-        "iso:access_constraints": image.access_constraints,
-        "iso:security_classification": image.security_classification,
-        "iso:metadata_language": image.metadata_language,
-        "iso:metadata_standard": image.metadata_standard_name,
-        "iso:metadata_standard_version": image.metadata_standard_version,
-        
-        # Contact information
-        "contact:point_of_contact": image.point_of_contact,
-        
-        # Spatial extent
-        "spatial:bbox": image.geographic_bounding_box,
-        "spatial:vertical_extent": image.vertical_extent,
-        
-        # Temporal extent
-        "temporal:start": image.temporal_extent_start.isoformat() if image.temporal_extent_start else None,
-        "temporal:end": image.temporal_extent_end.isoformat() if image.temporal_extent_end else None,
-    }
-    
-    # Remove None values
-    properties = {k: v for k, v in properties.items() if v is not None}
-    
-    # Build assets
+# Use the shared STAC generator service for Item generation instead of
+# duplicating mapping logic here. The generator returns a dict compatible
+# with the STAC Item structure and handles geometry/asset/link construction.
+def _image_to_stac_via_generator(image: ImageMetadata, request: Request) -> Dict:
+    """Wrapper around services.stac_generator.image_to_stac_item to provide
+    a base_url and optional collection id based on the image."""
     base_url = str(request.base_url).rstrip('/')
-    assets = {
-        "image": STACAsset(
-            href=f"{base_url}/uploads/{image.filename}",
-            title="Original Image",
-            type=f"image/{image.format_name.lower()}" if image.format_name else "image/jpeg",
-            roles=["data"]
-        )
-    }
-    
-    # Add thumbnail if available
-    if image.thumbnail_url:
-        assets["thumbnail"] = STACAsset(
-            href=image.thumbnail_url,
-            title="Thumbnail",
-            type="image/jpeg",
-            roles=["thumbnail"]
-        )
-    
-    # Determine collection ID based on hazard type
-    collection_id = f"hazard-{image.hazard_type.lower()}" if image.hazard_type else "general"
-    
-    return STACItem(
-        id=image.filename,
-        collection=collection_id,
-        geometry=geometry,
-        bbox=bbox,
-        properties=properties,
-        links=build_stac_links(request, image.filename, collection_id),
-        assets=assets
-    )
+    # Prefer generator's collection naming for consistency
+    try:
+        collection_id = get_collection_id_for_image(image)
+    except Exception:
+        collection_id = None
+
+    # image_to_stac_item returns a dict
+    return image_to_stac_item(image, base_url, collection_id)
 
 def build_stac_collection(hazard_type: str, images: List[ImageMetadata], request: Request) -> STACCollection:
     """Build STAC Collection for a hazard type"""
@@ -267,7 +196,7 @@ def build_stac_collection(hazard_type: str, images: List[ImageMetadata], request
         ],
         extent=STACExtent(
             spatial={"bbox": [spatial_bbox]},
-            temporal={"interval": [[temporal_start, temporal_end]]}
+            temporal={"interval": [temporal_start, temporal_end] if temporal_start and temporal_end else []}
         ),
         links=build_stac_links(request, collection_id=collection_id),
         summaries=summaries
@@ -300,7 +229,8 @@ async def get_stac_conformance():
 @router.get("/collections", response_model=List[STACCollection])
 async def get_stac_collections(
     request: Request,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    status: Optional[List[str]] = Query(default=["approved"], description="Filter by status. Default: approved only")
 ):
     """Get all STAC collections"""
     # Get unique hazard types
@@ -310,9 +240,13 @@ async def get_stac_collections(
     for (hazard_type,) in hazard_types:
         if hazard_type:
             # Get images for this hazard type
-            images = db.query(ImageMetadata).filter(
+            images_q = db.query(ImageMetadata).filter(
                 ImageMetadata.hazard_type == hazard_type
-            ).limit(100).all()  # Limit for performance
+            )
+            # Apply status filter
+            if status:
+                images_q = images_q.filter(ImageMetadata.status.in_(status))
+            images = images_q.limit(100).all()  # Limit for performance
             
             collection = build_stac_collection(hazard_type, images, request)
             collections.append(collection)
@@ -332,10 +266,13 @@ async def get_stac_collection(
     
     hazard_type = collection_id.replace("hazard-", "").replace("-", "_")
     
-    # Get images for this hazard type
-    images = db.query(ImageMetadata).filter(
+    # Get images for this hazard type (default to approved only)
+    images_q = db.query(ImageMetadata).filter(
         ImageMetadata.hazard_type == hazard_type
-    ).all()
+    )
+    # Default behaviour: only approved images are returned in collection view
+    images_q = images_q.filter(ImageMetadata.status.in_(["approved"]))
+    images = images_q.all()
     
     if not images:
         raise HTTPException(status_code=404, detail="Collection not found")
@@ -350,7 +287,8 @@ async def get_stac_collection_items(
     limit: int = Query(10, ge=1, le=100),
     bbox: Optional[str] = Query(None, description="Bounding box as 'minx,miny,maxx,maxy'"),
     datetime: Optional[str] = Query(None, description="Date/time filter"),
-    offset: int = Query(0, ge=0)
+    offset: int = Query(0, ge=0),
+    status: Optional[List[str]] = Query(default=["approved"], description="Filter by status. Default: approved only")
 ):
     """Get items from a STAC collection"""
     # Extract hazard type from collection ID
@@ -361,6 +299,10 @@ async def get_stac_collection_items(
     
     # Build query
     query = db.query(ImageMetadata).filter(ImageMetadata.hazard_type == hazard_type)
+
+    # Status filter (default to approved only)
+    if status:
+        query = query.filter(ImageMetadata.status.in_(status))
     
     # Apply spatial filter
     if bbox:
@@ -395,7 +337,14 @@ async def get_stac_collection_items(
     images = query.offset(offset).limit(limit).all()
     
     # Convert to STAC items
-    stac_items = [iso_to_stac_item(img, request) for img in images]
+    # Convert to STAC items using shared generator
+    stac_items = []
+    for img in images:
+        try:
+            stac_items.append(_image_to_stac_via_generator(img, request))
+        except Exception:
+            # Skip images that fail STAC generation to keep listing responsive
+            continue
     
     # Build context
     context = {
@@ -451,7 +400,11 @@ async def get_stac_item(
     if collection_id != expected_collection:
         raise HTTPException(status_code=404, detail="Item not found in this collection")
     
-    return iso_to_stac_item(image, request)
+    # Use generator to produce canonical STAC Item dict
+    try:
+        return _image_to_stac_via_generator(image, request)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate STAC Item: {str(e)}")
 
 @router.post("/search", response_model=STACItemCollection)
 @router.get("/search", response_model=STACItemCollection)
@@ -468,6 +421,9 @@ async def search_stac_items(
     """STAC Item Search endpoint"""
     # Build base query
     db_query = db.query(ImageMetadata)
+
+    # Default status filter to approved images for search/list operations
+    db_query = db_query.filter(ImageMetadata.status.in_(["approved"]))
     
     # Filter by collections
     if collections:
@@ -521,8 +477,13 @@ async def search_stac_items(
     # Apply pagination
     images = db_query.offset(offset).limit(limit).all()
     
-    # Convert to STAC items
-    stac_items = [iso_to_stac_item(img, request) for img in images]
+    # Convert to STAC items using shared generator
+    stac_items = []
+    for img in images:
+        try:
+            stac_items.append(_image_to_stac_via_generator(img, request))
+        except Exception:
+            continue
     
     # Build context
     context = {

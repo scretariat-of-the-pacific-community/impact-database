@@ -1,8 +1,9 @@
 import os
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from PIL import Image
 import io
+from datetime import datetime, timezone
 
 from celery import Celery
 from sqlalchemy.orm import Session
@@ -11,7 +12,11 @@ from sqlalchemy import create_engine
 from .celery_app import celery_app
 from services.minio_client import get_minio_client, get_minio_storage
 from models.database import ImageMetadata
+from models.webhook import WebhookSubscription
 from core.config import settings
+import requests
+import json
+from services.stac_generator import image_to_stac_item
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +24,101 @@ logger = logging.getLogger(__name__)
 
 # Database setup for tasks
 engine = create_engine(settings.DATABASE_URL)
+
+@celery_app.task(bind=True, max_retries=5, default_retry_delay=300) # Retry up to 5 times, with 5 min delay
+def trigger_webhooks_on_approval(self, image_id: str):
+    """
+    Trigger webhooks for approved ImageMetadata records.
+    """
+    logger.info(f"Attempting to trigger webhooks for approved image_id: {image_id}")
+    db_session = None
+    try:
+        db_session = Session(engine)
+        image = db_session.query(ImageMetadata).filter(ImageMetadata.id == image_id).first()
+
+        if not image:
+            logger.warning(f"ImageMetadata with ID {image_id} not found for webhook triggering.")
+            return
+
+        # Construct a base STAC Item for the image
+        # We need a dummy request object for image_to_stac_item
+        class DummyRequest:
+            @property
+            def base_url(self):
+                return settings.API_BASE_URL # Assuming API_BASE_URL is configured
+        
+        dummy_request = DummyRequest()
+        stac_item_payload = image_to_stac_item(image, str(dummy_request.base_url).rstrip('/'), None)
+
+        active_subscriptions = db_session.query(WebhookSubscription).filter(
+            WebhookSubscription.is_active == True
+        ).all()
+
+        for subscription in active_subscriptions:
+            if self._matches_filters(image, subscription.filters):
+                logger.info(f"Triggering webhook {subscription.id} at {subscription.callback_url} for image {image_id}")
+                try:
+                    # TODO: Implement proper authentication/signing for webhooks
+                    response = requests.post(
+                        subscription.callback_url,
+                        json=stac_item_payload, # Send the full STAC item
+                        timeout=10 # 10 second timeout
+                    )
+                    response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+                    logger.info(f"Webhook {subscription.id} successfully triggered. Status: {response.status_code}")
+                    # Reset failure count on success
+                    subscription.failure_count = 0
+                    subscription.last_failure_reason = None
+                    subscription.last_triggered_at = datetime.now(timezone.utc)
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Webhook {subscription.id} failed to trigger for image {image_id}: {e}")
+                    subscription.failure_count += 1
+                    subscription.last_failure_reason = str(e)
+                    # TODO: Implement logic to deactivate webhook after N failures
+                finally:
+                    db_session.add(subscription)
+                    db_session.commit()
+
+    except Exception as exc:
+        logger.error(f"Error in trigger_webhooks_on_approval for image {image_id}: {exc}")
+        if db_session: # Ensure session is rolled back on unexpected errors
+            db_session.rollback()
+        raise self.retry(exc=exc)
+    finally:
+        if db_session:
+            db_session.close()
+
+def _matches_filters(image: ImageMetadata, filters: Optional[Dict[str, Any]]) -> bool:
+    """
+    Helper to check if an image matches the subscription filters.
+    """
+    if not filters:
+        return True # No filters means match all
+
+    # Bbox filter (simple intersection check)
+    if "bbox" in filters and image.geometry:
+        sub_bbox = filters["bbox"]
+        # Assuming sub_bbox is [minx, miny, maxx, maxy]
+        # This is a very basic check, a proper geospatial intersection would be more complex
+        # For now, check if image point is within the bbox
+        if image.longitude is not None and image.latitude is not None:
+            if not (
+                sub_bbox[0] <= image.longitude <= sub_bbox[2] and
+                sub_bbox[1] <= image.latitude <= sub_bbox[3]
+            ):
+                return False
+
+    # Hazard type filter
+    if "hazard_type" in filters:
+        if image.hazard_type.lower() != filters["hazard_type"].lower():
+            return False
+
+    # Event ID filter
+    if "event_id" in filters:
+        if image.event_id != filters["event_id"]:
+            return False
+
+    return True
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def process_upload(self, file_metadata: Dict[str, Any], bucket_name: str, object_key: str):

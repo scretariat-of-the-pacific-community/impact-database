@@ -2,16 +2,19 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, AuthSession } from '@/lib/types';
+import { sanitizeReturnUrl } from '@/lib/security';
 
 interface AuthContextType {
   user: User | null;
   session: AuthSession | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  error: string | null;
   signIn: (returnUrl?: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (role: string) => boolean;
   handleCallback: (code: string, state?: string) => Promise<void>;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const isAuthenticated = !!user && !!session;
 
@@ -58,6 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Auth initialization failed:', error);
+      setAuthError('Unable to verify your session. Please sign in again.');
       clearStoredSession();
     } finally {
       setIsLoading(false);
@@ -66,13 +71,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (returnUrl?: string) => {
     try {
+      setAuthError(null);
       // Generate PKCE challenge for security
       const { codeVerifier, codeChallenge } = await generatePKCE();
       
       // Store PKCE verifier and return URL
       sessionStorage.setItem('oauth_code_verifier', codeVerifier);
-      if (returnUrl) {
-        sessionStorage.setItem('oauth_return_url', returnUrl);
+      const safeReturnUrl = sanitizeReturnUrl(returnUrl);
+      if (safeReturnUrl) {
+        sessionStorage.setItem('oauth_return_url', safeReturnUrl);
       }
 
       // Build authorization URL
@@ -82,6 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.location.href = authUrl;
     } catch (error) {
       console.error('Sign in failed:', error);
+      setAuthError('We could not start the sign-in flow. Please check your network and try again.');
       throw error;
     }
   };
@@ -93,6 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Clear local state
       setUser(null);
       setSession(null);
+      setAuthError(null);
       clearStoredSession();
 
       // Build logout URL for SPC SSO
@@ -105,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error('Sign out failed:', error);
+      setAuthError('We were unable to sign you out completely. Please close the tab or try again.');
       // Still clear local state even if remote logout fails
       window.location.href = '/';
     }
@@ -147,12 +157,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.removeItem('oauth_code_verifier');
       
       // Redirect to return URL or home
-      const returnUrl = sessionStorage.getItem('oauth_return_url') || '/';
+      const returnUrl = sanitizeReturnUrl(sessionStorage.getItem('oauth_return_url'));
       sessionStorage.removeItem('oauth_return_url');
       
-      window.location.href = returnUrl;
+      window.location.href = sanitizeReturnUrl(returnUrl);
     } catch (error) {
       console.error('OAuth callback failed:', error);
+      setAuthError('We could not complete your sign-in. Please try again.');
       throw error;
     } finally {
       setIsLoading(false);
@@ -168,6 +179,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signOut,
     hasRole,
     handleCallback, // Export for callback page
+    error: authError,
+    clearError: () => setAuthError(null),
   };
 
   return (
@@ -202,6 +215,7 @@ function storeSession(session: AuthSession): void {
   
   try {
     localStorage.setItem('ocean_portal_session', JSON.stringify(session));
+    setAuthCookie(session.access_token);
   } catch (error) {
     console.error('Failed to store session:', error);
   }
@@ -212,9 +226,19 @@ function clearStoredSession(): void {
   
   try {
     localStorage.removeItem('ocean_portal_session');
+    setAuthCookie(null);
   } catch (error) {
     console.error('Failed to clear session:', error);
   }
+}
+
+function setAuthCookie(token: string | null) {
+  if (typeof document === 'undefined') return;
+  if (!token) {
+    document.cookie = 'ocean_portal_token=; Max-Age=0; path=/; Secure; SameSite=Strict';
+    return;
+  }
+  document.cookie = `ocean_portal_token=${encodeURIComponent(token)}; Max-Age=3600; path=/; Secure; SameSite=Strict`;
 }
 
 function isSessionExpired(session: AuthSession): boolean {

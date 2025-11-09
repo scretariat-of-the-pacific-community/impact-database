@@ -24,6 +24,8 @@ class DummyImage:
     keywords = ["flood"]
     format_name = "JPEG"
     format_version = "1.0"
+    latitude = 0.5
+    longitude = 0.5
     geographic_bounding_box = {
         "westBoundLongitude": 0.0,
         "eastBoundLongitude": 1.0,

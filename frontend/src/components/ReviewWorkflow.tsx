@@ -20,6 +20,10 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import MetadataEditor from './MetadataEditor';
 import CommentsSystem from './CommentsSystem';
+import Image from 'next/image';
+import { sanitizeText } from '@/lib/sanitize';
+import { useEffect } from 'react';
+import ErrorBanner from './ErrorBanner';
 
 interface ReviewItem {
   id: string;
@@ -215,6 +219,27 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
     }
   };
 
+  useEffect(() => {
+    if (!item) return;
+    if (typeof window === 'undefined') return;
+    const handler = (event: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement)?.tagName || '')) {
+        return;
+      }
+      if (event.key.toLowerCase() === 'a') {
+        handleStatusUpdate('approved');
+      } else if (event.key.toLowerCase() === 'r') {
+        handleStatusUpdate('rejected');
+      } else if (event.key.toLowerCase() === 'n') {
+        handleStatusUpdate('needs_changes');
+      } else if (event.key.toLowerCase() === 'f') {
+        handleFlag();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleFlag, handleStatusUpdate, item, updateStatusMutation.isPending, reviewNotes]);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -224,18 +249,26 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
   }
 
   if (error || !item) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : 'We could not retrieve the data for this submission. Please try again.';
     return (
-      <div className="bg-red-50 border border-red-200 rounded-md p-4">
-        <div className="flex">
-          <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
-          <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800">Error loading review item</h3>
-            <p className="text-sm text-red-700 mt-1">Please try refreshing the page.</p>
-          </div>
-        </div>
-      </div>
+      <ErrorBanner
+        title="Error loading review item"
+        message={message}
+        tone="error"
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ['review-item', itemId] })}
+        retryLabel="Retry fetch"
+      />
     );
   }
+
+  const safeTitle = sanitizeText(item.title || 'Untitled');
+  const safeDescription = sanitizeText(item.description || 'No description provided');
+  const safeSubmittedBy = sanitizeText(item.submittedBy || '');
+  const safeImageId = sanitizeText(item.imageId);
+  const safeHazardType = sanitizeText(item.metadata.hazardType || '');
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -277,12 +310,17 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
           <div className="lg:col-span-1">
             <div className="relative">
               {item.thumbnailUrl || item.imageUrl ? (
-                <img
-                  src={item.thumbnailUrl || item.imageUrl}
-                  alt={item.title}
-                  className="w-full h-48 object-cover rounded-lg cursor-pointer"
-                  onClick={() => setShowImageModal(true)}
-                />
+                <div className="relative w-full h-48">
+                  <Image
+                    src={item.thumbnailUrl || item.imageUrl || '/placeholder-image.svg'}
+                    alt={item.title || 'Submission preview'}
+                    fill
+                    sizes="(min-width: 1024px) 33vw, 100vw"
+                    className="object-cover rounded-lg cursor-pointer"
+                    onClick={() => setShowImageModal(true)}
+                    unoptimized
+                  />
+                </div>
               ) : (
                 <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
                   <PhotoIcon className="h-12 w-12 text-gray-400" />
@@ -300,22 +338,22 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
           {/* Details */}
           <div className="lg:col-span-2 space-y-4">
             <div>
-              <h3 className="text-lg font-medium text-gray-900">{item.title || 'Untitled'}</h3>
-              <p className="text-gray-600 mt-1">{item.description || 'No description provided'}</p>
+                      <h3 className="text-lg font-medium text-gray-900">{safeTitle}</h3>
+                      <p className="text-gray-600 mt-1">{safeDescription}</p>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <label className="font-medium text-gray-700">Image ID:</label>
-                <p className="text-gray-900">{item.imageId}</p>
+                <p className="text-gray-900">{safeImageId}</p>
               </div>
               <div>
                 <label className="font-medium text-gray-700">Hazard Type:</label>
-                <p className="text-gray-900 capitalize">{item.metadata.hazardType}</p>
+                <p className="text-gray-900 capitalize">{safeHazardType}</p>
               </div>
               <div>
                 <label className="font-medium text-gray-700">Submitted By:</label>
-                <p className="text-gray-900">{item.submittedBy}</p>
+                <p className="text-gray-900">{safeSubmittedBy}</p>
               </div>
               <div>
                 <label className="font-medium text-gray-700">Submitted:</label>
@@ -350,7 +388,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
       {/* Tab Navigation */}
       <div className="bg-white rounded-lg shadow-md">
         <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+          <nav className="flex space-x-8 px-6" role="navigation" aria-label="Review workflow tabs">
             {[
               { id: 'review', label: 'Review', icon: CheckCircleIcon },
               { id: 'metadata', label: 'Metadata', icon: DocumentTextIcon },
@@ -561,12 +599,17 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
       {/* Image Modal */}
       {showImageModal && (item.imageUrl || item.thumbnailUrl) && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="relative max-w-4xl max-h-full p-4">
-            <img
-              src={item.imageUrl || item.thumbnailUrl}
-              alt={item.title}
-              className="max-w-full max-h-full object-contain"
-            />
+          <div className="relative max-w-4xl max-h-full p-4 w-full">
+            <div className="relative w-full h-[70vh]">
+              <Image
+                src={item.imageUrl || item.thumbnailUrl || '/placeholder-image.svg'}
+                alt={item.title || 'Submission preview'}
+                fill
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-contain rounded-lg"
+                unoptimized
+              />
+            </div>
             <button
               onClick={() => setShowImageModal(false)}
               className="absolute top-4 right-4 text-white text-2xl hover:text-gray-300"

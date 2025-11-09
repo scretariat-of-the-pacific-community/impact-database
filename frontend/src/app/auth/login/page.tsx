@@ -11,14 +11,17 @@ import {
   ArrowRight,
   CheckCircle
 } from 'lucide-react';
+import ErrorBanner from '@/components/ErrorBanner';
+import { sanitizeReturnUrl } from '@/lib/security';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { isAuthenticated, signIn, isLoading } = useAuth();
+  const { isAuthenticated, signIn, isLoading, error: authError, clearError } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
 
-  const returnUrl = searchParams.get('returnUrl') || '/';
+  const sanitizedReturnUrl = sanitizeReturnUrl(searchParams.get('returnUrl'));
+  const returnUrl = sanitizedReturnUrl || '/';
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -29,6 +32,7 @@ export default function LoginPage() {
 
   const handleSignIn = async () => {
     try {
+      clearError();
       setIsSigningIn(true);
       await signIn(returnUrl);
     } catch (error) {
@@ -106,6 +110,17 @@ export default function LoginPage() {
                 </p>
               </div>
               
+              {authError && (
+                <div className="mb-6">
+                  <ErrorBanner
+                    title="We couldn't sign you in"
+                    message={authError}
+                    onRetry={handleSignIn}
+                    retryLabel="Retry sign-in"
+                  />
+                </div>
+              )}
+
               {/* SSO Benefits */}
               <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-start">

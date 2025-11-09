@@ -1,7 +1,10 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { CalendarDays, MapPin, Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import { Card, Tag } from '@/components/design-system';
+import { trackFilterApplied } from '@/lib/analytics';
+import { sanitizeText } from '@/lib/sanitize';
 
 export interface FilterState {
   searchTerm: string;
@@ -37,19 +40,6 @@ const HAZARD_ICONS: Record<string, string> = {
   hail: '🧊',
 };
 
-const HAZARD_COLORS: Record<string, string> = {
-  flood: 'bg-blue-100 text-blue-800 border-blue-200',
-  cyclone: 'bg-purple-100 text-purple-800 border-purple-200',
-  drought: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-  earthquake: 'bg-red-100 text-red-800 border-red-200',
-  tsunami: 'bg-cyan-100 text-cyan-800 border-cyan-200',
-  landslide: 'bg-orange-100 text-orange-800 border-orange-200',
-  wildfire: 'bg-red-200 text-red-900 border-red-300',
-  volcano: 'bg-gray-100 text-gray-800 border-gray-200',
-  storm: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-  hail: 'bg-slate-100 text-slate-800 border-slate-200',
-};
-
 export default function ImageFilters({
   filters,
   onFiltersChange,
@@ -71,6 +61,7 @@ export default function ImageFilters({
       ? filters.hazardTypes.filter(h => h !== hazard)
       : [...filters.hazardTypes, hazard];
     updateFilters({ hazardTypes: newHazardTypes });
+    trackFilterApplied('hazard', hazard, newHazardTypes.length);
   };
 
   const toggleCountry = (country: string) => {
@@ -78,6 +69,7 @@ export default function ImageFilters({
       ? filters.countries.filter(c => c !== country)
       : [...filters.countries, country];
     updateFilters({ countries: newCountries });
+    trackFilterApplied('country', country, newCountries.length);
   };
 
   const clearAllFilters = () => {
@@ -89,6 +81,7 @@ export default function ImageFilters({
       sortBy: 'date',
       sortOrder: 'desc',
     });
+    trackFilterApplied('all', 'cleared', 0);
   };
 
   const hasActiveFilters = useMemo(() => {
@@ -102,7 +95,7 @@ export default function ImageFilters({
   }, [filters]);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+    <Card variant="surface" padding="none" className="divide-y divide-gray-100">
       {/* Main Search Bar */}
       <div className="p-4 border-b border-gray-100">
         <div className="relative">
@@ -153,7 +146,7 @@ export default function ImageFilters({
                       />
                       <span className="ml-3 text-sm flex items-center">
                         <span className="mr-2">{HAZARD_ICONS[hazard] || '⚠️'}</span>
-                        <span className="capitalize">{hazard}</span>
+                        <span className="capitalize">{sanitizeText(hazard)}</span>
                       </span>
                     </label>
                   ))}
@@ -194,7 +187,7 @@ export default function ImageFilters({
                         onChange={() => toggleCountry(country)}
                         className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                       />
-                      <span className="ml-3 text-sm">{country}</span>
+                      <span className="ml-3 text-sm">{sanitizeText(country)}</span>
                     </label>
                   ))}
                 </div>
@@ -292,50 +285,39 @@ export default function ImageFilters({
         <div className="p-4 border-t border-gray-100">
           <div className="flex flex-wrap gap-2">
             {filters.hazardTypes.map((hazard) => (
-              <span
+              <Tag
                 key={hazard}
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${
-                  HAZARD_COLORS[hazard] || 'bg-gray-100 text-gray-800 border-gray-200'
-                }`}
+                tone="info"
+                icon={HAZARD_ICONS[hazard] || '⚠️'}
+                onRemove={() => toggleHazardType(hazard)}
+                removableLabel={`Remove ${hazard} filter`}
+                className="capitalize"
               >
-                <span className="mr-1">{HAZARD_ICONS[hazard] || '⚠️'}</span>
-                <span className="capitalize">{hazard}</span>
-                <button
-                  onClick={() => toggleHazardType(hazard)}
-                  className="ml-2 text-current hover:text-red-600"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
+                {hazard}
+              </Tag>
             ))}
 
             {filters.countries.map((country) => (
-              <span
+              <Tag
                 key={country}
-                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200"
+                tone="success"
+                icon={<MapPin className="w-3 h-3" />}
+                onRemove={() => toggleCountry(country)}
+                removableLabel={`Remove ${country} filter`}
               >
-                <MapPin className="w-3 h-3 mr-1" />
                 {country}
-                <button
-                  onClick={() => toggleCountry(country)}
-                  className="ml-2 text-current hover:text-red-600"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
+              </Tag>
             ))}
 
             {(filters.dateRange.start || filters.dateRange.end) && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                <CalendarDays className="w-3 h-3 mr-1" />
-                {filters.dateRange.start || 'Any'} - {filters.dateRange.end || 'Any'}
-                <button
-                  onClick={() => updateFilters({ dateRange: {} })}
-                  className="ml-2 text-current hover:text-red-600"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
+              <Tag
+                tone="brand"
+                icon={<CalendarDays className="w-3 h-3" />}
+                onRemove={() => updateFilters({ dateRange: {} })}
+                removableLabel="Clear date range filter"
+              >
+                {filters.dateRange.start || 'Any'} – {filters.dateRange.end || 'Any'}
+              </Tag>
             )}
           </div>
         </div>
@@ -366,6 +348,11 @@ export default function ImageFilters({
           }}
         />
       )}
-    </div>
+    </Card>
   );
 }
+
+// Memoize the component to prevent unnecessary re-renders when parent updates
+// but props haven't changed. This is especially important for filter components
+// that are passed callback functions.
+export const MemoizedImageFilters = memo(ImageFilters);

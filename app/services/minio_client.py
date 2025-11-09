@@ -12,7 +12,11 @@ MINIO_ENDPOINT = os.getenv("MINIO_ENDPOINT", "localhost:9000")
 MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
-MINIO_BUCKET = os.getenv("MINIO_BUCKET", "impact-images")
+MINIO_BUCKET_NAME = (
+    os.getenv("MINIO_BUCKET_NAME")
+    or os.getenv("MINIO_BUCKET")
+    or "impact-images"
+)
 
 def get_minio_client():
     """Get MinIO client instance."""
@@ -28,7 +32,7 @@ class MinIOStorage:
     
     def __init__(self):
         self.client = None
-        self.bucket_name = MINIO_BUCKET
+        self.bucket_name = MINIO_BUCKET_NAME
     
     def _get_client(self):
         """Get MinIO client instance, creating it if needed."""

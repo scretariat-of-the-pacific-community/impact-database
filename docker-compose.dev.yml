@@ -1,0 +1,37 @@
+# Compose overrides for development mode.
+# Keeps the current dev-time behavior (hot reload frontend/backend)
+# while simply ensuring the file exists for docker-start.sh --dev.
+
+services:
+  postgis_db:
+    ports:
+      - "5433:5432"
+
+  redis:
+    ports:
+      - "6380:6379"
+
+  api:
+    ports:
+      - "8001:8000"
+    environment:
+      APP_ENV: dev
+      MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:-impact-images}"
+
+  frontend:
+    ports:
+      - "3001:3000"
+    # Explicitly ensure the container runs the hot-reload dev server.
+    command: ["npm", "run", "dev:host"]
+    # Fix API URL for server-side compilation - use Docker network name
+    environment:
+      NEXT_PUBLIC_API_URL: "http://api:8000"
+      # Disable Sentry to avoid instrumentation overhead in dev
+      NEXT_PUBLIC_SENTRY_DSN: ""
+      SENTRY_AUTH_TOKEN: ""
+    # Disable healthcheck in dev mode - Next.js compiles on-demand and healthcheck causes restarts
+    healthcheck:
+      test: ["NONE"]
+    # Add more memory for Next.js compilation
+    mem_limit: 2g
+

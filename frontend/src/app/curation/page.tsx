@@ -17,6 +17,7 @@ import CurationQueue from '../../components/CurationQueue';
 import UserManagement from '../../components/UserManagement';
 import BulkImportExport from '../../components/BulkImportExport';
 import ReviewWorkflow from '../../components/ReviewWorkflow';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 interface CurationItem {
   id: string;
@@ -98,7 +99,8 @@ const AdminCurationPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <ErrorBoundary boundaryName="admin portal">
+      <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -121,7 +123,7 @@ const AdminCurationPage: React.FC = () => {
       {/* Navigation Tabs */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8">
+          <nav className="flex space-x-8" role="navigation" aria-label="Curation portal sections">
             {tabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -242,7 +244,8 @@ const AdminCurationPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 };
 

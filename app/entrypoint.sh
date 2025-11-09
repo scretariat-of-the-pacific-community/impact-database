@@ -1,21 +1,63 @@
 #!/bin/bash
 
-# Wait for DB to be ready
-echo "Waiting for database..."
-DB_HOST=${POSTGRES_HOST:-postgis_db}
-DB_PORT=${POSTGRES_PORT:-5432}
-DB_USER=${POSTGRES_USER:-postgres}
+# Exit on error
+set -e
 
-until pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
-  echo "Database not ready yet, waiting..."
-  sleep 2
-done
+wait_for_tcp() {
+    local host="$1"
+    local port="$2"
+    local label="$3"
 
-echo "Database is ready!"
+    echo "Waiting for ${label} at ${host}:${port}..."
+    until (echo > /dev/tcp/"$host"/"$port") >/dev/null 2>&1; do
+        echo "${label} not ready yet, waiting..."
+        sleep 2
+    done
+    echo "${label} is ready!"
+}
 
-# Run database migrations
-echo "Running database migrations..."
-python -c "
+# Default service role to 'api' if not set
+SERVICE_ROLE=${SERVICE_ROLE:-api}
+
+echo "Starting service with role: $SERVICE_ROLE"
+
+# Common database readiness check
+if [ "$SERVICE_ROLE" = "api" ] || [ "$SERVICE_ROLE" = "worker" ] || [ "$SERVICE_ROLE" = "beat" ]; then
+    echo "Waiting for database..."
+    DB_HOST=${POSTGRES_HOST:-postgis_db}
+    DB_PORT=${POSTGRES_PORT:-5432}
+    DB_USER=${POSTGRES_USER:-postgres}
+
+    until pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
+      echo "Database not ready yet, waiting..."
+      sleep 2
+    done
+    echo "Database is ready!"
+fi
+
+if [ "$SERVICE_ROLE" = "api" ] || [ "$SERVICE_ROLE" = "worker" ] || [ "$SERVICE_ROLE" = "beat" ] || [ "$SERVICE_ROLE" = "flower" ]; then
+    REDIS_TARGET=$(python - <<'PY'
+import os
+from urllib.parse import urlparse
+
+url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+parsed = urlparse(url)
+host = parsed.hostname or "redis"
+port = parsed.port or 6379
+print(f"{host}:{port}", end="")
+PY
+)
+    REDIS_HOST=${REDIS_TARGET%:*}
+    REDIS_PORT=${REDIS_TARGET#*:}
+    wait_for_tcp "$REDIS_HOST" "$REDIS_PORT" "Redis"
+fi
+
+# Role-specific startup logic
+case "$SERVICE_ROLE" in
+  api)
+    # Run database migrations
+    echo "Running database migrations..."
+    python -c "
 import sys
 import os
 sys.path.insert(0, '/app')
@@ -29,9 +71,9 @@ except Exception as e:
     print(f'Migration error (continuing anyway): {e}')
 "
 
-# Apply SQLAlchemy models with error handling
-echo "Initializing database schema..."
-python -c "
+    # Apply SQLAlchemy models with error handling
+    echo "Initializing database schema..."
+    python -c "
 import sys
 sys.path.insert(0, '/app')
 from models.database import Base, engine
@@ -44,6 +86,9 @@ except Exception as e:
 
 # Initialize MinIO bucket
 echo "Initializing MinIO bucket..."
+# Standardize bucket env (prefer MINIO_BUCKET_NAME, fallback to legacy MINIO_BUCKET)
+: "${MINIO_BUCKET_NAME:=${MINIO_BUCKET:-impact-images}}"
+export MINIO_BUCKET_NAME
 python -c "
 import sys
 sys.path.insert(0, '/app')
@@ -54,9 +99,9 @@ try:
     
     # Wait a bit for MinIO to be fully ready
     time.sleep(10)
-    
+
     minio_client = get_minio_storage()
-    bucket_name = os.getenv('MINIO_BUCKET', 'impact-images')
+    bucket_name = os.getenv('MINIO_BUCKET_NAME', 'impact-images')
     
     # The bucket creation is handled inside get_minio_storage()
     print(f'MinIO bucket already exists: {bucket_name}')
@@ -64,20 +109,47 @@ try:
 except Exception as e:
     print(f'MinIO initialization error (continuing anyway): {e}')
 "
-
-# Check if command is provided, otherwise start FastAPI server
-if [ $# -eq 0 ]; then
-    # Start FastAPI server (using simplified version for development)
+    
+    # Start FastAPI server
     echo "Starting FastAPI app..."
+    APP_ENV=${APP_ENV:-prod}
+    APP_MODULE="core.main:app"
     if [ -f "/app/core/main_simple.py" ]; then
         echo "Using simplified main for development"
-        exec uvicorn core.main_simple:app --host 0.0.0.0 --port 8000 --reload
+        APP_MODULE="core.main_simple:app"
     else
         echo "Using regular main"
-        exec uvicorn core.main:app --host 0.0.0.0 --port 8000 --reload
     fi
-else
-    # Execute the provided command
-    echo "Executing command: $@"
-    exec "$@"
-fi
+
+    case "$APP_ENV" in
+        dev)
+            echo "APP_ENV=dev → enabling auto-reload"
+            exec uvicorn "$APP_MODULE" --host 0.0.0.0 --port 8000 --reload
+            ;;
+        prod|*)
+            echo "APP_ENV=${APP_ENV} → running without reload"
+            exec uvicorn "$APP_MODULE" --host 0.0.0.0 --port 8000
+            ;;
+    esac
+    ;;
+
+  worker)
+    echo "Starting Celery worker..."
+    exec celery -A workers.celery_app worker --loglevel=info --concurrency=2
+    ;;
+
+  beat)
+    echo "Starting Celery beat..."
+    exec celery -A workers.celery_app beat --loglevel=info
+    ;;
+
+  flower)
+    echo "Starting Flower..."
+    exec celery -A workers.celery_app flower --port=5555
+    ;;
+
+  *)
+    echo "Error: Unknown SERVICE_ROLE: $SERVICE_ROLE"
+    exit 1
+    ;;
+esac

@@ -9,6 +9,16 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { config } from '@/lib/config';
+import { Button, FormField } from '@/components/design-system';
+import ErrorBanner from '@/components/ErrorBanner';
+import { trackUploadEvent } from '@/lib/analytics';
+import {
+  queueUpload,
+  getQueuedUploads,
+  flushQueuedUploads,
+  subscribeToOnlineFlush,
+  QueuedUploadPayload,
+} from '@/lib/offline-uploads';
 
 interface UploadForm {
   file: FileList;
@@ -26,16 +36,28 @@ interface UploadForm {
 const MAX_FILE_SIZE = config.UPLOAD.MAX_FILE_SIZE;
 const ALLOWED_EXTENSIONS = config.UPLOAD.ALLOWED_EXTENSIONS;
 
+const base64ToBlob = (base64: string, type: string) => {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: type || 'application/octet-stream' });
+};
+
 export default function UploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [queuedUploads, setQueuedUploads] = useState<QueuedUploadPayload[]>([]);
+  const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const { data: vocabData, isLoading, error } = useQuery({
+  const { data: vocabData, isLoading, error, refetch } = useQuery({
     queryKey: ['vocabularies'],
     queryFn: () => imageApi.vocabularies(),
   });
@@ -127,21 +149,36 @@ export default function UploadPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  const handleQueuedUpload = async (payload: QueuedUploadPayload) => {
+    const blob = base64ToBlob(payload.fileData, payload.fileType);
+    const file = new File([blob], payload.fileName, { type: payload.fileType || 'application/octet-stream' });
+    const formData = new FormData();
+    formData.append('file', file);
+    Object.entries(payload.metadata).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, value as any);
+      }
+    });
+    await imageApi.upload(formData);
+  };
+
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
       setUploadProgress(0);
-      
+
       return imageApi.upload(formData, (progress) => {
         setUploadProgress(progress);
       });
     },
     onSuccess: () => {
       setUploadProgress(100);
+      trackUploadEvent('succeeded');
       queryClient.invalidateQueries({ queryKey: ['images'] });
       setTimeout(() => router.push('/'), 1000); // Small delay to show completion
     },
     onError: (error) => {
       setUploadProgress(0);
+      trackUploadEvent('failed');
       console.error('Upload failed:', error);
     },
   });
@@ -154,18 +191,36 @@ export default function UploadPage() {
 
     // Clear validation errors before upload
     setValidationError(null);
+    trackUploadEvent('started', data.hazard_type);
+
+    const metadata: Record<string, any> = {
+      hazard_type: data.hazard_type,
+      location: data.location,
+      country: data.country,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      title: data.title,
+      abstract: data.abstract,
+      keywords: data.keywords,
+    };
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      queueUpload(metadata, selectedFile).then(() => {
+        setQueueMessage('Stored offline. We will sync this upload when you reconnect.');
+        setQueuedUploads(getQueuedUploads());
+        setSelectedFile(null);
+        setUploadProgress(0);
+      });
+      return;
+    }
 
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('hazard_type', data.hazard_type);
-    formData.append('location', data.location);
-    
-    if (data.country) formData.append('country', data.country);
-    if (data.latitude) formData.append('latitude', data.latitude.toString());
-    if (data.longitude) formData.append('longitude', data.longitude.toString());
-    if (data.title) formData.append('title', data.title);
-    if (data.abstract) formData.append('abstract', data.abstract);
-    if (data.keywords) formData.append('keywords', data.keywords);
+    Object.entries(metadata).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        formData.append(key, value as any);
+      }
+    });
 
     uploadMutation.mutate(formData);
   };
@@ -178,6 +233,24 @@ export default function UploadPage() {
       }
     };
   }, [previewUrl]);
+
+  React.useEffect(() => {
+    setQueuedUploads(getQueuedUploads());
+    const flush = () =>
+      flushQueuedUploads(handleQueuedUpload).then(() => setQueuedUploads(getQueuedUploads()));
+    const unsubscribe = subscribeToOnlineFlush(flush);
+    // Attempt immediate flush in case we're back online
+    flush();
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!queueMessage) return;
+    const timeout = setTimeout(() => setQueueMessage(null), 5000);
+    return () => clearTimeout(timeout);
+  }, [queueMessage]);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
@@ -199,6 +272,12 @@ export default function UploadPage() {
     }
   };
 
+  const handleSyncQueuedUploads = async () => {
+    await flushQueuedUploads(handleQueuedUpload);
+    setQueuedUploads(getQueuedUploads());
+    setQueueMessage('Queued uploads synced successfully.');
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow">
@@ -214,6 +293,28 @@ export default function UploadPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {(queueMessage || queuedUploads.length > 0) && (
+            <div className="rounded-lg border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+              {queueMessage && <p>{queueMessage}</p>}
+              {queuedUploads.length > 0 && (
+                <div className="mt-2 flex items-center justify-between">
+                  <p>{queuedUploads.length} upload(s) waiting for connectivity.</p>
+                  <Button type="button" variant="secondary" size="sm" onClick={handleSyncQueuedUploads}>
+                    Sync now
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          {error && (
+            <ErrorBanner
+              tone="warning"
+              title="We couldn't load the metadata vocabularies"
+              message="Some dropdowns may be incomplete until we reconnect. Please retry once you're online."
+              onRetry={() => refetch()}
+              retryLabel="Retry loading vocabularies"
+            />
+          )}
           {/* File Upload */}
           <div className="bg-white p-6 rounded-lg shadow">
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -332,12 +433,15 @@ export default function UploadPage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Required Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Hazard Type *
-                </label>
+              <FormField
+                label="Hazard Type"
+                htmlFor="upload-hazard-type"
+                required
+                error={errors.hazard_type?.message}
+              >
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 appearance-none"
+                  id="upload-hazard-type"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-gray-900 appearance-none"
                   style={{
                     backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                     backgroundPosition: 'right 0.5rem center',
@@ -356,21 +460,22 @@ export default function UploadPage() {
                     </option>
                   ))}
                 </select>
-                {errors.hazard_type && <p className="mt-1 text-sm text-red-600">{errors.hazard_type.message}</p>}
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Location *
-                </label>
+              <FormField
+                label="Location"
+                htmlFor="upload-location"
+                required
+                error={errors.location?.message}
+              >
                 <input
+                  id="upload-location"
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="e.g., Port Vila, Vanuatu"
                   {...register('location', { required: 'Location is required' })}
                 />
-                {errors.location && <p className="mt-1 text-sm text-red-600">{errors.location.message}</p>}
-              </div>
+              </FormField>
             </div>
           </div>
 
@@ -378,10 +483,10 @@ export default function UploadPage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Additional Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+              <FormField label="Country" htmlFor="upload-country" hint="Optional">
                 <select
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 appearance-none"
+                  id="upload-country"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white text-gray-900 appearance-none"
                   style={{
                     backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                     backgroundPosition: 'right 0.5rem center',
@@ -400,85 +505,76 @@ export default function UploadPage() {
                     </option>
                   ))}
                 </select>
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <FormField label="Title" htmlFor="upload-title" hint="Optional">
                 <input
+                  id="upload-title"
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="Descriptive title for the image"
                   {...register('title')}
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+              <FormField label="Latitude" htmlFor="upload-latitude" hint="e.g., -17.7334">
                 <input
+                  id="upload-latitude"
                   type="number"
                   step="any"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="e.g., -17.7334"
                   {...register('latitude', { valueAsNumber: true })}
                 />
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+              <FormField label="Longitude" htmlFor="upload-longitude" hint="e.g., 168.3273">
                 <input
+                  id="upload-longitude"
                   type="number"
                   step="any"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="e.g., 168.3273"
                   {...register('longitude', { valueAsNumber: true })}
                 />
-              </div>
+              </FormField>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Abstract</label>
+              <FormField label="Abstract" htmlFor="upload-abstract" className="md:col-span-2">
                 <textarea
+                  id="upload-abstract"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
                   placeholder="Brief description of the image content"
                   {...register('abstract')}
                 />
-              </div>
+              </FormField>
 
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Keywords</label>
+              <FormField label="Keywords" htmlFor="upload-keywords" hint="Comma-separated terms" className="md:col-span-2">
                 <input
+                  id="upload-keywords"
                   type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Comma-separated keywords (e.g., flooding, damage, infrastructure, coastal, impact)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  placeholder="Comma-separated keywords (e.g., flooding, damage, infrastructure)"
                   {...register('keywords')}
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Add descriptive keywords separated by commas to help others find your image. 
-                  Examples: flooding, damage, infrastructure, roads, buildings, coastal, impact, assessment
+                  Add descriptive keywords separated by commas to help others find your image.
                 </p>
-              </div>
+              </FormField>
             </div>
           </div>
 
           {/* Submit Button */}
           <div className="flex justify-end">
-            <button
+            <Button
               type="submit"
-              disabled={uploadMutation.isPending}
-              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              variant="primary"
+              size="lg"
+              leftIcon={!uploadMutation.isPending ? <Upload className="w-4 h-4" /> : undefined}
+              isLoading={uploadMutation.isPending}
             >
-              {uploadMutation.isPending ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  Upload Image
-                </>
-              )}
-            </button>
+              {uploadMutation.isPending ? 'Uploading...' : 'Upload Image'}
+            </Button>
           </div>
 
           {/* Upload Progress */}

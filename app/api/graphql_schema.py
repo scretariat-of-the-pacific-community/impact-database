@@ -17,45 +17,19 @@ from api.upload import get_db, upload_image as upload_image_route
 
 @strawberry.type
 class ImageMetadataType:
-    filename: str
-    hazard_type: str
-    location: str
-    country: Optional[str]
-    timestamp: Optional[datetime]
+    id: str
+    datetime: datetime
     latitude: Optional[float]
     longitude: Optional[float]
-    title: Optional[str]
-    title_i18n: Optional[JSON]
-    abstract: Optional[str]
-    abstract_i18n: Optional[JSON]
-    purpose: Optional[str]
-    purpose_i18n: Optional[JSON]
-    status: Optional[str]
-    point_of_contact: Optional[str]
-    date_stamp: Optional[datetime]
-    maintenance_frequency: Optional[str]
-    geographic_bounding_box: Optional[JSON]
-    geographic_identifier: Optional[str]
-    temporal_extent_start: Optional[datetime]
-    temporal_extent_end: Optional[datetime]
-    vertical_extent: Optional[float]
-    topic_category: Optional[JSON]
-    keywords: Optional[JSON]
-    keywords_i18n: Optional[JSON]
-    keyword_thesaurus: Optional[str]
-    resource_locator: Optional[str]
-    format_name: Optional[str]
-    format_version: Optional[str]
-    lineage_statement: Optional[str]
-    source: Optional[str]
+    hazard_type: str
+    event_id: Optional[str]
+    status: str
+    data_license: str
+    source_type: str
+    uploader_id: str
     positional_accuracy: Optional[float]
-    use_constraints: Optional[str]
-    access_constraints: Optional[str]
-    security_classification: Optional[str]
-    metadata_language: Optional[str]
-    metadata_standard_name: Optional[str]
-    metadata_standard_version: Optional[str]
-    metadata_date: Optional[datetime]
+    thumbnail_url: Optional[str]
+    filename: Optional[str]
 
     @classmethod
     def from_dict(cls, data: dict) -> "ImageMetadataType":

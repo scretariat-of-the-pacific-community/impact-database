@@ -8,7 +8,7 @@ const customJestConfig = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
+  testPathIgnorePatterns: ['<rootDir>/tests/e2e/'],
 };
 
 module.exports = createJestConfig(customJestConfig);
-

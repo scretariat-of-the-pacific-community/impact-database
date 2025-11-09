@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
+import { sanitizeText } from '@/lib/sanitize';
 import {
   UserPlusIcon,
   UserIcon,
@@ -324,21 +326,30 @@ const UserManagement: React.FC = () => {
         <div className="space-y-6">
           {/* Profile Section */}
           <div className="flex items-center space-x-4">
-            <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center">
+            <div className="h-16 w-16 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
               {user.profilePicture ? (
-                <img src={user.profilePicture} alt="Profile" className="h-16 w-16 rounded-full object-cover" />
+                <div className="relative h-16 w-16">
+                  <Image
+                    src={user.profilePicture}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    fill
+                    sizes="64px"
+                    className="rounded-full object-cover"
+                    unoptimized
+                  />
+                </div>
               ) : (
                 <UserIcon className="h-8 w-8 text-gray-400" />
               )}
             </div>
             <div>
               <h4 className="text-xl font-medium text-gray-900">
-                {user.firstName} {user.lastName}
+                {sanitizeText(user.firstName)} {sanitizeText(user.lastName)}
               </h4>
-              <p className="text-gray-600">{user.email}</p>
+              <p className="text-gray-600">{sanitizeText(user.email)}</p>
               <div className="flex items-center space-x-2 mt-1">
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
-                  {user.role}
+                  {sanitizeText(user.role)}
                 </span>
                 <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user)}`}>
                   {getStatusText(user)}
@@ -351,7 +362,7 @@ const UserManagement: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">Organization</label>
-              <p className="mt-1 text-sm text-gray-900">{user.organization || 'Not specified'}</p>
+              <p className="mt-1 text-sm text-gray-900">{sanitizeText(user.organization || 'Not specified')}</p>
             </div>
             
             <div>
@@ -549,21 +560,30 @@ const UserManagement: React.FC = () => {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
+                        <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">
                           {user.profilePicture ? (
-                            <img src={user.profilePicture} alt="Profile" className="h-10 w-10 rounded-full object-cover" />
+                            <div className="relative h-10 w-10">
+                              <Image
+                                src={user.profilePicture}
+                                alt={`${user.firstName} ${user.lastName}`}
+                                fill
+                                sizes="40px"
+                                className="rounded-full object-cover"
+                                unoptimized
+                              />
+                            </div>
                           ) : (
                             <UserIcon className="h-5 w-5 text-gray-400" />
                           )}
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {user.firstName} {user.lastName}
-                          </div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
-                          {user.organization && (
-                            <div className="text-xs text-gray-400">{user.organization}</div>
-                          )}
+                {sanitizeText(user.firstName)} {sanitizeText(user.lastName)}
+              </div>
+              <div className="text-sm text-gray-500">{sanitizeText(user.email)}</div>
+              {user.organization && (
+                <div className="text-xs text-gray-400">{sanitizeText(user.organization)}</div>
+              )}
                         </div>
                       </div>
                     </td>

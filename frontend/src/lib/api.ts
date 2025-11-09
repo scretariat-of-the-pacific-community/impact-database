@@ -50,10 +50,17 @@ class APIClient {
   }
 
   private getAuthToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('authToken');
+    if (typeof window === 'undefined') {
+      return null;
     }
-    return null;
+    const cookieToken = document.cookie
+      ?.split('; ')
+      .find((row) => row.startsWith('ocean_portal_token='))
+      ?.split('=')[1];
+    if (cookieToken) {
+      return decodeURIComponent(cookieToken);
+    }
+    return localStorage.getItem('authToken');
   }
 
   private handleUnauthorized(): void {

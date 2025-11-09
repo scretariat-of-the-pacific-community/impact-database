@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -17,11 +17,15 @@ import {
   ChevronUp,
   SlidersHorizontal
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 import { imageApi } from '@/lib/api';
 import { SearchFilters, ImageMetadata, HazardType, SourceAgency, HAZARD_TYPE_LABELS, SOURCE_AGENCY_LABELS } from '@/lib/types';
+import ErrorBanner from '@/components/ErrorBanner';
+import { sanitizeText } from '@/lib/sanitize';
+import { ImageGridCardSkeleton, ImageListCardSkeleton } from '@/components/ImageCardSkeleton';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
@@ -75,20 +79,37 @@ interface SearchPageState {
   sortOrder: 'asc' | 'desc';
 }
 
+const RESULTS_PER_PAGE = 24;
+
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const FILTER_STORAGE_KEY = 'search_filters_v1';
+  const VIEW_MODE_STORAGE_KEY = 'search_view_mode_v1';
+  const persistedFilters =
+    typeof window !== 'undefined'
+      ? JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? 'null')
+      : null;
+  const persistedView =
+    typeof window !== 'undefined'
+      ? (localStorage.getItem(VIEW_MODE_STORAGE_KEY) as SearchPageState['viewMode'] | null)
+      : null;
+  const searchParamsString = useMemo(() => searchParams.toString(), [searchParams]);
   
   const [state, setState] = useState<SearchPageState>({
-    searchQuery: searchParams.get('q') || '',
-    selectedHazards: [],
-    selectedAgencies: [],
-    dateFrom: '',
-    dateTo: '',
-    viewMode: 'grid',
+    searchQuery: searchParams.get('q') || persistedFilters?.searchQuery || '',
+    selectedHazards: persistedFilters?.selectedHazards || [],
+    selectedAgencies: persistedFilters?.selectedAgencies || [],
+    dateFrom: persistedFilters?.dateFrom || '',
+    dateTo: persistedFilters?.dateTo || '',
+    viewMode: (searchParams.get('view') as SearchPageState['viewMode']) || persistedView || 'grid',
     filtersOpen: false,
-    sortBy: 'relevance',
-    sortOrder: 'desc'
+    sortBy: persistedFilters?.sortBy || 'relevance',
+    sortOrder: persistedFilters?.sortOrder || 'desc'
+  });
+  const [currentPage, setCurrentPage] = useState(() => {
+    const initial = Number(searchParams.get('page') || '1');
+    return Number.isNaN(initial) || initial < 1 ? 1 : initial;
   });
 
   // Build search filters from state
@@ -100,17 +121,25 @@ export default function SearchPage() {
     date_to: state.dateTo || undefined,
     sort_by: state.sortBy,
     sort_order: state.sortOrder,
-    limit: 24
+    page: currentPage,
+    limit: RESULTS_PER_PAGE
   };
 
   // Query for search results
-  const { data: searchResults, isLoading, error } = useQuery({
+  const { data: searchResults, isLoading, error, refetch } = useQuery({
     queryKey: ['search', filters],
     queryFn: () => imageApi.search(filters),
   });
+  const images = useMemo(() => searchResults?.images || [], [searchResults]);
+  const totalResults = searchResults?.total || 0;
+  const totalPages =
+    searchResults?.total_pages || Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
+  const showingFrom = totalResults === 0 ? 0 : (currentPage - 1) * RESULTS_PER_PAGE + 1;
+  const showingTo = Math.min(currentPage * RESULTS_PER_PAGE, totalResults);
 
   const handleSearch = useCallback((newQuery: string) => {
     setState(prev => ({ ...prev, searchQuery: newQuery }));
+    setCurrentPage(1);
     
     // Update URL
     const params = new URLSearchParams(searchParams);
@@ -129,6 +158,7 @@ export default function SearchPage() {
         ? prev.selectedHazards.filter(h => h !== hazard)
         : [...prev.selectedHazards, hazard]
     }));
+    setCurrentPage(1);
   }, []);
 
   const toggleAgencyFilter = useCallback((agency: SourceAgency) => {
@@ -138,6 +168,7 @@ export default function SearchPage() {
         ? prev.selectedAgencies.filter(a => a !== agency)
         : [...prev.selectedAgencies, agency]
     }));
+    setCurrentPage(1);
   }, []);
 
   const clearFilters = useCallback(() => {
@@ -150,10 +181,32 @@ export default function SearchPage() {
       searchQuery: ''
     }));
     router.push('/search');
+    setCurrentPage(1);
   }, [router]);
 
-  const images = searchResults?.images || [];
-  const totalResults = searchResults?.total || 0;
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamsString);
+    if (currentPage > 1) {
+      params.set('page', currentPage.toString());
+    } else {
+      params.delete('page');
+    }
+    router.replace(`/search?${params.toString()}`, { scroll: false });
+  }, [currentPage, router, searchParamsString]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const { filtersOpen, ...persistable } = state;
+    localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(persistable));
+    localStorage.setItem(VIEW_MODE_STORAGE_KEY, state.viewMode);
+  }, [state, FILTER_STORAGE_KEY, VIEW_MODE_STORAGE_KEY]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -186,6 +239,7 @@ export default function SearchPage() {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
+                name="search"
                 placeholder="Search images by title, keywords, location..."
                 value={state.searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
@@ -207,22 +261,25 @@ export default function SearchPage() {
             </button>
 
             {/* View Mode Toggle */}
-            <div className="flex border border-gray-300 rounded-lg">
+            <div className="flex border border-gray-300 rounded-lg" role="group" aria-label="Result view">
               <button
                 onClick={() => setState(prev => ({ ...prev, viewMode: 'grid' }))}
                 className={`p-2 ${state.viewMode === 'grid' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                aria-label="Grid view"
               >
                 <Grid className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setState(prev => ({ ...prev, viewMode: 'list' }))}
                 className={`p-2 border-l border-gray-300 ${state.viewMode === 'list' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                aria-label="List view"
               >
                 <List className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setState(prev => ({ ...prev, viewMode: 'map' }))}
                 className={`p-2 border-l border-gray-300 ${state.viewMode === 'map' ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:text-gray-700'}`}
+                aria-label="Map view"
               >
                 <MapIcon className="w-5 h-5" />
               </button>
@@ -231,104 +288,121 @@ export default function SearchPage() {
         </div>
 
         {/* Filters Panel */}
-        {state.filtersOpen && (
-          <div className="mb-6 bg-white rounded-lg border border-gray-200 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {/* Hazard Types */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Hazard Types</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {Object.entries(HAZARD_TYPE_LABELS).map(([value, label]) => (
-                    <label key={value} className="flex items-center text-sm">
-                      <input
-                        type="checkbox"
-                        checked={state.selectedHazards.includes(value as HazardType)}
-                        onChange={() => toggleHazardFilter(value as HazardType)}
-                        className="mr-2 text-blue-600 focus:ring-blue-500"
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Source Agencies */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Source Agencies</h3>
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {Object.entries(SOURCE_AGENCY_LABELS).map(([value, label]) => (
-                    <label key={value} className="flex items-center text-sm">
-                      <input
-                        type="checkbox"
-                        checked={state.selectedAgencies.includes(value as SourceAgency)}
-                        onChange={() => toggleAgencyFilter(value as SourceAgency)}
-                        className="mr-2 text-blue-600 focus:ring-blue-500"
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Date Range */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Date Range</h3>
-                <div className="space-y-3">
+        <AnimatePresence>
+          {state.filtersOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              className="overflow-hidden"
+            >
+              <div className="mb-6 bg-white rounded-lg border border-gray-200 p-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  {/* Hazard Types */}
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">From</label>
-                    <input
-                      type="date"
-                      value={state.dateFrom}
-                      onChange={(e) => setState(prev => ({ ...prev, dateFrom: e.target.value }))}
-                      className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                    />
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Hazard Types</h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {Object.entries(HAZARD_TYPE_LABELS).map(([value, label]) => (
+                        <label key={value} className="flex items-center text-sm">
+                          <input
+                            type="checkbox"
+                            checked={state.selectedHazards.includes(value as HazardType)}
+                            onChange={() => toggleHazardFilter(value as HazardType)}
+                            className="mr-2 text-blue-600 focus:ring-blue-500"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
                   </div>
+
+                  {/* Source Agencies */}
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">To</label>
-                    <input
-                      type="date"
-                      value={state.dateTo}
-                      onChange={(e) => setState(prev => ({ ...prev, dateTo: e.target.value }))}
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Source Agencies</h3>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {Object.entries(SOURCE_AGENCY_LABELS).map(([value, label]) => (
+                        <label key={value} className="flex items-center text-sm">
+                          <input
+                            type="checkbox"
+                            checked={state.selectedAgencies.includes(value as SourceAgency)}
+                            onChange={() => toggleAgencyFilter(value as SourceAgency)}
+                            className="mr-2 text-blue-600 focus:ring-blue-500"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Date Range */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Date Range</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">From</label>
+                        <input
+                          type="date"
+                          value={state.dateFrom}
+                          onChange={(e) => {
+                            setState(prev => ({ ...prev, dateFrom: e.target.value }));
+                            setCurrentPage(1);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">To</label>
+                        <input
+                          type="date"
+                          value={state.dateTo}
+                          onChange={(e) => {
+                            setState(prev => ({ ...prev, dateTo: e.target.value }));
+                            setCurrentPage(1);
+                          }}
+                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Sort Options */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Sort By</h3>
+                    <select
+                      value={`${state.sortBy}-${state.sortOrder}`}
+                      onChange={(e) => {
+                        const [sortBy, sortOrder] = e.target.value.split('-');
+                        setState(prev => ({ 
+                          ...prev, 
+                          sortBy: sortBy as any, 
+                          sortOrder: sortOrder as 'asc' | 'desc' 
+                        }));
+                        setCurrentPage(1);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                    />
+                    >
+                      <option value="relevance-desc">Relevance</option>
+                      <option value="date-desc">Date (Newest)</option>
+                      <option value="date-asc">Date (Oldest)</option>
+                      <option value="upload_date-desc">Upload Date (Newest)</option>
+                      <option value="upload_date-asc">Upload Date (Oldest)</option>
+                      <option value="title-asc">Title (A-Z)</option>
+                      <option value="title-desc">Title (Z-A)</option>
+                    </select>
+
+                    <button
+                      onClick={clearFilters}
+                      className="mt-3 w-full px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Clear All Filters
+                    </button>
                   </div>
                 </div>
               </div>
-
-              {/* Sort Options */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Sort By</h3>
-                <select
-                  value={`${state.sortBy}-${state.sortOrder}`}
-                  onChange={(e) => {
-                    const [sortBy, sortOrder] = e.target.value.split('-');
-                    setState(prev => ({ 
-                      ...prev, 
-                      sortBy: sortBy as any, 
-                      sortOrder: sortOrder as 'asc' | 'desc' 
-                    }));
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="relevance-desc">Relevance</option>
-                  <option value="date-desc">Date (Newest)</option>
-                  <option value="date-asc">Date (Oldest)</option>
-                  <option value="upload_date-desc">Upload Date (Newest)</option>
-                  <option value="upload_date-asc">Upload Date (Oldest)</option>
-                  <option value="title-asc">Title (A-Z)</option>
-                  <option value="title-desc">Title (Z-A)</option>
-                </select>
-
-                <button
-                  onClick={clearFilters}
-                  className="mt-3 w-full px-3 py-2 text-sm text-gray-600 hover:text-gray-800 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
-                >
-                  Clear All Filters
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Active Filters */}
         {(state.selectedHazards.length > 0 || state.selectedAgencies.length > 0 || state.dateFrom || state.dateTo) && (
@@ -359,7 +433,10 @@ export default function SearchPage() {
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800">
                 From: {state.dateFrom}
                 <button
-                  onClick={() => setState(prev => ({ ...prev, dateFrom: '' }))}
+                  onClick={() => {
+                    setState(prev => ({ ...prev, dateFrom: '' }));
+                    setCurrentPage(1);
+                  }}
                   className="ml-2 hover:text-purple-600"
                 >
                   <X className="w-3 h-3" />
@@ -370,7 +447,10 @@ export default function SearchPage() {
               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-purple-100 text-purple-800">
                 To: {state.dateTo}
                 <button
-                  onClick={() => setState(prev => ({ ...prev, dateTo: '' }))}
+                  onClick={() => {
+                    setState(prev => ({ ...prev, dateTo: '' }));
+                    setCurrentPage(1);
+                  }}
                   className="ml-2 hover:text-purple-600"
                 >
                   <X className="w-3 h-3" />
@@ -383,14 +463,34 @@ export default function SearchPage() {
         {/* Results */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-3 text-gray-600">Searching...</span>
+            <div className="p-6">
+              {state.viewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {Array.from({ length: RESULTS_PER_PAGE }).map((_, index) => (
+                    <ImageGridCardSkeleton key={index} />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {Array.from({ length: RESULTS_PER_PAGE }).map((_, index) => (
+                    <ImageListCardSkeleton key={index} />
+                  ))}
+                </div>
+              )}
             </div>
           ) : error ? (
-            <div className="text-center py-12">
-              <div className="text-red-600 mb-2">Error loading search results</div>
-              <p className="text-gray-500 text-sm">Please try again or refine your search</p>
+            <div className="px-4 py-6">
+              <ErrorBanner
+                title="We couldn't load the catalog"
+                message={
+                  error instanceof Error
+                    ? error.message
+                    : 'Something went wrong while searching. Please try again.'
+                }
+                tone="error"
+                onRetry={() => refetch()}
+                retryLabel="Retry search"
+              />
             </div>
           ) : images.length === 0 ? (
             <div className="text-center py-12">
@@ -406,16 +506,42 @@ export default function SearchPage() {
             </div>
           ) : (
             <div className="p-6">
+              <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
+                <span>
+                  Showing {showingFrom}-{showingTo} of {totalResults.toLocaleString()} results
+                </span>
+                {totalPages > 1 && (
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <span>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1 border rounded-md text-sm disabled:opacity-50"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
               {state.viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {images.map((image) => (
-                    <ImageGridCard key={image.id} image={image} />
+                    <MemoizedImageGridCard key={image.id} image={image} />
                   ))}
                 </div>
               ) : state.viewMode === 'list' ? (
                 <div className="space-y-4">
                   {images.map((image) => (
-                    <ImageListCard key={image.id} image={image} />
+                    <MemoizedImageListCard key={image.id} image={image} />
                   ))}
                 </div>
               ) : (
@@ -443,6 +569,27 @@ export default function SearchPage() {
                   </MapContainer>
                 </div>
               )}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-3 mt-6">
+                  <button
+                    onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                    disabled={currentPage === 1}
+                    className="px-4 py-2 border rounded-md text-sm disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-4 py-2 border rounded-md text-sm disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -451,7 +598,12 @@ export default function SearchPage() {
   );
 }
 
+// Memoize card components to prevent re-renders when search state changes
+// but individual image data hasn't changed
 function ImageGridCard({ image }: { image: ImageMetadata }) {
+  const safeTitle = sanitizeText(image.title);
+  const safeAbstract = sanitizeText(image.abstract || 'No description available');
+  const safeLocation = sanitizeText(image.latitude && image.longitude ? `${image.latitude.toFixed(2)}, ${image.longitude.toFixed(2)}` : 'No location');
   return (
     <Link href={`/images/${image.id}`} className="group">
       <div className="border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-md transition-all duration-200">
@@ -466,7 +618,7 @@ function ImageGridCard({ image }: { image: ImageMetadata }) {
         <div className="p-4">
           <div className="flex items-start justify-between mb-2">
             <h3 className="font-medium text-gray-900 group-hover:text-blue-600 transition-colors line-clamp-2 text-sm">
-              {image.title}
+              {safeTitle}
             </h3>
             <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 capitalize ml-2 flex-shrink-0">
               {image.hazard_type}
@@ -474,17 +626,13 @@ function ImageGridCard({ image }: { image: ImageMetadata }) {
           </div>
           
           <p className="text-xs text-gray-600 line-clamp-2 mb-3">
-            {image.abstract || 'No description available'}
+            {safeAbstract}
           </p>
           
           <div className="flex items-center justify-between text-xs text-gray-500">
             <div className="flex items-center">
               <MapPin className="w-3 h-3 mr-1" />
-              {image.latitude && image.longitude ? (
-                <span>{image.latitude.toFixed(2)}, {image.longitude.toFixed(2)}</span>
-              ) : (
-                <span>No location</span>
-              )}
+              <span>{safeLocation}</span>
             </div>
             <div className="flex items-center">
               <Calendar className="w-3 h-3 mr-1" />
@@ -498,6 +646,13 @@ function ImageGridCard({ image }: { image: ImageMetadata }) {
 }
 
 function ImageListCard({ image }: { image: ImageMetadata }) {
+  const safeTitle = sanitizeText(image.title);
+  const safeAbstract = sanitizeText(image.abstract || 'No description available');
+  const safeLocation = sanitizeText(
+    image.latitude && image.longitude
+      ? `${image.latitude.toFixed(4)}, ${image.longitude.toFixed(4)}`
+      : 'Location not specified'
+  );
   return (
     <Link href={`/images/${image.id}`} className="group">
       <div className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all duration-200">
@@ -511,7 +666,7 @@ function ImageListCard({ image }: { image: ImageMetadata }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between mb-2">
               <h3 className="text-lg font-medium text-gray-900 group-hover:text-blue-600 transition-colors">
-                {image.title}
+                {safeTitle}
               </h3>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize ml-4">
                 {image.hazard_type}
@@ -519,17 +674,13 @@ function ImageListCard({ image }: { image: ImageMetadata }) {
             </div>
             
             <p className="text-sm text-gray-600 line-clamp-2 mb-3">
-              {image.abstract || 'No description available'}
+              {safeAbstract}
             </p>
             
             <div className="flex items-center space-x-6 text-sm text-gray-500">
               <div className="flex items-center">
                 <MapPin className="w-4 h-4 mr-1" />
-                {image.latitude && image.longitude ? (
-                  <span>{image.latitude.toFixed(4)}, {image.longitude.toFixed(4)}</span>
-                ) : (
-                  <span>Location not specified</span>
-                )}
+                <span>{safeLocation}</span>
               </div>
               <div className="flex items-center">
                 <Calendar className="w-4 h-4 mr-1" />
@@ -546,3 +697,7 @@ function ImageListCard({ image }: { image: ImageMetadata }) {
     </Link>
   );
 }
+
+// Memoized versions for performance optimization
+const MemoizedImageGridCard = memo(ImageGridCard);
+const MemoizedImageListCard = memo(ImageListCard);
