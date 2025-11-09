@@ -4,18 +4,18 @@ import { useQuery } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
 import { ArrowLeft, BarChart3, MapPin, Calendar, TrendingUp, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import type { ImageMetadata as SharedImageMetadata } from '@/lib/types';
 
 // Extend ImageMetadata to include all required properties for this page
 type ImageMetadata = SharedImageMetadata & {
-  country?: string;
-  location?: string;
-  latitude?: number;
-  longitude?: number;
-  timestamp?: string;
+  country?: string | null;
+  location?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  timestamp?: string | null;
   filename: string;
-  title?: string;
+  title?: string | null;
   hazard_type: string;
 };
 
@@ -25,13 +25,26 @@ interface HazardStats {
   countries: string[];
   latestDate?: string;
   locations: string[];
+}
+
+export default function HazardAnalysisPage() {
+  const [selectedHazard, setSelectedHazard] = useState('');
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['hazard-images'],
+    queryFn: () => imageApi.search({ limit: 1000 }),
+  });
+
+  const images = (data?.images as ImageMetadata[]) || [];
+
   const hazardStats = useMemo(() => {
-    if (!images) return [];
+    if (!images || images.length === 0) return [] as HazardStats[];
 
     const statsMap = new Map<string, HazardStats>();
 
-    images.forEach((image: ImageMetadata) => {
+    images.forEach((image) => {
       const hazard = image.hazard_type;
+      if (!hazard) return;
 
       if (!statsMap.has(hazard)) {
         statsMap.set(hazard, {
@@ -43,14 +56,20 @@ interface HazardStats {
       }
 
       const stats = statsMap.get(hazard)!;
-      stats.count++;
+      stats.count += 1;
 
-      if (image.country && !stats.countries.includes(image.country)) {
-        stats.countries.push(image.country);
+      if (image.country) {
+        const country = image.country;
+        if (!stats.countries.includes(country)) {
+          stats.countries.push(country);
+        }
       }
 
-      if (image.location && !stats.locations.includes(image.location)) {
-        stats.locations.push(image.location);
+      if (image.location) {
+        const location = image.location;
+        if (!stats.locations.includes(location)) {
+          stats.locations.push(location);
+        }
       }
 
       if (image.timestamp) {
@@ -61,24 +80,26 @@ interface HazardStats {
       }
     });
 
-    return Array.from(statsMap.values());
+    return Array.from(statsMap.values()).sort((a, b) => b.count - a.count);
   }, [images]);
-        stats.locations.push(image.location);
-      }
-      
-      if (image.timestamp) {
-        const imageDate = new Date(image.timestamp);
-        if (!stats.latestDate || imageDate > new Date(stats.latestDate)) {
-  const totalImages = images?.length || 0;
-  const totalCountries = new Set(images?.map((img: ImageMetadata) => img.country).filter(Boolean)).size;
-  const geolocatedImages = images?.filter((img: ImageMetadata) => img.latitude && img.longitude).length || 0;
+
+  const totalImages = images.length;
+  const totalCountries = useMemo(() => {
+    const countries = images
+      .map((img) => img.country)
+      .filter((country): country is string => Boolean(country));
+    return new Set(countries).size;
+  }, [images]);
+
+  const geolocatedImages = useMemo(() => {
+    return images.filter((img) => typeof img.latitude === 'number' && typeof img.longitude === 'number').length;
+  }, [images]);
 
   const selectedHazardImages = useMemo(() => {
-    if (!images || !selectedHazard) return [];
-    return images.filter((img: ImageMetadata) => img.hazard_type === selectedHazard);
+    if (!selectedHazard) return [] as ImageMetadata[];
+    return images.filter((img) => img.hazard_type === selectedHazard);
   }, [images, selectedHazard]);
 
-  // Helper for hazard color
   const getHazardColor = (hazard: string) => {
     const colors: Record<string, string> = {
       flood: 'bg-blue-100 text-blue-800 border-blue-200',
@@ -91,24 +112,29 @@ interface HazardStats {
     };
     return colors[hazard] || 'bg-gray-100 text-gray-800 border-gray-200';
   };
-      landslide: 'bg-orange-100 text-orange-800 border-orange-200',
-      wildfire: 'bg-red-100 text-red-800 border-red-200',
-    };
-    return colors[hazard] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
 
   const getHazardIcon = (hazard: string) => {
     switch (hazard) {
-      case 'flood': return '🌊';
-      case 'cyclone': return '🌀';
-      case 'drought': return '🏜️';
-      case 'earthquake': return '🫨';
-      case 'tsunami': return '🌊';
-      case 'landslide': return '⛰️';
-      case 'wildfire': return '🔥';
-      default: return '⚠️';
+      case 'flood':
+        return '🌊';
+      case 'cyclone':
+        return '🌀';
+      case 'drought':
+        return '🏜️';
+      case 'earthquake':
+        return '🫨';
+      case 'tsunami':
+        return '🌊';
+      case 'landslide':
+        return '⛰️';
+      case 'wildfire':
+        return '🔥';
+      default:
+        return '⚠️';
     }
   };
+
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error fetching hazard data';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -134,7 +160,11 @@ interface HazardStats {
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-md p-6 text-center">
-            <p className="text-red-800">Error loading hazard data: {error.message}</p>
+            <p className="text-red-800">Error loading hazard data: {errorMessage}</p>
+          </div>
+        ) : images.length === 0 ? (
+          <div className="bg-white p-6 rounded-lg shadow text-center text-gray-600">
+            No hazard imagery available yet. Try uploading new imagery to see analytics here.
           </div>
         ) : (
           <>
@@ -149,7 +179,7 @@ interface HazardStats {
                   </div>
                 </div>
               </div>
-              
+
               <div className="bg-white p-6 rounded-lg shadow">
                 <div className="flex items-center">
                   <AlertTriangle className="w-8 h-8 text-orange-600" />
@@ -185,7 +215,7 @@ interface HazardStats {
             <div className="bg-white p-6 rounded-lg shadow mb-8">
               <h2 className="text-xl font-semibold text-gray-900 mb-6">Hazard Types Overview</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {hazardStats.map((hazard: HazardStats) => (
+                {hazardStats.map((hazard) => (
                   <div
                     key={hazard.hazard_type}
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
@@ -193,9 +223,11 @@ interface HazardStats {
                         ? 'ring-2 ring-blue-500 ' + getHazardColor(hazard.hazard_type)
                         : getHazardColor(hazard.hazard_type)
                     }`}
-                    onClick={() => setSelectedHazard(
-                      selectedHazard === hazard.hazard_type ? '' : hazard.hazard_type
-                    )}
+                    onClick={() =>
+                      setSelectedHazard(
+                        selectedHazard === hazard.hazard_type ? '' : hazard.hazard_type
+                      )
+                    }
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
@@ -204,7 +236,7 @@ interface HazardStats {
                       </div>
                       <span className="text-2xl font-bold">{hazard.count}</span>
                     </div>
-                    
+
                     <div className="space-y-2 text-sm">
                       <div>
                         <span className="font-medium">Countries: </span>
@@ -221,7 +253,7 @@ interface HazardStats {
                         </div>
                       )}
                     </div>
-                    
+
                     <div className="mt-3 pt-3 border-t border-current border-opacity-20">
                       <Link
                         href={`/hazards/${hazard.hazard_type}`}
@@ -247,7 +279,11 @@ interface HazardStats {
                     </h2>
                     <p className="text-gray-600">
                       {selectedHazardImages.length} images from {
-                        new Set(selectedHazardImages.map((img: ImageMetadata) => img.location)).size
+                        new Set(
+                          selectedHazardImages
+                            .map((img) => img.location)
+                            .filter((loc): loc is string => Boolean(loc))
+                        ).size
                       } locations
                     </p>
                   </div>
@@ -258,13 +294,17 @@ interface HazardStats {
                   <h3 className="text-lg font-medium text-gray-900 mb-3">Affected Locations</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.entries(
-                      selectedHazardImages.reduce((acc: Record<string, number>, img: ImageMetadata) => {
+                      selectedHazardImages.reduce((acc: Record<string, number>, img) => {
                         const key = img.country ? `${img.location}, ${img.country}` : img.location;
-                        acc[key] = (acc[key] || 0) + 1;
+                        const safeKey = key || 'Unknown location';
+                        acc[safeKey] = (acc[safeKey] || 0) + 1;
                         return acc;
                       }, {} as Record<string, number>)
                     ).map(([location, count]) => (
-                      <div key={location} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                      <div
+                        key={location}
+                        className="flex justify-between items-center p-3 bg-gray-50 rounded"
+                      >
                         <span className="text-sm font-medium">{location}</span>
                         <span className="text-sm text-gray-600">{count} images</span>
                       </div>
@@ -277,22 +317,26 @@ interface HazardStats {
                   <h3 className="text-lg font-medium text-gray-900 mb-3">Recent Images</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {selectedHazardImages
-                      .sort((a: ImageMetadata, b: ImageMetadata) => {
+                      .slice()
+                      .sort((a, b) => {
                         if (!a.timestamp && !b.timestamp) return 0;
                         if (!a.timestamp) return 1;
                         if (!b.timestamp) return -1;
-                        return new Date(b.timestamp!).getTime() - new Date(a.timestamp!).getTime();
+                        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
                       })
                       .slice(0, 6)
-                      .map((image: ImageMetadata) => (
-                        <div key={image.filename} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      .map((image) => (
+                        <div
+                          key={image.filename}
+                          className="border rounded-lg p-4 hover:shadow-md transition-shadow"
+                        >
                           <h4 className="font-medium text-gray-900 mb-2 truncate">
                             {image.title || image.filename}
                           </h4>
                           <div className="space-y-1 text-sm text-gray-600">
                             <div className="flex items-center">
                               <MapPin className="w-3 h-3 mr-1" />
-                              <span className="truncate">{image.location}</span>
+                              <span className="truncate">{image.location || 'Unknown location'}</span>
                             </div>
                             {image.timestamp && (
                               <div className="flex items-center">
@@ -312,7 +356,7 @@ interface HazardStats {
                         </div>
                       ))}
                   </div>
-                  
+
                   {selectedHazardImages.length > 6 && (
                     <div className="mt-4 text-center">
                       <Link
