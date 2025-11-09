@@ -295,9 +295,8 @@ export default function HazardAnalysisPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.entries(
                       selectedHazardImages.reduce((acc: Record<string, number>, img) => {
-                        const key = img.country ? `${img.location}, ${img.country}` : img.location;
-                        const safeKey = key || 'Unknown location';
-                        acc[safeKey] = (acc[safeKey] || 0) + 1;
+                        const key = img.location && img.country ? `${img.location}, ${img.country}` : (img.location || img.country || 'Unknown location');
+                        acc[key] = (acc[key] || 0) + 1;
                         return acc;
                       }, {} as Record<string, number>)
                     ).map(([location, count]) => (
