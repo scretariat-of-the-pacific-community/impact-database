@@ -27,6 +27,14 @@ interface HazardStats {
   locations: string[];
 }
 
+interface HazardStatsInternal {
+  hazard_type: string;
+  count: number;
+  countriesSet: Set<string>;
+  latestDate?: string;
+  locationsSet: Set<string>;
+}
+
 export default function HazardAnalysisPage() {
   const [selectedHazard, setSelectedHazard] = useState('');
 
@@ -40,7 +48,7 @@ export default function HazardAnalysisPage() {
   const hazardStats = useMemo(() => {
     if (!images || images.length === 0) return [] as HazardStats[];
 
-    const statsMap = new Map<string, HazardStats>();
+    const statsMap = new Map<string, HazardStatsInternal>();
 
     images.forEach((image) => {
       const hazard = image.hazard_type;
@@ -50,8 +58,8 @@ export default function HazardAnalysisPage() {
         statsMap.set(hazard, {
           hazard_type: hazard,
           count: 0,
-          countries: [],
-          locations: [],
+          countriesSet: new Set<string>(),
+          locationsSet: new Set<string>(),
         });
       }
 
@@ -59,17 +67,11 @@ export default function HazardAnalysisPage() {
       stats.count += 1;
 
       if (image.country) {
-        const country = image.country;
-        if (!stats.countries.includes(country)) {
-          stats.countries.push(country);
-        }
+        stats.countriesSet.add(image.country);
       }
 
       if (image.location) {
-        const location = image.location;
-        if (!stats.locations.includes(location)) {
-          stats.locations.push(location);
-        }
+        stats.locationsSet.add(image.location);
       }
 
       if (image.timestamp) {
@@ -80,7 +82,16 @@ export default function HazardAnalysisPage() {
       }
     });
 
-    return Array.from(statsMap.values()).sort((a, b) => b.count - a.count);
+    // Convert Sets to arrays and create final stats objects
+    return Array.from(statsMap.values())
+      .map((stats) => ({
+        hazard_type: stats.hazard_type,
+        count: stats.count,
+        countries: Array.from(stats.countriesSet),
+        locations: Array.from(stats.locationsSet),
+        latestDate: stats.latestDate,
+      }))
+      .sort((a, b) => b.count - a.count);
   }, [images]);
 
   const totalImages = images.length;
