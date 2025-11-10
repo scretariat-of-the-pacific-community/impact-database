@@ -18,6 +18,11 @@ export default function PWAInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
+    // Avoid noisy console warnings during local development.
+    if (process.env.NODE_ENV !== 'production') {
+      return;
+    }
+
     // Check if user has already dismissed or installed
     const dismissed = localStorage.getItem('pwa-prompt-dismissed');
     const installed = localStorage.getItem('pwa-installed');

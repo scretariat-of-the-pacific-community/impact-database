@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
@@ -9,7 +9,6 @@ import { MapPinIcon, PhotoIcon, FunnelIcon } from '@heroicons/react/24/outline';
 
 import { imageApi } from '@/lib/api';
 import { configureLeafletIcons } from '@/lib/leaflet-config';
-import { createCustomIcon } from '@/lib/mapUtils';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ErrorBanner from '@/components/ErrorBanner';
 import Skeleton from '@/components/design-system/Skeleton';
@@ -41,8 +40,14 @@ const MapUsageTracker = dynamic(
 );
 
 export default function MapPage() {
+  const [createCustomIcon, setCreateCustomIcon] = useState<any>(null);
+  
   useEffect(() => {
     configureLeafletIcons();
+    // Dynamically import mapUtils only on client-side
+    import('@/lib/mapUtils').then((mod) => {
+      setCreateCustomIcon(() => mod.createCustomIcon);
+    });
   }, []);
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -114,7 +119,7 @@ export default function MapPage() {
                     attribution="&copy; OpenStreetMap contributors"
                   />
                   <MapUsageTracker />
-                  {imagesWithCoordinates.map((image, index) => (
+                  {createCustomIcon && imagesWithCoordinates.map((image, index) => (
                     <Marker
                       key={image.id}
                       position={[image.latitude!, image.longitude!] as [number, number]}

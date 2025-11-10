@@ -4,8 +4,9 @@
 
 services:
   postgis_db:
-    ports:
-      - "5433:5432"
+    # Commenting out external port to avoid conflicts
+    # ports:
+    #   - "5433:5432"
 
   redis:
     ports:
@@ -23,9 +24,10 @@ services:
       - "3001:3000"
     # Explicitly ensure the container runs the hot-reload dev server.
     command: ["npm", "run", "dev:host"]
-    # Fix API URL for server-side compilation - use Docker network name
+    # Fix API URL for client-side (browser) access
     environment:
-      NEXT_PUBLIC_API_URL: "http://api:8000"
+      NEXT_PUBLIC_API_URL: "http://localhost:8001"
+      NEXT_PUBLIC_API_URL_INTERNAL: "http://api:8000"
       # Disable Sentry to avoid instrumentation overhead in dev
       NEXT_PUBLIC_SENTRY_DSN: ""
       SENTRY_AUTH_TOKEN: ""

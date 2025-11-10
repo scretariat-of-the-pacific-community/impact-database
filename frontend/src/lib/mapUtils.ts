@@ -1,17 +1,35 @@
-import L from 'leaflet';
+import type { DivIcon } from 'leaflet';
 
-// Fix for default markers in react-leaflet
-// Only run on client-side to avoid SSR issues
-if (typeof window !== 'undefined') {
-  delete (L.Icon.Default.prototype as any)._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  });
-}
+let leaflet: typeof import('leaflet') | null = null;
+let iconsConfigured = false;
 
-export const createCustomIcon = (hazardType: string) => {
+const ensureLeaflet = (): (typeof import('leaflet')) | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  if (!leaflet) {
+    // `require` keeps Leaflet out of the server bundle until we are on the client.
+    leaflet = require('leaflet');
+  }
+
+  if (!iconsConfigured && leaflet) {
+    delete (leaflet.Icon.Default.prototype as any)._getIconUrl;
+    leaflet.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    });
+    iconsConfigured = true;
+  }
+
+  return leaflet;
+};
+
+export const createCustomIcon = (hazardType: string): DivIcon | null => {
+  const L = ensureLeaflet();
+  if (!L) return null;
+
   const colors: Record<string, string> = {
     flood: '#3b82f6',
     cyclone: '#8b5cf6',

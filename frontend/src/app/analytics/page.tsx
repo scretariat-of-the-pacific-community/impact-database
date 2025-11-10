@@ -40,7 +40,13 @@ export default function Analytics() {
       const response = await fetch('/api/analytics');
       if (response.ok) {
         const data = await response.json();
-        setAnalyticsData(data);
+        // Validate data structure before setting
+        if (data && data.hazardDistribution && data.countryDistribution && data.monthlyUploads) {
+          setAnalyticsData(data);
+        } else {
+          // Use mock data if structure is invalid
+          setAnalyticsData(getMockAnalyticsData());
+        }
       } else {
         // If API doesn't exist, use mock data
         setAnalyticsData(getMockAnalyticsData());
@@ -116,9 +122,17 @@ export default function Analytics() {
     );
   }
 
-  const maxHazardCount = Math.max(...Object.values(analyticsData.hazardDistribution));
-  const maxCountryCount = Math.max(...Object.values(analyticsData.countryDistribution));
-  const maxMonthlyCount = Math.max(...Object.values(analyticsData.monthlyUploads));
+  // Check if there's any data
+  const hasData = analyticsData.totalImages > 0;
+  const maxHazardCount = Object.keys(analyticsData.hazardDistribution).length > 0 
+    ? Math.max(...Object.values(analyticsData.hazardDistribution)) 
+    : 1;
+  const maxCountryCount = Object.keys(analyticsData.countryDistribution).length > 0
+    ? Math.max(...Object.values(analyticsData.countryDistribution))
+    : 1;
+  const maxMonthlyCount = Object.keys(analyticsData.monthlyUploads).length > 0
+    ? Math.max(...Object.values(analyticsData.monthlyUploads))
+    : 1;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50">
@@ -127,7 +141,7 @@ export default function Analytics() {
         <div className="mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Analytics & Insights</h1>
           <p className="text-xl text-gray-600">
-            Comprehensive analysis of hazard data across the Pacific region
+            {hasData ? 'Comprehensive analysis of hazard data across the Pacific region' : 'No data available yet - upload images to see analytics'}
           </p>
         </div>
 

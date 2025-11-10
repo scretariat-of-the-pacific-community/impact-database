@@ -123,8 +123,13 @@ class APIClient {
   }
 
   async getImage(id: string): Promise<ImageMetadata> {
-    const response: AxiosResponse<ImageMetadata> = await this.client.get(`/upload/images/${id}/metadata`);
-    return response.data;
+    // First try to get from the search results since we don't have a direct get-by-id endpoint
+    const response = await this.searchImages({ limit: 1000 });
+    const image = response.images.find((img: any) => img.id === id || img.filename === id);
+    if (image) {
+      return image;
+    }
+    throw new Error(`Image with id ${id} not found`);
   }
 
   async getImagesInBounds(bounds: BoundingBox): Promise<ImageMetadata[]> {

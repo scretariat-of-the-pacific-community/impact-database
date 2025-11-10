@@ -38,7 +38,7 @@ const createCSP = () => {
     `img-src ${sources.imgSrc.join(' ')}`,
     `connect-src ${sources.connectSrc.join(' ')}`,
     "form-action 'self'",
-    "media-src 'self' blob:",
+    "media-src 'self' blob: data:",
   ]
     .filter(Boolean)
     .join('; ');

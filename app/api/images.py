@@ -290,18 +290,9 @@ async def get_hazards(
 
 
 @router.get("/vocabularies")
-async def get_vocabularies(
-    request: Request,
-    current_user: User = Depends(get_current_user)
-):
-    """Get vocabularies for metadata fields. Requires authentication."""
+async def get_vocabularies(request: Request):
+    """Get vocabularies for metadata fields. Public endpoint for upload form."""
     try:
-        # Check permissions
-        if "read:metadata" not in current_user.permissions and "read:all" not in current_user.permissions:
-            raise HTTPException(
-                status_code=403,
-                detail="Insufficient permissions to access vocabulary data"
-            )
         
         vocabularies = {
             "hazard_types": [
