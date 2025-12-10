@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCircleIcon,
@@ -22,7 +22,6 @@ import MetadataEditor from './MetadataEditor';
 import CommentsSystem from './CommentsSystem';
 import Image from 'next/image';
 import { sanitizeText } from '@/lib/sanitize';
-import { useEffect } from 'react';
 import ErrorBanner from './ErrorBanner';
 
 interface ReviewItem {
@@ -169,21 +168,21 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
     }
   });
 
-  const handleStatusUpdate = (status: string) => {
+  const handleStatusUpdate = useCallback((status: string) => {
     setSelectedAction(status);
     updateStatusMutation.mutate({ status, notes: reviewNotes });
-  };
+  }, [reviewNotes, updateStatusMutation]);
 
-  const handleAssignToSelf = () => {
+  const handleAssignToSelf = useCallback(() => {
     assignMutation.mutate();
-  };
+  }, [assignMutation]);
 
-  const handleFlag = () => {
+  const handleFlag = useCallback(() => {
     const reason = prompt('Please provide a reason for flagging this item:');
     if (reason && reason.trim()) {
       flagMutation.mutate(reason.trim());
     }
-  };
+  }, [flagMutation]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {

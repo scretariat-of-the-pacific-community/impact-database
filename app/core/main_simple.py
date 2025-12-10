@@ -45,6 +45,10 @@ async def root():
 
 # Include only essential routers
 try:
+    # Import auth API for authentication
+    from api.auth import router as auth_router
+    app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+    
     # Import simplified images API
     from api.images_simple import router as images_router
     app.include_router(images_router, prefix="/api/images", tags=["images"])
@@ -53,7 +57,15 @@ try:
     from api.upload import router as upload_router
     app.include_router(upload_router, prefix="/upload", tags=["upload"])
     
-    logger.info("Images API and Upload API routers included")
+    # Import RBAC API (Phase 0: Foundation)
+    from api.rbac import router as rbac_router
+    app.include_router(rbac_router, tags=["rbac"])
+    
+    # Import Review Workflow API (Phase 1: Assignment & Audit Trail)
+    from api.review_workflow import router as review_workflow_router
+    app.include_router(review_workflow_router, tags=["review-workflow"])
+    
+    logger.info("Auth API, Images API, Upload API, RBAC API, and Review Workflow API routers included")
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
 

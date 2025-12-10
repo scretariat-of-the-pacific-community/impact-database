@@ -86,27 +86,44 @@ export default function SearchPage() {
   const searchParams = useSearchParams();
   const FILTER_STORAGE_KEY = 'search_filters_v1';
   const VIEW_MODE_STORAGE_KEY = 'search_view_mode_v1';
-  const persistedFilters =
-    typeof window !== 'undefined'
-      ? JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? 'null')
-      : null;
-  const persistedView =
-    typeof window !== 'undefined'
-      ? (localStorage.getItem(VIEW_MODE_STORAGE_KEY) as SearchPageState['viewMode'] | null)
-      : null;
   const searchParamsString = useMemo(() => searchParams.toString(), [searchParams]);
   
+  // Initialize state with safe defaults (no localStorage access during initial render)
   const [state, setState] = useState<SearchPageState>({
-    searchQuery: searchParams.get('q') || persistedFilters?.searchQuery || '',
-    selectedHazards: persistedFilters?.selectedHazards || [],
-    selectedAgencies: persistedFilters?.selectedAgencies || [],
-    dateFrom: persistedFilters?.dateFrom || '',
-    dateTo: persistedFilters?.dateTo || '',
-    viewMode: (searchParams.get('view') as SearchPageState['viewMode']) || persistedView || 'grid',
+    searchQuery: searchParams.get('q') || '',
+    selectedHazards: [],
+    selectedAgencies: [],
+    dateFrom: '',
+    dateTo: '',
+    viewMode: (searchParams.get('view') as SearchPageState['viewMode']) || 'grid',
     filtersOpen: false,
-    sortBy: persistedFilters?.sortBy || 'relevance',
-    sortOrder: persistedFilters?.sortOrder || 'desc'
+    sortBy: 'relevance',
+    sortOrder: 'desc'
   });
+  
+  // Load persisted filters and view mode after hydration
+  const [isHydrated, setIsHydrated] = useState(false);
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !isHydrated) {
+      const persistedFilters = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? 'null');
+      const persistedView = localStorage.getItem(VIEW_MODE_STORAGE_KEY) as SearchPageState['viewMode'] | null;
+      
+      setState(prev => ({
+        ...prev,
+        searchQuery: searchParams.get('q') || persistedFilters?.searchQuery || prev.searchQuery,
+        selectedHazards: persistedFilters?.selectedHazards || prev.selectedHazards,
+        selectedAgencies: persistedFilters?.selectedAgencies || prev.selectedAgencies,
+        dateFrom: persistedFilters?.dateFrom || prev.dateFrom,
+        dateTo: persistedFilters?.dateTo || prev.dateTo,
+        viewMode: (searchParams.get('view') as SearchPageState['viewMode']) || persistedView || prev.viewMode,
+        sortBy: persistedFilters?.sortBy || prev.sortBy,
+        sortOrder: persistedFilters?.sortOrder || prev.sortOrder
+      }));
+      
+      setIsHydrated(true);
+    }
+  }, [searchParams, FILTER_STORAGE_KEY, VIEW_MODE_STORAGE_KEY, isHydrated]);
   const [currentPage, setCurrentPage] = useState(() => {
     const initial = Number(searchParams.get('page') || '1');
     return Number.isNaN(initial) || initial < 1 ? 1 : initial;

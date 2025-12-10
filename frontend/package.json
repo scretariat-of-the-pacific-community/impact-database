@@ -13,7 +13,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "lighthouse": "lhci autorun --config=lighthouserc.json",
-    "lighthouse:local": "npx lighthouse http://localhost:3000 --view --output-path=./lighthouse-report.html",
+    "lighthouse:local": "echo 'Note: Lighthouse requires Chrome with display in WSL2. Consider running from Windows or CI/CD.' && npx lighthouse@11 http://localhost:3001 --chrome-flags=\"--headless --no-sandbox --disable-gpu\" --output html --output-path=./lighthouse-report.html",
     "analyze": "ANALYZE=true npm run build"
   },
   "dependencies": {

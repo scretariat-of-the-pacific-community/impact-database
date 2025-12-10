@@ -497,12 +497,18 @@ async def upload_image(
         minio_client = get_minio_storage()
         minio_client.upload_object(object_key, io.BytesIO(content), len(content))
 
-        # Extract geometry from validated upload data
+        # Extract geometry from validated upload data OR fall back to EXIF GPS
         geom = None
         if upload_data.geometry is not None:
-            # Extract lon, lat from geometry.coordinates [lon, lat]
+            # User provided coordinates - use those (highest priority)
             lon, lat = upload_data.geometry.coordinates
             geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
+        elif 'latitude' in exif_data and 'longitude' in exif_data:
+            # No user coordinates, but image has GPS EXIF - use those
+            lat = exif_data['latitude']
+            lon = exif_data['longitude']
+            geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
+            logger.info(f"Using GPS coordinates from EXIF: ({lat}, {lon})")
 
         image_metadata = ImageMetadata(
             filename=file.filename,

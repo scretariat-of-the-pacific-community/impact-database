@@ -35,7 +35,9 @@ export default function HazardAnalysisPage() {
     queryFn: () => imageApi.search({ limit: 1000 }),
   });
 
-  const images = (data?.images as ImageMetadata[]) || [];
+  const images = useMemo(() => {
+    return (data?.images as ImageMetadata[]) || [];
+  }, [data?.images]);
 
   const hazardStats = useMemo(() => {
     if (!images || images.length === 0) return [] as HazardStats[];

@@ -3,3 +3,35 @@ node_modules
 .venv
 .env
 secrets/
+
+# Test files and scripts
+test_*.py
+create_gps_test_images.py
+test_exif_images/
+
+# Backup files
+*.bak
+*.py.bak
+*.tsx.bak
+
+# Temporary frontend files
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+
+# Environment files (if not already ignored)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+

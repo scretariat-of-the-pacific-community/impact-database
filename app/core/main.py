@@ -17,6 +17,7 @@ from core.config import settings
 # Use simplified APIs for development
 from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds
 from api import images_simple as images  # Use simple version
+from api import rbac  # Phase 0: RBAC foundation
 # Temporarily disable complex features for basic startup
 # from services.monitoring import setup_monitoring, monitoring_background_tasks
 # from services.performance import initialize_performance_optimizations
@@ -102,6 +103,13 @@ app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
 # API endpoints - now require authentication
 app.include_router(images.router, prefix="/api", tags=["api", "images"])
 app.include_router(metadata.router, prefix="/api", tags=["metadata"])
+
+# RBAC endpoints - Phase 0: Foundation
+app.include_router(rbac.router, tags=["rbac", "roles", "permissions", "users"])
+
+# Review Workflow endpoints - Phase 1: Assignment & Audit Trail
+from api import review_workflow
+app.include_router(review_workflow.router, tags=["review-workflow"])
 
 # STAC and OGC API - Records with authentication
 app.include_router(stac.router, prefix="/stac", tags=["stac"])

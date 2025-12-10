@@ -44,6 +44,13 @@ export default function ImageDetailPage() {
   
   const imageId = params.id as string;
   
+  // Call hooks before any conditional returns
+  const { data: image, isLoading, error } = useQuery({
+    queryKey: ['image', imageId],
+    queryFn: () => imageApi.getById(imageId),
+    enabled: !!imageId && imageId !== 'undefined' && imageId !== 'null'
+  });
+  
   // Handle invalid image IDs
   if (!imageId || imageId === 'undefined' || imageId === 'null') {
     return (
@@ -58,12 +65,6 @@ export default function ImageDetailPage() {
       </div>
     );
   }
-  
-  const { data: image, isLoading, error } = useQuery({
-    queryKey: ['image', imageId],
-    queryFn: () => imageApi.getById(imageId),
-    enabled: !!imageId && imageId !== 'undefined' && imageId !== 'null'
-  });
 
   // Construct the image URL
   const imageUrl = image ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}` : '';
@@ -486,6 +487,13 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
 }
 
 function LocationTab({ image }: { image: ImageMetadata }) {
+  // Call hooks before any conditional returns
+  useEffect(() => {
+    if (image.latitude && image.longitude) {
+      configureLeafletIcons();
+    }
+  }, [image.latitude, image.longitude]);
+
   if (!image.latitude || !image.longitude) {
     return (
       <div className="text-center py-8">
@@ -495,10 +503,6 @@ function LocationTab({ image }: { image: ImageMetadata }) {
       </div>
     );
   }
-
-  useEffect(() => {
-    configureLeafletIcons();
-  }, []);
 
   return (
     <div className="space-y-6">

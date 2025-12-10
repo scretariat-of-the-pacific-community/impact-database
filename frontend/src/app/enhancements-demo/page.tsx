@@ -271,7 +271,7 @@ export default function EnhancementsDemoPage() {
             <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
               <h3 className="mb-3 text-lg font-bold text-green-800">Installable App</h3>
               <p className="mb-4 text-green-700">
-                After your second visit, you'll see a prompt to install Ocean Portal as an app. 
+                After your second visit, you&apos;ll see a prompt to install Ocean Portal as an app. 
                 This gives you a native app experience with offline support.
               </p>
               <ul className="space-y-2">
@@ -297,7 +297,7 @@ export default function EnhancementsDemoPage() {
             <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
               <h3 className="mb-3 text-lg font-bold text-blue-800">Offline Upload Queue</h3>
               <p className="mb-4 text-blue-700">
-                When you're offline, uploads are automatically queued and will sync when you're back online.
+                When you&apos;re offline, uploads are automatically queued and will sync when you&apos;re back online.
                 Perfect for field work in remote areas.
               </p>
               <div className="rounded-lg bg-white p-4">
@@ -307,7 +307,7 @@ export default function EnhancementsDemoPage() {
                 <ol className="mt-2 list-inside list-decimal space-y-1 text-sm text-gray-600">
                   <li>Submit upload while offline</li>
                   <li>File is stored locally in your browser</li>
-                  <li>Toast notification confirms it's queued</li>
+                  <li>Toast notification confirms it&apos;s queued</li>
                   <li>When online, uploads sync automatically</li>
                   <li>Success/failure notifications appear</li>
                 </ol>

@@ -49,6 +49,13 @@ fake_users_db = {
         "email": "johndoe@example.com",
         "hashed_password": pwd_context.hash("secret"),
         "disabled": False,
+    },
+    "admin": {
+        "username": "admin",
+        "full_name": "Admin User",
+        "email": "admin@example.com",
+        "hashed_password": pwd_context.hash("admin123"),
+        "disabled": False,
     }
 }
 
@@ -94,6 +101,35 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+@router.post("/login")
+async def login(login_data: LoginRequest):
+    """Login endpoint that accepts JSON credentials"""
+    user = authenticate_user(login_data.username, login_data.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "id": 1,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name
+    }
 
 
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> User:

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
@@ -56,6 +56,7 @@ export default function UploadPage() {
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const { data: vocabData, isLoading, error, refetch } = useQuery({
     queryKey: ['vocabularies'],
@@ -335,13 +336,14 @@ export default function UploadPage() {
                 <div className="mt-4">
                   <label htmlFor="file-upload" className="cursor-pointer">
                     <span className="mt-2 block text-sm font-medium text-gray-900">
-                      Drop files here or click to upload
+                      Drop files here or click to select an image
                     </span>
                     <input
                       id="file-upload"
                       type="file"
                       className="sr-only"
                       accept="image/*"
+                      ref={fileInputRef}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                         const file = e.target.files?.[0];
                         if (file) handleFileSelect(file);
@@ -351,6 +353,15 @@ export default function UploadPage() {
                   <p className="mt-1 text-xs text-gray-500">
                     {ALLOWED_EXTENSIONS.join(', ').toUpperCase()} up to {Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB
                   </p>
+                  <div className="mt-4 flex justify-center">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Choose Image
+                    </Button>
+                  </div>
                 </div>
               </div>
             ) : (

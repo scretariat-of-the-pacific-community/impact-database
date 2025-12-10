@@ -6,7 +6,7 @@ import {
   Upload,
   MapPin,
   Calendar,
-  Image,
+  Image as ImageIcon,
   Search,
   Filter,
   Globe,
@@ -275,7 +275,7 @@ export default function OceanPortalDashboard() {
               </div>
             ) : (
               <div className="text-center py-12">
-                <Image className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <ImageIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" aria-hidden="true" />
                 <p className="text-gray-500 font-medium">No images in the database yet</p>
                 <p className="text-gray-400 text-sm mt-2">
                   Start by uploading your first impact assessment image

@@ -1,9 +1,15 @@
-FROM node:18-alpine
+FROM node:20-bookworm
 
 WORKDIR /app
 
-# Use default HTTPS repositories and install ca-certificates
-RUN apk update && apk add --no-cache ca-certificates libc6-compat curl
+# Install ca-certificates and update npm with increased timeouts
+RUN apt-get update && \
+    apt-get install -y ca-certificates curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-timeout 300000
 
 # Copy package files
 COPY package*.json ./
