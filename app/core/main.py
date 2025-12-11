@@ -84,7 +84,13 @@ app.add_middleware(
 )
 
 # Include routers with enhanced security
-# app.include_router(auth_enhanced_router, prefix="/api/auth", tags=["auth"])  # Commented out - not imported
+# SECURITY FIX: Mount auth router to enable token-based authentication
+from api import auth
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+
+# RBAC routers
+from api import rbac
+app.include_router(rbac.router, prefix="/api/rbac", tags=["rbac"])
 
 # Secure upload endpoint (replaces upload.py, upload_backup.py, upload_fixed.py)
 # from api import upload_secure  # Commented out - optional module

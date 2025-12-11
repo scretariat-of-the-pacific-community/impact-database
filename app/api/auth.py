@@ -41,23 +41,49 @@ class UserInDB(User):
     hashed_password: str
 
 
-# Simple in-memory user store
+# DEPRECATED: In-memory user store (transitioning to database)
+# Use database users from models.rbac.User instead
+# Keep for backward compatibility during migration
 fake_users_db = {
     "johndoe": {
         "username": "johndoe",
         "full_name": "John Doe",
         "email": "johndoe@example.com",
         "hashed_password": pwd_context.hash("secret"),
-        "disabled": False,
+        "disabled": False
     },
     "admin": {
         "username": "admin",
         "full_name": "Admin User",
         "email": "admin@example.com",
         "hashed_password": pwd_context.hash("admin123"),
-        "disabled": False,
+        "disabled": False
     }
 }
+
+# Database integration
+def get_user_from_db(username: str):
+    """Get user from database. Falls back to fake_users_db for backward compatibility."""
+    from models.database import get_db
+    from models.rbac import User as DBUser
+    from sqlalchemy.orm import Session
+    
+    try:
+        db: Session = next(get_db())
+        db_user = db.query(DBUser).filter(DBUser.username == username).first()
+        if db_user and db_user.is_active:
+            return UserInDB(
+                username=db_user.username,
+                email=db_user.email,
+                full_name=db_user.full_name,
+                disabled=not db_user.is_active,
+                hashed_password=db_user.hashed_password or ""
+            )
+    except Exception as e:
+        print(f"Database user lookup failed: {e}")
+    
+    # Fallback to in-memory store
+    return get_user(fake_users_db, username)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -71,7 +97,8 @@ def get_user(db, username: str) -> Optional[UserInDB]:
 
 
 def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
-    user = get_user(fake_users_db, username)
+    """Authenticate user with username and password (checks database first)."""
+    user = get_user_from_db(username)
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -133,18 +160,11 @@ async def login(login_data: LoginRequest):
 
 
 async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> User:
-    # Development bypass - allow uploads without authentication
-    from core.config import settings
-    if settings.ENVIRONMENT.lower() == "development":
-        # Return a mock user for development
-        return User(
-            username="dev_user",
-            email="dev@example.com",
-            full_name="Development User",
-            disabled=False
-        )
+    """Get current authenticated user from JWT token.
     
-    # Production authentication logic
+    SECURITY: No dev bypass! All environments require valid authentication.
+    Use seeded test users or feature flags for testing.
+    """
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -165,7 +185,7 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> Use
         token_data = TokenData(username=username)
     except JWTError:
         raise credentials_exception
-    user = get_user(fake_users_db, token_data.username)
+    user = get_user_from_db(token_data.username)
     if user is None:
         raise credentials_exception
     return user
