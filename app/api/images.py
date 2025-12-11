@@ -32,90 +32,66 @@ router = APIRouter()
 @router.get("/images")
 async def get_all_images(
     request: Request,
-    limit: int = Query(QueryLimits.DEFAULT_LIMIT_IMAGES, ge=1, le=QueryLimits.MAX_LIMIT_IMAGES, 
+    limit: int = Query(QueryLimits.DEFAULT_LIMIT, ge=1, le=QueryLimits.MAX_LIMIT, 
                       description="Maximum number of images to return"),
-    offset: int = Query(0, ge=0, le=QueryLimits.MAX_OFFSET, 
+    offset: int = Query(0, ge=0, 
                        description="Number of images to skip"),
-    hazard_type: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+    hazard_type: Optional[str] = Query(None, max_length=100,
                                      description="Filter by hazard type"),
-    location: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+    location: Optional[str] = Query(None, max_length=200,
                                   description="Filter by location"),
-    country: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+    country: Optional[str] = Query(None, max_length=100,
                                  description="Filter by country"),
     sort_by: str = Query("date_stamp", description="Sort field: date_stamp, title, hazard_type"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
-    """Get all images with optional filtering and pagination. Requires authentication."""
+    """Get all images with optional filtering and pagination (simplified implementation)."""
     try:
-        # Check if user has permission to read images
-        if "read:images" not in current_user.permissions and "read:all" not in current_user.permissions:
-            raise HTTPException(
-                status_code=403, 
-                detail="Insufficient permissions to access images"
-            )
+        # Build base query
+        query = db.query(ImageMetadata)
         
-        # Create validated pagination
-        pagination = ValidatedPagination.create(limit, offset, QueryLimits.MAX_LIMIT_IMAGES)
-        
-        # Create validated filters
-        filters = ValidatedFilter.create(
-            hazard_type=hazard_type,
-            location=location, 
-            country=country
-        )
-        
-        # Build secure query using the available method
-        query_builder = ImageQueryBuilder()
-        
-        # Create filters dict
-        filter_dict = {}
+        # Apply filters
         if hazard_type:
-            filter_dict['hazard_type'] = hazard_type
+            query = query.filter(ImageMetadata.hazard_type == hazard_type)
         if location:
-            filter_dict['location'] = location
+            query = query.filter(ImageMetadata.location.ilike(f"%{location}%"))
         if country:
-            filter_dict['country'] = country
-            
-        # Use the base build_query method
-        from models.database import ImageMetadata
-        images = query_builder.build_query(
-            db=db,
-            model=ImageMetadata,
-            filters=filter_dict,
-            allowed_filters=['hazard_type', 'location', 'country'],
-            sort_by=sort_by,
-            sort_order=sort_order,
-            allowed_sorts=['date_stamp', 'title', 'hazard_type', 'created_at'],
-            limit=limit,
-            offset=offset
-        )
+            query = query.filter(ImageMetadata.country.ilike(f"%{country}%"))
+        
+        # Apply sorting
+        if sort_by == "date_stamp" and hasattr(ImageMetadata, 'date_stamp'):
+            order_col = ImageMetadata.date_stamp
+        elif sort_by == "title" and hasattr(ImageMetadata, 'title'):
+            order_col = ImageMetadata.title
+        elif sort_by == "hazard_type":
+            order_col = ImageMetadata.hazard_type
+        else:
+            order_col = ImageMetadata.datetime  # Default to datetime
+        
+        if sort_order == "desc":
+            query = query.order_by(desc(order_col))
+        else:
+            query = query.order_by(order_col)
+        
+        # Apply pagination
+        images = query.limit(limit).offset(offset).all()
         
         # Convert to response format
         result = []
         for image in images:
             result.append({
-                "id": image.filename,  # Use filename as ID since it's the primary key
+                "id": str(image.id) if hasattr(image, 'id') else image.filename,
                 "filename": image.filename,
                 "title": image.title,
-                "description": image.abstract,  # Use abstract as description
+                "description": image.abstract if hasattr(image, 'abstract') else None,
                 "hazard_type": image.hazard_type,
                 "location": image.location,
                 "country": image.country,
-                "keywords": image.keywords,  # Add keywords field
-                "latitude": float(image.latitude) if image.latitude else None,
-                "longitude": float(image.longitude) if image.longitude else None,
-                "upload_date": image.date_stamp.isoformat() if image.date_stamp else None,
-                "file_size": getattr(image, 'file_size', None),
-                "image_hash": getattr(image, 'image_hash', None),
+                "keywords": image.keywords if hasattr(image, 'keywords') else [],
+                "upload_date": image.date_stamp.isoformat() if hasattr(image, 'date_stamp') and image.date_stamp else None,
                 "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
-                "full_url": f"/upload/images/{image.filename}" if image.filename else None,
-                "contact": {
-                    "organisation_name": getattr(image, 'contact_organisation_name', None),
-                    "individual_name": getattr(image, 'contact_individual_name', None),
-                    "email": getattr(image, 'contact_email', None)
-                }
+                "full_url": f"/upload/images/{image.filename}" if image.filename else None
             })
         
         # Calculate total count
@@ -139,97 +115,78 @@ async def get_all_images(
 @router.get("/v1/images/search")
 async def search_images(
     request: Request,
-    q: Optional[str] = Query(None, max_length=QueryLimits.MAX_SEARCH_TERM_LENGTH,
+    q: Optional[str] = Query(None, max_length=500,
                            description="Search query"),
-    hazard_type: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+    hazard_type: Optional[str] = Query(None, max_length=100,
                                      description="Filter by hazard type"),
-    location: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+    location: Optional[str] = Query(None, max_length=200,
                                   description="Filter by location"),
-    country: Optional[str] = Query(None, max_length=QueryLimits.MAX_FILTER_VALUE_LENGTH,
+    country: Optional[str] = Query(None, max_length=100,
                                  description="Filter by country"),
     sort_by: str = Query("relevance", description="Sort by: relevance, date_stamp, title"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    limit: int = Query(QueryLimits.DEFAULT_LIMIT_SEARCH, ge=1, le=QueryLimits.MAX_LIMIT_SEARCH, 
+    limit: int = Query(QueryLimits.DEFAULT_LIMIT, ge=1, le=QueryLimits.MAX_LIMIT, 
                       description="Maximum number of results"),
-    offset: int = Query(0, ge=0, le=QueryLimits.MAX_OFFSET, 
+    offset: int = Query(0, ge=0, 
                        description="Number of results to skip"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
-    """Search images with full-text search and filtering. Requires authentication."""
+    """Search images with full-text search and filtering (simplified implementation)."""
     try:
-        # Check permissions
-        if "search:basic" not in current_user.permissions and "read:all" not in current_user.permissions:
-            raise HTTPException(
-                status_code=403,
-                detail="Insufficient permissions to search images"
+        # Build base query
+        query = db.query(ImageMetadata)
+        
+        # Apply text search if provided
+        if q:
+            search_pattern = f"%{q}%"
+            query = query.filter(
+                or_(
+                    ImageMetadata.title.ilike(search_pattern),
+                    ImageMetadata.abstract.ilike(search_pattern),
+                    ImageMetadata.filename.ilike(search_pattern)
+                )
             )
         
-        # Create validated pagination
-        pagination = ValidatedPagination.create(limit, offset, QueryLimits.MAX_LIMIT_SEARCH)
-        
-        # Create validated search term
-        validated_search = ValidatedSearch.create(q)
-        search_term = validated_search.q if validated_search else None
-        
-        # Create validated filters
-        filters = ValidatedFilter.create(
-            hazard_type=hazard_type,
-            location=location,
-            country=country
-        )
-        
-        # Map sort_by for compatibility
-        if sort_by == "relevance":
-            sort_field = "date_stamp"  # Default to date when relevance requested
-        else:
-            sort_field = sort_by
-        
-        # Build secure query using the available method
-        query_builder = ImageQueryBuilder()
-        
-        # Create filters dict
-        filter_dict = {}
+        # Apply filters
         if hazard_type:
-            filter_dict['hazard_type'] = hazard_type
+            query = query.filter(ImageMetadata.hazard_type == hazard_type)
         if location:
-            filter_dict['location'] = location
+            query = query.filter(ImageMetadata.location.ilike(f"%{location}%"))
         if country:
-            filter_dict['country'] = country
-            
-        # Use the base build_query method
-        from models.database import ImageMetadata
-        images = query_builder.build_query(
-            db=db,
-            model=ImageMetadata,
-            filters=filter_dict,
-            allowed_filters=['hazard_type', 'location', 'country'],
-            sort_by=sort_field,
-            sort_order=sort_order,
-            allowed_sorts=['date_stamp', 'title', 'hazard_type', 'created_at'],
-            limit=pagination.limit,
-            offset=pagination.offset
-        )
+            query = query.filter(ImageMetadata.country.ilike(f"%{country}%"))
         
-        # Get total count for pagination
-        total_count = db.query(ImageMetadata).count()
+        # Apply sorting
+        if sort_by == "date_stamp" and hasattr(ImageMetadata, 'date_stamp'):
+            order_col = ImageMetadata.date_stamp
+        elif sort_by == "title" and hasattr(ImageMetadata, 'title'):
+            order_col = ImageMetadata.title
+        else:
+            order_col = ImageMetadata.datetime  # Default to datetime
+        
+        if sort_order == "desc":
+            query = query.order_by(desc(order_col))
+        else:
+            query = query.order_by(order_col)
+        
+        # Get total before pagination
+        total_count = query.count()
+        
+        # Apply pagination
+        images = query.limit(limit).offset(offset).all()
+        
         
         # Convert to response format
         results = []
         for image in images:
             results.append({
-                "id": image.filename,
+                "id": str(image.id) if hasattr(image, 'id') else image.filename,
                 "filename": image.filename,
                 "title": image.title,
-                "description": image.abstract,
+                "description": image.abstract if hasattr(image, 'abstract') else None,
                 "hazard_type": image.hazard_type,
                 "location": image.location,
                 "country": image.country,
-                "latitude": float(image.latitude) if image.latitude else None,
-                "longitude": float(image.longitude) if image.longitude else None,
-                "upload_date": image.date_stamp.isoformat() + "Z" if image.date_stamp else None,
-                "file_size": getattr(image, 'file_size', None),
-                "image_hash": getattr(image, 'image_hash', None),
+                "upload_date": image.date_stamp.isoformat() + "Z" if hasattr(image, 'date_stamp') and image.date_stamp else None,
                 "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
                 "image_url": f"/upload/images/{image.filename}" if image.filename else None
             })
@@ -237,11 +194,11 @@ async def search_images(
         return {
             "images": results,
             "total": total_count,
-            "page": (pagination.offset // pagination.limit) + 1,
-            "limit": pagination.limit,
-            "total_pages": (total_count + pagination.limit - 1) // pagination.limit,
-            "has_more": pagination.offset + pagination.limit < total_count,
-            "query": search_term
+            "page": (offset // limit) + 1,
+            "limit": limit,
+            "total_pages": (total_count + limit - 1) // limit,
+            "has_more": offset + limit < total_count,
+            "query": q
         }
         
     except HTTPException:
@@ -253,18 +210,10 @@ async def search_images(
 @router.get("/hazards")
 async def get_hazards(
     request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db)
 ):
-    """Get list of all available hazard types. Requires authentication."""
+    """Get list of all available hazard types (simplified - public endpoint)."""
     try:
-        # Check permissions
-        if "read:metadata" not in current_user.permissions and "read:all" not in current_user.permissions:
-            raise HTTPException(
-                status_code=403,
-                detail="Insufficient permissions to access hazard data"
-            )
-        
         hazards = db.query(ImageMetadata.hazard_type).filter(
             ImageMetadata.hazard_type.isnot(None),
             ImageMetadata.hazard_type != ''
@@ -357,29 +306,26 @@ async def get_images_geojson(
         # Parse and validate bounding box if provided
         bbox_coords = None
         if bbox:
-            from core.query_security import validate_bbox
             try:
-                bbox_coords = validate_bbox(bbox)
+                parts = bbox.split(',')
+                if len(parts) != 4:
+                    raise ValueError("Bounding box must have 4 values: min_lon,min_lat,max_lon,max_lat")
+                bbox_coords = [float(x) for x in parts]
+                min_lon, min_lat, max_lon, max_lat = bbox_coords
+                # Validate ranges
+                if not (-180 <= min_lon <= 180 and -180 <= max_lon <= 180):
+                    raise ValueError("Longitude must be between -180 and 180")
+                if not (-90 <= min_lat <= 90 and -90 <= max_lat <= 90):
+                    raise ValueError("Latitude must be between -90 and 90")
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e))
         
-        # Use secure query builder for GeoJSON
-        query_builder = ImageQueryBuilder()
-        from models.database import ImageMetadata
-        
-        # Create filters dict
-        filter_dict = {}
-        if hazard_type:
-            filter_dict['hazard_type'] = hazard_type
-            
-        # Build query with filters and bbox constraint
+        # Build query
         query = db.query(ImageMetadata)
         
-        # Apply filters
-        if filter_dict:
-            for key, value in filter_dict.items():
-                if hasattr(ImageMetadata, key):
-                    query = query.filter(getattr(ImageMetadata, key) == value)
+        # Apply hazard type filter
+        if hazard_type:
+            query = query.filter(ImageMetadata.hazard_type == hazard_type)
         
         # Apply bounding box filter if provided
         if bbox_coords:

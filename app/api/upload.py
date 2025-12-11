@@ -148,26 +148,56 @@ def create_audit_log(
 
 @router.get("/images/{filename}")
 async def serve_image(filename: str):
-    """Serve uploaded image files"""
+    """Serve uploaded image files with path traversal protection"""
+    # SECURITY: Validate and sanitize filename to prevent path traversal
+    # Reject any filename containing path separators or parent directory references
+    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: path traversal detected"
+        )
+    
+    # Validate file extension (whitelist approach)
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.tiff', '.tif'}
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file extension: {ext}. Allowed: {', '.join(allowed_extensions)}"
+        )
+    
+    # Normalize the filename (removes any remaining path components)
+    safe_filename = os.path.basename(filename)
+    
     # Define the upload directory path (absolute path within container)
     upload_dir = "/app/uploads"  
-    file_path = os.path.join(upload_dir, filename)
+    file_path = os.path.join(upload_dir, safe_filename)
+    
+    # Additional security: ensure the resolved path is within upload_dir
+    real_upload_dir = os.path.realpath(upload_dir)
+    real_file_path = os.path.realpath(file_path)
+    if not real_file_path.startswith(real_upload_dir):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file path: directory traversal detected"
+        )
     
     # Check if file exists
     if not os.path.exists(file_path):
         raise HTTPException(
             status_code=404,
-            detail=f"Image '{filename}' not found"
+            detail=f"Image '{safe_filename}' not found"
         )
     
     # Determine media type based on file extension
-    _, ext = os.path.splitext(filename.lower())
     media_type_map = {
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg', 
         '.png': 'image/png',
         '.gif': 'image/gif',
-        '.webp': 'image/webp'
+        '.webp': 'image/webp',
+        '.tiff': 'image/tiff',
+        '.tif': 'image/tiff'
     }
     media_type = media_type_map.get(ext, 'image/jpeg')
     
@@ -175,20 +205,48 @@ async def serve_image(filename: str):
     return FileResponse(
         path=file_path,
         media_type=media_type,
-        filename=filename
+        filename=safe_filename
     )
 
 @router.get("/images/{filename}/thumbnail")
 async def serve_image_thumbnail(filename: str):
-    """Serve thumbnail versions of uploaded images"""
+    """Serve thumbnail versions of uploaded images with path traversal protection"""
+    # SECURITY: Validate and sanitize filename to prevent path traversal
+    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: path traversal detected"
+        )
+    
+    # Validate file extension
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.tiff', '.tif'}
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file extension: {ext}"
+        )
+    
+    # Normalize filenames
+    safe_filename = os.path.basename(filename)
+    thumbnail_name = f"thumb_{safe_filename}"
+    
     # Define the upload directory path for thumbnails
     upload_dir = "/app/uploads"
-    thumbnail_name = f"thumb_{filename}"
     file_path = os.path.join(upload_dir, thumbnail_name)
+    
+    # Additional security: ensure the resolved path is within upload_dir
+    real_upload_dir = os.path.realpath(upload_dir)
+    real_file_path = os.path.realpath(file_path)
+    if not real_file_path.startswith(real_upload_dir):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file path: directory traversal detected"
+        )
     
     # If thumbnail doesn't exist, serve the original image
     if not os.path.exists(file_path):
-        return await serve_image(filename)
+        return await serve_image(safe_filename)
     
     # Return the thumbnail
     return FileResponse(
@@ -492,12 +550,8 @@ async def upload_image(
         # Extract EXIF data, but prioritize user-provided metadata
         exif_data = extract_exif_data(io.BytesIO(content))
 
-        object_key = f"images/{file.filename}"
-
-        minio_client = get_minio_storage()
-        minio_client.upload_object(object_key, io.BytesIO(content), len(content))
-
-        # Extract geometry from validated upload data OR fall back to EXIF GPS
+        # TRANSACTION FIX: Determine geometry BEFORE uploading to storage
+        # This ensures we reject uploads that would fail DB constraint before storing bytes
         geom = None
         if upload_data.geometry is not None:
             # User provided coordinates - use those (highest priority)
@@ -509,41 +563,71 @@ async def upload_image(
             lon = exif_data['longitude']
             geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
             logger.info(f"Using GPS coordinates from EXIF: ({lat}, {lon})")
-
-        image_metadata = ImageMetadata(
-            filename=file.filename,
-            datetime=upload_data.datetime,
-            hazard_type=upload_data.hazard_type.value,
-            event_id=upload_data.event_id,
-            status='pending_review',
-            data_license=upload_data.data_license,
-            source_type=upload_data.source_type.value,
-            uploader_id=current_user.username,
-            positional_accuracy=upload_data.positional_accuracy,
-            geometry=geom,
-            resource_locator=object_key
-        )
-
-        db.add(image_metadata)
-        db.flush()  # Get the ID before commit
         
-        # Create audit log for upload
-        create_audit_log(
-            db=db,
-            record_id=str(image_metadata.id) if hasattr(image_metadata, 'id') else image_metadata.filename,
-            action="CREATE",
-            user=current_user,
-            change_summary={
-                'filename': file.filename,
-                'hazard_type': upload_data.hazard_type.value,
-                'event_id': upload_data.event_id,
-                'status': 'pending_review'
-            },
-            request=request
-        )
+        # ENFORCE: Geometry is required (DB has nullable=False constraint)
+        if geom is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Coordinates required: provide geometry in metadata or upload image with GPS EXIF data"
+            )
+
+        object_key = f"images/{file.filename}"
+        minio_client = get_minio_storage()
         
-        db.commit()
-        db.refresh(image_metadata)
+        # TRANSACTION: Upload to storage, but delete if DB insert fails
+        try:
+            minio_client.upload_object(object_key, io.BytesIO(content), len(content))
+            
+            # Create database record
+            image_metadata = ImageMetadata(
+                filename=file.filename,
+                datetime=upload_data.datetime,
+                hazard_type=upload_data.hazard_type.value,
+                event_id=upload_data.event_id,
+                status='pending_review',
+                data_license=upload_data.data_license,
+                source_type=upload_data.source_type.value,
+                uploader_id=current_user.username,
+                positional_accuracy=upload_data.positional_accuracy,
+                geometry=geom,
+                resource_locator=object_key
+            )
+
+            db.add(image_metadata)
+            db.flush()  # Get the ID before commit
+            
+            # Create audit log for upload
+            create_audit_log(
+                db=db,
+                record_id=str(image_metadata.id) if hasattr(image_metadata, 'id') else image_metadata.filename,
+                action="CREATE",
+                user=current_user,
+                change_summary={
+                    'filename': file.filename,
+                    'hazard_type': upload_data.hazard_type.value,
+                    'event_id': upload_data.event_id,
+                    'status': 'pending_review'
+                },
+                request=request
+            )
+            
+            db.commit()
+            db.refresh(image_metadata)
+            
+        except Exception as db_error:
+            # ROLLBACK: If DB insert fails, delete the uploaded object from storage
+            db.rollback()
+            try:
+                logger.error(f"Database insert failed for {file.filename}, cleaning up storage: {db_error}")
+                minio_client.delete_object(object_key)
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup storage after DB error: {cleanup_error}")
+            
+            # Re-raise the original database error
+            raise HTTPException(
+                status_code=500,
+                detail=f"Upload failed: {str(db_error)}"
+            )
 
         logger.info(f"User {current_user.username} uploaded image: {file.filename}")
 
