@@ -168,6 +168,15 @@ async def serve_image(filename: str):
             detail="Invalid filename: path traversal not allowed"
         )
     
+    # Validate file extension is allowed BEFORE checking file existence
+    _, ext = os.path.splitext(filename.lower())
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'}
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed: {ext}"
+        )
+    
     # Safely join paths and resolve to prevent traversal
     file_path = os.path.normpath(os.path.join(upload_dir, filename))
     
@@ -183,15 +192,6 @@ async def serve_image(filename: str):
         raise HTTPException(
             status_code=404,
             detail=f"Image '{filename}' not found"
-        )
-    
-    # Validate file extension is allowed
-    _, ext = os.path.splitext(filename.lower())
-    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'}
-    if ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not allowed: {ext}"
         )
     
     # Determine media type based on file extension
