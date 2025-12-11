@@ -84,7 +84,8 @@ app.add_middleware(
 )
 
 # Include routers with enhanced security
-# app.include_router(auth_enhanced_router, prefix="/api/auth", tags=["auth"])  # Commented out - not imported
+# Mount auth router to make /api/auth/* endpoints accessible
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 # Secure upload endpoint (replaces upload.py, upload_backup.py, upload_fixed.py)
 # from api import upload_secure  # Commented out - optional module

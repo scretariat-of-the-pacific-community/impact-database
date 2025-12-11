@@ -150,8 +150,42 @@ def create_audit_log(
 async def serve_image(filename: str):
     """Serve uploaded image files"""
     # Define the upload directory path (absolute path within container)
-    upload_dir = "/app/uploads"  
-    file_path = os.path.join(upload_dir, filename)
+    upload_dir = "/app/uploads"
+    
+    # Prevent path traversal by validating filename
+    # Only allow safe characters and no path separators
+    import re
+    if not re.match(r'^[a-zA-Z0-9_\-\.]+$', filename):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: only alphanumeric characters, hyphens, underscores and dots allowed"
+        )
+    
+    # Additional check: ensure no path traversal attempts
+    if '..' in filename or '/' in filename or '\\' in filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: path traversal not allowed"
+        )
+    
+    # Validate file extension is allowed BEFORE checking file existence
+    _, ext = os.path.splitext(filename.lower())
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tiff'}
+    if ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File type not allowed: {ext}"
+        )
+    
+    # Safely join paths and resolve to prevent traversal
+    file_path = os.path.normpath(os.path.join(upload_dir, filename))
+    
+    # Ensure the resolved path is still within upload_dir
+    if not file_path.startswith(os.path.abspath(upload_dir) + os.sep):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: path traversal attempt detected"
+        )
     
     # Check if file exists
     if not os.path.exists(file_path):
@@ -161,13 +195,14 @@ async def serve_image(filename: str):
         )
     
     # Determine media type based on file extension
-    _, ext = os.path.splitext(filename.lower())
     media_type_map = {
         '.jpg': 'image/jpeg',
         '.jpeg': 'image/jpeg', 
         '.png': 'image/png',
         '.gif': 'image/gif',
-        '.webp': 'image/webp'
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp',
+        '.tiff': 'image/tiff'
     }
     media_type = media_type_map.get(ext, 'image/jpeg')
     
@@ -181,10 +216,34 @@ async def serve_image(filename: str):
 @router.get("/images/{filename}/thumbnail")
 async def serve_image_thumbnail(filename: str):
     """Serve thumbnail versions of uploaded images"""
+    # Prevent path traversal by validating filename
+    import re
+    if not re.match(r'^[a-zA-Z0-9_\-\.]+$', filename):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: only alphanumeric characters, hyphens, underscores and dots allowed"
+        )
+    
+    # Additional check: ensure no path traversal attempts
+    if '..' in filename or '/' in filename or '\\' in filename:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid filename: path traversal not allowed"
+        )
+    
     # Define the upload directory path for thumbnails
     upload_dir = "/app/uploads"
     thumbnail_name = f"thumb_{filename}"
-    file_path = os.path.join(upload_dir, thumbnail_name)
+    
+    # Safely join and resolve path
+    file_path = os.path.normpath(os.path.join(upload_dir, thumbnail_name))
+    
+    # Ensure the resolved path is still within upload_dir
+    if not file_path.startswith(os.path.abspath(upload_dir) + os.sep):
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: path traversal attempt detected"
+        )
     
     # If thumbnail doesn't exist, serve the original image
     if not os.path.exists(file_path):
@@ -471,6 +530,9 @@ async def upload_image(
     db: Session = Depends(get_db)
 ):
     """Upload an image with metadata and audit logging"""
+    minio_object_uploaded = False
+    object_key = None
+    
     try:
         try:
             metadata_dict = json.loads(metadata_json)
@@ -492,12 +554,8 @@ async def upload_image(
         # Extract EXIF data, but prioritize user-provided metadata
         exif_data = extract_exif_data(io.BytesIO(content))
 
-        object_key = f"images/{file.filename}"
-
-        minio_client = get_minio_storage()
-        minio_client.upload_object(object_key, io.BytesIO(content), len(content))
-
         # Extract geometry from validated upload data OR fall back to EXIF GPS
+        # CRITICAL: Require coordinates before storing to avoid nullable=False violation
         geom = None
         if upload_data.geometry is not None:
             # User provided coordinates - use those (highest priority)
@@ -509,7 +567,21 @@ async def upload_image(
             lon = exif_data['longitude']
             geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
             logger.info(f"Using GPS coordinates from EXIF: ({lat}, {lon})")
+        
+        # Enforce geometry requirement before storing in MinIO
+        if geom is None:
+            raise HTTPException(
+                status_code=400, 
+                detail="Coordinates are required. Provide geometry in metadata or ensure image has GPS EXIF data."
+            )
 
+        # Now that we have valid geometry, upload to MinIO
+        object_key = f"images/{file.filename}"
+        minio_client = get_minio_storage()
+        minio_client.upload_object(object_key, io.BytesIO(content), len(content))
+        minio_object_uploaded = True
+
+        # Create database entry (wrapped in transaction)
         image_metadata = ImageMetadata(
             filename=file.filename,
             datetime=upload_data.datetime,
@@ -556,9 +628,25 @@ async def upload_image(
 
     except HTTPException:
         db.rollback()
+        # Cleanup MinIO object if DB write failed
+        if minio_object_uploaded and object_key:
+            try:
+                minio_client = get_minio_storage()
+                minio_client.delete_object(object_key)
+                logger.info(f"Cleaned up MinIO object after DB failure: {object_key}")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup MinIO object {object_key}: {cleanup_error}")
         raise
     except Exception as e:
         db.rollback()
+        # Cleanup MinIO object if DB write failed
+        if minio_object_uploaded and object_key:
+            try:
+                minio_client = get_minio_storage()
+                minio_client.delete_object(object_key)
+                logger.info(f"Cleaned up MinIO object after error: {object_key}")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup MinIO object {object_key}: {cleanup_error}")
         logger.error(f"Failed to upload image: {str(e)}")
         raise HTTPException(
             status_code=500,
