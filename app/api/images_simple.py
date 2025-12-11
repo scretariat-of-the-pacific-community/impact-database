@@ -142,61 +142,129 @@ async def get_images_list(
         logger.error(f"Error fetching images list: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch images: {str(e)}")
 
+@router.get("/images/{image_id}", response_model=Dict[str, Any])
+async def get_image_by_id(
+    image_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get single image by ID or filename."""
+    try:
+        # Try to find by UUID first, then by filename
+        from uuid import UUID
+        
+        image = None
+        try:
+            # Try UUID lookup
+            uuid_id = UUID(image_id)
+            image = db.query(ImageMetadata).filter(ImageMetadata.id == uuid_id).first()
+        except (ValueError, AttributeError):
+            # Fall back to filename lookup
+            image = db.query(ImageMetadata).filter(ImageMetadata.filename == image_id).first()
+        
+        if not image:
+            raise HTTPException(status_code=404, detail=f"Image with id '{image_id}' not found")
+        
+        # Format response
+        return {
+            "id": str(image.id) if hasattr(image, 'id') else image.filename,
+            "filename": image.filename,
+            "title": image.title,
+            "description": image.abstract if hasattr(image, 'abstract') else None,
+            "hazard_type": image.hazard_type,
+            "country": image.country,
+            "location": image.location,
+            "keywords": image.keywords if hasattr(image, 'keywords') else [],
+            "latitude": float(image.latitude) if hasattr(image, 'latitude') and image.latitude else None,
+            "longitude": float(image.longitude) if hasattr(image, 'longitude') and image.longitude else None,
+            "upload_date": image.date_stamp.isoformat() if hasattr(image, 'date_stamp') and image.date_stamp else None,
+            "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
+            "full_url": f"/upload/images/{image.filename}" if image.filename else None,
+            "contact": {
+                "organisation_name": getattr(image, 'contact_organisation_name', None),
+                "individual_name": getattr(image, 'contact_individual_name', None),
+                "email": getattr(image, 'contact_email', None)
+            } if hasattr(image, 'point_of_contact') else None
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching image {image_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch image: {str(e)}")
+
 @router.get("/search", response_model=Dict[str, Any])
 async def search_images(
     q: Optional[str] = Query(None, description="Search query"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
+    sort_by: Optional[str] = Query("upload_date", description="Sort field"),
+    sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
     db: Session = Depends(get_db)
 ):
-    """Search images with text query."""
+    """Search images with text query and sorting."""
     try:
         query = db.query(ImageMetadata)
         
+        # Apply text search if query provided
         if q:
-            # Simple text search across multiple fields (using correct field names)
-            search_filter = (
-                ImageMetadata.title.ilike(f"%{q}%") |
-                ImageMetadata.abstract.ilike(f"%{q}%") |
-                ImageMetadata.location.ilike(f"%{q}%") |
-                ImageMetadata.hazard_type.ilike(f"%{q}%")
+            from sqlalchemy import or_
+            search_pattern = f"%{q}%"
+            query = query.filter(
+                or_(
+                    ImageMetadata.title.ilike(search_pattern),
+                    ImageMetadata.abstract.ilike(search_pattern),
+                    ImageMetadata.location.ilike(search_pattern),
+                    ImageMetadata.hazard_type.ilike(search_pattern)
+                )
             )
-            query = query.filter(search_filter)
         
+        # Apply sorting
+        order_field = ImageMetadata.date_stamp  # Default
+        if sort_by == "title":
+            order_field = ImageMetadata.title
+        elif sort_by == "hazard_type":
+            order_field = ImageMetadata.hazard_type
+        
+        if sort_order == "asc":
+            query = query.order_by(asc(order_field))
+        else:
+            query = query.order_by(desc(order_field))
+        
+        # Get total count and paginated results
         total = query.count()
-        images = query.order_by(desc(ImageMetadata.date_stamp)).offset(skip).limit(limit).all()
+        images = query.offset(skip).limit(limit).all()
         
-        # Convert to response format (same as above but with correct fields)
+        # Convert to response format matching frontend expectations
         image_list = []
         for img in images:
             image_data = {
+                "id": str(img.id) if hasattr(img, 'id') else img.filename,
                 "filename": img.filename,
                 "title": img.title,
-                "description": img.abstract,  # Using abstract as description
+                "description": img.abstract if hasattr(img, 'abstract') else None,
                 "hazard_type": img.hazard_type,
                 "country": img.country,
                 "location": img.location,
-                "date_taken": img.timestamp.isoformat() if img.timestamp else None,
-                "file_size": None,  # Not available in current model
-                "mime_type": img.format_name,
-                "keywords": img.keywords if img.keywords else [],
-                "coordinates": {
-                    "latitude": img.latitude,
-                    "longitude": img.longitude
-                } if img.latitude and img.longitude else None,
-                "upload_timestamp": img.date_stamp.isoformat() if img.date_stamp else None,
-                "uploaded_by": img.point_of_contact
+                "keywords": img.keywords if hasattr(img, 'keywords') else [],
+                "latitude": float(img.latitude) if hasattr(img, 'latitude') and img.latitude else None,
+                "longitude": float(img.longitude) if hasattr(img, 'longitude') and img.longitude else None,
+                "upload_date": img.date_stamp.isoformat() if hasattr(img, 'date_stamp') and img.date_stamp else None,
+                "thumbnail_url": f"/upload/images/{img.filename}/thumbnail" if img.filename else None,
+                "full_url": f"/upload/images/{img.filename}" if img.filename else None,
+                "contact": {
+                    "organisation_name": getattr(img, 'contact_organisation_name', None),
+                    "individual_name": getattr(img, 'contact_individual_name', None),
+                    "email": getattr(img, 'contact_email', None)
+                } if hasattr(img, 'point_of_contact') else None
             }
             image_list.append(image_data)
         
         return {
             "images": image_list,
             "total": total,
-            "skip": skip,
+            "page": (skip // limit) + 1,
             "limit": limit,
-            "query": q,
-            "has_next": skip + limit < total,
-            "has_previous": skip > 0
+            "total_pages": (total + limit - 1) // limit,
+            "has_more": skip + limit < total
         }
         
     except Exception as e:

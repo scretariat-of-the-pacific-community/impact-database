@@ -104,40 +104,58 @@ class APIClient {
   async searchImages(filters: SearchFilters = {}): Promise<SearchResponse> {
     const params = new URLSearchParams();
     
+    // Map frontend filters to backend parameter names
+    const paramMap: Record<string, string> = {
+      'limit': 'limit',
+      'offset': 'skip',  // Backend uses 'skip' instead of 'offset'
+      'q': 'q',
+      'sort_by': 'sort_by',
+      'sort_order': 'sort_order',
+      'hazard_type': 'hazard_type',
+      'location': 'location',
+      'country': 'country'
+    };
+    
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
+        const backendKey = paramMap[key] || key;
         if (Array.isArray(value)) {
-          value.forEach(v => params.append(key, v.toString()));
+          value.forEach(v => params.append(backendKey, v.toString()));
         } else if (typeof value === 'object' && 'west' in value) {
           params.append('bbox', `${value.west},${value.south},${value.east},${value.north}`);
         } else {
-          params.append(key, value.toString());
+          params.append(backendKey, value.toString());
         }
       }
     });
 
     const response: AxiosResponse<SearchResponse> = await this.client.get(
-      `/api/v1/images/search?${params.toString()}`
+      `/api/search?${params.toString()}`
     );
     return response.data;
   }
 
   async getImage(id: string): Promise<ImageMetadata> {
-    // First try to get from the search results since we don't have a direct get-by-id endpoint
-    const response = await this.searchImages({ limit: 1000 });
-    const image = response.images.find((img: any) => img.id === id || img.filename === id);
-    if (image) {
-      return image;
-    }
-    throw new Error(`Image with id ${id} not found`);
+    // Use dedicated endpoint for efficient single image lookup
+    const response: AxiosResponse<ImageMetadata> = await this.client.get(
+      `/api/images/${encodeURIComponent(id)}`
+    );
+    return response.data;
   }
 
   async getImagesInBounds(bounds: BoundingBox): Promise<ImageMetadata[]> {
     const bbox = `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`;
-    const response: AxiosResponse<ImageMetadata[]> = await this.client.get(
-      `/api/v1/images/bounds?bbox=${bbox}`
+    // Use GeoJSON endpoint which accepts bbox parameter
+    const response = await this.client.get(
+      `/api/geojson?bbox=${bbox}&limit=1000`
     );
-    return response.data;
+    // GeoJSON returns features array, extract properties as ImageMetadata
+    const features = response.data.features || [];
+    return features.map((f: any) => ({
+      ...f.properties,
+      latitude: f.geometry?.coordinates?.[1],
+      longitude: f.geometry?.coordinates?.[0]
+    }));
   }
 
   async getHazards(): Promise<any[]> {
