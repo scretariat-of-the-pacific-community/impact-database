@@ -158,3 +158,38 @@ a.skip-link:focus-visible {
     background-position-x: -200%;
   }
 }
+
+/* Mobile enhancements */
+@supports (padding: max(0px)) {
+  .h-safe-area-inset-bottom {
+    height: max(env(safe-area-inset-bottom), 0px);
+  }
+  
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Pull-to-refresh indicator */
+@media (hover: none) and (pointer: coarse) {
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* Smooth scroll behavior */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Touch optimizations */
+@media (hover: none) {
+  button,
+  a,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

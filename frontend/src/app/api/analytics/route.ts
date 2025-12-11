@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     
     try {
       // Get all images from the backend
-      const response = await fetch(`${apiUrl}/api/v1/images/search?limit=10000`, {
+      const response = await fetch(`${apiUrl}/api/search?limit=10000`, {
         headers: {
           'Content-Type': 'application/json',
         },

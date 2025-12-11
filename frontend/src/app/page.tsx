@@ -3,7 +3,7 @@
 import { useMemo, useState, useCallback, useEffect, type ComponentType } from 'react';
 import nextDynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Waves,
@@ -23,7 +23,6 @@ import { imageApi } from '@/lib/api';
 import { getApiUrl } from '@/lib/config';
 import { sanitizeText } from '@/lib/sanitize';
 import { Card, Tag } from '@/components/design-system';
-import SmartSearch from '@/components/SmartSearch';
 
 // Define WaveLoader before dynamic imports that reference it
 const WaveLoader = () => (
@@ -45,7 +44,37 @@ const ActivityFeed = nextDynamic(() => import('@/components/ActivityFeed'), {
   loading: () => null,
 });
 
+const SmartSearch = nextDynamic(() => import('@/components/SmartSearch'), {
+  ssr: false,
+  loading: () => null,
+});
+
 const FeaturedStories = nextDynamic(() => import('@/components/FeaturedStories'), {
+  ssr: false,
+  loading: () => null,
+});
+
+const SocialProof = nextDynamic(() => import('@/components/SocialProof'), {
+  ssr: false,
+  loading: () => null,
+});
+
+const GamificationBadges = nextDynamic(() => import('@/components/GamificationBadges'), {
+  ssr: false,
+  loading: () => null,
+});
+
+const VideoExplainer = nextDynamic(() => import('@/components/VideoExplainer'), {
+  ssr: false,
+  loading: () => null,
+});
+
+const MobileBottomNav = nextDynamic(() => import('@/components/MobileBottomNav'), {
+  ssr: false,
+  loading: () => null,
+});
+
+const PullToRefresh = nextDynamic(() => import('@/components/PullToRefresh'), {
   ssr: false,
   loading: () => null,
 });
@@ -338,6 +367,8 @@ const GalleryCard = ({
 };
 
 export default function OceanPortalDashboard() {
+  const queryClient = useQueryClient();
+  
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-images'],
     queryFn: () =>
@@ -346,6 +377,15 @@ export default function OceanPortalDashboard() {
   });
 
   const images = data?.images ?? [];
+
+  // Handle pull-to-refresh
+  const handleRefresh = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['dashboard-images'] }),
+      queryClient.invalidateQueries({ queryKey: ['activity-feed'] }),
+      queryClient.invalidateQueries({ queryKey: ['contributor-stats'] }),
+    ]);
+  }, [queryClient]);
 
   const stats = useMemo(() => {
     const hazardSet = new Set(images.map((img) => img.hazard_type).filter(Boolean));
@@ -680,6 +720,15 @@ export default function OceanPortalDashboard() {
           )}
         </section>
 
+        {/* Week 3: Social Proof Section */}
+        <SocialProof />
+
+        {/* Week 3: Video Explainer */}
+        <VideoExplainer />
+
+        {/* Week 3: Gamification Badges */}
+        <GamificationBadges />
+
         <section className="mx-auto max-w-7xl">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
@@ -759,6 +808,10 @@ export default function OceanPortalDashboard() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+
+      {/* Week 3: Mobile Bottom Navigation */}
+      <MobileBottomNav />
+      </div>
+    </PullToRefresh>
   );
 }
