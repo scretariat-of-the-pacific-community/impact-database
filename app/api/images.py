@@ -29,6 +29,16 @@ ALLOWED_SORT_FIELDS = ["created_at", "updated_at", "filename"]
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+def _escape_ilike(value: str) -> str:
+    """Escape special characters for ILIKE patterns."""
+    if value is None:
+        return value
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
 @router.get("/images")
 async def get_all_images(
     request: Request,
@@ -55,9 +65,18 @@ async def get_all_images(
         if hazard_type:
             query = query.filter(ImageMetadata.hazard_type == hazard_type)
         if location:
-            query = query.filter(ImageMetadata.location.ilike(f"%{location}%"))
+            safe_location = _escape_ilike(location)
+            query = query.filter(
+                ImageMetadata.location.ilike(f"%{safe_location}%", escape='\\')
+            )
         if country:
-            query = query.filter(ImageMetadata.country.ilike(f"%{country}%"))
+            safe_country = _escape_ilike(country)
+            query = query.filter(
+                ImageMetadata.country.ilike(f"%{safe_country}%", escape='\\')
+            )
+        
+        # Capture filtered total before pagination
+        total_count = query.count()
         
         # Apply sorting
         if sort_by == "date_stamp" and hasattr(ImageMetadata, 'date_stamp'):
@@ -93,9 +112,6 @@ async def get_all_images(
                 "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
                 "full_url": f"/upload/images/{image.filename}" if image.filename else None
             })
-        
-        # Calculate total count
-        total_count = db.query(ImageMetadata).count()
         
         return {
             "images": result,
@@ -138,12 +154,13 @@ async def search_images(
         
         # Apply text search if provided
         if q:
-            search_pattern = f"%{q}%"
+            safe_q = _escape_ilike(q)
+            search_pattern = f"%{safe_q}%"
             query = query.filter(
                 or_(
-                    ImageMetadata.title.ilike(search_pattern),
-                    ImageMetadata.abstract.ilike(search_pattern),
-                    ImageMetadata.filename.ilike(search_pattern)
+                    ImageMetadata.title.ilike(search_pattern, escape='\\'),
+                    ImageMetadata.abstract.ilike(search_pattern, escape='\\'),
+                    ImageMetadata.filename.ilike(search_pattern, escape='\\')
                 )
             )
         
@@ -151,9 +168,15 @@ async def search_images(
         if hazard_type:
             query = query.filter(ImageMetadata.hazard_type == hazard_type)
         if location:
-            query = query.filter(ImageMetadata.location.ilike(f"%{location}%"))
+            safe_location = _escape_ilike(location)
+            query = query.filter(
+                ImageMetadata.location.ilike(f"%{safe_location}%", escape='\\')
+            )
         if country:
-            query = query.filter(ImageMetadata.country.ilike(f"%{country}%"))
+            safe_country = _escape_ilike(country)
+            query = query.filter(
+                ImageMetadata.country.ilike(f"%{safe_country}%", escape='\\')
+            )
         
         # Apply sorting
         if sort_by == "date_stamp" and hasattr(ImageMetadata, 'date_stamp'):

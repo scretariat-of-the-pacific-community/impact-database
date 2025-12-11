@@ -8,8 +8,8 @@ const getBaseApiUrl = (): string => {
   if (typeof window === 'undefined') {
     return process.env.NEXT_PUBLIC_API_URL_INTERNAL || process.env.NEXT_PUBLIC_API_URL || 'http://api:8000';
   }
-  // Client-side (browser): use external URL accessible from host
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+  // Client-side (browser): use external URL accessible from host and allowed by CSP
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 };
 
 const config = {

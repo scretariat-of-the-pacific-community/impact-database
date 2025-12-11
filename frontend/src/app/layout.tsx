@@ -10,6 +10,19 @@ import { Toaster } from "sonner";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import GlobalShortcutsProvider from "@/components/GlobalShortcutsProvider";
+import { Outfit, Inter } from "next/font/google";
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: "--font-outfit",
+  display: "swap",
+});
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Ocean Portal - Impact Database",
@@ -35,8 +48,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="font-sans">
+    <html lang="en" className={`${outfit.variable} ${inter.variable}`}>
+      <body className="font-sans bg-deep-950 text-surface-soft">
         <a href="#main-content" className="skip-link">
           Skip to main content
         </a>

@@ -2,16 +2,25 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import os
+import secrets
+import logging
 
 from fastapi import Depends, HTTPException, status, APIRouter
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
-from fastapi import Request
+logger = logging.getLogger(__name__)
 
 # Configuration via environment variables
-SECRET_KEY = os.getenv("SECRET_KEY", "changeme")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    environment = os.getenv("ENVIRONMENT", "development").lower()
+    if environment == "production":
+        raise ValueError("SECRET_KEY must be set in production")
+    SECRET_KEY = secrets.token_urlsafe(32)
+    logger.warning("Using auto-generated SECRET_KEY for development/testing")
+
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
@@ -35,65 +44,38 @@ class User(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     disabled: Optional[bool] = None
+    id: Optional[str] = None
 
 
 class UserInDB(User):
     hashed_password: str
 
 
-# DEPRECATED: In-memory user store (transitioning to database)
-# Use database users from models.rbac.User instead
-# Keep for backward compatibility during migration
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "full_name": "John Doe",
-        "email": "johndoe@example.com",
-        "hashed_password": pwd_context.hash("secret"),
-        "disabled": False
-    },
-    "admin": {
-        "username": "admin",
-        "full_name": "Admin User",
-        "email": "admin@example.com",
-        "hashed_password": pwd_context.hash("admin123"),
-        "disabled": False
-    }
-}
-
 # Database integration
 def get_user_from_db(username: str):
-    """Get user from database. Falls back to fake_users_db for backward compatibility."""
-    from models.database import get_db
+    """Get user from database (no insecure fallback)."""
+    from models.database import SessionLocal
     from models.rbac import User as DBUser
-    from sqlalchemy.orm import Session
     
     try:
-        db: Session = next(get_db())
-        db_user = db.query(DBUser).filter(DBUser.username == username).first()
-        if db_user and db_user.is_active:
-            return UserInDB(
-                username=db_user.username,
-                email=db_user.email,
-                full_name=db_user.full_name,
-                disabled=not db_user.is_active,
-                hashed_password=db_user.hashed_password or ""
-            )
+        with SessionLocal() as db:
+            db_user = db.query(DBUser).filter(DBUser.username == username).first()
+            if db_user and db_user.is_active:
+                return UserInDB(
+                    username=db_user.username,
+                    email=db_user.email,
+                    full_name=db_user.full_name,
+                    id=str(db_user.id),
+                    disabled=not db_user.is_active,
+                    hashed_password=db_user.hashed_password or ""
+                )
     except Exception as e:
-        print(f"Database user lookup failed: {e}")
-    
-    # Fallback to in-memory store
-    return get_user(fake_users_db, username)
+        logger.error(f"Database user lookup failed: {e}")
+    return None
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_user(db, username: str) -> Optional[UserInDB]:
-    if username in db:
-        return UserInDB(**db[username])
-    return None
 
 
 def authenticate_user(username: str, password: str) -> Optional[UserInDB]:
@@ -152,7 +134,7 @@ async def login(login_data: LoginRequest):
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "id": 1,
+        "id": getattr(user, "id", user.username),
         "username": user.username,
         "email": user.email,
         "full_name": user.full_name

@@ -130,7 +130,7 @@ class APIClient {
     });
 
     const response: AxiosResponse<SearchResponse> = await this.client.get(
-      `/api/search?${params.toString()}`
+      `/api/images/search?${params.toString()}`
     );
     return response.data;
   }

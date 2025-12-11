@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status, Depends, Path, Request
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status, Depends, Request
+from fastapi import Path as ApiPath
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
@@ -6,6 +7,8 @@ import shutil
 import tempfile
 import logging
 import io
+import imghdr
+from pathlib import Path as FilePath
 from datetime import datetime, timezone
 from typing import Optional, Any, Dict
 import json
@@ -29,8 +32,70 @@ from geoalchemy2 import WKTElement
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Admin user list (in production, this should come from a database)
-ADMIN_USERS = ["admin", "johndoe", "dev_user"]  # Add admin usernames here
+ALLOWED_CONTENT_TYPES = {
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'image/tiff',
+    'image/bmp',
+    'image/avif',
+    'image/heic',
+    'image/heif'
+}
+
+IMGHDR_TYPE_TO_MIME = {
+    'jpeg': 'image/jpeg',
+    'png': 'image/png',
+    'gif': 'image/gif',
+    'tiff': 'image/tiff',
+    'bmp': 'image/bmp',
+    'webp': 'image/webp'
+}
+
+ALLOWED_EXTENSIONS = {
+    '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', '.webp', '.avif', '.heic', '.heif'
+}
+
+AVIF_BRANDS = {b'avif', b'av01', b'mif1', b'msf1'}
+HEIC_BRANDS = {b'heic', b'heix', b'hevc', b'hevx', b'heim', b'heis', b'hevm', b'hevs', b'hvc1', b'hvce'}
+HEIF_BRANDS = {b'heif', b'heio', b'heof', b'hif1'}
+
+async def _read_upload_with_limit(upload_file: UploadFile, max_bytes: int) -> bytes:
+    """Read upload in chunks enforcing maximum size."""
+    chunk_size = 1024 * 1024  # 1MB chunks
+    data = bytearray()
+    while True:
+        chunk = await upload_file.read(chunk_size)
+        if not chunk:
+            break
+        data.extend(chunk)
+        if len(data) > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds {max_bytes // (1024 * 1024)}MB limit"
+            )
+    return bytes(data)
+
+def _detect_mime_from_bytes(content: bytes) -> Optional[str]:
+    """Detect MIME type using magic bytes (supports avif/heic/heif)."""
+    if not content:
+        return None
+    detected = imghdr.what(None, h=content[:32])
+    if detected:
+        mime = IMGHDR_TYPE_TO_MIME.get(detected)
+        if mime:
+            return mime
+    # Detect ISO-BMFF based formats (avif/heic/heif)
+    if len(content) >= 12 and content[4:8] == b'ftyp':
+        brand = content[8:12]
+        if brand in AVIF_BRANDS:
+            return 'image/avif'
+        if brand in HEIC_BRANDS:
+            return 'image/heic'
+        if brand in HEIF_BRANDS:
+            return 'image/heif'
+    return None
 
 def get_storage_client():
     """Get storage client - try MinIO first, fallback to local storage."""
@@ -111,9 +176,24 @@ class ImageUploadRequest(BaseModel):
 
 router = APIRouter()
 
-def is_admin(user: User) -> bool:
-    """Check if user is an admin"""
-    return user.username in ADMIN_USERS
+def _get_user_identifier(user: User) -> str:
+    """Return a stable identifier for the user (UUID when available)."""
+    if not user:
+        return ""
+    return str(getattr(user, "id", None) or user.username)
+
+def is_admin(user: User, db: Session) -> bool:
+    """Check if user has the admin role via RBAC."""
+    if not user or not user.username:
+        return False
+    try:
+        from models.rbac import User as DBUser
+        db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
+        if db_user and db_user.has_role("admin"):
+            return True
+    except Exception as exc:
+        logger.warning(f"RBAC admin lookup failed for {user.username}: {exc}")
+    return False
 
 def create_audit_log(
     db: Session,
@@ -136,7 +216,7 @@ def create_audit_log(
         old_value=old_value,
         new_value=new_value,
         change_summary=change_summary,
-        user_id=user.username,  # In production, use user.id
+        user_id=_get_user_identifier(user),
         username=user.username,
         review_notes=review_notes,
         ip_address=request.client.host if request else None,
@@ -257,7 +337,7 @@ async def serve_image_thumbnail(filename: str):
 
 @router.put("/images/{filename}", response_model=UpdateResponse)
 async def update_image_metadata(
-    filename: str = Path(..., description="Image filename to update"),
+    filename: str = ApiPath(..., description="Image filename to update"),
     metadata_update: ImageMetadataUpdate = ...,
     request: Request = None,
     current_user: User = Depends(get_current_user),
@@ -275,8 +355,12 @@ async def update_image_metadata(
             )
         
         # Check ownership and permissions
-        user_is_admin = is_admin(current_user)
-        user_is_owner = image.uploader_id == current_user.username
+        user_is_admin = is_admin(current_user, db)
+        user_identifier = _get_user_identifier(current_user)
+        user_is_owner = (
+            str(image.uploader_id) == user_identifier
+            or image.uploader_id == current_user.username
+        )
         
         # Permission checks
         update_data = metadata_update.dict(exclude_unset=True)
@@ -400,7 +484,7 @@ async def update_image_metadata(
 
 @router.get("/images/{filename}/metadata", response_model=ImageResponse)
 async def get_image_metadata(
-    filename: str = Path(..., description="Image filename to retrieve"),
+    filename: str = ApiPath(..., description="Image filename to retrieve"),
     db: Session = Depends(get_db)
 ):
     """Get metadata for a specific image"""
@@ -430,7 +514,7 @@ async def get_image_metadata(
 
 @router.delete("/images/{filename}", response_model=DeleteResponse)
 async def delete_image(
-    filename: str = Path(..., description="Image filename to delete"),
+    filename: str = ApiPath(..., description="Image filename to delete"),
     request: Request = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -447,8 +531,12 @@ async def delete_image(
             )
         
         # Check permissions
-        user_is_admin = is_admin(current_user)
-        user_is_owner = image.uploader_id == current_user.username
+        user_is_admin = is_admin(current_user, db)
+        user_identifier = _get_user_identifier(current_user)
+        user_is_owner = (
+            str(image.uploader_id) == user_identifier
+            or image.uploader_id == current_user.username
+        )
         
         if not user_is_admin and not user_is_owner:
             raise HTTPException(
@@ -545,7 +633,41 @@ async def upload_image(
         if existing:
             raise HTTPException(status_code=400, detail=f"Image {file.filename} already exists")
 
-        content = await file.read()
+        # Validate extension
+        extension = FilePath(file.filename).suffix.lower()
+        if extension not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file extension '{extension}'. Allowed: {', '.join(sorted(ALLOWED_EXTENSIONS))}"
+            )
+
+        # Validate declared content type
+        declared_content_type = (file.content_type or "").lower()
+        if declared_content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported content type '{declared_content_type or 'unknown'}'"
+            )
+
+        max_file_size = settings.MAX_FILE_SIZE
+        content = await _read_upload_with_limit(file, max_file_size)
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+        detected_mime = _detect_mime_from_bytes(content)
+        if not detected_mime:
+            raise HTTPException(status_code=400, detail="File is not a supported image type")
+        if detected_mime != declared_content_type:
+            logger.warning(
+                "Declared content-type %s does not match detected %s for %s",
+                declared_content_type,
+                detected_mime,
+                file.filename
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="Content type mismatch between headers and file bytes"
+            )
 
         # Extract EXIF data, but prioritize user-provided metadata
         exif_data = extract_exif_data(io.BytesIO(content))
@@ -587,7 +709,7 @@ async def upload_image(
                 status='pending_review',
                 data_license=upload_data.data_license,
                 source_type=upload_data.source_type.value,
-                uploader_id=current_user.username,
+                uploader_id=_get_user_identifier(current_user),
                 positional_accuracy=upload_data.positional_accuracy,
                 geometry=geom,
                 resource_locator=object_key
@@ -651,7 +773,7 @@ async def upload_image(
 
 @router.post("/regenerate-thumbnail/{filename}")
 async def regenerate_thumbnail(
-    filename: str = Path(..., description="Image filename for thumbnail regeneration"),
+    filename: str = ApiPath(..., description="Image filename for thumbnail regeneration"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -686,7 +808,7 @@ async def regenerate_thumbnail(
 # Audit Log Endpoints
 @router.get("/audit-logs/{record_id}")
 async def get_audit_logs_for_image(
-    record_id: str = Path(..., description="Image ID or filename"),
+    record_id: str = ApiPath(..., description="Image ID or filename"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -715,7 +837,7 @@ async def get_all_audit_logs(
 ):
     """Get audit logs with filtering (admin only for all logs)"""
     # Only admins can view all audit logs
-    if not is_admin(current_user):
+    if not is_admin(current_user, db):
         # Non-admins can only see their own actions
         user_id = current_user.username
     

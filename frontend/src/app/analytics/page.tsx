@@ -62,6 +62,7 @@ export default function EnhancedAnalytics() {
   const [error, setError] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'charts' | 'map'>('charts');
+  const [mounted, setMounted] = useState(false);
   
   const [filters, setFilters] = useState<Filters>({
     startDate: '',
@@ -70,6 +71,11 @@ export default function EnhancedAnalytics() {
     country: '',
     timeRange: 'monthly'
   });
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchAnalyticsData = useCallback(async () => {
     try {
@@ -149,6 +155,11 @@ export default function EnhancedAnalytics() {
     link.click();
     URL.revokeObjectURL(url);
   }, [analyticsData]);
+
+  // Prevent hydration mismatch - don't render until mounted
+  if (!mounted) {
+    return null;
+  }
 
   if (loading) {
     return (
