@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { 
@@ -14,7 +14,7 @@ import {
 import ErrorBanner from '@/components/ErrorBanner';
 import { sanitizeReturnUrl } from '@/lib/security';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, signIn, isLoading, error: authError, clearError } = useAuth();
@@ -204,5 +204,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50" />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

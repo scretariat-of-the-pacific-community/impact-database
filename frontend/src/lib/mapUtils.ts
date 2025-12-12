@@ -1,4 +1,4 @@
-import type { DivIcon } from 'leaflet';
+import type { DivIcon, Icon, IconOptions } from 'leaflet';
 
 let leaflet: typeof import('leaflet') | null = null;
 let iconsConfigured = false;
@@ -26,9 +26,9 @@ const ensureLeaflet = (): (typeof import('leaflet')) | null => {
   return leaflet;
 };
 
-export const createCustomIcon = (hazardType: string): DivIcon | null => {
+export const createCustomIcon = (hazardType: string): DivIcon | Icon<IconOptions> | undefined => {
   const L = ensureLeaflet();
-  if (!L) return null;
+  if (!L) return undefined;
 
   const colors: Record<string, string> = {
     flood: '#3b82f6',

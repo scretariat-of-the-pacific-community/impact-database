@@ -10,19 +10,7 @@ import { Toaster } from "sonner";
 import KeyboardShortcutsHelp from "@/components/KeyboardShortcutsHelp";
 import PWAInstallPrompt from "@/components/PWAInstallPrompt";
 import GlobalShortcutsProvider from "@/components/GlobalShortcutsProvider";
-import { Outfit, Inter } from "next/font/google";
-
-const outfit = Outfit({
-  subsets: ["latin"],
-  variable: "--font-outfit",
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-  display: "swap",
-});
+import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Ocean Portal - Impact Database",
@@ -48,7 +36,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${outfit.variable} ${inter.variable}`}>
+    <html lang="en">
       <body className="font-sans bg-deep-950 text-surface-soft">
         <a href="#main-content" className="skip-link">
           Skip to main content
@@ -57,17 +45,19 @@ export default function RootLayout({
         <GlobalShortcutsProvider />
         <AuthProvider>
           <QueryProvider>
-            <AnalyticsProvider>
-              <ErrorBoundary boundaryName="application">
-                <NetworkStatusBanner />
-                <Toaster position="top-right" richColors closeButton />
-                <KeyboardShortcutsHelp />
-                <PWAInstallPrompt />
-                <main id="main-content" role="main" tabIndex={-1}>
-                  {children}
-                </main>
-              </ErrorBoundary>
-            </AnalyticsProvider>
+            <Suspense fallback={null}>
+              <AnalyticsProvider>
+                <ErrorBoundary boundaryName="application">
+                  <NetworkStatusBanner />
+                  <Toaster position="top-right" richColors closeButton />
+                  <KeyboardShortcutsHelp />
+                  <PWAInstallPrompt />
+                  <main id="main-content" role="main" tabIndex={-1}>
+                    {children}
+                  </main>
+                </ErrorBoundary>
+              </AnalyticsProvider>
+            </Suspense>
           </QueryProvider>
         </AuthProvider>
       </body>

@@ -13,6 +13,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import ErrorBanner from '@/components/ErrorBanner';
 import Skeleton from '@/components/design-system/Skeleton';
 import { trackMapInteraction } from '@/lib/analytics';
+import type { HazardType } from '@/lib/types';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
@@ -72,7 +73,7 @@ export default function MapPage() {
   const hazardTypeCount = new Set(
     imagesWithCoordinates
       .map((img) => img.hazard_type)
-      .filter((type): type is string => Boolean(type))
+      .filter((type): type is HazardType => Boolean(type))
   ).size;
 
   return (

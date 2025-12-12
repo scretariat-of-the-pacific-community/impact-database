@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
+import type { ImageMetadata } from '@/lib/types';
 import { ArrowLeft, MapPin, Calendar, Eye, X, Download, ExternalLink } from 'lucide-react';
 import Link from 'next/link';
 import * as React from 'react';
@@ -25,6 +26,18 @@ interface ImageData {
   file_size?: number;
   acquisitionDate?: string;
 }
+
+type ApiImage = ImageMetadata & {
+  location?: string;
+  country?: string;
+  timestamp?: string;
+  latitude?: number;
+  longitude?: number;
+  abstract?: string;
+  keywords?: string[];
+  file_size?: number;
+  acquisitionDate?: string;
+};
 
 interface QuickViewModalProps {
   image: ImageData;
@@ -359,9 +372,34 @@ export default function ImagesPage() {
     queryFn: async (): Promise<ImageData[]> => {
       const res = await imageApi.getAll();
       // Filter out any items that do not have required fields
-      return (res.data as ImageData[]).filter(
-        (img: any) => img.filename && img.location && img.hazard_type
-      );
+      return (res.data ?? [])
+        .filter(
+          (img: ApiImage): img is ApiImage =>
+            Boolean(
+              img?.filename &&
+                img.hazard_type &&
+                ((img as any).location || img.country || img.contact?.organisation_name)
+            )
+        )
+        .map((img) => {
+          const location =
+            (img as any).location ?? img.country ?? img.contact?.organisation_name ?? 'Unknown location';
+
+            return {
+              filename: img.filename,
+              title: img.title,
+              location,
+              country: img.country,
+            hazard_type: img.hazard_type,
+            timestamp: img.timestamp,
+            latitude: img.latitude,
+            longitude: img.longitude,
+            abstract: img.abstract,
+            keywords: img.keywords,
+            file_size: img.file_size,
+            acquisitionDate: img.acquisitionDate,
+          } satisfies ImageData;
+        });
     },
   });
 
@@ -374,7 +412,7 @@ export default function ImagesPage() {
       ...new Set(
         (images ?? [])
           .map((img: ImageData) => img.country)
-          .filter((c) => !!c)
+          .filter((c): c is string => Boolean(c))
       ),
     ].sort();
   }, [images]);
