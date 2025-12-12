@@ -20,7 +20,13 @@ const COLORS = ['#009ee0', '#18b374', '#ff6b4a', '#8b5cf6', '#eab308', '#ef4444'
 export default function ImpactMetricsBar({ data, title, className = '' }: Props) {
   const sortedData = [...data].sort((a, b) => b.value - a.value).slice(0, 10);
 
-  const CustomTooltip = ({ active, payload }: TooltipProps<ValueType, NameType>) => {
+  const CustomTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean;
+    payload?: Array<{ value?: ValueType; payload: MetricData }>;
+  }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload as MetricData;
       return (

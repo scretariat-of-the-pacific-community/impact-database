@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 function DevTestConnection() {
   const [backendStatus, setBackendStatus] = useState<string>('Testing...');
-  const [apiResponse, setApiResponse] = useState<unknown>(null);
+  const [apiResponse, setApiResponse] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     testBackendConnection();
@@ -16,7 +16,7 @@ function DevTestConnection() {
       const response = await fetch('http://localhost:8000/');
       const data = await response.json();
       setBackendStatus('✅ Connected successfully!');
-      setApiResponse(data);
+      setApiResponse(data as Record<string, unknown>);
     } catch (error) {
       setBackendStatus(`❌ Connection failed: ${error}`);
       console.error('Backend connection error:', error);

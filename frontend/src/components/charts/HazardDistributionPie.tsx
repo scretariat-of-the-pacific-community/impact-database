@@ -37,7 +37,13 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
     percentage: total > 0 ? ((item.value / total) * 100).toFixed(1) : 0,
   }));
 
-  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+  const CustomTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean;
+    payload?: Array<{ payload: HazardData }>;
+  }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload as HazardData;
       return (

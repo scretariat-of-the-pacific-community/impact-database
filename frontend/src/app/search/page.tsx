@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo, memo } from 'react';
+import { Suspense, useState, useCallback, useEffect, useMemo, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -81,7 +81,7 @@ interface SearchPageState {
 
 const RESULTS_PER_PAGE = 24;
 
-export default function SearchPage() {
+function SearchPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const FILTER_STORAGE_KEY = 'search_filters_v1';
@@ -612,6 +612,14 @@ export default function SearchPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-white">Loading search experience…</div>}>
+      <SearchPageContent />
+    </Suspense>
   );
 }
 

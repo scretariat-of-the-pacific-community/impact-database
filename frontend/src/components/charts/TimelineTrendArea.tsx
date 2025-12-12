@@ -16,12 +16,21 @@ interface Props {
 }
 
 export default function TimelineTrendArea({ data, className = '' }: Props) {
-  const CustomTooltip = ({ active, payload, label }: TooltipProps<ValueType, NameType>) => {
+  const CustomTooltip = ({
+    active,
+    payload,
+    label,
+  }: {
+    active?: boolean;
+    payload?: Array<{ value?: ValueType }>;
+    label?: NameType;
+  }) => {
     if (active && payload && payload.length) {
+      const labelText = typeof label === 'string' ? label : String(label ?? '');
       return (
         <div className="rounded-lg border border-white/20 bg-deep-900/95 p-3 shadow-xl backdrop-blur">
           <p className="font-semibold text-white">
-            {format(parseISO(label as string), 'MMM d, yyyy')}
+            {format(parseISO(labelText), 'MMM d, yyyy')}
           </p>
           <p className="text-sm text-pacific-300">
             {payload[0].value} uploads

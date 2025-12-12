@@ -322,6 +322,15 @@ const buildImageUrl = (path?: string | null) => {
   return getApiUrl(path);
 };
 
+const resolveImagePath = (image: ImageRecord) => {
+  const directUrl = (image as { image_url?: string | null }).image_url;
+  return image.thumbnail_url || directUrl;
+};
+
+const resolveCountry = (image: ImageRecord) => (image as { country?: string }).country;
+const resolveDescription = (image: ImageRecord) =>
+  (image as { description?: string }).description ?? (image as { abstract?: string }).abstract;
+
 const GalleryCard = ({
   image,
   onSelect,
@@ -329,7 +338,7 @@ const GalleryCard = ({
   image: ImageRecord;
   onSelect: (img: ImageRecord) => void;
 }) => {
-  const thumbnail = buildImageUrl(image.thumbnail_url || image.image_url);
+  const thumbnail = buildImageUrl(resolveImagePath(image));
   return (
     <motion.button
       type="button"
@@ -346,7 +355,7 @@ const GalleryCard = ({
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
           <p className="absolute bottom-3 left-4 text-sm font-semibold text-white">
-            {sanitizeText(image.country) || 'Unknown location'}
+            {sanitizeText(resolveCountry(image)) || 'Unknown location'}
           </p>
         </div>
       ) : (
@@ -419,7 +428,7 @@ export default function OceanPortalDashboard() {
     // Prepare impact metrics for bar chart
     const countryCounts = new Map<string, number>();
     images.forEach((img) => {
-      const country = img.country || 'Unknown';
+      const country = resolveCountry(img) || 'Unknown';
       countryCounts.set(country, (countryCounts.get(country) || 0) + 1);
     });
     const impactMetrics = Array.from(countryCounts.entries())
@@ -469,7 +478,7 @@ export default function OceanPortalDashboard() {
   ];
 
   const galleryImages = useMemo(
-    () => images.filter((img) => img.thumbnail_url || img.image_url).slice(0, 9),
+    () => images.filter((img) => resolveImagePath(img)).slice(0, 9),
     [images]
   );
 
@@ -540,7 +549,7 @@ export default function OceanPortalDashboard() {
         <div className="relative z-10 max-w-7xl px-4 pb-16 pt-24 sm:px-6 lg:px-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <Tag variant="outline" className="border-white/30 bg-white/10 text-white backdrop-blur">
+              <Tag className="border-white/30 bg-white/10 text-white backdrop-blur">
                 Data Storytelling · Week 2
               </Tag>
               <motion.h1
@@ -712,7 +721,7 @@ export default function OceanPortalDashboard() {
               <p className="text-sm uppercase tracking-wide text-white/70">Hazard Intelligence</p>
               <h2 className="text-2xl font-semibold">Animated review dashboard</h2>
             </div>
-            <Tag variant="solid" className="bg-coral-500/20 text-coral-200">
+            <Tag className="bg-coral-500/20 text-coral-200">
               Live telemetry
             </Tag>
           </div>
@@ -787,7 +796,7 @@ export default function OceanPortalDashboard() {
             >
               <div className="relative aspect-video w-full overflow-hidden rounded-2xl">
                 <img
-                  src={buildImageUrl(lightboxImage.image_url || lightboxImage.thumbnail_url) || ''}
+                  src={buildImageUrl(resolveImagePath(lightboxImage)) || ''}
                   alt={lightboxImage.title ?? lightboxImage.filename}
                   className="h-full w-full object-cover"
                 />
@@ -801,7 +810,7 @@ export default function OceanPortalDashboard() {
                     {sanitizeText(lightboxImage.title) ?? sanitizeText(lightboxImage.filename)}
                   </h3>
                   <p className="mt-2 text-white/70">
-                    {sanitizeText(lightboxImage.description) || 'Field notes unavailable.'}
+                    {sanitizeText(resolveDescription(lightboxImage)) || 'Field notes unavailable.'}
                   </p>
                 </div>
                 <button
