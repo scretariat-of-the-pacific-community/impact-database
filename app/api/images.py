@@ -8,13 +8,16 @@ import logging
 
 from models.database import get_db, ImageMetadata
 from api.schemas.image_schemas import ImageResponse
-from typing import Optional
+from api.auth import get_current_user, User
 # Simple pagination for basic functionality
 from pydantic import BaseModel
 
 class QueryLimits:
     MAX_LIMIT = 100
     DEFAULT_LIMIT = 20
+    MAX_LIMIT_GEOJSON = 500
+    DEFAULT_LIMIT_GEOJSON = 100
+    MAX_FILTER_VALUE_LENGTH = 200
 
 class ValidatedPagination(BaseModel):
     offset: int = 0
