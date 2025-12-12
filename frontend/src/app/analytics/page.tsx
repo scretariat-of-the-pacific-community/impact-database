@@ -567,12 +567,12 @@ export default function EnhancedAnalytics() {
                         weight={2}
                       >
                         <Popup>
-                          <div className="text-sm">
+                          <div className="text-sm text-gray-900">
                             <p className="font-semibold">{point.hazard}</p>
-                            <p className="text-white/70 text-xs">
+                            <p className="text-gray-700 text-xs">
                               {new Date(point.date).toLocaleDateString()}
                             </p>
-                            <p className="text-white/60 text-xs mt-1">
+                            <p className="text-gray-600 text-xs mt-1">
                               {point.lat.toFixed(4)}, {point.lon.toFixed(4)}
                             </p>
                           </div>
