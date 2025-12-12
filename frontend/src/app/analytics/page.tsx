@@ -503,8 +503,8 @@ export default function EnhancedAnalytics() {
                     <div key={index} className="p-4 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/15">
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                          <AlertTriangle className="w-5 h-5 text-orange-600" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-500/15 border border-orange-400/30">
+                          <AlertTriangle className="w-5 h-5 text-orange-300" />
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
