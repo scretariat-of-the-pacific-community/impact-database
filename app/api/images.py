@@ -8,7 +8,6 @@ import logging
 
 from models.database import get_db, ImageMetadata
 from api.schemas.image_schemas import ImageResponse
-from api.auth import get_current_user, User
 # Simple pagination for basic functionality
 from pydantic import BaseModel
 
