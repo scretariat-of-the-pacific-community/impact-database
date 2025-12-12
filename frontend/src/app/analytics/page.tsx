@@ -258,17 +258,17 @@ export default function EnhancedAnalytics() {
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white placeholder:text-white/50 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-white/80 mb-2">End Date</label>
                 <input
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => setFilters({...filters, endDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white placeholder:text-white/50 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 />
               </div>
               
@@ -277,7 +277,7 @@ export default function EnhancedAnalytics() {
                 <select
                   value={filters.hazardType}
                   onChange={(e) => setFilters({...filters, hazardType: e.target.value})}
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 >
                   <option value="">All Hazards</option>
                   {Object.keys(analyticsData.hazardDistribution).map(hazard => (
@@ -291,7 +291,7 @@ export default function EnhancedAnalytics() {
                 <select
                   value={filters.country}
                   onChange={(e) => setFilters({...filters, country: e.target.value})}
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 >
                   <option value="">All Countries</option>
                   {Object.keys(analyticsData.countryDistribution).map(country => (
@@ -305,7 +305,7 @@ export default function EnhancedAnalytics() {
                 <select
                   value={filters.timeRange}
                   onChange={(e) => setFilters({...filters, timeRange: e.target.value as Filters['timeRange']})}
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 >
                   <option value="daily">Daily</option>
                   <option value="monthly">Monthly</option>
@@ -499,8 +499,8 @@ export default function EnhancedAnalytics() {
                 <h3 className="text-xl font-semibold text-white">Recent Activity</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                {analyticsData.recentActivity.slice(0, 10).map((activity, index) => (
-                  <div key={index} className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-white/15">
+                  {analyticsData.recentActivity.slice(0, 10).map((activity, index) => (
+                    <div key={index} className="p-4 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/15">
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
                         <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
