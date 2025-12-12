@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 // Custom service worker + manifest handle PWA concerns (see public/sw.js / manifest.json).
 
-const { withSentryConfig } = require('@sentry/nextjs');
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
@@ -108,19 +107,5 @@ const nextConfig = {
 
 const configWithPlugins = withBundleAnalyzer(nextConfig);
 
-// Disable Sentry wrapper in development to prevent crashes
-module.exports = process.env.NODE_ENV === 'development' 
-  ? configWithPlugins
-  : withSentryConfig(
-      configWithPlugins,
-      {
-        silent: true,
-        widenClientFileUpload: true,
-        tunnelRoute: '/monitoring',
-        hideSourceMaps: true,
-        disableLogger: true,
-      },
-      {
-        dryRun: !process.env.NEXT_PUBLIC_SENTRY_DSN,
-      }
-    );
+// Export configuration without Sentry wrapper (100% open-source)
+module.exports = configWithPlugins;

@@ -521,9 +521,12 @@ export default function OceanPortalDashboard() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 pb-24 text-white">
-      {/* Activity Feed - Fixed Position */}
-      <ActivityFeed />
+    <PullToRefresh onRefresh={async () => {
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-images'] });
+    }}>
+      <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 pb-24 text-white">
+        {/* Activity Feed - Fixed Position */}
+        <ActivityFeed />
 
       {/* Header with Interactive Map Hero */}
       <header className="relative isolate overflow-hidden">
