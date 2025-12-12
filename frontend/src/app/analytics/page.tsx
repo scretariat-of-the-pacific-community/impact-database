@@ -163,7 +163,7 @@ export default function EnhancedAnalytics() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50">
+      <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 text-white">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="flex items-center justify-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
@@ -175,12 +175,12 @@ export default function EnhancedAnalytics() {
 
   if (error || !analyticsData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50">
+      <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 text-white">
         <div className="max-w-7xl mx-auto px-4 py-12">
           <div className="text-center">
             <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Analytics</h2>
-            <p className="text-gray-600 mb-4">{error || 'Please try again later.'}</p>
+            <h2 className="text-2xl font-bold text-white mb-2">Unable to Load Analytics</h2>
+            <p className="text-white/70 mb-4">{error || 'Please try again later.'}</p>
             <button
               onClick={fetchAnalyticsData}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -200,13 +200,13 @@ export default function EnhancedAnalytics() {
   const maxTimeSeriesCount = Math.max(...timeSeriesData.map(d => d.value), 1);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 text-white">
       <div className="max-w-7xl mx-auto px-4 py-12">
         {/* Header with Actions */}
         <div className="mb-8 flex justify-between items-start">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Analytics & Insights</h1>
-            <p className="text-lg text-gray-600">
+            <h1 className="text-4xl font-bold text-white mb-2">Analytics & Insights</h1>
+            <p className="text-lg text-white/70">
               {hasData ? 'Comprehensive analysis of hazard data across the Pacific region' : 'No data available yet'}
             </p>
           </div>
@@ -215,7 +215,7 @@ export default function EnhancedAnalytics() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`inline-flex items-center px-4 py-2 rounded-lg border ${
-                showFilters ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300'
+                showFilters ? 'bg-blue-600 text-white border-blue-600' : 'bg-white/5 text-white/80 border-white/20'
               } hover:shadow-md transition-all`}
             >
               <Filter className="w-4 h-4 mr-2" />
@@ -224,7 +224,7 @@ export default function EnhancedAnalytics() {
             
             <button
               onClick={() => setViewMode(viewMode === 'charts' ? 'map' : 'charts')}
-              className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:shadow-md transition-all"
+              className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/20 text-white/80 rounded-lg hover:shadow-md transition-all"
             >
               {viewMode === 'charts' ? <Globe className="w-4 h-4 mr-2" /> : <BarChart3 className="w-4 h-4 mr-2" />}
               {viewMode === 'charts' ? 'Map View' : 'Charts'}
@@ -232,7 +232,7 @@ export default function EnhancedAnalytics() {
             
             <button
               onClick={exportCSV}
-              className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:shadow-md transition-all"
+              className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/20 text-white/80 rounded-lg hover:shadow-md transition-all"
             >
               <Download className="w-4 h-4 mr-2" />
               Export CSV
@@ -240,7 +240,7 @@ export default function EnhancedAnalytics() {
             
             <button
               onClick={fetchAnalyticsData}
-              className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:shadow-md transition-all"
+              className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/20 text-white/80 rounded-lg hover:shadow-md transition-all"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
@@ -249,35 +249,35 @@ export default function EnhancedAnalytics() {
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="bg-white p-6 rounded-xl shadow-sm border mb-8">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Filter Analytics</h3>
+          <div className="bg-white/5 p-6 rounded-xl shadow-card border border-white/10 mb-8">
+            <h3 className="text-lg font-semibold text-white mb-4">Filter Analytics</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">Start Date</label>
                 <input
                   type="date"
                   value={filters.startDate}
                   onChange={(e) => setFilters({...filters, startDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white placeholder:text-white/50 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 />
               </div>
-              
+
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">End Date</label>
                 <input
                   type="date"
                   value={filters.endDate}
                   onChange={(e) => setFilters({...filters, endDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white placeholder:text-white/50 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Hazard Type</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">Hazard Type</label>
                 <select
                   value={filters.hazardType}
                   onChange={(e) => setFilters({...filters, hazardType: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 >
                   <option value="">All Hazards</option>
                   {Object.keys(analyticsData.hazardDistribution).map(hazard => (
@@ -287,11 +287,11 @@ export default function EnhancedAnalytics() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Country</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">Country</label>
                 <select
                   value={filters.country}
                   onChange={(e) => setFilters({...filters, country: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 >
                   <option value="">All Countries</option>
                   {Object.keys(analyticsData.countryDistribution).map(country => (
@@ -301,11 +301,11 @@ export default function EnhancedAnalytics() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Time Range</label>
+                <label className="block text-sm font-medium text-white/80 mb-2">Time Range</label>
                 <select
                   value={filters.timeRange}
                   onChange={(e) => setFilters({...filters, timeRange: e.target.value as Filters['timeRange']})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                 >
                   <option value="daily">Daily</option>
                   <option value="monthly">Monthly</option>
@@ -318,15 +318,15 @@ export default function EnhancedAnalytics() {
 
         {/* Key Metrics with Trends */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="bg-white/5 p-6 rounded-xl shadow-card border border-white/10">
             <div className="flex items-start justify-between">
               <div className="flex items-center">
                 <div className="p-3 bg-blue-50 rounded-lg">
                   <Database className="w-8 h-8 text-blue-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Total Images</p>
-                  <p className="text-3xl font-bold text-gray-900">{analyticsData.totalImages}</p>
+                  <p className="text-sm font-medium text-white/60">Total Images</p>
+                  <p className="text-3xl font-bold text-white">{analyticsData.totalImages}</p>
                 </div>
               </div>
               {analyticsData.trends.totalGrowth !== 0 && (
@@ -340,43 +340,43 @@ export default function EnhancedAnalytics() {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="bg-white/5 p-6 rounded-xl shadow-card border border-white/10">
             <div className="flex items-start justify-between">
               <div className="flex items-center">
                 <div className="p-3 bg-green-50 rounded-lg">
                   <MapPin className="w-8 h-8 text-green-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Countries</p>
-                  <p className="text-3xl font-bold text-gray-900">{Object.keys(analyticsData.countryDistribution).length}</p>
+                  <p className="text-sm font-medium text-white/60">Countries</p>
+                  <p className="text-3xl font-bold text-white">{Object.keys(analyticsData.countryDistribution).length}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="bg-white/5 p-6 rounded-xl shadow-card border border-white/10">
             <div className="flex items-start justify-between">
               <div className="flex items-center">
                 <div className="p-3 bg-orange-50 rounded-lg">
                   <AlertTriangle className="w-8 h-8 text-orange-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Hazard Types</p>
-                  <p className="text-3xl font-bold text-gray-900">{Object.keys(analyticsData.hazardDistribution).length}</p>
+                  <p className="text-sm font-medium text-white/60">Hazard Types</p>
+                  <p className="text-3xl font-bold text-white">{Object.keys(analyticsData.hazardDistribution).length}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-xl shadow-sm border">
+          <div className="bg-white/5 p-6 rounded-xl shadow-card border border-white/10">
             <div className="flex items-start justify-between">
               <div className="flex items-center">
                 <div className="p-3 bg-purple-50 rounded-lg">
                   <TrendingUp className="w-8 h-8 text-purple-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">Monthly Trend</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-sm font-medium text-white/60">Monthly Trend</p>
+                  <p className="text-3xl font-bold text-white">
                     {analyticsData.trends.monthly > 0 ? '+' : ''}{analyticsData.trends.monthly.toFixed(1)}%
                   </p>
                 </div>
@@ -395,13 +395,13 @@ export default function EnhancedAnalytics() {
         {viewMode === 'charts' ? (
           <>
             {/* Time Series Chart */}
-            <div className="bg-white p-8 rounded-xl shadow-sm border mb-8">
+            <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10 mb-8">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
                   <TrendingUp className="w-6 h-6 text-green-600 mr-3" />
-                  <h3 className="text-xl font-semibold text-gray-900">Upload Trend ({filters.timeRange})</h3>
+                  <h3 className="text-xl font-semibold text-white">Upload Trend ({filters.timeRange})</h3>
                 </div>
-                <div className="text-sm text-gray-500">
+                <div className="text-sm text-white/60">
                   {timeSeriesData.length} data points
                 </div>
               </div>
@@ -423,7 +423,7 @@ export default function EnhancedAnalytics() {
                         </div>
                       </div>
                     </div>
-                    <div className="text-xs text-gray-600 font-medium mt-2 truncate w-full text-center">
+                    <div className="text-xs text-white/70 font-medium mt-2 truncate w-full text-center">
                       {item.key}
                     </div>
                   </div>
@@ -434,10 +434,10 @@ export default function EnhancedAnalytics() {
             {/* Comparative Analysis */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Top Hazards */}
-              <div className="bg-white p-8 rounded-xl shadow-sm border">
+              <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
                 <div className="flex items-center mb-6">
                   <BarChart3 className="w-6 h-6 text-purple-600 mr-3" />
-                  <h3 className="text-xl font-semibold text-gray-900">Top Hazard Types</h3>
+                  <h3 className="text-xl font-semibold text-white">Top Hazard Types</h3>
                 </div>
                 <div className="space-y-4">
                   {analyticsData.topHazards.map(([hazard, count], index) => (
@@ -447,8 +447,8 @@ export default function EnhancedAnalytics() {
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium text-gray-900">{hazard}</span>
-                          <span className="text-sm font-bold text-gray-700">{count}</span>
+                          <span className="text-sm font-medium text-white">{hazard}</span>
+                          <span className="text-sm font-bold text-white/80">{count}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
@@ -463,10 +463,10 @@ export default function EnhancedAnalytics() {
               </div>
 
               {/* Top Countries */}
-              <div className="bg-white p-8 rounded-xl shadow-sm border">
+              <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
                 <div className="flex items-center mb-6">
                   <MapPin className="w-6 h-6 text-blue-600 mr-3" />
-                  <h3 className="text-xl font-semibold text-gray-900">Top Countries</h3>
+                  <h3 className="text-xl font-semibold text-white">Top Countries</h3>
                 </div>
                 <div className="space-y-4">
                   {analyticsData.topCountries.map(([country, count], index) => (
@@ -476,8 +476,8 @@ export default function EnhancedAnalytics() {
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium text-gray-900">{country}</span>
-                          <span className="text-sm font-bold text-gray-700">{count}</span>
+                          <span className="text-sm font-medium text-white">{country}</span>
+                          <span className="text-sm font-bold text-white/80">{count}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div 
@@ -493,24 +493,24 @@ export default function EnhancedAnalytics() {
             </div>
 
             {/* Recent Activity */}
-            <div className="bg-white p-8 rounded-xl shadow-sm border">
+            <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
               <div className="flex items-center mb-6">
                 <Activity className="w-6 h-6 text-orange-600 mr-3" />
-                <h3 className="text-xl font-semibold text-gray-900">Recent Activity</h3>
+                <h3 className="text-xl font-semibold text-white">Recent Activity</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                {analyticsData.recentActivity.slice(0, 10).map((activity, index) => (
-                  <div key={index} className="p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg border border-gray-200">
+                  {analyticsData.recentActivity.slice(0, 10).map((activity, index) => (
+                    <div key={index} className="p-4 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/15">
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
-                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-                          <AlertTriangle className="w-5 h-5 text-orange-600" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-500/15 border border-orange-400/30">
+                          <AlertTriangle className="w-5 h-5 text-orange-300" />
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">{activity.type}</p>
-                        <p className="text-xs text-gray-600 truncate">{activity.country}</p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-sm font-semibold text-white truncate">{activity.type}</p>
+                        <p className="text-xs text-white/70 truncate">{activity.country}</p>
+                        <p className="text-xs text-white/60 mt-1">
                           {new Date(activity.timestamp).toLocaleDateString()}
                         </p>
                       </div>
@@ -522,13 +522,13 @@ export default function EnhancedAnalytics() {
           </>
         ) : (
           /* Map View with Clustering */
-          <div className="bg-white p-8 rounded-xl shadow-sm border">
+          <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center">
                 <Globe className="w-6 h-6 text-blue-600 mr-3" />
-                <h3 className="text-xl font-semibold text-gray-900">Geographic Distribution</h3>
+                <h3 className="text-xl font-semibold text-white">Geographic Distribution</h3>
               </div>
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-white/70">
                 {analyticsData.geoData.length} locations
               </div>
             </div>
@@ -567,12 +567,12 @@ export default function EnhancedAnalytics() {
                         weight={2}
                       >
                         <Popup>
-                          <div className="text-sm">
+                          <div className="text-sm text-gray-900">
                             <p className="font-semibold">{point.hazard}</p>
-                            <p className="text-gray-600 text-xs">
+                            <p className="text-gray-700 text-xs">
                               {new Date(point.date).toLocaleDateString()}
                             </p>
-                            <p className="text-gray-500 text-xs mt-1">
+                            <p className="text-gray-600 text-xs mt-1">
                               {point.lat.toFixed(4)}, {point.lon.toFixed(4)}
                             </p>
                           </div>
@@ -588,7 +588,7 @@ export default function EnhancedAnalytics() {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-white/60">
             Analytics are updated in real-time. Last updated: {new Date().toLocaleString()}
           </p>
         </div>
