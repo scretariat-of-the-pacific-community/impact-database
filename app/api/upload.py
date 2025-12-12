@@ -22,6 +22,7 @@ from services.local_storage import get_local_storage
 from models.database import get_db, ImageMetadata
 from models.audit_log import AuditLog
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError, OperationalError
 from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumbnail
 from api.schemas.image_schemas import ImageMetadataUpdate, ImageResponse, DeleteResponse, UpdateResponse, StatusEnum
 from core.config import settings
@@ -61,9 +62,8 @@ AVIF_BRANDS = {b'avif', b'av01', b'mif1', b'msf1'}
 HEIC_BRANDS = {b'heic', b'heix', b'hevc', b'hevx', b'heim', b'heis', b'hevm', b'hevs', b'hvc1', b'hvce'}
 HEIF_BRANDS = {b'heif', b'heio', b'heof', b'hif1'}
 
-async def _read_upload_with_limit(upload_file: UploadFile, max_bytes: int) -> bytes:
-    """Read upload in chunks enforcing maximum size."""
-    chunk_size = 1024 * 1024  # 1MB chunks
+async def _read_upload_with_limit(upload_file: UploadFile, max_bytes: int, chunk_size: int = 5 * 1024 * 1024) -> bytes:
+    """Read upload in chunks enforcing maximum size. Chunk size is configurable (default 5MB)."""
     data = bytearray()
     while True:
         chunk = await upload_file.read(chunk_size)
@@ -191,8 +191,10 @@ def is_admin(user: User, db: Session) -> bool:
         db_user = db.query(DBUser).filter(DBUser.username == user.username).first()
         if db_user and db_user.has_role("admin"):
             return True
+    except (AttributeError, ImportError) as exc:
+        logger.error(f"CRITICAL: RBAC security check failed for {user.username}: {exc}")
     except Exception as exc:
-        logger.warning(f"RBAC admin lookup failed for {user.username}: {exc}")
+        logger.error(f"CRITICAL: Unexpected error in admin check for {user.username}: {exc}")
     return False
 
 def create_audit_log(
@@ -736,7 +738,7 @@ async def upload_image(
             db.commit()
             db.refresh(image_metadata)
             
-        except Exception as db_error:
+        except (IntegrityError, OperationalError) as db_error:
             # ROLLBACK: If DB insert fails, delete the uploaded object from storage
             db.rollback()
             try:
@@ -744,6 +746,7 @@ async def upload_image(
                 minio_client.delete_object(object_key)
             except Exception as cleanup_error:
                 logger.error(f"Failed to cleanup storage after DB error: {cleanup_error}")
+                # TODO: Add alerting mechanism for orphaned files when cleanup fails
             
             # Re-raise the original database error
             raise HTTPException(

@@ -477,14 +477,32 @@ export default function OceanPortalDashboard() {
   const openLightbox = useCallback((img: ImageRecord) => setLightboxImage(img), []);
   const closeLightbox = useCallback(() => setLightboxImage(null), []);
 
-  // Prepare featured stories data
+  // Fetch featured stories from API
+  const { data: featuredStoriesData } = useQuery({
+    queryKey: ['featured-stories'],
+    queryFn: imageApi.getFeaturedStories,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  });
+
+  // Prepare featured stories data with fallback to placeholder
   const featuredStories = useMemo(() => {
-    // TODO: Replace with API endpoint GET /api/featured-stories when available
-    // PRODUCTION: This should fetch real before/after image pairs from the database
-    // For now, using placeholder SVG images that exist in public/stories/
-    // When API is ready, structure should be: { before_image_id, after_image_id, title, description, ... }
-    
-    const placeholderStories = [
+    if (featuredStoriesData && Array.isArray(featuredStoriesData) && featuredStoriesData.length > 0) {
+      // Map API response to FeaturedStories component format
+      return featuredStoriesData.map((story: any) => ({
+        id: story.id.toString(),
+        title: story.title,
+        description: story.description,
+        beforeImage: story.image, // Using single image for now
+        afterImage: story.image,
+        location: story.location,
+        date: story.date,
+        hazardType: story.hazard_type,
+        impact: `${story.country || ''}`,
+      }));
+    }
+
+    // Fallback to placeholder if API fails or returns no data
+    return [
       {
         id: '1',
         title: 'Cyclone Winston Recovery: Fiji\'s Resilience',
@@ -508,22 +526,11 @@ export default function OceanPortalDashboard() {
         impact: 'Major infrastructure damage, 84% population affected',
       },
     ];
-
-    // Future: Fetch from API and map to this structure
-    // const apiStories = await fetch('/api/featured-stories').then(r => r.json());
-    // return apiStories.map(story => ({
-    //   ...story,
-    //   beforeImage: buildImageUrl(story.before_image_url),
-    //   afterImage: buildImageUrl(story.after_image_url),
-    // }));
-
-    return placeholderStories;
+  }, [featuredStoriesData]);
   }, []);
 
   return (
-    <PullToRefresh onRefresh={async () => {
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-images'] });
-    }}>
+    <PullToRefresh onRefresh={handleRefresh}>
       <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 pb-24 text-white">
         {/* Activity Feed - Fixed Position */}
         <ActivityFeed />

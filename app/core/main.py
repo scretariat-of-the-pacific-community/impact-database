@@ -15,7 +15,7 @@ import redis
 
 from core.config import settings
 # Use simplified APIs for development
-from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds
+from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds, featured
 from api import images_simple as images  # Use simple version
 from api import rbac  # Phase 0: RBAC foundation
 # Temporarily disable complex features for basic startup
@@ -124,6 +124,9 @@ app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
 # Lightweight feeds for external integration
 app.include_router(feeds.router, prefix="/feeds", tags=["feeds"])
+
+# Featured stories endpoint for homepage
+app.include_router(featured.router, prefix="/api", tags=["featured"])
 
 # Setup monitoring - temporarily disabled
 # setup_monitoring(app)

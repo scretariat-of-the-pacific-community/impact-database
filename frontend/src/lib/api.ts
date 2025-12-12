@@ -369,4 +369,8 @@ export const imageApi = {
     return response.data;
   },
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
+  getFeaturedStories: async () => {
+    const response = await apiClient.get('/api/featured-stories');
+    return response.data;
+  },
 };
