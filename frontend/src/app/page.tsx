@@ -527,7 +527,6 @@ export default function OceanPortalDashboard() {
       },
     ];
   }, [featuredStoriesData]);
-  }, []);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
