@@ -1,8 +1,22 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 import AchievementsHub from '@/components/profile/AchievementsHub';
 
 describe('AchievementsHub', () => {
+  let originalShare: Navigator['share'];
+  let originalOpen: Window['open'];
+
+  beforeEach(() => {
+    originalShare = navigator.share;
+    originalOpen = window.open;
+  });
+
+  afterEach(() => {
+    navigator.share = originalShare;
+    window.open = originalOpen;
+    vi.restoreAllMocks();
+  });
+
   it('renders share buttons with accessible labels', () => {
     render(<AchievementsHub />);
 
@@ -31,8 +45,6 @@ describe('AchievementsHub', () => {
   });
 
   it('falls back to window.open sharing when navigator.share is unavailable', () => {
-    const originalShare = navigator.share;
-    const originalOpen = window.open;
     // @ts-expect-error allow overriding for test
     navigator.share = undefined;
     window.open = vi.fn();
@@ -41,8 +53,42 @@ describe('AchievementsHub', () => {
 
     screen.getByLabelText(/share regional explorer/i).click();
 
-    expect(window.open).toHaveBeenCalled();
-    navigator.share = originalShare;
-    window.open = originalOpen;
+    return waitFor(() => expect(window.open).toHaveBeenCalled());
+  });
+
+  it('uses navigator.share when available', async () => {
+    navigator.share = vi.fn().mockResolvedValue(undefined);
+    window.open = vi.fn();
+
+    render(<AchievementsHub />);
+    screen.getByLabelText(/share regional explorer/i).click();
+
+    await waitFor(() =>
+      expect(navigator.share).toHaveBeenCalledWith({
+        title: 'Impact Database Achievement',
+        text: 'I unlocked the Regional Explorer badge on the Impact Database!',
+        url: 'https://impactdatabase.org',
+      }),
+    );
+    expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('logs share errors when navigator.share rejects', async () => {
+    navigator.share = vi.fn().mockRejectedValue(new Error('fail'));
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    render(<AchievementsHub />);
+    screen.getByLabelText(/share regional explorer/i).click();
+
+    await waitFor(() => expect(consoleSpy).toHaveBeenCalled());
+    expect(consoleSpy.mock.calls[0]?.[0]).toContain('Regional Explorer');
+  });
+
+  it('renders the notification timeline items', () => {
+    render(<AchievementsHub />);
+
+    expect(screen.getByText(/unlocked: regional explorer/i)).toBeInTheDocument();
+    expect(screen.getByText(/leaderboard surge/i)).toBeInTheDocument();
+    expect(screen.getByText(/quality streak at 90%/i)).toBeInTheDocument();
   });
 });

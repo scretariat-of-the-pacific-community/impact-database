@@ -183,9 +183,22 @@ const springTransition = {
   damping: 20,
 };
 
-export default function AchievementsHub() {
-  const unlockedBadges = achievements.filter((achievement) => achievement.unlocked);
+interface AchievementsHubProps {
+  achievementsData?: Achievement[];
+  leaderboardData?: LeaderboardEntry[];
+  notificationsData?: typeof notifications;
+}
 
+export default function AchievementsHub({
+  achievementsData = achievements,
+  leaderboardData = leaderboard,
+  notificationsData = notifications,
+}: AchievementsHubProps) {
+  const unlockedBadges = achievementsData.filter((achievement) => achievement.unlocked);
+
+  /**
+   * Shares an achievement badge via the Web Share API when available, falling back to Twitter intent on web.
+   */
   const shareBadge = (achievement: Achievement) => {
     const shareText = `I unlocked the ${achievement.name} badge on the Impact Database!`;
     const shareUrl = 'https://impactdatabase.org';
@@ -197,7 +210,9 @@ export default function AchievementsHub() {
           text: shareText,
           url: shareUrl,
         })
-        .catch((error) => console.error('Share failed', error));
+        .catch((error) =>
+          console.error(`Share failed for achievement "${achievement.name}" (ID: ${achievement.id})`, error),
+        );
       return;
     }
 
@@ -254,7 +269,7 @@ export default function AchievementsHub() {
 
           <div className="grid gap-4 md:grid-cols-2">
             <AnimatePresence>
-              {achievements.map((achievement, index) => {
+              {achievementsData.map((achievement, index) => {
                 const progressPct = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
                 const CategoryIcon = achievement.icon;
                 const badgeGradient = categoryStyles[achievement.category];
@@ -279,8 +294,9 @@ export default function AchievementsHub() {
                           animate={{ scale: achievement.unlocked ? [0.8, 1.1, 1] : 1, rotate: achievement.unlocked ? [0, 5, 0] : 0 }}
                           transition={springTransition}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
+                          aria-label={`${achievement.category} badge icon`}
                         >
-                          <CategoryIcon className="h-6 w-6" aria-hidden />
+                          <CategoryIcon className="h-6 w-6" />
                         </motion.div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -335,7 +351,7 @@ export default function AchievementsHub() {
               </div>
             </div>
             <div className="mt-4 space-y-3">
-              {leaderboard.map((entry) => (
+              {leaderboardData.map((entry) => (
                 <motion.div
                   key={entry.id}
                   initial={{ opacity: 0, x: -8 }}
@@ -369,7 +385,7 @@ export default function AchievementsHub() {
               </div>
             </div>
             <div className="mt-4 space-y-4">
-              {notifications.map((notification, idx) => {
+              {notificationsData.map((notification, idx) => {
                 const IconComponent = notification.icon;
                 return (
                   <motion.div
@@ -380,7 +396,7 @@ export default function AchievementsHub() {
                     className="flex gap-3 rounded-xl bg-white/5 p-3 text-white"
                   >
                     <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-black/30">
-                      <IconComponent className="h-5 w-5 text-pacific-200" aria-hidden />
+                      <IconComponent className="h-5 w-5 text-pacific-200" aria-label={`${notification.title} icon`} />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
