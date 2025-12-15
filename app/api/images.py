@@ -9,7 +9,7 @@ import logging
 from models.database import get_db, ImageMetadata
 from models.audit_log import AuditLog
 from api.schemas.image_schemas import ImageResponse
-from api.auth import get_current_user, User
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced
 # Simple pagination for basic functionality
 from pydantic import BaseModel
 from api.services.iso_vocabulary import HAZARD_TYPES
@@ -18,6 +18,9 @@ from api.upload import create_audit_log
 class QueryLimits:
     MAX_LIMIT = 100
     DEFAULT_LIMIT = 20
+    DEFAULT_LIMIT_GEOJSON = 50
+    MAX_LIMIT_GEOJSON = 500
+    MAX_FILTER_VALUE_LENGTH = 200
 
 class ValidatedPagination(BaseModel):
     offset: int = 0
@@ -57,10 +60,17 @@ async def get_all_images(
                                  description="Filter by country"),
     sort_by: str = Query("date_stamp", description="Sort field: date_stamp, title, hazard_type"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
-    """Get all images with optional filtering and pagination (simplified implementation)."""
+    """Get all images with optional filtering and pagination. Requires authentication."""
     try:
+        if "metadata:read" not in current_user.permissions and "metadata:update" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to access images"
+            )
+
         # Build base query
         query = db.query(ImageMetadata)
         
@@ -316,12 +326,15 @@ async def get_images_geojson(
                                      description="Filter by hazard type"),
     bbox: Optional[str] = Query(None, description="Bounding box: min_lon,min_lat,max_lon,max_lat"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Get all geolocated images as GeoJSON. Requires authentication."""
     try:
         # Check permissions - GeoJSON is sensitive geolocation data
-        if "read:images" not in current_user.permissions and "read:all" not in current_user.permissions:
+        if (
+            "metadata:read" not in current_user.permissions
+            and "metadata:update" not in current_user.permissions
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Insufficient permissions to access geolocation data"
@@ -447,10 +460,15 @@ async def update_image_metadata(
     update_data: ImageUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Update image metadata with validation and version tracking."""
     try:
+        if "metadata:update" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to update image metadata"
+            )
         # Find the image
         image = db.query(ImageMetadata).filter(
             ImageMetadata.id == image_id
@@ -627,10 +645,18 @@ async def get_image_history(
     image_id: str,
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Return audit history entries for an image."""
     try:
+        if (
+            "metadata:read" not in current_user.permissions
+            and "audit:view" not in current_user.permissions
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to view image history"
+            )
         logs = (
             db.query(AuditLog)
             .filter(
