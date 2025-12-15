@@ -1,7 +1,6 @@
 'use client';
 
 import type React from 'react';
-import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Award,
@@ -40,6 +39,144 @@ interface LeaderboardEntry {
   rank: number;
 }
 
+const achievements: Achievement[] = [
+  {
+    id: 'contributor-10',
+    name: 'Active Contributor',
+    category: 'Contributor',
+    description: 'Reach 10 verified uploads to inspire the community.',
+    icon: Upload,
+    progress: 8,
+    target: 10,
+    milestoneLabel: 'Uploads',
+    unlocked: false,
+    nextMilestone: '2 more uploads to reach Bronze Contributor',
+  },
+  {
+    id: 'contributor-50',
+    name: 'Impact Architect',
+    category: 'Contributor',
+    description: 'Share 50 high-quality uploads with metadata.',
+    icon: Medal,
+    progress: 26,
+    target: 50,
+    milestoneLabel: 'Uploads',
+    unlocked: false,
+    nextMilestone: 'Upload 24 more items for Silver status',
+  },
+  {
+    id: 'explorer-5',
+    name: 'Regional Explorer',
+    category: 'Explorer',
+    description: 'Cover 5 distinct countries with disaster imagery.',
+    icon: Globe2,
+    progress: 5,
+    target: 5,
+    milestoneLabel: 'Countries mapped',
+    unlocked: true,
+    nextMilestone: 'Next: Continental Voyager at 10 countries',
+  },
+  {
+    id: 'explorer-continents',
+    name: 'Continental Voyager',
+    category: 'Explorer',
+    description: 'Contribute imagery across three continents.',
+    icon: Compass,
+    progress: 2,
+    target: 3,
+    milestoneLabel: 'Continents reached',
+    unlocked: false,
+    nextMilestone: 'Visit 1 more continent for unlock',
+  },
+  {
+    id: 'quality-95',
+    name: 'Quality Champion',
+    category: 'Quality Champion',
+    description: 'Maintain a 95% approval rate across reviews.',
+    icon: ShieldCheck,
+    progress: 93,
+    target: 95,
+    milestoneLabel: 'Approval rate',
+    unlocked: false,
+    nextMilestone: 'Improve approval rate by 2% to unlock',
+  },
+  {
+    id: 'quality-100',
+    name: 'Perfect Steward',
+    category: 'Quality Champion',
+    description: 'Sustain 100 approved uploads in a row.',
+    icon: BadgeCheck,
+    progress: 64,
+    target: 100,
+    milestoneLabel: 'Approved streak',
+    unlocked: false,
+    nextMilestone: '36 approvals away from flawless streak',
+  },
+  {
+    id: 'specialist-flood',
+    name: 'Flood Specialist',
+    category: 'Specialist',
+    description: 'Catalog 30 high-signal flood impact scenes.',
+    icon: BarChart3,
+    progress: 30,
+    target: 30,
+    milestoneLabel: 'Flood uploads',
+    unlocked: true,
+    nextMilestone: 'Eligible for community spotlight',
+  },
+  {
+    id: 'specialist-wildfire',
+    name: 'Wildfire Analyst',
+    category: 'Specialist',
+    description: 'Document 25 wildfire hazard assessments.',
+    icon: Flame,
+    progress: 14,
+    target: 25,
+    milestoneLabel: 'Wildfire uploads',
+    unlocked: false,
+    nextMilestone: '11 more wildfire uploads for badge',
+  },
+];
+
+const leaderboard: LeaderboardEntry[] = [
+  { id: '1', name: 'Lena M.', uploads: 182, badges: 9, rank: 1 },
+  { id: '2', name: 'You', uploads: 134, badges: 7, rank: 2 },
+  { id: '3', name: 'Alex M.', uploads: 118, badges: 6, rank: 3 },
+  { id: '4', name: 'Saeed', uploads: 94, badges: 5, rank: 4 },
+  { id: '5', name: 'Priya', uploads: 88, badges: 4, rank: 5 },
+];
+
+const notifications = [
+  {
+    id: 'n1',
+    title: 'Unlocked: Regional Explorer',
+    timestamp: 'Today, 09:45',
+    description: 'You mapped your fifth country and unlocked a new Explorer badge.',
+    icon: Compass,
+  },
+  {
+    id: 'n2',
+    title: 'Leaderboard surge',
+    timestamp: 'Yesterday, 16:20',
+    description: 'Two new uploads helped you climb to rank #2 among contributors.',
+    icon: Crown,
+  },
+  {
+    id: 'n3',
+    title: 'Quality streak at 90%',
+    timestamp: 'Mon, 14:10',
+    description: 'Review feedback shows a 90% approval streak—keep aiming for 95%.',
+    icon: ShieldCheck,
+  },
+];
+
+const categoryStyles: Record<Achievement['category'], string> = {
+  Contributor: 'from-pacific-500/20 to-pacific-500/5 border-pacific-500/30',
+  Explorer: 'from-sand-500/20 to-sand-500/5 border-sand-500/30',
+  'Quality Champion': 'from-coral-500/20 to-coral-500/5 border-coral-500/30',
+  Specialist: 'from-palm-500/20 to-palm-500/5 border-palm-500/30',
+};
+
 const springTransition = {
   type: 'spring',
   stiffness: 260,
@@ -47,144 +184,7 @@ const springTransition = {
 };
 
 export default function AchievementsHub() {
-  const achievements: Achievement[] = useMemo(
-    () => [
-      {
-        id: 'contributor-10',
-        name: 'Active Contributor',
-        category: 'Contributor',
-        description: 'Reach 10 verified uploads to inspire the community.',
-        icon: Upload,
-        progress: 8,
-        target: 10,
-        milestoneLabel: 'Uploads',
-        unlocked: false,
-        nextMilestone: '2 more uploads to reach Bronze Contributor',
-      },
-      {
-        id: 'contributor-50',
-        name: 'Impact Architect',
-        category: 'Contributor',
-        description: 'Share 50 high-quality uploads with metadata.',
-        icon: Medal,
-        progress: 26,
-        target: 50,
-        milestoneLabel: 'Uploads',
-        unlocked: false,
-        nextMilestone: 'Upload 24 more items for Silver status',
-      },
-      {
-        id: 'explorer-5',
-        name: 'Regional Explorer',
-        category: 'Explorer',
-        description: 'Cover 5 distinct countries with disaster imagery.',
-        icon: Globe2,
-        progress: 5,
-        target: 5,
-        milestoneLabel: 'Countries mapped',
-        unlocked: true,
-        nextMilestone: 'Next: Continental Voyager at 10 countries',
-      },
-      {
-        id: 'explorer-continents',
-        name: 'Continental Voyager',
-        category: 'Explorer',
-        description: 'Contribute imagery across three continents.',
-        icon: Compass,
-        progress: 2,
-        target: 3,
-        milestoneLabel: 'Continents reached',
-        unlocked: false,
-        nextMilestone: 'Visit 1 more continent for unlock',
-      },
-      {
-        id: 'quality-95',
-        name: 'Quality Champion',
-        category: 'Quality Champion',
-        description: 'Maintain a 95% approval rate across reviews.',
-        icon: ShieldCheck,
-        progress: 93,
-        target: 95,
-        milestoneLabel: 'Approval rate',
-        unlocked: false,
-        nextMilestone: 'Improve approval rate by 2% to unlock',
-      },
-      {
-        id: 'quality-100',
-        name: 'Perfect Steward',
-        category: 'Quality Champion',
-        description: 'Sustain 100 approved uploads in a row.',
-        icon: BadgeCheck,
-        progress: 64,
-        target: 100,
-        milestoneLabel: 'Approved streak',
-        unlocked: false,
-        nextMilestone: '36 approvals away from flawless streak',
-      },
-      {
-        id: 'specialist-flood',
-        name: 'Flood Specialist',
-        category: 'Specialist',
-        description: 'Catalog 30 high-signal flood impact scenes.',
-        icon: BarChart3,
-        progress: 30,
-        target: 30,
-        milestoneLabel: 'Flood uploads',
-        unlocked: true,
-        nextMilestone: 'Eligible for community spotlight',
-      },
-      {
-        id: 'specialist-wildfire',
-        name: 'Wildfire Analyst',
-        category: 'Specialist',
-        description: 'Document 25 wildfire hazard assessments.',
-        icon: Flame,
-        progress: 14,
-        target: 25,
-        milestoneLabel: 'Wildfire uploads',
-        unlocked: false,
-        nextMilestone: '11 more wildfire uploads for badge',
-      },
-    ],
-    [],
-  );
-
-  const leaderboard: LeaderboardEntry[] = useMemo(
-    () => [
-      { id: '1', name: 'Lena M.', uploads: 182, badges: 9, rank: 1 },
-      { id: '2', name: 'You', uploads: 134, badges: 7, rank: 2 },
-      { id: '3', name: 'Alex M.', uploads: 118, badges: 6, rank: 3 },
-      { id: '4', name: 'Saeed', uploads: 94, badges: 5, rank: 4 },
-      { id: '5', name: 'Priya', uploads: 88, badges: 4, rank: 5 },
-    ],
-    [],
-  );
-
   const unlockedBadges = achievements.filter((achievement) => achievement.unlocked);
-
-  const notifications = [
-    {
-      id: 'n1',
-      title: 'Unlocked: Regional Explorer',
-      timestamp: 'Today, 09:45',
-      description: 'You mapped your fifth country and unlocked a new Explorer badge.',
-      icon: Compass,
-    },
-    {
-      id: 'n2',
-      title: 'Leaderboard surge',
-      timestamp: 'Yesterday, 16:20',
-      description: 'Two new uploads helped you climb to rank #2 among contributors.',
-      icon: Crown,
-    },
-    {
-      id: 'n3',
-      title: 'Quality streak at 90%',
-      timestamp: 'Mon, 14:10',
-      description: 'Review feedback shows a 90% approval streak—keep aiming for 95%.',
-      icon: ShieldCheck,
-    },
-  ];
 
   const shareBadge = (achievement: Achievement) => {
     const shareText = `I unlocked the ${achievement.name} badge on the Impact Database!`;
@@ -197,7 +197,7 @@ export default function AchievementsHub() {
           text: shareText,
           url: shareUrl,
         })
-        .catch(() => undefined);
+        .catch((error) => console.error('Share failed', error));
       return;
     }
 
@@ -220,19 +220,19 @@ export default function AchievementsHub() {
             </p>
           </div>
           <div className="flex gap-4">
-              {unlockedBadges.map((badge) => (
-                <motion.button
-                  key={badge.id}
-                  whileHover={{ y: -4, scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => shareBadge(badge)}
-                  className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
-                  aria-label={`Share ${badge.name} achievement`}
-                >
-                  <Share2 className="h-4 w-4 text-pacific-300 group-hover:rotate-6" aria-hidden />
-                  Share {badge.name}
-                </motion.button>
-              ))}
+            {unlockedBadges.map((badge) => (
+              <motion.button
+                key={badge.id}
+                whileHover={{ y: -4, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => shareBadge(badge)}
+                className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
+                aria-label={`Share ${badge.name}`}
+              >
+                <Share2 className="h-4 w-4 text-pacific-300 group-hover:rotate-6" aria-hidden />
+                Share {badge.name}
+              </motion.button>
+            ))}
           </div>
         </div>
       </header>
@@ -257,12 +257,7 @@ export default function AchievementsHub() {
               {achievements.map((achievement, index) => {
                 const progressPct = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
                 const CategoryIcon = achievement.icon;
-                const badgeGradient = {
-                  Contributor: 'from-pacific-500/20 to-pacific-500/5 border-pacific-500/30',
-                  Explorer: 'from-sand-500/20 to-sand-500/5 border-sand-500/30',
-                  'Quality Champion': 'from-coral-500/20 to-coral-500/5 border-coral-500/30',
-                  Specialist: 'from-palm-500/20 to-palm-500/5 border-palm-500/30',
-                }[achievement.category];
+                const badgeGradient = categoryStyles[achievement.category];
 
                 return (
                   <motion.div
@@ -272,6 +267,8 @@ export default function AchievementsHub() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 20 }}
                     transition={{ ...springTransition, delay: index * 0.05 }}
+                    role="article"
+                    aria-label={`${achievement.name} achievement card`}
                     className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${badgeGradient} p-5 shadow-lg`}
                   >
                     <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-white/5 opacity-0 transition group-hover:opacity-100" />
@@ -306,6 +303,11 @@ export default function AchievementsHub() {
 
                     <div className="mt-4 h-2 w-full rounded-full bg-white/10">
                       <motion.div
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progressPct}
+                        aria-label={`${achievement.name} progress`}
                         className="h-full rounded-full bg-gradient-to-r from-pacific-400 to-palm-400"
                         initial={{ width: 0 }}
                         animate={{ width: `${progressPct}%` }}
