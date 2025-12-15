@@ -161,9 +161,12 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/login")
-async def login(login_data: LoginRequest):
+async def login(
+    login_data: LoginRequest,
+    db: Session = Depends(get_db)
+):
     """Login endpoint that accepts JSON credentials"""
-    user = authenticate_user(login_data.username, login_data.password)
+    user = authenticate_user(login_data.username, login_data.password, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

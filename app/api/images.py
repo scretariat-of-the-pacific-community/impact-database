@@ -9,7 +9,7 @@ import logging
 from models.database import get_db, ImageMetadata
 from models.audit_log import AuditLog
 from api.schemas.image_schemas import ImageResponse
-from api.auth import get_current_user, User
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced
 # Simple pagination for basic functionality
 from pydantic import BaseModel
 from api.services.iso_vocabulary import HAZARD_TYPES
@@ -57,10 +57,18 @@ async def get_all_images(
                                  description="Filter by country"),
     sort_by: str = Query("date_stamp", description="Sort field: date_stamp, title, hazard_type"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
-    """Get all images with optional filtering and pagination (simplified implementation)."""
+    """Get all images with optional filtering and pagination. Requires authentication."""
     try:
+        permissions = current_user.permissions
+        if "read:images" not in permissions and "read:all" not in permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to access images"
+            )
+
         # Build base query
         query = db.query(ImageMetadata)
         
