@@ -7,8 +7,10 @@ import {
   Award,
   BadgeCheck,
   BarChart3,
+  Bell,
   Compass,
   Crown,
+  Flame,
   Globe2,
   Medal,
   Share2,
@@ -136,7 +138,7 @@ export default function AchievementsHub() {
         name: 'Wildfire Analyst',
         category: 'Specialist',
         description: 'Document 25 wildfire hazard assessments.',
-        icon: FireIcon,
+        icon: Flame,
         progress: 14,
         target: 25,
         milestoneLabel: 'Wildfire uploads',
@@ -218,18 +220,19 @@ export default function AchievementsHub() {
             </p>
           </div>
           <div className="flex gap-4">
-            {unlockedBadges.map((badge) => (
-              <motion.button
-                key={badge.id}
-                whileHover={{ y: -4, scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => shareBadge(badge)}
-                className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
-              >
-                <Share2 className="h-4 w-4 text-pacific-300 group-hover:rotate-6" />
-                Share {badge.name}
-              </motion.button>
-            ))}
+              {unlockedBadges.map((badge) => (
+                <motion.button
+                  key={badge.id}
+                  whileHover={{ y: -4, scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => shareBadge(badge)}
+                  className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
+                  aria-label={`Share ${badge.name} achievement`}
+                >
+                  <Share2 className="h-4 w-4 text-pacific-300 group-hover:rotate-6" aria-hidden />
+                  Share {badge.name}
+                </motion.button>
+              ))}
           </div>
         </div>
       </header>
@@ -280,7 +283,7 @@ export default function AchievementsHub() {
                           transition={springTransition}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
                         >
-                          <CategoryIcon className="h-6 w-6" />
+                          <CategoryIcon className="h-6 w-6" aria-hidden />
                         </motion.div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -311,7 +314,7 @@ export default function AchievementsHub() {
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs text-white/70">
                       <span>{achievement.nextMilestone}</span>
-                      <span>Next: {achievement.target - achievement.progress} remaining</span>
+                      <span>Next: {Math.max(0, achievement.target - achievement.progress)} remaining</span>
                     </div>
                   </motion.div>
                 );
@@ -357,7 +360,7 @@ export default function AchievementsHub() {
 
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-pacific-500/10 to-pacific-900/10 p-5 shadow-lg">
             <div className="flex items-center gap-2 text-white">
-              <BellIcon className="h-5 w-5 text-coral-200" />
+              <Bell className="h-5 w-5 text-coral-200" aria-hidden />
               <div>
                 <p className="text-sm text-white/70">Notification Center</p>
                 <h3 className="text-lg font-semibold">Achievement timeline</h3>
@@ -375,7 +378,7 @@ export default function AchievementsHub() {
                     className="flex gap-3 rounded-xl bg-white/5 p-3 text-white"
                   >
                     <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-black/30">
-                      <IconComponent className="h-5 w-5 text-pacific-200" />
+                      <IconComponent className="h-5 w-5 text-pacific-200" aria-hidden />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
@@ -395,41 +398,3 @@ export default function AchievementsHub() {
   );
 }
 
-function BellIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5"
-      aria-hidden
-      {...props}
-    >
-      <path d="M6.428 9.6A5.57 5.57 0 0 1 12 4a5.57 5.57 0 0 1 5.572 5.6c0 4.2 1.24 5.2 1.24 5.2H5.186s1.242-1 .242-5.2Z" />
-      <path d="M9.75 19h4.5" />
-    </svg>
-  );
-}
-
-function FireIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5"
-      aria-hidden
-      {...props}
-    >
-      <path d="M12 21a7 7 0 0 0 7-7c0-2.572-.752-4.107-1.778-5.32C16.48 6.293 14.7 5.5 13.5 3.5 12 5 12.1 7.1 10.5 7.5c-1.5.4-2-2.5-2-2.5-4.5 4-2.5 11 3.5 11-1 3-4 3-4 3" />
-    </svg>
-  );
-}
