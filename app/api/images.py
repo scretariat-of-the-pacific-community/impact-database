@@ -18,6 +18,9 @@ from api.upload import create_audit_log
 class QueryLimits:
     MAX_LIMIT = 100
     DEFAULT_LIMIT = 20
+    DEFAULT_LIMIT_GEOJSON = 50
+    MAX_LIMIT_GEOJSON = 500
+    MAX_FILTER_VALUE_LENGTH = 200
 
 class ValidatedPagination(BaseModel):
     offset: int = 0
@@ -62,8 +65,7 @@ async def get_all_images(
 ):
     """Get all images with optional filtering and pagination. Requires authentication."""
     try:
-        permissions = getattr(current_user, "permissions", []) or []
-        if "read:images" not in permissions and "read:all" not in permissions:
+        if "metadata:read" not in current_user.permissions and "metadata:update" not in current_user.permissions:
             raise HTTPException(
                 status_code=403,
                 detail="Insufficient permissions to access images"
@@ -329,7 +331,10 @@ async def get_images_geojson(
     """Get all geolocated images as GeoJSON. Requires authentication."""
     try:
         # Check permissions - GeoJSON is sensitive geolocation data
-        if "read:images" not in current_user.permissions and "read:all" not in current_user.permissions:
+        if (
+            "metadata:read" not in current_user.permissions
+            and "metadata:update" not in current_user.permissions
+        ):
             raise HTTPException(
                 status_code=403,
                 detail="Insufficient permissions to access geolocation data"
@@ -459,6 +464,11 @@ async def update_image_metadata(
 ):
     """Update image metadata with validation and version tracking."""
     try:
+        if "metadata:update" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to update image metadata"
+            )
         # Find the image
         image = db.query(ImageMetadata).filter(
             ImageMetadata.id == image_id
@@ -639,6 +649,15 @@ async def get_image_history(
 ):
     """Return audit history entries for an image."""
     try:
+        if (
+            "metadata:read" not in current_user.permissions
+            and "metadata:update" not in current_user.permissions
+            and "audit:view" not in current_user.permissions
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to view image history"
+            )
         logs = (
             db.query(AuditLog)
             .filter(
