@@ -331,10 +331,7 @@ async def get_images_geojson(
     """Get all geolocated images as GeoJSON. Requires authentication."""
     try:
         # Check permissions - GeoJSON is sensitive geolocation data
-        if (
-            "metadata:read" not in current_user.permissions
-            and "metadata:update" not in current_user.permissions
-        ):
+        if "metadata:read" not in current_user.permissions:
             raise HTTPException(
                 status_code=403,
                 detail="Insufficient permissions to access geolocation data"
@@ -651,7 +648,6 @@ async def get_image_history(
     try:
         if (
             "metadata:read" not in current_user.permissions
-            and "metadata:update" not in current_user.permissions
             and "audit:view" not in current_user.permissions
         ):
             raise HTTPException(

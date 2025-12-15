@@ -40,11 +40,14 @@ class FakeQuery:
 
 
 class FakeDB:
-    def __init__(self, items=None):
-        self.items = items or []
+    def __init__(self, images=None, audit_logs=None):
+        self.images = images or []
+        self.audit_logs = audit_logs or []
 
-    def query(self, *_args, **_kwargs):
-        return FakeQuery(self.items)
+    def query(self, model, *_args, **_kwargs):
+        if getattr(model, "__name__", "") == "AuditLog":
+            return FakeQuery(self.audit_logs)
+        return FakeQuery(self.images)
 
     def commit(self):
         return None
@@ -89,14 +92,33 @@ def fake_images():
 
 
 @pytest.fixture
-def client(fake_images):
+def fake_audit_logs():
+    from datetime import datetime
+
+    return [
+        SimpleNamespace(
+            id=1,
+            field_name="title",
+            action="UPDATE",
+            old_value="Old",
+            new_value="New",
+            timestamp=datetime.utcnow(),
+            username="tester",
+            user_id="tester-id",
+        )
+    ]
+
+
+@pytest.fixture
+def client(fake_images, fake_audit_logs):
     test_app = FastAPI()
     test_app.include_router(images.router)
 
     def override_db():
-        yield FakeDB(fake_images)
+        yield FakeDB(fake_images, fake_audit_logs)
 
     test_app.dependency_overrides[get_db] = override_db
+    test_app.dependency_overrides[get_current_user_enhanced] = unauthorized_user_override
 
     client = TestClient(test_app)
     yield client
@@ -130,6 +152,14 @@ def test_get_all_images_allows_metadata_read(client):
     assert body["total"] >= 1
 
 
+def test_get_all_images_allows_metadata_update(client):
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["metadata:update"])
+
+    response = client.get("/images")
+
+    assert response.status_code == 200
+
+
 def test_update_image_metadata_requires_update_permission(client):
     client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["metadata:read"])
 
@@ -147,4 +177,22 @@ def test_get_image_history_requires_permissions(client):
     response = client.get("/images/test-id/history")
 
     assert response.status_code == 403
+
+
+def test_get_image_history_allows_metadata_read(client):
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["metadata:read"])
+
+    response = client.get("/images/test-id/history")
+
+    assert response.status_code == 200
+    assert "history" in response.json()
+
+
+def test_get_image_history_allows_audit_view(client):
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["audit:view"])
+
+    response = client.get("/images/test-id/history")
+
+    assert response.status_code == 200
+    assert "history" in response.json()
 
