@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { Globe2, Upload } from 'lucide-react';
 import { vi } from 'vitest';
 import AchievementsHub from '@/components/profile/AchievementsHub';
 
@@ -90,5 +91,77 @@ describe('AchievementsHub', () => {
     expect(screen.getByText(/unlocked: regional explorer/i)).toBeInTheDocument();
     expect(screen.getByText(/leaderboard surge/i)).toBeInTheDocument();
     expect(screen.getByText(/quality streak at 90%/i)).toBeInTheDocument();
+  });
+
+  it('caps progress at 100% and applies category styling to achievements', () => {
+    const customAchievements = [
+      {
+        id: 'overachiever',
+        name: 'Overachiever',
+        category: 'Explorer' as const,
+        description: 'Exceeded progress example',
+        icon: Globe2,
+        progress: 120,
+        target: 100,
+        milestoneLabel: 'Countries mapped',
+        unlocked: true,
+        nextMilestone: 'Maxed out',
+      },
+    ];
+
+    render(
+      <AchievementsHub
+        achievementsData={customAchievements}
+        leaderboardData={[]}
+        notificationsData={[]}
+      />,
+    );
+
+    expect(screen.getByText(/Unlocked/i)).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: /overachiever progress/i })).toHaveAttribute(
+      'aria-valuenow',
+      '100',
+    );
+    expect(screen.getByLabelText(/overachiever achievement card/i).className).toContain('from-sand-500/20');
+  });
+
+  it('only renders share buttons for unlocked achievements', () => {
+    const achievements = [
+      {
+        id: 'share-ready',
+        name: 'Share Ready',
+        category: 'Contributor' as const,
+        description: 'Unlocked badge to share',
+        icon: Upload,
+        progress: 10,
+        target: 10,
+        milestoneLabel: 'Uploads',
+        unlocked: true,
+        nextMilestone: 'Completed',
+      },
+      {
+        id: 'locked',
+        name: 'Locked Badge',
+        category: 'Explorer' as const,
+        description: 'Still in progress',
+        icon: Globe2,
+        progress: 2,
+        target: 5,
+        milestoneLabel: 'Countries mapped',
+        unlocked: false,
+        nextMilestone: '3 more needed',
+      },
+    ];
+
+    render(
+      <AchievementsHub
+        achievementsData={achievements}
+        leaderboardData={[]}
+        notificationsData={[]}
+      />,
+    );
+
+    expect(screen.getAllByLabelText(/share/i)).toHaveLength(1);
+    expect(screen.queryByLabelText(/share locked badge/i)).not.toBeInTheDocument();
   });
 });

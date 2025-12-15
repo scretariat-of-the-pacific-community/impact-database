@@ -18,6 +18,14 @@ import {
   Upload,
 } from 'lucide-react';
 
+interface Notification {
+  id: string;
+  title: string;
+  timestamp: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
 interface Achievement {
   id: string;
   name: string;
@@ -146,7 +154,7 @@ const leaderboard: LeaderboardEntry[] = [
   { id: '5', name: 'Priya', uploads: 88, badges: 4, rank: 5 },
 ];
 
-const notifications = [
+const notifications: Notification[] = [
   {
     id: 'n1',
     title: 'Unlocked: Regional Explorer',
@@ -183,12 +191,21 @@ const springTransition = {
   damping: 20,
 };
 
+/**
+ * Optional data inputs for AchievementsHub. Each collection defaults to showcase fixtures but can be
+ * replaced with live data when embedding in a profile view.
+ */
 interface AchievementsHubProps {
   achievementsData?: Achievement[];
   leaderboardData?: LeaderboardEntry[];
-  notificationsData?: typeof notifications;
+  notificationsData?: Notification[];
 }
 
+/**
+ * AchievementsHub renders the achievements experience including badge progress, leaderboard ranking,
+ * notification timeline, and social sharing. Consumers can supply custom data for each section; if no
+ * data is provided, the component falls back to static showcase examples.
+ */
 export default function AchievementsHub({
   achievementsData = achievements,
   leaderboardData = leaderboard,
@@ -244,7 +261,7 @@ export default function AchievementsHub({
                 className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
                 aria-label={`Share ${badge.name}`}
               >
-                <Share2 className="h-4 w-4 text-pacific-300 group-hover:rotate-6" aria-hidden />
+                <Share2 className="h-4 w-4 text-pacific-300 group-hover:rotate-6" />
                 Share {badge.name}
               </motion.button>
             ))}
@@ -396,7 +413,7 @@ export default function AchievementsHub({
                     className="flex gap-3 rounded-xl bg-white/5 p-3 text-white"
                   >
                     <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-black/30">
-                      <IconComponent className="h-5 w-5 text-pacific-200" aria-label={`${notification.title} icon`} />
+                      <IconComponent className="h-5 w-5 text-pacific-200" aria-hidden />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
