@@ -9,7 +9,7 @@ import logging
 from models.database import get_db, ImageMetadata
 from models.audit_log import AuditLog
 from api.schemas.image_schemas import ImageResponse
-from api.auth import get_current_user, User
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced
 # Simple pagination for basic functionality
 from pydantic import BaseModel
 from api.services.iso_vocabulary import HAZARD_TYPES
@@ -57,10 +57,18 @@ async def get_all_images(
                                  description="Filter by country"),
     sort_by: str = Query("date_stamp", description="Sort field: date_stamp, title, hazard_type"),
     sort_order: str = Query("desc", description="Sort order: asc, desc"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
-    """Get all images with optional filtering and pagination (simplified implementation)."""
+    """Get all images with optional filtering and pagination. Requires authentication."""
     try:
+        permissions = getattr(current_user, "permissions", []) or []
+        if "read:images" not in permissions and "read:all" not in permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to access images"
+            )
+
         # Build base query
         query = db.query(ImageMetadata)
         
@@ -316,7 +324,7 @@ async def get_images_geojson(
                                      description="Filter by hazard type"),
     bbox: Optional[str] = Query(None, description="Bounding box: min_lon,min_lat,max_lon,max_lat"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Get all geolocated images as GeoJSON. Requires authentication."""
     try:
@@ -447,7 +455,7 @@ async def update_image_metadata(
     update_data: ImageUpdateRequest,
     request: Request,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Update image metadata with validation and version tracking."""
     try:
@@ -627,7 +635,7 @@ async def get_image_history(
     image_id: str,
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Return audit history entries for an image."""
     try:
