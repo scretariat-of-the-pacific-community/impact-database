@@ -93,7 +93,7 @@ def fake_images():
 
 @pytest.fixture
 def fake_audit_logs():
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     return [
         SimpleNamespace(
@@ -102,7 +102,7 @@ def fake_audit_logs():
             action="UPDATE",
             old_value="Old",
             new_value="New",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             username="tester",
             user_id="tester-id",
         )
