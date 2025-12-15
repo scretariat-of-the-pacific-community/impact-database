@@ -62,7 +62,7 @@ async def get_all_images(
 ):
     """Get all images with optional filtering and pagination. Requires authentication."""
     try:
-        permissions = getattr(current_user, "permissions", []) or []
+        permissions = current_user.permissions
         if "read:images" not in permissions and "read:all" not in permissions:
             raise HTTPException(
                 status_code=403,
