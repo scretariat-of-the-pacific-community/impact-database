@@ -3,8 +3,9 @@
 import { useMemo, useState, useCallback, useEffect, type ComponentType } from 'react';
 import nextDynamic from 'next/dynamic';
 import Link from 'next/link';
+import NextImage from 'next/image';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Waves,
   MapPin,
@@ -16,7 +17,8 @@ import {
   Sparkles,
   Compass,
   Camera,
-  X,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 
 import { imageApi } from '@/lib/api';
@@ -208,27 +210,70 @@ const Sparkline = ({ values, color }: { values: number[]; color: string }) => {
   if (values.length < 2) {
     return null;
   }
+  
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
-  const points = values
-    .map((value, index) => {
-      const x = (index / (values.length - 1)) * 100;
-      const y = 100 - ((value - min) / range) * 100;
-      return `${x},${y}`;
-    })
-    .join(' ');
+  
+  // Generate smooth curve path using quadratic bezier curves
+  const points = values.map((value, index) => {
+    const x = (index / (values.length - 1)) * 100;
+    const y = 100 - ((value - min) / range) * 80 - 10; // Add padding
+    return { x, y };
+  });
+  
+  // Create smooth path
+  let pathData = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 1; i < points.length; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const controlX = (prev.x + curr.x) / 2;
+    pathData += ` Q ${controlX} ${prev.y}, ${curr.x} ${curr.y}`;
+  }
+  
+  // Create area fill path
+  const areaPath = `${pathData} L 100 100 L 0 100 Z`;
 
   return (
-    <svg viewBox="0 0 100 100" className="h-16 w-full" preserveAspectRatio="none" aria-hidden="true">
-      <polyline
+    <svg 
+      viewBox="0 0 100 100" 
+      className="h-16 w-full" 
+      preserveAspectRatio="none" 
+      aria-hidden="true"
+    >
+      {/* Gradient definition */}
+      <defs>
+        <linearGradient id={`gradient-${color}`} x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor={color} stopOpacity="0.3" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      
+      {/* Area fill */}
+      <path
+        d={areaPath}
+        fill={`url(#gradient-${color})`}
+        className="transition-all duration-500"
+      />
+      
+      {/* Main line */}
+      <path
+        d={pathData}
         fill="none"
         stroke={color}
-        strokeWidth="3"
+        strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        points={points}
-        className="drop-shadow-[0_3px_8px_rgba(0,0,0,0.25)]"
+        className="drop-shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-all duration-500"
+      />
+      
+      {/* End point indicator */}
+      <circle
+        cx={points[points.length - 1].x}
+        cy={points[points.length - 1].y}
+        r="2.5"
+        fill={color}
+        className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)]"
       />
     </svg>
   );
@@ -274,25 +319,65 @@ const MetricCard = ({
   loading: boolean;
   sparkline?: number[];
   sparkColor?: string;
-}) => (
-  <Card padding="lg" className={`card-ripple border border-white/10 bg-gradient-to-br ${accent}`}>
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm uppercase tracking-wide text-white/70">{label}</p>
-        <AnimatedNumber
-          value={value}
-          enabled={!loading}
-          suffix={suffix}
-          className="mt-2 block text-3xl font-semibold"
-        />
+}) => {
+  const hasSparkline = sparkline && sparkline.length >= 2;
+  
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{ duration: 0.4 }}
+      className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br ${accent} backdrop-blur-xl shadow-lg hover:shadow-2xl hover:border-white/20 transition-all duration-300`}
+    >
+      {/* Subtle gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+      
+      <div className="relative p-6">
+        {/* Header with icon */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/60 mb-1">
+              {label}
+            </p>
+            <div className="flex items-baseline gap-1">
+              <AnimatedNumber
+                value={value}
+                enabled={!loading}
+                suffix={suffix}
+                className="text-4xl font-bold text-white tabular-nums"
+              />
+            </div>
+          </div>
+          
+          {/* Icon with animated background */}
+          <div className="relative">
+            <div className="absolute inset-0 bg-white/20 blur-xl rounded-full group-hover:bg-white/30 transition-all duration-300" />
+            <div className="relative flex items-center justify-center h-12 w-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 group-hover:scale-110 group-hover:bg-white/20 transition-all duration-300">
+              <Icon className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </div>
+        
+        {/* Sparkline area */}
+        {hasSparkline ? (
+          <div className="mt-4 -mb-2 -mx-2">
+            <Sparkline values={sparkline} color={sparkColor ?? SPARKLINE_COLORS[0]} />
+          </div>
+        ) : (
+          <div className="mt-2">
+            <div className="h-12 flex items-center">
+              <div className="text-xs text-white/40 italic">No trend data</div>
+            </div>
+          </div>
+        )}
       </div>
-      <div className="rounded-2xl bg-white/10 p-3">
-        <Icon className="h-6 w-6 text-white" />
-      </div>
-    </div>
-    {sparkline && <Sparkline values={sparkline} color={sparkColor ?? SPARKLINE_COLORS[0]} />}
-  </Card>
-);
+      
+      {/* Bottom accent line */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+    </motion.div>
+  );
+};
 
 const SparklineCard = ({
   series,
@@ -331,51 +416,7 @@ const resolveCountry = (image: ImageRecord) => (image as { country?: string }).c
 const resolveDescription = (image: ImageRecord) =>
   (image as { description?: string }).description ?? (image as { abstract?: string }).abstract;
 
-const GalleryCard = ({
-  image,
-  onSelect,
-}: {
-  image: ImageRecord;
-  onSelect: (img: ImageRecord) => void;
-}) => {
-  const thumbnail = buildImageUrl(resolveImagePath(image));
-  return (
-    <motion.button
-      type="button"
-      onClick={() => onSelect(image)}
-      className="group h-full rounded-3xl border border-white/10 bg-deep-900/50 text-left transition hover:-translate-y-1 hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pacific-400"
-      whileHover={{ scale: 1.01 }}
-    >
-      {thumbnail ? (
-        <div className="relative h-48 overflow-hidden rounded-2xl">
-          <img
-            src={thumbnail}
-            alt={image.title ?? image.filename}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-          <p className="absolute bottom-3 left-4 text-sm font-semibold text-white">
-            {sanitizeText(resolveCountry(image)) || 'Unknown location'}
-          </p>
-        </div>
-      ) : (
-        <div className="flex h-48 items-center justify-center rounded-2xl bg-deep-900/60 text-sm text-white/60">
-          Preview unavailable
-        </div>
-      )}
-      <div className="p-4 text-white">
-        <p className="text-sm uppercase tracking-wide text-white/60">
-          {image.hazard_type || 'Hazard'}
-        </p>
-        <p className="mt-2 line-clamp-2 text-base font-semibold">
-          {sanitizeText(image.title) || sanitizeText(image.filename)}
-        </p>
-      </div>
-    </motion.button>
-  );
-};
-
-export default function OceanPortalDashboard() {
+export default function PacificImpactAtlasDashboard() {
   const queryClient = useQueryClient();
   
   const { data, isLoading } = useQuery({
@@ -412,7 +453,7 @@ export default function OceanPortalDashboard() {
       count,
     }));
     
-    // Prepare timeline data for area chart
+    // Prepare timeline data for area chart - Always generate 30 daily buckets
     const timelineCounts = new Map<string, number>();
     images.forEach((img) => {
       if (img.upload_date) {
@@ -420,19 +461,32 @@ export default function OceanPortalDashboard() {
         timelineCounts.set(date, (timelineCounts.get(date) || 0) + 1);
       }
     });
-    const timeline = Array.from(timelineCounts.entries())
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-30); // Last 30 days
+    
+    // Generate full 30-day window with zeros for missing days
+    const today = new Date();
+    const timeline = Array.from({ length: 30 }, (_, i) => {
+      const date = new Date(today);
+      date.setDate(date.getDate() - (29 - i)); // 29 days ago to today
+      const dateStr = date.toISOString().split('T')[0];
+      return {
+        date: dateStr,
+        count: timelineCounts.get(dateStr) || 0,
+      };
+    });
     
     // Prepare impact metrics for bar chart
     const countryCounts = new Map<string, number>();
     images.forEach((img) => {
-      const country = resolveCountry(img) || 'Unknown';
+      const country = resolveCountry(img) || 'Unspecified location';
       countryCounts.set(country, (countryCounts.get(country) || 0) + 1);
     });
+    const totalCountries = countryCounts.size;
     const impactMetrics = Array.from(countryCounts.entries())
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value]) => ({ 
+        name, 
+        value,
+        country: name // Keep original for logic
+      }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
     
@@ -445,6 +499,7 @@ export default function OceanPortalDashboard() {
       hazardDistribution,
       timeline,
       impactMetrics,
+      totalCountries,
     };
   }, [data, images]);
 
@@ -473,27 +528,21 @@ export default function OceanPortalDashboard() {
 
   const heroStats = [
     { label: 'Pacific Hazards Curated', value: stats.total, suffix: '+' },
-    { label: 'Live Contributors', value: Math.max(stats.organizations, 12), suffix: '' },
+    { label: 'Live Contributors', value: stats.organizations, suffix: '' },
     { label: 'Reviewed in 30 days', value: stats.recentUploads, suffix: '' },
   ];
-
-  const galleryImages = useMemo(
-    () => images.filter((img) => resolveImagePath(img)).slice(0, 9),
-    [images]
-  );
-
-  const [lightboxImage, setLightboxImage] = useState<ImageRecord | null>(null);
-  const openLightbox = useCallback((img: ImageRecord) => setLightboxImage(img), []);
-  const closeLightbox = useCallback(() => setLightboxImage(null), []);
 
   // Fetch featured stories from API
   const { data: featuredStoriesData } = useQuery({
     queryKey: ['featured-stories'],
     queryFn: imageApi.getFeaturedStories,
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    meta: {
+      errorMessage: 'Featured stories endpoint optional - using fallback',
+    },
   });
 
-  // Prepare featured stories data with fallback to placeholder
+  // Prepare featured stories data - use API data if available, otherwise use curated local stories
   const featuredStories = useMemo(() => {
     if (featuredStoriesData && Array.isArray(featuredStoriesData) && featuredStoriesData.length > 0) {
       // Map API response to FeaturedStories component format
@@ -501,38 +550,38 @@ export default function OceanPortalDashboard() {
         id: story.id.toString(),
         title: story.title,
         description: story.description,
-        beforeImage: story.image, // Using single image for now
-        afterImage: story.image,
+        beforeImage: story.beforeImage || story.image,
+        afterImage: story.afterImage || story.image,
         location: story.location,
         date: story.date,
         hazardType: story.hazard_type,
-        impact: `${story.country || ''}`,
+        impact: story.impact || `${story.country || ''}`,
       }));
     }
 
-    // Fallback to placeholder if API fails or returns no data
+    // Curated featured stories with real satellite imagery
     return [
       {
         id: '1',
-        title: 'Cyclone Winston Recovery: Fiji\'s Resilience',
-        description: 'Before and after images showing the devastating impact of Category 5 Cyclone Winston in 2016 and the remarkable recovery efforts that followed.',
-        beforeImage: '/stories/placeholder-before.svg',
-        afterImage: '/stories/placeholder-after.svg',
-        location: 'Fiji',
-        date: '2016-02-20',
+        title: 'Cyclone Winston: Namacu Village, Fiji',
+        description: 'DigitalGlobe satellite imagery documenting the catastrophic impact of Category 5 Cyclone Winston on Namacu village, February 21-22, 2016. The before image shows a thriving coastal community with dense vegetation, while the after reveals widespread devastation with structures destroyed and vegetation completely stripped.',
+        beforeImage: '/stories/cyclone-winston/namacu-before.jpg',
+        afterImage: '/stories/cyclone-winston/namacu-after.jpg',
+        location: 'Namacu Village, Fiji',
+        date: '2016-02-22',
         hazardType: 'Cyclone',
-        impact: '44 deaths, $1.4B in damages',
+        impact: '44 deaths, $1.4B damages, 40,000 homes destroyed',
       },
       {
         id: '2',
-        title: 'Tonga Tsunami: Rebuilding Communities',
-        description: 'The aftermath of the 2022 Hunga Tonga volcanic eruption and tsunami, documenting the path to recovery.',
-        beforeImage: '/stories/placeholder-before.svg',
-        afterImage: '/stories/placeholder-after.svg',
-        location: 'Tonga',
-        date: '2022-01-15',
-        hazardType: 'Tsunami',
-        impact: 'Major infrastructure damage, 84% population affected',
+        title: 'Hunga Tonga-Hunga Haʻapai: December 2021 Eruption',
+        description: 'MAXAR satellite imagery documenting the volcanic activity in December 2021 that foreshadowed the catastrophic January 2022 eruption. The images show Nukuʻalofa harbor and coastal infrastructure before and during the eruption phase, with ash plumes reaching the stratosphere and Surtseyan explosions reshaping the volcanic island.',
+        beforeImage: '/stories/tonga-tsunami/nuku-before.jpg',
+        afterImage: '/stories/tonga-tsunami/nuku-after.jpg',
+        location: 'Nukuʻalofa, Tonga',
+        date: '2021-12-20',
+        hazardType: 'Volcano',
+        impact: 'Ash plumes disrupted air travel, island growth by hundreds of meters, precursor to January 2022 global tsunami',
       },
     ];
   }, [featuredStoriesData]);
@@ -549,19 +598,16 @@ export default function OceanPortalDashboard() {
         <div className="relative z-10 max-w-7xl px-4 pb-16 pt-24 sm:px-6 lg:px-8">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <Tag className="border-white/30 bg-white/10 text-white backdrop-blur">
-                Data Storytelling · Week 2
-              </Tag>
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
                 className="mt-6 max-w-3xl text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl"
               >
-                Interactive maps & visual intelligence for Pacific hazards
+                Pacific Disaster Evidence Repository
               </motion.h1>
               <p className="mt-6 max-w-2xl text-lg text-white/80">
-                Explore 3D terrain, heatmaps, and timeline-driven insights. Discover compelling before/after stories and real-time activity across the Pacific region.
+                A centralized database of verified disaster impact imagery across Pacific island nations. Upload field observations, search historical events, and access geospatial evidence for cyclones, tsunamis, floods, and volcanic activity.
               </p>
             </div>
             <SmartSearch />
@@ -569,21 +615,21 @@ export default function OceanPortalDashboard() {
           <div className="mt-10 flex flex-wrap items-center gap-4">
             <Link
               href="/search"
-              className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 font-semibold text-pacific-600 transition hover:shadow-card"
+              className="group inline-flex items-center gap-2 rounded-full bg-coral-500 px-6 py-3 font-semibold text-white shadow-lg shadow-coral-500/30 transition hover:bg-coral-400 hover:shadow-xl hover:shadow-coral-500/40"
             >
               <Search className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" />
               Launch Search
             </Link>
             <Link
               href="/upload"
-              className="inline-flex items-center gap-2 rounded-full border border-white/40 px-6 py-3 text-white transition hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-full bg-palm-600 px-6 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40"
             >
               <Upload className="h-5 w-5" />
               Upload Field Sighting
             </Link>
             <button
               type="button"
-              className="inline-flex items-center gap-2 rounded-full border border-white/40 px-6 py-3 text-white transition hover:bg-white/10"
+              className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 backdrop-blur-sm bg-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/20 hover:border-white/50"
             >
               <Sparkles className="h-5 w-5" />
               Watch the Story
@@ -599,44 +645,164 @@ export default function OceanPortalDashboard() {
       </header>
 
       <main className="relative z-10 -mt-16 space-y-12 px-4 pb-10 sm:px-6 lg:px-8">
-        {/* Advanced Visualizations Section */}
-        <section className="mx-auto max-w-7xl space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-deep-900/40 p-6 backdrop-blur">
-            <div className="mb-6">
-              <p className="text-sm uppercase tracking-wide text-white/70">Data Insights</p>
-              <h2 className="text-2xl font-semibold">Visual Analytics Dashboard</h2>
-            </div>
-            <div className="grid gap-6 lg:grid-cols-3">
-              {/* Hazard Distribution Pie Chart */}
-              <div className="rounded-2xl border border-white/10 bg-deep-950/60 p-6">
-                <h3 className="mb-4 text-lg font-semibold">Hazard Distribution</h3>
-                {isLoading ? (
-                  <WaveLoader />
-                ) : (
-                  <HazardDistributionPie data={stats.hazardDistribution} />
-                )}
+        {/* Analytics Dashboard - Rapid Situational Snapshot */}
+        <section className="mx-auto max-w-7xl">
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur">
+            {/* Section Header */}
+            <div className="border-b border-white/10 px-6 py-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex-1">
+                  <p className="text-sm font-medium uppercase tracking-wide text-pacific-400">
+                    Data Insights
+                  </p>
+                  <h2 className="mt-1 text-2xl font-bold text-white">
+                    Pacific Impact Evidence Dashboard
+                  </h2>
+                  <p className="mt-2 text-sm text-surface-soft">
+                    Summarises recent disaster impact evidence submitted across the Pacific region.
+                  </p>
+                </div>
+                <div className="flex flex-col items-start gap-1 text-xs text-surface-soft sm:items-end sm:text-right">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Last updated: {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>Coverage: last 30 days</span>
+                  </div>
+                </div>
               </div>
-
-              {/* Timeline Trend Area Chart */}
-              <div className="rounded-2xl border border-white/10 bg-deep-950/60 p-6 lg:col-span-2">
-                <h3 className="mb-4 text-lg font-semibold">Upload Timeline (Last 30 Days)</h3>
-                {isLoading ? (
-                  <WaveLoader />
-                ) : (
-                  <TimelineTrendArea data={stats.timeline} />
-                )}
-              </div>
             </div>
 
-            {/* Impact Metrics Bar Chart */}
-            <div className="mt-6 rounded-2xl border border-white/10 bg-deep-950/60 p-6">
-              <h3 className="mb-4 text-lg font-semibold">Impact by Country (Top 10)</h3>
-              {isLoading ? (
+            {/* Insight Summary Row */}
+            {!isLoading && stats.hazardDistribution.length > 0 && (
+              <div className="border-b border-white/10 bg-deep-950/40 px-6 py-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 text-sm">
+                  {/* Dominant Hazard Insight */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="h-2 w-2 rounded-full bg-pacific-400 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">
+                        {stats.hazardDistribution[0]?.hazard_type?.replace(/_/g, ' ').toUpperCase() || 'Unknown'} most documented
+                      </p>
+                      <p className="text-xs text-surface-soft">
+                        {stats.hazardDistribution[0]?.count || 0} of {stats.total} images ({Math.round((stats.hazardDistribution[0]?.count || 0) / stats.total * 100)}%)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Timeline Insight */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="h-2 w-2 rounded-full bg-palm-400 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">
+                        {stats.timeline.filter((d: any) => d.count > 0).length} active days
+                      </p>
+                      <p className="text-xs text-surface-soft">
+                        {stats.timeline.length > 0 && stats.timeline[stats.timeline.length - 1]?.count > 0 
+                          ? `${stats.timeline[stats.timeline.length - 1].count} uploads today`
+                          : 'No uploads in last 24h'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Country Insight */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <div className="h-2 w-2 rounded-full bg-coral-400 animate-pulse" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-white">
+                        {stats.totalCountries || 0} countries affected
+                      </p>
+                      <p className="text-xs text-surface-soft">
+                        {stats.impactMetrics[0]?.name || 'N/A'} leads with {stats.impactMetrics[0]?.value || 0} images
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Empty State - Never looks broken */}
+            {!isLoading && stats.total === 0 && (
+              <div className="px-6 py-12 text-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-pacific-500/20">
+                  <Camera className="h-8 w-8 text-pacific-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-white mb-2">
+                  No Evidence Documented Yet
+                </h3>
+                <p className="text-sm text-surface-soft max-w-md mx-auto mb-6">
+                  Analytics will appear here once disaster impact images are uploaded to the system.
+                  Be the first to contribute critical evidence.
+                </p>
+                <Link
+                  href="/upload"
+                  className="inline-flex items-center gap-2 rounded-lg bg-pacific-600 px-4 py-2 text-sm font-medium text-white hover:bg-pacific-700 transition-colors"
+                >
+                  <Upload className="h-4 w-4" />
+                  Upload First Image
+                </Link>
+              </div>
+            )}
+
+            {/* Loading State */}
+            {isLoading && (
+              <div className="px-6 py-12">
                 <WaveLoader />
-              ) : (
-                <ImpactMetricsBar data={stats.impactMetrics} />
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Charts Grid - Only show when data exists */}
+            {!isLoading && stats.total > 0 && (
+              <div className="p-6 space-y-6">
+                {/* Top Row: Hazard Distribution + Upload Timeline */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Hazard Distribution - Left Column */}
+                  <div className="rounded-2xl border border-white/10 bg-deep-950/60 backdrop-blur p-6 min-h-[400px]">
+                    <div className="mb-4">
+                      <h3 className="text-base font-semibold text-white">Hazard Distribution</h3>
+                      <p className="text-xs text-surface-soft mt-1">
+                        Type breakdown of {stats.total} documented incidents
+                      </p>
+                    </div>
+                    <HazardDistributionPie data={stats.hazardDistribution} />
+                    <p className="mt-4 text-xs text-surface-soft border-t border-white/5 pt-3">
+                      💡 <strong>{stats.hazardDistribution.length} hazard types</strong> recorded. 
+                      {stats.hazardDistribution[0] && ` ${stats.hazardDistribution[0].hazard_type.replace(/_/g, ' ')} accounts for ${Math.round((stats.hazardDistribution[0].count / stats.total) * 100)}% of evidence.`}
+                    </p>
+                  </div>
+
+                  {/* Upload Timeline - Right 2 Columns */}
+                  <div className="rounded-2xl border border-white/10 bg-deep-950/60 backdrop-blur p-6 lg:col-span-2 min-h-[400px]">
+                    <div className="mb-4">
+                      <h3 className="text-base font-semibold text-white">Upload Timeline</h3>
+                      <p className="text-xs text-surface-soft mt-1">
+                        Evidence submission trend over last 30 days
+                      </p>
+                    </div>
+                    <TimelineTrendArea data={stats.timeline} />
+                  </div>
+                </div>
+
+                {/* Bottom Row: Impact by Country - Full Width */}
+                <div className="rounded-2xl border border-white/10 bg-deep-950/60 backdrop-blur p-6 min-h-[400px]">
+                  <div className="mb-4">
+                    <h3 className="text-base font-semibold text-white">Impact by Country</h3>
+                    <p className="text-xs text-surface-soft mt-1">
+                      Top 10 countries by documented evidence (total: {stats.totalCountries || 0} countries)
+                    </p>
+                  </div>
+                  <ImpactMetricsBar data={stats.impactMetrics} />
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -667,7 +833,7 @@ export default function OceanPortalDashboard() {
               />
               <MetricCard
                 label="Active Contributors"
-                value={stats.organizations || 12}
+                value={stats.organizations}
                 icon={Globe}
                 accent="from-coral-500/20 to-coral-500/5"
                 loading={isLoading}
@@ -715,25 +881,109 @@ export default function OceanPortalDashboard() {
           ))}
         </section>
 
-        <section className="mx-auto max-w-7xl rounded-3xl border border-white/10 bg-deep-900/40 p-6 backdrop-blur">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+        <section className="mx-auto max-w-7xl rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/20 p-6 backdrop-blur">
+          <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
             <div>
-              <p className="text-sm uppercase tracking-wide text-white/70">Hazard Intelligence</p>
-              <h2 className="text-2xl font-semibold">Animated review dashboard</h2>
+              <p className="text-sm uppercase tracking-wide text-pacific-400">Recent Activity</p>
+              <h2 className="text-2xl font-semibold text-white">Latest Evidence Submissions</h2>
             </div>
-            <Tag className="bg-coral-500/20 text-coral-200">
-              Live telemetry
+            <Tag className="bg-palm-500/20 text-palm-200">
+              Live updates
             </Tag>
           </div>
-          {sparklineSeries.length === 0 ? (
+          
+          {isLoading ? (
             <div className="mt-8">
               <WaveLoader />
             </div>
+          ) : images.length === 0 ? (
+            <div className="mt-8 text-center py-12 rounded-xl border border-white/10 bg-deep-950/40">
+              <Camera className="mx-auto h-12 w-12 text-white/30 mb-4" />
+              <p className="text-white/60 mb-2">No evidence documented yet</p>
+              <p className="text-sm text-white/40">Upload disaster impact images to start tracking</p>
+            </div>
           ) : (
-            <div className="mt-8 grid gap-6 md:grid-cols-3">
-              {sparklineSeries.map((series) => (
-                <SparklineCard key={series.label} series={series} loading={isLoading} />
-              ))}
+            <div className="mt-6 space-y-4">
+              {images.slice(0, 5).map((image, index) => {
+                const imageUrl = buildImageUrl(resolveImagePath(image));
+                const uploadTime = image.upload_date ? new Date(image.upload_date) : null;
+                const timeAgo = uploadTime ? (
+                  Math.floor((Date.now() - uploadTime.getTime()) / (1000 * 60 * 60)) < 24
+                    ? `${Math.floor((Date.now() - uploadTime.getTime()) / (1000 * 60 * 60))}h ago`
+                    : uploadTime.toLocaleDateString()
+                ) : 'Recently';
+                
+                return (
+                  <motion.div
+                    key={image.filename}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-center gap-4 p-4 rounded-xl border border-white/10 bg-deep-950/40 hover:bg-deep-950/60 hover:border-white/20 transition-all group"
+                  >
+                    {/* Thumbnail */}
+                    <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-deep-900">
+                      {imageUrl ? (
+                        <NextImage
+                          src={imageUrl}
+                          alt={sanitizeText(image.title || image.filename)}
+                          fill
+                          className="object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Camera className="w-8 h-8 text-white/20" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white truncate group-hover:text-pacific-300 transition-colors">
+                            {sanitizeText(image.title || image.filename)}
+                          </h3>
+                          <div className="flex items-center gap-3 mt-1 text-sm text-white/60">
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3.5 h-3.5" />
+                              <span className="truncate">{sanitizeText(resolveCountry(image)) || 'Unknown location'}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5" />
+                              <span>{timeAgo}</span>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Hazard badge */}
+                        <span className="flex-shrink-0 px-2.5 py-1 text-xs font-medium bg-pacific-600/80 text-white rounded-full capitalize">
+                          {image.hazard_type || 'hazard'}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* View arrow */}
+                    <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TrendingUp className="w-5 h-5 text-pacific-400" />
+                    </div>
+                  </motion.div>
+                );
+              })}
+              
+              {/* View all link */}
+              {images.length > 5 && (
+                <Link
+                  href="/search"
+                  className="block mt-4 text-center py-3 rounded-lg border border-white/10 text-sm text-pacific-400 hover:bg-white/5 hover:border-pacific-500/50 transition-all"
+                >
+                  View all {images.length} evidence submissions →
+                </Link>
+              )}
             </div>
           )}
         </section>
@@ -746,86 +996,7 @@ export default function OceanPortalDashboard() {
 
         {/* Week 3: Gamification Badges */}
         <GamificationBadges />
-
-        <section className="mx-auto max-w-7xl">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-sm uppercase tracking-wide text-white/70">Immersive Impact Gallery</p>
-              <h2 className="text-2xl font-semibold">Thumbnails with lightbox + micro-interactions</h2>
-            </div>
-            <Link
-              href="/images"
-              className="inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-            >
-              View full gallery
-              <Camera className="h-4 w-4" />
-            </Link>
-          </div>
-
-          {isLoading ? (
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div key={`placeholder-${index}`} className="h-48 animate-pulse rounded-3xl bg-white/5 backdrop-blur" />
-              ))}
-            </div>
-          ) : (
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {galleryImages.map((image) => (
-                <GalleryCard key={image.id ?? image.filename} image={image} onSelect={openLightbox} />
-              ))}
-            </div>
-          )}
-        </section>
       </main>
-
-      <AnimatePresence>
-        {lightboxImage && (
-          <motion.div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={closeLightbox}
-          >
-            <motion.div
-              className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-3xl bg-deep-900/90 p-6 text-left text-white shadow-2xl"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="relative aspect-video w-full overflow-hidden rounded-2xl">
-                <img
-                  src={buildImageUrl(resolveImagePath(lightboxImage)) || ''}
-                  alt={lightboxImage.title ?? lightboxImage.filename}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="mt-6 flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm uppercase tracking-wide text-white/60">
-                    {lightboxImage.hazard_type}
-                  </p>
-                  <h3 className="mt-2 text-2xl font-semibold">
-                    {sanitizeText(lightboxImage.title) ?? sanitizeText(lightboxImage.filename)}
-                  </h3>
-                  <p className="mt-2 text-white/70">
-                    {sanitizeText(resolveDescription(lightboxImage)) || 'Field notes unavailable.'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeLightbox}
-                  className="inline-flex items-center gap-2 rounded-full border border-white/20 px-5 py-2 text-sm font-semibold text-white transition hover:bg-white/10"
-                >
-                  <X className="h-4 w-4" />
-                  Close
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Week 3: Mobile Bottom Navigation */}
       <MobileBottomNav />

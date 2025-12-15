@@ -1,0 +1,4 @@
+{
+  "/api/analytics/events/route": "app/api/analytics/events/route.js",
+  "/page": "app/page.js"
+}

@@ -157,7 +157,7 @@ function StoryCard({ story, index, parallaxY }: StoryCardProps) {
 
           <Link
             href={`/images/${story.id}`}
-            className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 font-semibold text-deep-900 transition hover:scale-105 hover:shadow-xl"
+            className="inline-flex items-center gap-2 rounded-full bg-coral-500 px-6 py-3 font-semibold text-white shadow-lg shadow-coral-500/30 transition hover:bg-coral-400 hover:shadow-xl hover:shadow-coral-500/40"
           >
             Explore Full Story
             <ArrowRight className="h-4 w-4" />

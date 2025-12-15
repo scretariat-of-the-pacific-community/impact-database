@@ -1,0 +1,293 @@
+/**
+ * Custom Tutorial Styles for Pacific Impact Database
+ * Overrides driver.js default theme
+ */
+
+/* Import driver.js base styles */
+@import 'driver.js/dist/driver.css';
+
+/* Custom popover styling */
+.driver-popover {
+  background: linear-gradient(135deg, #0c1726 0%, #1e2f45 100%) !important;
+  border: 1px solid rgba(0, 158, 224, 0.3) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 158, 224, 0.1) !important;
+  backdrop-filter: blur(16px) !important;
+  max-width: 420px !important;
+  padding: 0 !important;
+}
+
+.driver-popover-title {
+  color: #ffffff !important;
+  font-size: 1.25rem !important;
+  font-weight: 700 !important;
+  margin-bottom: 0.75rem !important;
+  padding: 1.25rem 1.25rem 0 1.25rem !important;
+  letter-spacing: -0.01em !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+.driver-popover-description {
+  color: rgba(255, 255, 255, 0.95) !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.65 !important;
+  padding: 0 1.25rem 1.25rem 1.25rem !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.driver-popover-footer {
+  padding: 1rem 1.25rem !important;
+  border-top: 1px solid rgba(0, 158, 224, 0.2) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.75rem !important;
+  background: rgba(0, 158, 224, 0.05) !important;
+  border-bottom-left-radius: 16px !important;
+  border-bottom-right-radius: 16px !important;
+}
+
+/* Button styling */
+.driver-popover-navigation-btns {
+  display: flex !important;
+  gap: 0.5rem !important;
+  align-items: center !important;
+}
+
+.driver-popover-prev-btn,
+.driver-popover-next-btn,
+.driver-popover-close-btn {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  padding: 0.625rem 1.25rem !important;
+  border-radius: 0.5rem !important;
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.driver-popover-prev-btn:hover,
+.driver-popover-next-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.driver-popover-close-btn {
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  padding: 0.5rem !important;
+  font-weight: 400 !important;
+}
+
+.driver-popover-close-btn:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
+}
+
+/* Next button - primary action */
+.driver-popover-next-btn {
+  background: linear-gradient(135deg, #009ee0 0%, #0077b3 100%) !important;
+  border-color: #009ee0 !important;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+.driver-popover-next-btn:hover {
+  background: linear-gradient(135deg, #00b8ff 0%, #009ee0 100%) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 4px 16px rgba(0, 158, 224, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  border-color: #00b8ff !important;
+}
+
+/* Progress text */
+.driver-popover-progress-text {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Overlay */
+.driver-overlay {
+  background: rgba(2, 9, 23, 0.85) !important;
+  backdrop-filter: blur(3px) !important;
+}
+
+/* Active element highlight */
+.driver-active-element {
+  border-radius: 8px !important;
+  box-shadow: 0 0 0 4px rgba(0, 158, 224, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Arrow styling */
+.driver-popover-arrow {
+  display: block !important;
+}
+
+.driver-popover-arrow-side-left.driver-popover-arrow,
+.driver-popover-arrow-side-right.driver-popover-arrow,
+.driver-popover-arrow-side-top.driver-popover-arrow,
+.driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-color: rgba(0, 158, 224, 0.3) !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .driver-popover {
+    max-width: 90vw;
+    margin: 0 1rem;
+  }
+
+  .driver-popover-title {
+    font-size: 1rem;
+  }
+
+  .driver-popover-description {
+    font-size: 0.8125rem;
+  }
+
+  .driver-popover-prev-btn,
+  .driver-popover-next-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* Animation */
+@keyframes driver-popover-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(-15px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.driver-popover {
+  animation: driver-popover-fade-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+/* Disabled state */
+.driver-popover-prev-btn:disabled,
+.driver-popover-next-btn:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.driver-popover-prev-btn:disabled:hover,
+.driver-popover-next-btn:disabled:hover {
+  transform: none !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  box-shadow: none !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Close button positioning */
+.driver-popover-close-btn {
+  position: absolute !important;
+  top: 1rem !important;
+  right: 1rem !important;
+  width: 2rem !important;
+  height: 2rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  z-index: 10 !important;
+}
+
+.driver-popover-close-btn:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  transform: none !important;
+}
+
+/* Highlight pulse effect */
+@keyframes highlight-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 158, 224, 0.8), 0 0 0 2px rgba(255, 255, 255, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(0, 158, 224, 0), 0 0 0 2px rgba(255, 255, 255, 0.1);
+  }
+}
+
+.driver-active-element {
+  animation: highlight-pulse 2.5s ease-in-out infinite !important;
+}
+
+/* Additional theme enhancements */
+.driver-popover::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(135deg, rgba(0, 158, 224, 0.15) 0%, rgba(0, 119, 179, 0.05) 100%);
+  border-radius: 16px;
+  z-index: -1;
+  opacity: 0.5;
+}
+
+/* Ensure text is always readable */
+.driver-popover * {
+  color: inherit;
+}
+
+.driver-popover-title {
+  line-height: 1.3 !important;
+}
+
+.driver-popover-description {
+  line-height: 1.65 !important;
+}
+
+/* Make sure buttons have good contrast */
+.driver-popover button {
+  font-family: inherit !important;
+}
+
+/* Smooth transitions for all interactive elements */
+.driver-popover button,
+.driver-popover-close-btn {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* Enhanced mobile responsiveness */
+@media (max-width: 480px) {
+  .driver-popover {
+    max-width: calc(100vw - 2rem) !important;
+  }
+  
+  .driver-popover-title {
+    font-size: 1.125rem !important;
+    padding: 1rem 1rem 0 1rem !important;
+  }
+  
+  .driver-popover-description {
+    font-size: 0.875rem !important;
+    padding: 0 1rem 1rem 1rem !important;
+  }
+  
+  .driver-popover-footer {
+    padding: 0.875rem 1rem !important;
+    flex-wrap: wrap !important;
+  }
+  
+  .driver-popover-prev-btn,
+  .driver-popover-next-btn {
+    padding: 0.5rem 1rem !important;
+    font-size: 0.8125rem !important;
+  }
+}

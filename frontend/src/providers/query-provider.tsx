@@ -79,6 +79,11 @@ export function QueryProvider({ children }: QueryProviderProps) {
       new QueryClient({
         queryCache: new QueryCache({
           onError: (error, query) => {
+            // Suppress logging for queries with error suppression meta
+            if (query?.meta?.errorMessage) {
+              return;
+            }
+
             const normalized = normalizeError(error);
 
             console.error('Query error:', normalized.message, {

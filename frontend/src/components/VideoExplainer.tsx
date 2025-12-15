@@ -12,7 +12,7 @@ interface VideoExplainerProps {
 
 export default function VideoExplainer({
   videoId = 'KOBVBk8OD5I', // Pacific Climate Change & Resilience video
-  title = 'How the Impact Database Works',
+  title = 'How Pacific Impact Atlas Works',
   description = 'Learn how to contribute disaster imagery and help build climate resilience across the Pacific region',
 }: VideoExplainerProps) {
   const [isPlaying, setIsPlaying] = useState(false);

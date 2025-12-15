@@ -6,7 +6,9 @@ import {
   User,
   APIError,
   BoundingBox,
-  VocabulariesResponse 
+  VocabulariesResponse,
+  UserStats,
+  UserUpload 
 } from './types';
 import { config, getApiUrl } from './config';
 
@@ -143,6 +145,11 @@ class APIClient {
     return response.data;
   }
 
+  async getImageHistory(id: string): Promise<{ history: any[] }> {
+    const response = await this.client.get(`/api/images/${encodeURIComponent(id)}/history`);
+    return response.data;
+  }
+
   async getImagesInBounds(bounds: BoundingBox): Promise<ImageMetadata[]> {
     const bbox = `${bounds.west},${bounds.south},${bounds.east},${bounds.north}`;
     // Use GeoJSON endpoint which accepts bbox parameter
@@ -170,6 +177,16 @@ class APIClient {
 
   async getVocabularies(): Promise<VocabulariesResponse> {
     const response: AxiosResponse<VocabulariesResponse> = await this.client.get('/api/vocabularies');
+    return response.data;
+  }
+
+  async getUserStats(): Promise<UserStats> {
+    const response: AxiosResponse<UserStats> = await this.client.get('/api/user/stats');
+    return response.data;
+  }
+
+  async getUserUploads(): Promise<UserUpload[]> {
+    const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/user/uploads');
     return response.data;
   }
 
@@ -312,7 +329,7 @@ class APIClient {
 // Legacy compatibility
 export const apiClient = new APIClient()['client'];
 
-// New Ocean Portal API
+// Pacific Impact Atlas API
 export const oceanPortalApi = new APIClient();
 
 // Legacy image API for backward compatibility
@@ -343,11 +360,23 @@ export const imageApi = {
             resolve(xhr.responseText);
           }
         } else {
-          reject(new Error(`Upload failed: ${xhr.statusText}`));
+          // Try to parse error detail from API response
+          let errorMessage = xhr.statusText;
+          try {
+            const errorData = JSON.parse(xhr.responseText);
+            if (errorData.detail) {
+              errorMessage = typeof errorData.detail === 'string' 
+                ? errorData.detail 
+                : JSON.stringify(errorData.detail);
+            }
+          } catch (e) {
+            // Use status text if can't parse JSON
+          }
+          reject(new Error(`Upload failed: ${errorMessage}`));
         }
       };
       
-      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.onerror = () => reject(new Error('Upload failed: Network error'));
       
       // Add auth token if available
       const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
@@ -368,9 +397,20 @@ export const imageApi = {
     const response = await apiClient.get('/api/vocabularies');
     return response.data;
   },
+  history: async (imageId: string) => oceanPortalApi.getImageHistory(imageId),
+  userStats: () => oceanPortalApi.getUserStats(),
+  userUploads: () => oceanPortalApi.getUserUploads(),
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
   getFeaturedStories: async () => {
-    const response = await apiClient.get('/api/featured-stories');
-    return response.data;
+    try {
+      const response = await apiClient.get('/api/featured-stories');
+      return response.data;
+    } catch (error: any) {
+      // Return null if endpoint doesn't exist - page will use fallback data
+      if (error?.response?.status === 404) {
+        return null;
+      }
+      throw error;
+    }
   },
 };

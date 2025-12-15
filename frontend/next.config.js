@@ -19,8 +19,22 @@ const getApiOrigin = () => {
 const createCSP = () => {
   const apiOrigin = getApiOrigin();
   const sources = {
-    imgSrc: ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org'],
-    connectSrc: ["'self'", apiOrigin, 'https://*.sentry.io', 'https://*.ingest.sentry.io', 'https://vitals.vercel-insights.com'],
+    imgSrc: [
+      "'self'", 
+      'data:', 
+      'blob:', 
+      'https://*.tile.openstreetmap.org',
+      'https://*.abc-cdn.net.au',
+      'https://live-production.wcms.abc-cdn.net.au',
+    ],
+    connectSrc: [
+      "'self'",
+      apiOrigin,
+      'https://*.sentry.io',
+      'https://*.ingest.sentry.io',
+      'https://vitals.vercel-insights.com',
+      'https://nominatim.openstreetmap.org',
+    ],
   };
   if (apiOrigin) {
     sources.imgSrc.push(apiOrigin);
@@ -64,7 +78,7 @@ const securityHeaders = () => {
     },
     {
       key: 'Permissions-Policy',
-      value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+      value: 'camera=(), microphone=(), geolocation=(self), interest-cohort=()',
     },
   ];
   if (process.env.NODE_ENV === 'production') {
@@ -80,8 +94,19 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
+  transpilePackages: ['framer-motion'],
   images: {
     domains: ['localhost', '127.0.0.1', '0.0.0.0'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**.abc-cdn.net.au',
+      },
+      {
+        protocol: 'https',
+        hostname: 'live-production.wcms.abc-cdn.net.au',
+      },
+    ],
     unoptimized: true
   },
   compiler: {

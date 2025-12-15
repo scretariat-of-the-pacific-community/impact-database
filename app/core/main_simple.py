@@ -65,7 +65,11 @@ try:
     from api.review_workflow import router as review_workflow_router
     app.include_router(review_workflow_router, tags=["review-workflow"])
     
-    logger.info("Auth API, Images API, Upload API, RBAC API, and Review Workflow API routers included")
+    # Import Featured Stories API
+    from api.featured import router as featured_router
+    app.include_router(featured_router, prefix="/api", tags=["featured"])
+    
+    logger.info("Auth API, Images API, Upload API, RBAC API, Review Workflow API, and Featured Stories API routers included")
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
 
@@ -245,11 +249,72 @@ async def search_images(
         }
         
     except Exception as e:
-        logging.error(f"Search images error: {e}")
+        logger.error(f"Error searching images: {e}")
+        return {"error": str(e), "images": [], "total": 0}
+
+@app.get("/api/search")
+async def api_search(
+    q: str = None,
+    hazard_type: str = None,
+    country: str = None,
+    sort_by: str = "upload_date",
+    sort_order: str = "desc",
+    limit: int = 24,
+    offset: int = 0,
+    page: int = 1
+):
+    """
+    API search endpoint that frontend uses
+    Proxy to the actual images search endpoint
+    """
+    try:
+        from fastapi import Depends
+        from models.database import get_db
+        from sqlalchemy.orm import Session
+        from api.images_simple import search_images as real_search
+        
+        # Calculate offset from page if provided
+        if page > 1:
+            offset = (page - 1) * limit
+        
+        # Get database session
+        db_gen = get_db()
+        db = next(db_gen)
+        
+        try:
+            # Call the real search function
+            result = await real_search(
+                q=q,
+                hazard_type=hazard_type,
+                country=country,
+                skip=offset,
+                limit=limit,
+                sort_by=sort_by,
+                sort_order=sort_order,
+                db=db
+            )
+            
+            return result
+        finally:
+            # Close database session
+            db.close()
+        
+    except Exception as e:
+        logger.error(f"Error in API search: {e}")
         return JSONResponse(
             status_code=500,
-            content={"detail": "Failed to search images"}
+            content={"error": str(e), "images": [], "total": 0}
         )
+
+@app.get("/api/user/stats")
+async def get_user_stats():
+    """Get user statistics - placeholder for development"""
+    return {
+        "total_uploads": 0,
+        "approved_images": 0,
+        "pending_review": 0,
+        "rejected_images": 0
+    }
 
 @app.get("/upload/images/{image_id}/metadata")
 async def get_image_metadata(image_id: str):

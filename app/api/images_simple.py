@@ -142,7 +142,7 @@ async def get_images_list(
         logger.error(f"Error fetching images list: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch images: {str(e)}")
 
-@router.get("/images/{image_id}", response_model=Dict[str, Any])
+@router.get("/{image_id}", response_model=Dict[str, Any])
 async def get_image_by_id(
     image_id: str,
     db: Session = Depends(get_db)
@@ -194,15 +194,23 @@ async def get_image_by_id(
 @router.get("/search", response_model=Dict[str, Any])
 async def search_images(
     q: Optional[str] = Query(None, description="Search query"),
+    hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
+    country: Optional[str] = Query(None, description="Filter by country"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
     sort_by: Optional[str] = Query("upload_date", description="Sort field"),
     sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
     db: Session = Depends(get_db)
 ):
-    """Search images with text query and sorting."""
+    """Search images with text query, filters, and sorting."""
     try:
         query = db.query(ImageMetadata)
+        
+        # Apply filters
+        if hazard_type:
+            query = query.filter(ImageMetadata.hazard_type == hazard_type)
+        if country:
+            query = query.filter(ImageMetadata.country == country)
         
         # Apply text search if query provided
         if q:
@@ -232,6 +240,9 @@ async def search_images(
         # Get total count and paginated results
         total = query.count()
         images = query.offset(skip).limit(limit).all()
+        
+        # Debug logging
+        logger.info(f"Search query returned {total} total images, fetched {len(images)} images")
         
         # Convert to response format matching frontend expectations
         image_list = []

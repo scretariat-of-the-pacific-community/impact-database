@@ -10,7 +10,7 @@ import io
 import imghdr
 from pathlib import Path as FilePath
 from datetime import datetime, timezone
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, List
 import json
 from enum import Enum
 from pydantic import BaseModel, validator, Field, root_validator, ValidationError
@@ -28,6 +28,7 @@ from api.schemas.image_schemas import ImageMetadataUpdate, ImageResponse, Delete
 from core.config import settings
 from api.auth import get_current_user, User
 from geoalchemy2 import WKTElement
+from api.services.iso_vocabulary import generate_iso_title, generate_iso_abstract
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +62,13 @@ ALLOWED_EXTENSIONS = {
 AVIF_BRANDS = {b'avif', b'av01', b'mif1', b'msf1'}
 HEIC_BRANDS = {b'heic', b'heix', b'hevc', b'hevx', b'heim', b'heis', b'hevm', b'hevs', b'hvc1', b'hvce'}
 HEIF_BRANDS = {b'heif', b'heio', b'heof', b'hif1'}
+
+def _humanize_filename(filename: str) -> str:
+    """Generate a readable fallback title from a filename."""
+    stem = FilePath(filename).stem.replace('_', ' ').replace('-', ' ').strip()
+    if not stem:
+        return "Untitled upload"
+    return " ".join(word.capitalize() for word in stem.split())
 
 async def _read_upload_with_limit(upload_file: UploadFile, max_bytes: int, chunk_size: int = 5 * 1024 * 1024) -> bytes:
     """Read upload in chunks enforcing maximum size. Chunk size is configurable (default 5MB)."""
@@ -113,7 +121,12 @@ class HazardType(str, Enum):
     flood = "flood"
     cyclone = "cyclone"
     tsunami = "tsunami"
+    drought = "drought"
     landslide = "landslide"
+    earthquake = "earthquake"
+    wildfire = "wildfire"
+    volcanic = "volcanic"
+    coastal_erosion = "coastal_erosion"
     other = "other"
 
 class SourceType(str, Enum):
@@ -145,6 +158,11 @@ class ImageUploadRequest(BaseModel):
     data_license: str = "https://creativecommons.org/licenses/by/4.0/"
     source_type: SourceType
     positional_accuracy: Optional[float] = None
+    title: Optional[str] = None
+    abstract: Optional[str] = None
+    location: Optional[str] = None
+    country: Optional[str] = None
+    keywords: Optional[List[str]] = None
 
     @validator('datetime', pre=True)
     def ensure_utc(cls, v):
@@ -161,6 +179,17 @@ class ImageUploadRequest(BaseModel):
                 return v.replace(tzinfo=timezone.utc)
             return v.astimezone(timezone.utc)
         return v
+
+    @validator('keywords', pre=True)
+    def normalize_keywords(cls, value):
+        if value is None or value == "":
+            return None
+        if isinstance(value, str):
+            value = [value]
+        if isinstance(value, list):
+            cleaned = [str(item).strip() for item in value if str(item).strip()]
+            return cleaned or None
+        raise ValueError("Invalid keywords format")
 
     @root_validator(pre=True)
     def check_geometry(cls, values):
@@ -230,112 +259,130 @@ def create_audit_log(
 
 @router.get("/images/{filename}")
 async def serve_image(filename: str):
-    """Serve uploaded image files with path traversal protection"""
-    # SECURITY: Validate and sanitize filename to prevent path traversal
-    # Reject any filename containing path separators or parent directory references
+    """Serve uploaded image files from MinIO or local storage"""
+    from fastapi.responses import StreamingResponse
+    from io import BytesIO
+    
+    # SECURITY: Validate and sanitize filename
     if not filename or '..' in filename or '/' in filename or '\\' in filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid filename: path traversal detected"
-        )
-    
-    # Validate file extension (whitelist approach)
-    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.tiff', '.tif'}
-    _, ext = os.path.splitext(filename.lower())
-    if ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file extension: {ext}. Allowed: {', '.join(allowed_extensions)}"
-        )
-    
-    # Normalize the filename (removes any remaining path components)
-    safe_filename = os.path.basename(filename)
-    
-    # Define the upload directory path (absolute path within container)
-    upload_dir = "/app/uploads"  
-    file_path = os.path.join(upload_dir, safe_filename)
-    
-    # Additional security: ensure the resolved path is within upload_dir
-    real_upload_dir = os.path.realpath(upload_dir)
-    real_file_path = os.path.realpath(file_path)
-    if not real_file_path.startswith(real_upload_dir):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file path: directory traversal detected"
-        )
-    
-    # Check if file exists
-    if not os.path.exists(file_path):
-        raise HTTPException(
-            status_code=404,
-            detail=f"Image '{safe_filename}' not found"
-        )
-    
-    # Determine media type based on file extension
-    media_type_map = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg', 
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp',
-        '.tiff': 'image/tiff',
-        '.tif': 'image/tiff'
-    }
-    media_type = media_type_map.get(ext, 'image/jpeg')
-    
-    # Return the file
-    return FileResponse(
-        path=file_path,
-        media_type=media_type,
-        filename=safe_filename
-    )
-
-@router.get("/images/{filename}/thumbnail")
-async def serve_image_thumbnail(filename: str):
-    """Serve thumbnail versions of uploaded images with path traversal protection"""
-    # SECURITY: Validate and sanitize filename to prevent path traversal
-    if not filename or '..' in filename or '/' in filename or '\\' in filename:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid filename: path traversal detected"
-        )
+        raise HTTPException(status_code=400, detail="Invalid filename")
     
     # Validate file extension
     allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.tiff', '.tif'}
     _, ext = os.path.splitext(filename.lower())
     if ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid file extension: {ext}"
-        )
+        raise HTTPException(status_code=400, detail=f"Invalid file extension: {ext}")
     
-    # Normalize filenames
     safe_filename = os.path.basename(filename)
-    thumbnail_name = f"thumb_{safe_filename}"
     
-    # Define the upload directory path for thumbnails
-    upload_dir = "/app/uploads"
-    file_path = os.path.join(upload_dir, thumbnail_name)
+    # Determine media type
+    media_type_map = {
+        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+        '.png': 'image/png', '.gif': 'image/gif',
+        '.webp': 'image/webp', '.tiff': 'image/tiff', '.tif': 'image/tiff'
+    }
+    media_type = media_type_map.get(ext, 'image/jpeg')
     
-    # Additional security: ensure the resolved path is within upload_dir
-    real_upload_dir = os.path.realpath(upload_dir)
-    real_file_path = os.path.realpath(file_path)
-    if not real_file_path.startswith(real_upload_dir):
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file path: directory traversal detected"
-        )
+    # Try MinIO first
+    try:
+        minio_storage = get_minio_storage()
+        minio_client = minio_storage._get_client()
+        object_key = f"images/{safe_filename}"
+        
+        # Get object from MinIO
+        response = minio_client.get_object('impact-images', object_key)
+        data = response.read()
+        response.close()
+        response.release_conn()
+        
+        return StreamingResponse(BytesIO(data), media_type=media_type)
+    except Exception as e:
+        logger.warning(f"MinIO fetch failed for {safe_filename}: {e}")
+        
+        # Fallback to local storage
+        upload_dir = "/app/uploads"
+        file_path = os.path.join(upload_dir, safe_filename)
+        real_upload_dir = os.path.realpath(upload_dir)
+        real_file_path = os.path.realpath(file_path)
+        
+        if not real_file_path.startswith(real_upload_dir):
+            raise HTTPException(status_code=400, detail="Invalid file path")
+        
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"Image not found: {safe_filename}")
+        
+        return FileResponse(path=file_path, media_type=media_type, filename=safe_filename)
+
+@router.get("/images/{filename}/thumbnail")
+async def serve_image_thumbnail(filename: str):
+    """Serve thumbnail from MinIO or generate on-the-fly"""
+    from fastapi.responses import StreamingResponse
+    from io import BytesIO
+    from PIL import Image
     
-    # If thumbnail doesn't exist, serve the original image
-    if not os.path.exists(file_path):
+    # SECURITY: Validate filename
+    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.tiff', '.tif'}
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in allowed_extensions:
+        raise HTTPException(status_code=400, detail=f"Invalid file extension: {ext}")
+    
+    safe_filename = os.path.basename(filename)
+    
+    # Try MinIO thumbnail first
+    try:
+        minio_storage = get_minio_storage()
+        minio_client = minio_storage._get_client()
+        thumb_key = f"thumbnails/thumb_{safe_filename}"
+        
+        try:
+            # Try to get existing thumbnail
+            response = minio_client.get_object('impact-images', thumb_key)
+            data = response.read()
+            response.close()
+            response.release_conn()
+            return StreamingResponse(BytesIO(data), media_type="image/jpeg")
+        except:
+            # Generate thumbnail on-the-fly
+            object_key = f"images/{safe_filename}"
+            response = minio_client.get_object('impact-images', object_key)
+            image_data = response.read()
+            response.close()
+            response.release_conn()
+            
+            # Create thumbnail
+            img = Image.open(BytesIO(image_data))
+            img.thumbnail((300, 300), Image.Resampling.LANCZOS)
+            
+            # Convert to JPEG
+            thumb_io = BytesIO()
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            img.save(thumb_io, 'JPEG', quality=85)
+            thumb_io.seek(0)
+            
+            # Save to MinIO for future requests
+            try:
+                minio_client.put_object(
+                    'impact-images',
+                    thumb_key,
+                    thumb_io,
+                    length=thumb_io.getbuffer().nbytes,
+                    content_type='image/jpeg'
+                )
+                thumb_io.seek(0)
+            except Exception as e:
+                logger.warning(f"Failed to save thumbnail to MinIO: {e}")
+                thumb_io.seek(0)
+            
+            return StreamingResponse(thumb_io, media_type="image/jpeg")
+            
+    except Exception as e:
+        logger.error(f"Thumbnail generation failed for {safe_filename}: {e}")
+        # Fallback to serving original image
         return await serve_image(safe_filename)
-    
-    # Return the thumbnail
-    return FileResponse(
-        path=file_path,
-        media_type="image/jpeg",
-        filename=thumbnail_name
-    )
 
 @router.put("/images/{filename}", response_model=UpdateResponse)
 async def update_image_metadata(
@@ -687,13 +734,43 @@ async def upload_image(
             lon = exif_data['longitude']
             geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
             logger.info(f"Using GPS coordinates from EXIF: ({lat}, {lon})")
-        
-        # ENFORCE: Geometry is required (DB has nullable=False constraint)
+
         if geom is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Coordinates required: provide geometry in metadata or upload image with GPS EXIF data"
+            logger.warning(
+                "Upload %s has no geometry. Image will be stored without spatial data.",
+                file.filename
             )
+
+        # Prepare high-quality metadata fallbacks
+        location_value = (upload_data.location or "").strip() or None
+        country_value = (upload_data.country or "").strip() or None
+        location_for_context = location_value or country_value or "Unknown location"
+        provided_title = (upload_data.title or "").strip()
+        provided_abstract = (upload_data.abstract or "").strip()
+        keywords = upload_data.keywords or []
+
+        try:
+            iso_title = generate_iso_title(
+                upload_data.hazard_type.value,
+                location_for_context,
+                upload_data.datetime
+            )
+        except Exception as iso_error:
+            logger.warning("Failed to generate ISO title for %s: %s", file.filename, iso_error)
+            iso_title = None
+
+        try:
+            iso_abstract = generate_iso_abstract(
+                upload_data.hazard_type.value,
+                location_for_context,
+                upload_data.datetime
+            )
+        except Exception as iso_error:
+            logger.warning("Failed to generate ISO abstract for %s: %s", file.filename, iso_error)
+            iso_abstract = None
+
+        final_title = provided_title or iso_title or _humanize_filename(file.filename)
+        final_abstract = provided_abstract or iso_abstract
 
         object_key = f"images/{file.filename}"
         minio_client = get_minio_storage()
@@ -714,7 +791,12 @@ async def upload_image(
                 uploader_id=_get_user_identifier(current_user),
                 positional_accuracy=upload_data.positional_accuracy,
                 geometry=geom,
-                resource_locator=object_key
+                resource_locator=object_key,
+                title=final_title,
+                abstract=final_abstract,
+                location=location_value,
+                country=country_value,
+                keywords=keywords or None
             )
 
             db.add(image_metadata)

@@ -271,7 +271,7 @@ export default function EnhancementsDemoPage() {
             <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
               <h3 className="mb-3 text-lg font-bold text-green-800">Installable App</h3>
               <p className="mb-4 text-green-700">
-                After your second visit, you&apos;ll see a prompt to install Ocean Portal as an app. 
+                After your second visit, you&apos;ll see a prompt to install Pacific Impact Atlas as an app. 
                 This gives you a native app experience with offline support.
               </p>
               <ul className="space-y-2">

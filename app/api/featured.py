@@ -42,7 +42,7 @@ def get_featured_stories(
             .filter(
                 and_(
                     ImageMetadata.status == StatusEnum.APPROVED,
-                    ImageMetadata.image_url.isnot(None)
+                    ImageMetadata.resource_locator.isnot(None)
                 )
             )
             .order_by(desc(ImageMetadata.datetime))
@@ -53,11 +53,14 @@ def get_featured_stories(
         # Transform to frontend-friendly format
         stories = []
         for img in featured_images:
+            # Build image URL from resource_locator or filename
+            image_url = img.resource_locator or (f"/upload/images/{img.filename}" if img.filename else None)
+            
             stories.append({
                 "id": img.id,
-                "title": img.location or f"{img.hazard_type or 'Impact'} Event",
-                "description": img.description or f"Impact imagery from {img.datetime.strftime('%B %d, %Y') if img.datetime else 'recent event'}",
-                "image": img.image_url,
+                "title": img.title or img.location or f"{img.hazard_type or 'Impact'} Event",
+                "description": img.abstract or img.purpose or f"Impact imagery from {img.datetime.strftime('%B %d, %Y') if img.datetime else 'recent event'}",
+                "image": image_url,
                 "date": img.datetime.isoformat() if img.datetime else None,
                 "hazard_type": img.hazard_type,
                 "location": img.location,

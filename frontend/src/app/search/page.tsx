@@ -80,6 +80,13 @@ interface SearchPageState {
 }
 
 const RESULTS_PER_PAGE = 24;
+const formatFileSize = (bytes?: number) => {
+  if (typeof bytes !== 'number' || Number.isNaN(bytes)) {
+    return null;
+  }
+  const megabytes = bytes / 1024 / 1024;
+  return `${megabytes.toFixed(1)} MB`;
+};
 
 function SearchPageContent() {
   const router = useRouter();
@@ -631,12 +638,30 @@ function ImageGridCard({ image }: { image: ImageMetadata }) {
   const safeLocation = sanitizeText(image.latitude && image.longitude ? `${image.latitude.toFixed(2)}, ${image.longitude.toFixed(2)}` : 'No location');
   return (
     <Link href={`/images/${image.id}`} className="group">
-      <div className="rounded-2xl border border-white/10 bg-deep-900/60 transition-all duration-200 hover:border-pacific-300/50 hover:shadow-card backdrop-blur">
-        {/* Image placeholder */}
-        <div className="aspect-video rounded-t-2xl bg-gradient-to-br from-deep-800/80 to-pacific-700/60 flex items-center justify-center">
-          <div className="text-pacific-200">
-            <MapPin className="w-8 h-8" />
-          </div>
+      <div className="rounded-2xl border border-white/10 bg-deep-900/60 transition-all duration-200 hover:border-pacific-300/50 hover:shadow-card backdrop-blur overflow-hidden">
+        {/* Image thumbnail */}
+        <div className="aspect-video rounded-t-2xl bg-gradient-to-br from-deep-800/80 to-pacific-700/60 relative">
+          {image.thumbnail_url ? (
+            <img
+              src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${image.thumbnail_url}`}
+              alt={image.title || image.filename}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) {
+                  parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><div class="text-pacific-200"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div></div>';
+                }
+              }}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <div className="text-pacific-200">
+                <MapPin className="w-8 h-8" />
+              </div>
+            </div>
+          )}
         </div>
         
         {/* Content */}
@@ -678,13 +703,32 @@ function ImageListCard({ image }: { image: ImageMetadata }) {
       ? `${image.latitude.toFixed(4)}, ${image.longitude.toFixed(4)}`
       : 'Location not specified'
   );
+  const fileSizeLabel = formatFileSize(image.file_size);
   return (
     <Link href={`/images/${image.id}`} className="group">
       <div className="rounded-2xl border border-white/10 bg-deep-900/60 p-4 transition-all duration-200 hover:border-pacific-300/50 hover:shadow-card backdrop-blur">
         <div className="flex items-start space-x-4">
           {/* Image thumbnail */}
-          <div className="flex-shrink-0 flex items-center justify-center h-20 w-20 rounded-xl bg-gradient-to-br from-deep-800/80 to-pacific-700/60">
-            <MapPin className="w-6 h-6 text-pacific-200" />
+          <div className="flex-shrink-0 h-20 w-20 rounded-xl bg-gradient-to-br from-deep-800/80 to-pacific-700/60 overflow-hidden relative">
+            {image.thumbnail_url ? (
+              <img
+                src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}${image.thumbnail_url}`}
+                alt={image.title || image.filename}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.style.display = 'none';
+                  const parent = target.parentElement;
+                  if (parent) {
+                    parent.innerHTML = '<div class="w-full h-full flex items-center justify-center"><svg class="w-6 h-6 text-pacific-200" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg></div>';
+                  }
+                }}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <MapPin className="w-6 h-6 text-pacific-200" />
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -711,10 +755,12 @@ function ImageListCard({ image }: { image: ImageMetadata }) {
                 <Calendar className="w-4 h-4 mr-1" />
                 <span>Uploaded {new Date(image.upload_date).toLocaleDateString()}</span>
               </div>
-              <div className="flex items-center">
-                <Download className="w-4 h-4 mr-1" />
-                <span>{(image.file_size / 1024 / 1024).toFixed(1)} MB</span>
-              </div>
+              {fileSizeLabel && (
+                <div className="flex items-center">
+                  <Download className="w-4 h-4 mr-1" />
+                  <span>{fileSizeLabel}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

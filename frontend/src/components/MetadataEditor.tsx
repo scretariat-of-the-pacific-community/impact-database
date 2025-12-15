@@ -54,7 +54,7 @@ const METADATA_FIELDS: MetadataField[] = [
     label: 'Hazard Type',
     type: 'select',
     required: true,
-    options: ['flood', 'earthquake', 'tsunami', 'landslide', 'cyclone', 'drought', 'wildfire', 'volcanic'],
+    options: ['flood', 'earthquake', 'tsunami', 'landslide', 'cyclone', 'drought', 'wildfire', 'volcanic', 'coastal_erosion'],
     description: 'Primary type of natural hazard depicted'
   },
   {

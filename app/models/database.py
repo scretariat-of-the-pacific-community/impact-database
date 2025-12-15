@@ -46,7 +46,7 @@ class ImageMetadata(Base):
     # Core metadata fields
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     datetime = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    geometry = Column(Geometry(geometry_type='POINT', srid=4326), nullable=False)
+    geometry = Column(Geometry(geometry_type='POINT', srid=4326), nullable=True)
     hazard_type = Column(String, nullable=False) # Or Enum
     event_id = Column(String, nullable=True)
     status = Column(String, default="pending_review", nullable=False) # Enum: pending_review, approved, rejected

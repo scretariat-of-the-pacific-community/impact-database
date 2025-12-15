@@ -3,14 +3,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, or_
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import logging
 
 from models.database import get_db, ImageMetadata
+from models.audit_log import AuditLog
 from api.schemas.image_schemas import ImageResponse
-from typing import Optional
+from api.auth import get_current_user, User
 # Simple pagination for basic functionality
 from pydantic import BaseModel
+from api.services.iso_vocabulary import HAZARD_TYPES
+from api.upload import create_audit_log
 
 class QueryLimits:
     MAX_LIMIT = 100
@@ -266,18 +269,21 @@ async def get_vocabularies(request: Request):
     """Get vocabularies for metadata fields. Public endpoint for upload form."""
     try:
         
+        hazard_vocab = []
+        for hazard_id, hazard in HAZARD_TYPES.items():
+            label = hazard.get("name", {}).get("eng", hazard_id.replace("_", " ").title())
+            keywords = hazard.get("keywords", {}).get("eng", [])
+            description = ", ".join(keywords[:2]) or "Hazard event"
+            hazard_vocab.append({
+                "id": hazard_id,
+                "label": label,
+                "description": description
+            })
+
+        hazard_vocab.sort(key=lambda item: item["label"])
+
         vocabularies = {
-            "hazard_types": [
-                {"id": "flood", "label": "Flood", "description": "Flooding and inundation events"},
-                {"id": "cyclone", "label": "Cyclone/Hurricane", "description": "Tropical cyclones and hurricanes"},
-                {"id": "tsunami", "label": "Tsunami", "description": "Tsunami waves and impacts"},
-                {"id": "drought", "label": "Drought", "description": "Drought conditions and water scarcity"},
-                {"id": "landslide", "label": "Landslide", "description": "Landslides and slope failures"},
-                {"id": "earthquake", "label": "Earthquake", "description": "Seismic events and ground shaking"},
-                {"id": "wildfire", "label": "Wildfire", "description": "Forest fires and bush fires"},
-                {"id": "volcanic", "label": "Volcanic", "description": "Volcanic eruptions and ash fall"},
-                {"id": "coastal_erosion", "label": "Coastal Erosion", "description": "Beach and coastal erosion"}
-            ],
+            "hazard_types": hazard_vocab,
             "countries": [
                 {"id": "FJ", "label": "Fiji"},
                 {"id": "TO", "label": "Tonga"},
@@ -410,3 +416,248 @@ async def get_images_geojson(
     except Exception as e:
         logger.error(f"Error creating GeoJSON: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error creating GeoJSON: {str(e)}")
+
+
+class ImageUpdateRequest(BaseModel):
+    """Schema for updating image metadata."""
+    title: Optional[str] = None
+    description: Optional[str] = None
+    hazard_type: Optional[str] = None
+    country: Optional[str] = None
+    location: Optional[str] = None
+    keywords: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    is_draft: Optional[bool] = False
+
+
+class ImageHistoryEntry(BaseModel):
+    id: int
+    field: Optional[str]
+    action: str
+    old_value: Optional[str]
+    new_value: Optional[str]
+    changed_at: str
+    changed_by: Optional[str]
+
+
+@router.put("/images/{image_id}")
+async def update_image_metadata(
+    image_id: str,
+    update_data: ImageUpdateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update image metadata with validation and version tracking."""
+    try:
+        # Find the image
+        image = db.query(ImageMetadata).filter(
+            ImageMetadata.id == image_id
+        ).first()
+        
+        if not image:
+            raise HTTPException(status_code=404, detail="Image not found")
+        
+        # Track changes for version history
+        changes: List[Dict[str, Any]] = []
+
+        def _stringify(value: Optional[Any]) -> Optional[str]:
+            if value is None:
+                return None
+            if isinstance(value, (str, int, float)):
+                return str(value)
+            return str(value)
+        
+        # Update fields if provided
+        if update_data.title is not None and update_data.title != image.title:
+            changes.append({
+                "field": "title",
+                "old_value": image.title,
+                "new_value": update_data.title
+            })
+            image.title = update_data.title
+        
+        if update_data.description is not None:
+            old_desc = image.abstract if hasattr(image, 'abstract') else None
+            if update_data.description != old_desc:
+                changes.append({
+                    "field": "description",
+                    "old_value": old_desc,
+                    "new_value": update_data.description
+                })
+                if hasattr(image, 'abstract'):
+                    image.abstract = update_data.description
+        
+        if update_data.hazard_type is not None:
+            # Validate hazard type
+            valid_hazards = [h_id for h_id in HAZARD_TYPES.keys()]
+            if update_data.hazard_type not in valid_hazards:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid hazard type. Must be one of: {', '.join(valid_hazards)}"
+                )
+            if update_data.hazard_type != image.hazard_type:
+                changes.append({
+                    "field": "hazard_type",
+                    "old_value": image.hazard_type,
+                    "new_value": update_data.hazard_type
+                })
+                image.hazard_type = update_data.hazard_type
+        
+        if update_data.country is not None and update_data.country != image.country:
+            changes.append({
+                "field": "country",
+                "old_value": image.country,
+                "new_value": update_data.country
+            })
+            image.country = update_data.country
+        
+        if update_data.location is not None and update_data.location != image.location:
+            changes.append({
+                "field": "location",
+                "old_value": image.location,
+                "new_value": update_data.location
+            })
+            image.location = update_data.location
+        
+        if update_data.keywords is not None:
+            old_keywords = image.keywords if hasattr(image, 'keywords') else None
+            if update_data.keywords != old_keywords:
+                changes.append({
+                    "field": "keywords",
+                    "old_value": old_keywords,
+                    "new_value": update_data.keywords
+                })
+                if hasattr(image, 'keywords'):
+                    image.keywords = update_data.keywords
+        
+        if update_data.latitude is not None:
+            # Validate latitude range
+            if not -90 <= update_data.latitude <= 90:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Latitude must be between -90 and 90"
+                )
+            if update_data.latitude != image.latitude:
+                changes.append({
+                    "field": "latitude",
+                    "old_value": str(image.latitude) if image.latitude else None,
+                    "new_value": str(update_data.latitude)
+                })
+                image.latitude = update_data.latitude
+        
+        if update_data.longitude is not None:
+            # Validate longitude range
+            if not -180 <= update_data.longitude <= 180:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Longitude must be between -180 and 180"
+                )
+            if update_data.longitude != image.longitude:
+                changes.append({
+                    "field": "longitude",
+                    "old_value": str(image.longitude) if image.longitude else None,
+                    "new_value": str(update_data.longitude)
+                })
+                image.longitude = update_data.longitude
+        
+        # Update geometry if coordinates changed
+        if update_data.latitude is not None or update_data.longitude is not None:
+            lat = update_data.latitude if update_data.latitude is not None else image.latitude
+            lng = update_data.longitude if update_data.longitude is not None else image.longitude
+            if lat and lng and hasattr(image, 'geometry'):
+                from geoalchemy2.elements import WKTElement
+                image.geometry = WKTElement(f'POINT({lng} {lat})', srid=4326)
+        
+        # Mark as draft if requested
+        if hasattr(image, 'is_draft'):
+            image.is_draft = update_data.is_draft
+        
+        # Update modified timestamp
+        from datetime import datetime
+        if hasattr(image, 'updated_at'):
+            image.updated_at = datetime.utcnow()
+        
+        # Commit changes
+        try:
+            # Record audit logs before commit so they participate in same transaction
+            for change in changes:
+                create_audit_log(
+                    db=db,
+                    record_id=str(image.id),
+                    action="UPDATE_DRAFT" if update_data.is_draft else "UPDATE",
+                    user=current_user,
+                    field_name=change["field"],
+                    old_value=_stringify(change["old_value"]),
+                    new_value=_stringify(change["new_value"]),
+                    request=request
+                )
+
+            db.commit()
+            db.refresh(image)
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Database error updating image {image_id}: {str(e)}")
+            raise HTTPException(status_code=500, detail="Failed to save changes to database")
+        
+        # TODO: Store version history in separate table
+        # For now, log changes
+        if changes:
+            logger.info(f"Image {image_id} updated. Changes: {len(changes)} fields modified")
+        
+        return {
+            "success": True,
+            "message": "Image metadata updated successfully",
+            "image_id": str(image.id),
+            "changes": len(changes),
+            "is_draft": update_data.is_draft
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating image {image_id}: {str(e)}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error updating image: {str(e)}")
+
+
+@router.get("/images/{image_id}/history")
+async def get_image_history(
+    image_id: str,
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Return audit history entries for an image."""
+    try:
+        logs = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.table_name == "image_metadata",
+                AuditLog.record_id == image_id
+            )
+            .order_by(AuditLog.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
+        history = [
+            {
+                "id": log.id,
+                "field": log.field_name,
+                "action": log.action,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "changed_at": log.timestamp.isoformat() if log.timestamp else None,
+                "changed_by": log.username or log.user_id,
+            }
+            for log in logs
+        ]
+
+        return {"history": history}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch history for {image_id}: {e}")
+        raise HTTPException(status_code=500, detail="Unable to load history for this image")

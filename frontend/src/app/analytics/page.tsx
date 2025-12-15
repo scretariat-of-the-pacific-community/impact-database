@@ -16,9 +16,13 @@ import {
   RefreshCw,
   ArrowUpRight,
   ArrowDownRight,
-  Globe
+  Globe,
+  FileText
 } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { generateInsights } from '@/lib/insights-engine';
+import { exportCSV, exportJSON } from '@/lib/export-utils';
+import InsightsPanel from '@/components/InsightsPanel';
 
 // Dynamic import for map to avoid SSR issues
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
@@ -63,6 +67,7 @@ export default function EnhancedAnalytics() {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'charts' | 'map'>('charts');
   const [mounted, setMounted] = useState(false);
+  const [showInsights, setShowInsights] = useState(true);
   
   const [filters, setFilters] = useState<Filters>({
     startDate: '',
@@ -122,38 +127,23 @@ export default function EnhancedAnalytics() {
       .map(([key, value]) => ({ key, value }));
   }, [analyticsData, filters.timeRange]);
 
-  const exportData = useCallback(() => {
-    if (!analyticsData) return;
-    
-    const dataStr = JSON.stringify(analyticsData, null, 2);
-    const dataBlob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(dataBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `analytics-${new Date().toISOString().split('T')[0]}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
+  // Generate insights focused on disaster patterns
+  const insights = useMemo(() => {
+    if (!analyticsData) return [];
+    // Filter out generic business recommendations - focus on disaster patterns
+    return generateInsights(analyticsData).filter(i => 
+      i.type !== 'recommendation'
+    );
   }, [analyticsData]);
 
-  const exportCSV = useCallback(() => {
+  const exportData = useCallback(() => {
     if (!analyticsData) return;
-    
-    const rows = [
-      ['Metric', 'Value'],
-      ['Total Images', analyticsData.totalImages.toString()],
-      ['Monthly Trend', `${analyticsData.trends.monthly.toFixed(2)}%`],
-      ...Object.entries(analyticsData.hazardDistribution).map(([k, v]) => [`Hazard: ${k}`, v.toString()]),
-      ...Object.entries(analyticsData.countryDistribution).map(([k, v]) => [`Country: ${k}`, v.toString()])
-    ];
-    
-    const csv = rows.map(row => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `analytics-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    exportJSON(analyticsData);
+  }, [analyticsData]);
+
+  const exportCSVData = useCallback(() => {
+    if (!analyticsData) return;
+    exportCSV(analyticsData);
   }, [analyticsData]);
 
   // Prevent hydration mismatch - don't render until mounted
@@ -223,6 +213,7 @@ export default function EnhancedAnalytics() {
             </button>
             
             <button
+              id="map-toggle"
               onClick={() => setViewMode(viewMode === 'charts' ? 'map' : 'charts')}
               className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/20 text-white/80 rounded-lg hover:shadow-md transition-all"
             >
@@ -230,13 +221,28 @@ export default function EnhancedAnalytics() {
               {viewMode === 'charts' ? 'Map View' : 'Charts'}
             </button>
             
-            <button
-              onClick={exportCSV}
-              className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/20 text-white/80 rounded-lg hover:shadow-md transition-all"
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </button>
+            <div id="export-dropdown" className="relative group">
+              <button className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/20 text-white/80 rounded-lg hover:shadow-md transition-all">
+                <Download className="w-4 h-4 mr-2" />
+                Export
+              </button>
+              <div className="absolute right-0 mt-2 w-48 bg-deep-900/95 backdrop-blur border border-white/20 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                <button
+                  onClick={exportCSVData}
+                  className="w-full text-left px-4 py-2 text-sm text-white/80 hover:bg-white/10 rounded-t-lg flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Export CSV
+                </button>
+                <button
+                  onClick={exportData}
+                  className="w-full text-left px-4 py-2 text-sm text-white/80 hover:bg-white/10 rounded-b-lg flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Export JSON
+                </button>
+              </div>
+            </div>
             
             <button
               onClick={fetchAnalyticsData}
@@ -394,8 +400,15 @@ export default function EnhancedAnalytics() {
 
         {viewMode === 'charts' ? (
           <>
+            {/* Data Insights */}
+            {showInsights && insights.length > 0 && (
+              <div id="insights-panel">
+                <InsightsPanel insights={insights} className="mb-8" />
+              </div>
+            )}
+
             {/* Time Series Chart */}
-            <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10 mb-8">
+            <div id="time-series-chart" className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10 mb-8">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
                   <TrendingUp className="w-6 h-6 text-green-600 mr-3" />
@@ -434,7 +447,7 @@ export default function EnhancedAnalytics() {
             {/* Comparative Analysis */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               {/* Top Hazards */}
-              <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
+              <div id="hazard-chart" className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
                 <div className="flex items-center mb-6">
                   <BarChart3 className="w-6 h-6 text-purple-600 mr-3" />
                   <h3 className="text-xl font-semibold text-white">Top Hazard Types</h3>
@@ -463,7 +476,7 @@ export default function EnhancedAnalytics() {
               </div>
 
               {/* Top Countries */}
-              <div className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
+              <div id="country-chart" className="bg-white/5 p-8 rounded-xl shadow-card border border-white/10">
                 <div className="flex items-center mb-6">
                   <MapPin className="w-6 h-6 text-blue-600 mr-3" />
                   <h3 className="text-xl font-semibold text-white">Top Countries</h3>

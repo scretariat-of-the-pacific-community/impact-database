@@ -1,0 +1,10 @@
+node_modules
+.next
+.next-root
+.next-cache
+dist
+build
+coverage
+public/workbox-*.js
+public/fallback-*.js
+*.log

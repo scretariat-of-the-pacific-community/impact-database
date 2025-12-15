@@ -1,15 +1,15 @@
-// API Response Types for Ocean Portal
+// API Response Types for Pacific Impact Atlas
 
 // Vocabulary Types
 export interface VocabularyItem {
   id: string;
   label: string;
+  description?: string;
 }
 
 export interface VocabulariesResponse {
   hazard_types: VocabularyItem[];
-  source_agencies: VocabularyItem[];
-  topic_categories: VocabularyItem[];
+  countries: VocabularyItem[];
 }
 
 export interface ImageMetadata {
@@ -21,7 +21,7 @@ export interface ImageMetadata {
   bucket_name: string;
   resource_locator: string;
   upload_date: string;
-  file_size: number;
+  file_size?: number;
   thumbnail_url?: string;
   
   // Geographic information
@@ -97,17 +97,12 @@ export type HazardType =
   | 'earthquake'
   | 'flood' 
   | 'tsunami'
-  | 'hurricane'
   | 'cyclone'
-  | 'tornado'
-  | 'wildfire'
   | 'drought'
   | 'landslide'
-  | 'volcanicEruption'
-  | 'avalanche'
-  | 'hailstorm'
-  | 'stormSurge'
-  | 'extremeTemperature'
+  | 'wildfire'
+  | 'volcanic'
+  | 'coastal_erosion'
   | 'other';
 
 export type SourceAgency = 
@@ -256,17 +251,12 @@ export const HAZARD_TYPE_LABELS: Record<HazardType, string> = {
   earthquake: 'Earthquake',
   flood: 'Flood',
   tsunami: 'Tsunami',
-  hurricane: 'Hurricane',
   cyclone: 'Cyclone',
-  tornado: 'Tornado',
-  wildfire: 'Wildfire',
   drought: 'Drought',
   landslide: 'Landslide',
-  volcanicEruption: 'Volcanic Eruption',
-  avalanche: 'Avalanche',
-  hailstorm: 'Hailstorm',
-  stormSurge: 'Storm Surge',
-  extremeTemperature: 'Extreme Temperature',
+  wildfire: 'Wildfire',
+  volcanic: 'Volcanic Activity',
+  coastal_erosion: 'Coastal Erosion',
   other: 'Other'
 };
 
@@ -308,3 +298,43 @@ export const TOPIC_CATEGORY_LABELS: Record<TopicCategory, string> = {
   transportation: 'Transportation',
   utilitiesCommunication: 'Utilities/Communication'
 };
+
+// User Profile Types
+export interface UserStats {
+  name: string;
+  email: string;
+  organization?: string;
+  avatar_url?: string;
+  total_uploads: number;
+  approval_rate: number;
+  impact_score: number;
+  last_active: string;
+  achievements: Array<{
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+  }>;
+  analytics: {
+    uploads_this_month: number;
+    average_review_time: number;
+    top_hazard: string;
+  };
+}
+
+export interface UserUpload {
+  id: string;
+  filename: string;
+  title?: string;
+  hazard_type: HazardType;
+  status: string;
+  uploaded_at: string;
+  approval_status: 'approved' | 'pending_review' | 'rejected' | 'flagged';
+  thumbnail_url?: string;
+  location?: string;
+  country?: string;
+  abstract?: string;
+  keywords?: string[];
+  latitude?: number;
+  longitude?: number;
+}

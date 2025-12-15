@@ -1,9 +1,10 @@
 'use client';
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line } from 'recharts';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import { useMemo } from 'react';
 
 interface TimelineData {
   date: string;
@@ -16,38 +17,99 @@ interface Props {
 }
 
 export default function TimelineTrendArea({ data, className = '' }: Props) {
+  // Calculate rolling 7-day average
+  const enrichedData = useMemo(() => {
+    if (data.length < 7) return data;
+    
+    return data.map((item, index) => {
+      if (index < 6) {
+        return { ...item, rollingAvg: undefined };
+      }
+      
+      const last7Days = data.slice(index - 6, index + 1);
+      const avg = last7Days.reduce((sum, d) => sum + d.count, 0) / 7;
+      return { ...item, rollingAvg: parseFloat(avg.toFixed(2)) };
+    });
+  }, [data]);
+
+  // Calculate peak date and trend insight
+  const insight = useMemo(() => {
+    const totalUploads = data.reduce((sum, d) => sum + d.count, 0);
+    
+    if (totalUploads === 0) {
+      return 'No uploads in the last 30 days.';
+    }
+    
+    const peakDay = data.reduce((max, d) => d.count > max.count ? d : max, data[0]);
+    const peakDate = format(parseISO(peakDay.date), 'MMM d');
+    
+    // Check trend after peak
+    const peakIndex = data.findIndex(d => d.date === peakDay.date);
+    const afterPeak = data.slice(peakIndex + 1);
+    
+    if (afterPeak.length >= 7) {
+      const recentAvg = afterPeak.slice(-7).reduce((sum, d) => sum + d.count, 0) / 7;
+      const peakValue = peakDay.count;
+      
+      if (recentAvg < peakValue * 0.5) {
+        return `Uploads peaked on ${peakDate} (${peakDay.count}) and have declined since.`;
+      } else if (recentAvg > peakValue * 0.8) {
+        return `Uploads peaked on ${peakDate} (${peakDay.count}) and have remained stable since.`;
+      } else {
+        return `Uploads peaked on ${peakDate} (${peakDay.count}) and have moderated since.`;
+      }
+    }
+    
+    return `Uploads peaked on ${peakDate} with ${peakDay.count} submission${peakDay.count !== 1 ? 's' : ''}.`;
+  }, [data]);
+
   const CustomTooltip = ({
     active,
     payload,
     label,
   }: {
     active?: boolean;
-    payload?: Array<{ value?: ValueType }>;
+    payload?: Array<{ value?: ValueType; dataKey?: string }>;
     label?: NameType;
   }) => {
     if (active && payload && payload.length) {
       const labelText = typeof label === 'string' ? label : String(label ?? '');
+      const dailyCount = payload.find(p => p.dataKey === 'count')?.value;
+      const rollingAvg = payload.find(p => p.dataKey === 'rollingAvg')?.value;
+      
       return (
         <div className="rounded-lg border border-white/20 bg-deep-900/95 p-3 shadow-xl backdrop-blur">
           <p className="font-semibold text-white">
             {format(parseISO(labelText), 'MMM d, yyyy')}
           </p>
           <p className="text-sm text-pacific-300">
-            {payload[0].value} uploads
+            Daily: {dailyCount} upload{dailyCount !== 1 ? 's' : ''}
           </p>
+          {rollingAvg !== undefined && (
+            <p className="text-xs text-palm-300">
+              7-day avg: {rollingAvg}
+            </p>
+          )}
         </div>
       );
     }
     return null;
   };
 
+  // Check if all data is zero
+  const totalUploads = data.reduce((sum, d) => sum + d.count, 0);
+  
   if (data.length === 0) {
     return (
-      <div className={`flex h-80 items-center justify-center ${className}`}>
-        <p className="text-white/60">No timeline data available</p>
+      <div className={`flex h-80 flex-col items-center justify-center ${className}`}>
+        <p className="text-sm text-white/60">No uploads in the last 30 days.</p>
       </div>
     );
   }
+
+  // Determine Y-axis tick interval for integer values
+  const maxCount = Math.max(...data.map(d => d.count));
+  const yAxisTicks = maxCount <= 5 ? Array.from({ length: maxCount + 1 }, (_, i) => i) : undefined;
 
   return (
     <motion.div
@@ -58,7 +120,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
     >
       <ResponsiveContainer width="100%" height={300}>
         <AreaChart
-          data={data}
+          data={enrichedData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
         >
           <defs>
@@ -73,10 +135,14 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
             stroke="rgba(255,255,255,0.6)"
             tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }}
             tickFormatter={(value) => format(parseISO(value), 'MMM d')}
+            interval="preserveStartEnd"
+            minTickGap={50}
           />
           <YAxis
             stroke="rgba(255,255,255,0.6)"
             tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 12 }}
+            allowDecimals={maxCount > 5}
+            ticks={yAxisTicks}
           />
           <Tooltip content={<CustomTooltip />} />
           <Area
@@ -88,8 +154,26 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
             fill="url(#colorUploads)"
             animationDuration={1000}
           />
+          {enrichedData.some(d => d.rollingAvg !== undefined) && (
+            <Line
+              type="monotone"
+              dataKey="rollingAvg"
+              stroke="#ffd700"
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="5 5"
+              animationDuration={1000}
+            />
+          )}
         </AreaChart>
       </ResponsiveContainer>
+      
+      {/* Insight Line */}
+      <div className="mt-3 border-t border-white/5 pt-3">
+        <p className="text-xs text-surface-soft">
+          💡 {insight}
+        </p>
+      </div>
     </motion.div>
   );
 }

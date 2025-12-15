@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { Award, Star, Upload, CheckCircle, TrendingUp, Zap, Target, Shield } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import Link from 'next/link';
 
 interface Badge {
   id: string;
@@ -33,9 +34,20 @@ export default function GamificationBadges() {
   }, isLoading } = useQuery<ContributorStats>({
     queryKey: ['contributor-stats'],
     queryFn: async () => {
-      const response = await fetch('/api/user/stats');
-      if (!response.ok) {
-        // Return default stats if endpoint doesn't exist yet
+      try {
+        const response = await fetch('/api/user/stats');
+        if (!response.ok) {
+          // Return default stats if endpoint doesn't exist yet
+          return {
+            totalUploads: 0,
+            reviewedImages: 0,
+            qualityScore: 0,
+            streak: 0,
+          };
+        }
+        return response.json();
+      } catch (error) {
+        // Silently return default stats if fetch fails
         return {
           totalUploads: 0,
           reviewedImages: 0,
@@ -43,10 +55,13 @@ export default function GamificationBadges() {
           streak: 0,
         };
       }
-      return response.json();
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false, // Don't retry if endpoint doesn't exist
+    meta: {
+      // Suppress error logging for this query since endpoint may not exist
+      errorMessage: 'User stats endpoint not yet implemented',
+    },
   });
 
   const badges: Badge[] = [
@@ -262,10 +277,10 @@ export default function GamificationBadges() {
           Upload your first disaster image to unlock achievements and join a community of 150+ contributors
           building climate resilience across the Pacific
         </p>
-        <button className="mt-6 inline-flex items-center gap-2 rounded-full bg-white px-8 py-3 font-semibold text-pacific-600 transition hover:shadow-card">
+        <Link href="/upload" className="mt-6 inline-flex items-center gap-2 rounded-full bg-palm-600 px-8 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40">
           <Upload className="h-5 w-5" />
           Upload Image
-        </button>
+        </Link>
       </motion.div>
     </section>
   );
