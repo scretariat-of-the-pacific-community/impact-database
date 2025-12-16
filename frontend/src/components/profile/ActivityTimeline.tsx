@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import clsx from 'clsx';
 import {
   AlertTriangle,
   Bell,
@@ -28,7 +29,6 @@ export interface ActivityItem {
   suggestedImprovements?: string[];
   systemMessage?: string;
   achievementBadge?: string;
-  read?: boolean;
 }
 
 const POLL_INTERVAL = 30_000;
@@ -79,7 +79,7 @@ const mockActivities: ActivityItem[] = [
   },
 ];
 
-async function fetchActivityTimeline(): Promise<ActivityItem[]> {
+export async function fetchActivityTimeline(): Promise<ActivityItem[]> {
   // Placeholder for future API integration. Keeps the API consistent with React Query expectations.
   return Promise.resolve(mockActivities);
 }
@@ -101,6 +101,15 @@ const iconMap: Record<ActivityType, JSX.Element> = {
   system: <AlertTriangle className="h-4 w-4" />,
 };
 
+const filterIcons: Record<ActivityType | 'all', JSX.Element> = {
+  all: <Filter className="h-4 w-4" />,
+  upload: iconMap.upload,
+  edit: iconMap.edit,
+  review: iconMap.review,
+  achievement: iconMap.achievement,
+  system: iconMap.system,
+};
+
 const typeStyles: Record<ActivityType, string> = {
   upload: 'border-pacific-500/40 bg-pacific-500/10',
   edit: 'border-coral-500/40 bg-coral-500/10',
@@ -113,7 +122,7 @@ export default function ActivityTimeline() {
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
-  const { data: activities = [], isLoading } = useQuery({
+  const { data: activities = [], isLoading, error } = useQuery({
     queryKey: ['profile-activity-timeline'],
     queryFn: fetchActivityTimeline,
     refetchInterval: POLL_INTERVAL,
@@ -174,8 +183,16 @@ export default function ActivityTimeline() {
     );
   };
 
+  if (error) {
+    return (
+      <div className="rounded-xl border border-coral-500/30 bg-coral-500/10 p-4 text-sm text-white">
+        Failed to load activity timeline. Please try again later.
+      </div>
+    );
+  }
+
   return (
-    <section className="space-y-4 rounded-2xl border border-white/10 bg-deep-900/60 p-6 shadow-lg backdrop-blur">
+    <section className="space-y-4 rounded-2xl border border-white/10 bg-deep-900/60 p-6 shadow-lg backdrop-blur" aria-label="Profile activity timeline">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -197,20 +214,28 @@ export default function ActivityTimeline() {
               <button
                 key={key}
                 onClick={() => setFilter(key)}
-                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition hover:scale-[1.01] ${
+                aria-label={`Filter by ${filterLabels[key].toLowerCase()}`}
+                className={clsx(
+                  'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition hover:scale-[1.01]',
                   filter === key
                     ? 'border-white bg-white/10 text-white'
-                    : 'border-white/10 bg-white/5 text-white/70 hover:text-white'
-                }`}
+                    : 'border-white/10 bg-white/5 text-white/70 hover:text-white',
+                )}
               >
-                <Filter className="h-4 w-4" />
+                {filterIcons[key]}
                 {filterLabels[key]}
               </button>
             ))}
           </div>
           <button
             onClick={markAllAsRead}
-            className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-white/80 transition hover:border-white/30 hover:text-white"
+            disabled={unreadCount === 0}
+            className={clsx(
+              'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition',
+              unreadCount === 0
+                ? 'border-white/10 bg-white/5 text-white/40'
+                : 'border-white/10 bg-white/5 text-white/80 hover:border-white/30 hover:text-white',
+            )}
           >
             <CheckCircle2 className="h-4 w-4" />
             Mark all as read
@@ -224,56 +249,66 @@ export default function ActivityTimeline() {
         ) : filteredActivities.length === 0 ? (
           <p className="text-sm text-white/60">No activity to show for this filter yet.</p>
         ) : (
-          filteredActivities.map((item) => {
-            const isUnread = !readIds.has(item.id);
-            return (
-              <article
-                key={item.id}
-                className={`relative overflow-hidden rounded-xl border p-4 transition hover:border-white/30 ${typeStyles[item.type]}`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="rounded-full bg-white/10 p-2 text-white">{iconMap[item.type]}</div>
-                  <div className="flex-1 space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-white">{item.title}</h3>
-                      {item.type === 'achievement' && item.achievementBadge && (
-                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-100">
-                          {item.achievementBadge}
-                        </span>
-                      )}
-                      {isUnread && (
-                        <span className="rounded-full bg-coral-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                          Unread
-                        </span>
-                      )}
+          <ol className="space-y-3" role="feed" aria-label="Activity feed">
+            {filteredActivities.map((item) => {
+              const isUnread = !readIds.has(item.id);
+              return (
+                <li key={item.id} role="listitem">
+                  <article
+                    className={clsx(
+                      'relative overflow-hidden rounded-xl border p-4 transition hover:border-white/30',
+                      typeStyles[item.type],
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="rounded-full bg-white/10 p-2 text-white">{iconMap[item.type]}</div>
+                      <div className="flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-base font-semibold text-white">{item.title}</h3>
+                          {item.type === 'achievement' && item.achievementBadge && (
+                            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-100">
+                              {item.achievementBadge}
+                            </span>
+                          )}
+                          {isUnread && (
+                            <span className="rounded-full bg-coral-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                              Unread
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-white/80">{item.description}</p>
+                        {renderReviewDetails(item)}
+                        {renderSystemMessage(item)}
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
+                          <span className="inline-flex items-center gap-1">
+                            <Clock3 className="h-4 w-4" />
+                            {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                          </span>
+                          {item.reviewer && item.type === 'review' && (
+                            <span className="inline-flex items-center gap-1 text-palm-200">
+                              <MessageSquareText className="h-4 w-4" /> Reviewed by {item.reviewer}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        {isUnread ? (
+                          <button
+                            onClick={() => markAsRead(item.id)}
+                            className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:border-white/30 hover:text-white"
+                          >
+                            Mark as read
+                          </button>
+                        ) : (
+                          <span className="text-xs text-white/50">Marked as read</span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-sm text-white/80">{item.description}</p>
-                    {renderReviewDetails(item)}
-                    {renderSystemMessage(item)}
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock3 className="h-4 w-4" />
-                        {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
-                      </span>
-                      {item.reviewer && item.type === 'review' && (
-                        <span className="inline-flex items-center gap-1 text-palm-200">
-                          <MessageSquareText className="h-4 w-4" /> Reviewed by {item.reviewer}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <button
-                      onClick={() => markAsRead(item.id)}
-                      className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:border-white/30 hover:text-white"
-                    >
-                      Mark as read
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })
+                  </article>
+                </li>
+              );
+            })}
+          </ol>
         )}
       </div>
     </section>
