@@ -13,8 +13,12 @@ describe('AchievementsHub', () => {
   });
 
   afterEach(() => {
-    navigator.share = originalShare;
-    window.open = originalOpen;
+    if ('share' in navigator) {
+      navigator.share = originalShare;
+    }
+    if ('open' in window) {
+      window.open = originalOpen;
+    }
     vi.restoreAllMocks();
   });
 

@@ -1,6 +1,7 @@
 'use client';
 
 import type React from 'react';
+import { useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Award,
@@ -191,6 +192,11 @@ const springTransition = {
   damping: 20,
 };
 
+const badgeSeparator = ' • ';
+const shareUrl = 'https://impactdatabase.org';
+const unlockedAnimation = { scale: [0.8, 1.1, 1], rotate: [0, 5, 0] };
+const lockedAnimation = { scale: 1, rotate: 0 };
+
 /**
  * Optional data inputs for AchievementsHub. Each collection defaults to showcase fixtures but can be
  * replaced with live data when embedding in a profile view.
@@ -216,9 +222,8 @@ export default function AchievementsHub({
   /**
    * Shares an achievement badge via the Web Share API when available, falling back to Twitter intent on web.
    */
-  const shareBadge = (achievement: Achievement) => {
+  const shareBadge = useCallback((achievement: Achievement) => {
     const shareText = `I unlocked the ${achievement.name} badge on the Impact Database!`;
-    const shareUrl = 'https://impactdatabase.org';
 
     if (navigator.share) {
       navigator
@@ -237,7 +242,7 @@ export default function AchievementsHub({
       shareText,
     )}&url=${encodeURIComponent(shareUrl)}`;
     window.open(twitterUrl, '_blank');
-  };
+  }, []);
 
   return (
     <section className="mx-auto max-w-7xl space-y-10 p-6">
@@ -251,7 +256,7 @@ export default function AchievementsHub({
               most active contributors.
             </p>
           </div>
-          <div className="flex gap-4">
+          <nav aria-label="Share unlocked achievements" className="flex gap-4">
             {unlockedBadges.map((badge) => (
               <motion.button
                 key={badge.id}
@@ -265,23 +270,35 @@ export default function AchievementsHub({
                 Share {badge.name}
               </motion.button>
             ))}
-          </div>
+          </nav>
         </div>
       </header>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-6">
+        <div className="space-y-6 lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-white/60">Badge Showcase</p>
               <h2 className="text-2xl font-semibold text-white">Animated unlocks & progress</h2>
             </div>
-            <div className="flex gap-3 text-xs text-white/70">
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-pacific-400" />Contributor</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sand-400" />Explorer</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-coral-400" />Quality</span>
-              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-palm-400" />Specialist</span>
-            </div>
+            <ul className="flex gap-3 text-xs text-white/70" aria-label="Badge categories">
+              <li className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-pacific-400" aria-hidden />
+                Contributor
+              </li>
+              <li className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-sand-400" aria-hidden />
+                Explorer
+              </li>
+              <li className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-coral-400" aria-hidden />
+                Quality
+              </li>
+              <li className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-palm-400" aria-hidden />
+                Specialist
+              </li>
+            </ul>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -308,7 +325,7 @@ export default function AchievementsHub({
                       <div className="flex items-center gap-3">
                         <motion.div
                           initial={{ scale: achievement.unlocked ? 0.8 : 1 }}
-                          animate={{ scale: achievement.unlocked ? [0.8, 1.1, 1] : 1, rotate: achievement.unlocked ? [0, 5, 0] : 0 }}
+                          animate={achievement.unlocked ? unlockedAnimation : lockedAnimation}
                           transition={springTransition}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
                           aria-label={`${achievement.category} badge icon`}
@@ -325,7 +342,7 @@ export default function AchievementsHub({
                             )}
                           </div>
                           <p className="text-sm text-white/70">{achievement.description}</p>
-                          <p className="mt-1 text-xs text-white/60">{achievement.category} • {achievement.milestoneLabel}</p>
+                          <p className="mt-1 text-xs text-white/60">{achievement.category}{badgeSeparator}{achievement.milestoneLabel}</p>
                         </div>
                       </div>
                       <div className="text-right text-sm text-white/70">
@@ -367,9 +384,9 @@ export default function AchievementsHub({
                 <h3 className="text-lg font-semibold">Contributor rank</h3>
               </div>
             </div>
-            <div className="mt-4 space-y-3">
+            <ol className="mt-4 space-y-3" aria-label="Contributor leaderboard">
               {leaderboardData.map((entry) => (
-                <motion.div
+                <motion.li
                   key={entry.id}
                   initial={{ opacity: 0, x: -8 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -384,13 +401,13 @@ export default function AchievementsHub({
                     </div>
                     <div>
                       <p className="font-semibold">{entry.name}</p>
-                      <p className="text-xs text-white/60">{entry.uploads} uploads • {entry.badges} badges</p>
+                      <p className="text-xs text-white/60">{entry.uploads} uploads{badgeSeparator}{entry.badges} badges</p>
                     </div>
                   </div>
-                  <Award className="h-4 w-4 text-pacific-200" />
-                </motion.div>
+                  <Award className="h-4 w-4 text-pacific-200" aria-hidden />
+                </motion.li>
               ))}
-            </div>
+            </ol>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-pacific-500/10 to-pacific-900/10 p-5 shadow-lg">
