@@ -223,7 +223,7 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
   }, [reverseGeocode]);
 
   // Use device location
-  const useDeviceLocation = useCallback(() => {
+  const useDeviceLocation = useCallback(async () => {
     const isSecureContext =
       typeof window !== 'undefined' &&
       (window.isSecureContext || ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname));
@@ -240,44 +240,72 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
     
     setIsSearching(true);
     setSearchError(null);
-    
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const newPosition: [number, number] = [
-          position.coords.latitude,
-          position.coords.longitude,
-        ];
-        setPosition(newPosition);
-        setMapCenter(newPosition);
-        reverseGeocode(newPosition[0], newPosition[1]);
-        setIsSearching(false);
-      },
-      (error) => {
-        console.error('Geolocation error (raw):', error ?? 'No error object returned');
-        console.error('Geolocation error (details):', {
-          code: (error as GeolocationPositionError | DOMException | undefined)?.code,
-          name: (error as GeolocationPositionError | DOMException | undefined)?.name,
-          message: (error as GeolocationPositionError | DOMException | undefined)?.message,
-        });
-        
-        const blockedNames = ['SecurityError', 'NotAllowedError', 'PermissionDeniedError'];
-        const blockedByPolicy =
-          (error instanceof DOMException && blockedNames.includes(error.name)) ||
-          (typeof error?.name === 'string' && blockedNames.includes(error.name));
-        
-        setSearchError(
-          blockedByPolicy
-            ? 'Browser blocked location sharing. Please enable permissions or drop a pin manually.'
-            : 'Could not get your location. Please check permissions.'
-        );
-        setIsSearching(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+
+    try {
+      if (navigator.permissions?.query) {
+        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        if (permissionStatus.state === 'denied') {
+          setIsSearching(false);
+          setSearchError('Browser blocked location sharing. Please enable permissions or drop a pin manually.');
+          return;
+        }
       }
-    );
+    } catch (permissionCheckError) {
+      console.warn('Unable to verify geolocation permission:', permissionCheckError);
+    }
+
+    const handleSuccess = (position: GeolocationPosition) => {
+      const newPosition: [number, number] = [
+        position.coords.latitude,
+        position.coords.longitude,
+      ];
+      setPosition(newPosition);
+      setMapCenter(newPosition);
+      reverseGeocode(newPosition[0], newPosition[1]);
+      setIsSearching(false);
+    };
+
+    const handleError = (error: unknown) => {
+      // Geolocation errors are expected when users deny permission or it's unavailable
+      // No need to log to console as we handle it gracefully with user-friendly messages
+      
+      const blockedNames = ['SecurityError', 'NotAllowedError', 'PermissionDeniedError'];
+      let blockedByPolicy = false;
+      
+      if (error instanceof DOMException) {
+        blockedByPolicy = blockedNames.includes(error.name);
+      } else if (error && typeof error === 'object') {
+        if ('code' in error) {
+          const posError = error as GeolocationPositionError;
+          blockedByPolicy = posError.code === 1;
+        } else if ('name' in error && typeof (error as { name?: string }).name === 'string') {
+          blockedByPolicy = blockedNames.includes((error as { name?: string }).name!);
+        }
+      } else if (typeof error === 'string') {
+        blockedByPolicy = blockedNames.some((name) => error.includes(name));
+      }
+      
+      setSearchError(
+        blockedByPolicy
+          ? 'Browser blocked location sharing. Please enable permissions or drop a pin manually.'
+          : 'Could not get your location. Please check permissions.'
+      );
+      setIsSearching(false);
+    };
+    
+    try {
+      navigator.geolocation.getCurrentPosition(
+        handleSuccess,
+        handleError,
+        {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        }
+      );
+    } catch (syncError) {
+      handleError(syncError);
+    }
   }, [reverseGeocode]);
 
   // Handle confirm

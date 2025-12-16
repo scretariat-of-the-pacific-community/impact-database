@@ -108,7 +108,13 @@ export default function ImageDetailPage() {
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => router.back()}
+                onClick={() => {
+                  if (window.history.length > 1) {
+                    router.back();
+                  } else {
+                    router.push('/search');
+                  }
+                }}
                 className="flex items-center text-surface-soft hover:text-white transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />

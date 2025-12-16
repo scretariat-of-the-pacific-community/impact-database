@@ -195,6 +195,11 @@ class APIClient {
     return response.data;
   }
 
+  async updateImage(imageId: string, data: any): Promise<any> {
+    const response = await this.client.put(`/api/images/${imageId}`, data);
+    return response.data;
+  }
+
   async checkHealth(): Promise<any> {
     const response = await this.client.get('/api/health');
     return response.data;
@@ -401,6 +406,10 @@ export const imageApi = {
   userStats: () => oceanPortalApi.getUserStats(),
   userUploads: () => oceanPortalApi.getUserUploads(),
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
+  updateImage: async (imageId: string, data: any) => {
+    const response = await apiClient.put(`/api/images/${imageId}`, data);
+    return response.data;
+  },
   getFeaturedStories: async () => {
     try {
       const response = await apiClient.get('/api/featured-stories');

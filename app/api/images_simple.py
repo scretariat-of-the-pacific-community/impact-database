@@ -3,17 +3,60 @@ Simple Images API endpoint - Basic functionality for development
 """
 import logging
 from typing import List, Optional, Dict, Any
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, asc
+from geoalchemy2 import WKTElement
 
 from models.database import get_db, ImageMetadata
-from api.schemas.image_schemas import ImageResponse
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _find_image(db: Session, image_id: str) -> Optional[ImageMetadata]:
+    """Look up an image by UUID or filename."""
+    image = None
+    try:
+        uuid_value = UUID(image_id)
+        image = db.query(ImageMetadata).filter(ImageMetadata.id == uuid_value).first()
+    except (ValueError, TypeError, AttributeError):
+        pass
+
+    if image:
+        return image
+
+    return db.query(ImageMetadata).filter(ImageMetadata.filename == image_id).first()
+
+
+def _serialize_image(image: ImageMetadata) -> Dict[str, Any]:
+    """Format ImageMetadata for API responses."""
+    return {
+        "id": str(image.id) if hasattr(image, 'id') and image.id else image.filename,
+        "filename": image.filename,
+        "title": image.title,
+        "description": image.abstract if hasattr(image, 'abstract') else None,
+        "hazard_type": image.hazard_type,
+        "country": image.country,
+        "location": image.location,
+        "keywords": image.keywords if hasattr(image, 'keywords') and image.keywords else [],
+        "latitude": float(image.latitude) if hasattr(image, 'latitude') and image.latitude is not None else None,
+        "longitude": float(image.longitude) if hasattr(image, 'longitude') and image.longitude is not None else None,
+        "upload_date": image.date_stamp.isoformat() if hasattr(image, 'date_stamp') and image.date_stamp else None,
+        "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
+        "full_url": f"/upload/images/{image.filename}" if image.filename else None,
+        "contact": {
+            "organisation_name": getattr(image, 'contact_organisation_name', None),
+            "individual_name": getattr(image, 'contact_individual_name', None),
+            "email": getattr(image, 'contact_email', None)
+        } if hasattr(image, 'point_of_contact') else None
+    }
+
 
 class SimpleImageResponse(BaseModel):
     filename: str
@@ -29,6 +72,18 @@ class SimpleImageResponse(BaseModel):
     coordinates: Optional[Dict[str, Any]] = None
     upload_timestamp: str
     uploaded_by: Optional[str] = None
+
+
+class ImageUpdateRequest(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    hazard_type: Optional[str] = None
+    country: Optional[str] = None
+    location: Optional[str] = None
+    keywords: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    is_draft: Optional[bool] = False
 
 @router.get("/", response_model=Dict[str, Any])
 async def get_images(
@@ -149,47 +204,114 @@ async def get_image_by_id(
 ):
     """Get single image by ID or filename."""
     try:
-        # Try to find by UUID first, then by filename
-        from uuid import UUID
-        
-        image = None
-        try:
-            # Try UUID lookup
-            uuid_id = UUID(image_id)
-            image = db.query(ImageMetadata).filter(ImageMetadata.id == uuid_id).first()
-        except (ValueError, AttributeError):
-            # Fall back to filename lookup
-            image = db.query(ImageMetadata).filter(ImageMetadata.filename == image_id).first()
-        
+        image = _find_image(db, image_id)
+
         if not image:
             raise HTTPException(status_code=404, detail=f"Image with id '{image_id}' not found")
-        
-        # Format response
-        return {
-            "id": str(image.id) if hasattr(image, 'id') else image.filename,
-            "filename": image.filename,
-            "title": image.title,
-            "description": image.abstract if hasattr(image, 'abstract') else None,
-            "hazard_type": image.hazard_type,
-            "country": image.country,
-            "location": image.location,
-            "keywords": image.keywords if hasattr(image, 'keywords') else [],
-            "latitude": float(image.latitude) if hasattr(image, 'latitude') and image.latitude else None,
-            "longitude": float(image.longitude) if hasattr(image, 'longitude') and image.longitude else None,
-            "upload_date": image.date_stamp.isoformat() if hasattr(image, 'date_stamp') and image.date_stamp else None,
-            "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
-            "full_url": f"/upload/images/{image.filename}" if image.filename else None,
-            "contact": {
-                "organisation_name": getattr(image, 'contact_organisation_name', None),
-                "individual_name": getattr(image, 'contact_individual_name', None),
-                "email": getattr(image, 'contact_email', None)
-            } if hasattr(image, 'point_of_contact') else None
-        }
+
+        return _serialize_image(image)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching image {image_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch image: {str(e)}")
+
+
+@router.put("/{image_id}", response_model=Dict[str, Any])
+async def update_image_by_id(
+    image_id: str,
+    update_data: ImageUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Update editable fields for an image record."""
+    try:
+        if "metadata:update" not in current_user.permissions:
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to update image metadata"
+            )
+
+        image = _find_image(db, image_id)
+        if not image:
+            raise HTTPException(status_code=404, detail=f"Image with id '{image_id}' not found")
+
+        updated_fields: List[str] = []
+
+        def track_update(field: str, new_value: Optional[Any]) -> None:
+            current_value = getattr(image, field, None)
+            if current_value != new_value:
+                setattr(image, field, new_value)
+                updated_fields.append(field)
+
+        if update_data.title is not None:
+            track_update("title", update_data.title)
+
+        if update_data.description is not None:
+            track_update("abstract", update_data.description)
+
+        if update_data.hazard_type is not None:
+            track_update("hazard_type", update_data.hazard_type)
+
+        if update_data.country is not None:
+            track_update("country", update_data.country)
+
+        if update_data.location is not None:
+            track_update("location", update_data.location)
+
+        if update_data.keywords is not None:
+            normalized_keywords = [
+                kw.strip() for kw in update_data.keywords.split(",") if kw.strip()
+            ]
+            current_keywords = image.keywords or []
+            if normalized_keywords != current_keywords:
+                image.keywords = normalized_keywords
+                updated_fields.append("keywords")
+
+        lat = update_data.latitude
+        lng = update_data.longitude
+        if lat is not None or lng is not None:
+            if lat is None or lng is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Both latitude and longitude are required to update coordinates"
+                )
+            image.geometry = WKTElement(f"POINT({lng} {lat})", srid=4326)
+            updated_fields.append("geometry")
+
+        if update_data.is_draft is not None and hasattr(image, "is_draft"):
+            track_update("is_draft", update_data.is_draft)
+
+        if not updated_fields:
+            return {
+                "success": True,
+                "message": "No changes detected",
+                "image": _serialize_image(image)
+            }
+
+        db.commit()
+        db.refresh(image)
+
+        logger.info(
+            "User %s updated image %s fields: %s",
+            getattr(current_user, "username", "unknown"),
+            image_id,
+            ", ".join(updated_fields)
+        )
+
+        return {
+            "success": True,
+            "message": f"Updated {len(updated_fields)} field(s)",
+            "updated_fields": updated_fields,
+            "image": _serialize_image(image)
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating image {image_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update image: {str(e)}")
 
 @router.get("/search", response_model=Dict[str, Any])
 async def search_images(

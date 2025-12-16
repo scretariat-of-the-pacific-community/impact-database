@@ -39,7 +39,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body className="font-sans bg-deep-950 text-surface-soft">
         <a href="#main-content" className="skip-link">
           Skip to main content

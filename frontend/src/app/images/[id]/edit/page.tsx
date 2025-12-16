@@ -6,6 +6,7 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import Image from 'next/image';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
 import {
   ArrowLeft,
@@ -23,9 +24,31 @@ import {
   Clock,
 } from 'lucide-react';
 import { imageApi } from '@/lib/api';
-import { FormField, Button, Tag as TagComponent, WaveLoader } from '@/components/design-system';
-import MapPicker from '@/components/MapPicker';
+import { FormField, Button, Tag as TagComponent } from '@/components/design-system';
 import { toast } from 'sonner';
+
+// Dynamic import for MapPicker (Leaflet requires window)
+const MapPicker = dynamic(() => import('@/components/MapPicker'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-[400px] bg-deep-800/50 rounded-lg">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pacific-400 mx-auto mb-2" />
+        <p className="text-sm text-surface-soft/70">Loading map…</p>
+      </div>
+    </div>
+  ),
+});
+
+// Loading component
+const WaveLoader = () => (
+  <div className="rounded-3xl bg-deep-900/40 p-6 backdrop-blur">
+    <div className="wave-loader" aria-hidden="true" />
+    <p className="mt-4 text-center text-sm text-surface-soft/70">
+      Loading metadata…
+    </p>
+  </div>
+);
 
 interface EditFormData {
   title: string;
@@ -65,6 +88,12 @@ export default function EditImagePage() {
   const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Fetch vocabularies for dropdowns
+  const { data: vocabData } = useQuery({
+    queryKey: ['vocabularies'],
+    queryFn: () => imageApi.vocabularies(),
+  });
+
   // Fetch image data
   const { data: image, isLoading, error } = useQuery({
     queryKey: ['image', imageId],
@@ -75,10 +104,18 @@ export default function EditImagePage() {
   const { data: versionHistory } = useQuery<VersionHistory[]>({
     queryKey: ['image-history', imageId],
     queryFn: async () => {
-      const historyResponse = await imageApi.history(imageId);
-      return historyResponse.history || [];
+      try {
+        const historyResponse = await imageApi.history(imageId);
+        return historyResponse.history || [];
+      } catch (error) {
+        // History endpoint not yet implemented, return empty array
+        return [];
+      }
     },
     enabled: showHistory,
+    meta: {
+      errorMessage: 'Version history not available',
+    },
   });
 
   const {
@@ -95,19 +132,16 @@ export default function EditImagePage() {
   useEffect(() => {
     if (image) {
       setValue('title', image.title || '');
-      setValue('description', image.description || '');
+      setValue('description', image.abstract || '');
       setValue('hazard_type', image.hazard_type || '');
-      setValue('country', image.country || '');
-      setValue('location', image.location || '');
-      setValue('keywords', Array.isArray(image.keywords) ? image.keywords.join(', ') : image.keywords || '');
+      setValue('country', image.contact?.organisation_name || '');
+      setValue('location', image.purpose || '');
+      setValue('keywords', Array.isArray(image.keywords) ? image.keywords.join(', ') : '');
       setValue('latitude', image.latitude || 0);
       setValue('longitude', image.longitude || 0);
 
-      if (image.keywords) {
-        const keywordsArray = Array.isArray(image.keywords)
-          ? image.keywords
-          : image.keywords.split(',').map((k: string) => k.trim());
-        setSelectedKeywords(keywordsArray.filter(Boolean));
+      if (image.keywords && Array.isArray(image.keywords)) {
+        setSelectedKeywords(image.keywords.filter(Boolean));
       }
     }
   }, [image, setValue]);
@@ -185,29 +219,17 @@ export default function EditImagePage() {
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: EditFormData & { is_draft?: boolean }) => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/images/${imageId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...data,
-          keywords: selectedKeywords.join(', '),
-          is_draft: isDraft,
-        }),
+      return imageApi.updateImage(imageId, {
+        ...data,
+        keywords: selectedKeywords.join(', '),
+        is_draft: data.is_draft,
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.detail || 'Failed to update image');
-      }
-
-      return response.json();
     },
-    onSuccess: () => {
-      toast.success(isDraft ? 'Draft saved successfully' : 'Image updated successfully');
+    onSuccess: (_, variables) => {
+      const wasDraft = variables.is_draft;
+      toast.success(wasDraft ? 'Draft saved successfully' : 'Image updated successfully');
       setHasUnsavedChanges(false);
-      if (!isDraft) {
+      if (!wasDraft) {
         router.push(`/images/${imageId}`);
       }
     },
@@ -216,18 +238,16 @@ export default function EditImagePage() {
     },
   });
 
-  const onSubmit = (data: EditFormData) => {
-    updateMutation.mutate(data);
+  const onSubmit = (data: EditFormData, isDraftMode: boolean) => {
+    updateMutation.mutate({ ...data, is_draft: isDraftMode });
   };
 
   const handleSaveDraft = () => {
-    setIsDraft(true);
-    handleSubmit(onSubmit)();
+    handleSubmit((data) => onSubmit(data, true))();
   };
 
   const handlePublish = () => {
-    setIsDraft(false);
-    handleSubmit(onSubmit)();
+    handleSubmit((data) => onSubmit(data, false))();
   };
 
   const handleCoordinatesChange = (lat: number, lng: number, locationName?: string) => {
@@ -274,19 +294,31 @@ export default function EditImagePage() {
     );
   }
 
+  // Construct URLs - use thumbnail for preview, full image for download
+  const thumbnailUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}/thumbnail`;
+  const imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}`;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 pb-24 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <Link
-              href={`/images/${imageId}`}
+            <button
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
+                    router.push(`/images/${imageId}`);
+                  }
+                } else {
+                  router.push(`/images/${imageId}`);
+                }
+              }}
               className="inline-flex items-center gap-2 text-white/70 hover:text-white transition"
             >
               <ArrowLeft className="h-5 w-5" />
               Back to Image
-            </Link>
+            </button>
             {hasUnsavedChanges && (
               <TagComponent className="bg-coral-500/20 text-coral-300 border-coral-500/30">
                 <AlertCircle className="h-3 w-3" />
@@ -315,13 +347,20 @@ export default function EditImagePage() {
                 <FileText className="h-5 w-5 text-pacific-400" />
                 Image Preview
               </h2>
-              <div className="relative aspect-video rounded-2xl overflow-hidden bg-deep-900">
+              <div className="relative aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-deep-900 to-deep-950">
                 <Image
-                  src={image.thumbnail_url || image.url}
+                  src={thumbnailUrl}
                   alt={image.title || image.filename}
                   fill
-                  className="object-cover"
+                  className="object-contain bg-deep-900"
                   sizes="(max-width: 768px) 100vw, 50vw"
+                  priority
+                  unoptimized
+                  onError={(e) => {
+                    // Fallback to full image if thumbnail fails
+                    const target = e.target as HTMLImageElement;
+                    target.src = imageUrl;
+                  }}
                 />
               </div>
               <div className="mt-4 space-y-2 text-sm text-white/70">
@@ -433,19 +472,25 @@ export default function EditImagePage() {
                   <select
                     {...register('hazard_type', { required: 'Hazard type is required' })}
                     id="edit-hazard-type"
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.5rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.5em 1.5em'
+                    }}
                   >
-                    <option value="">Select hazard type</option>
-                    <option value="cyclone">Cyclone</option>
-                    <option value="flood">Flood</option>
-                    <option value="tsunami">Tsunami</option>
-                    <option value="earthquake">Earthquake</option>
-                    <option value="drought">Drought</option>
-                    <option value="wildfire">Wildfire</option>
-                    <option value="landslide">Landslide</option>
-                    <option value="volcano">Volcanic Eruption</option>
-                    <option value="storm">Storm</option>
-                    <option value="other">Other</option>
+                    <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Select hazard type</option>
+                    <option value="cyclone" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Cyclone</option>
+                    <option value="flood" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Flood</option>
+                    <option value="tsunami" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Tsunami</option>
+                    <option value="earthquake" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Earthquake</option>
+                    <option value="drought" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Drought</option>
+                    <option value="wildfire" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Wildfire</option>
+                    <option value="landslide" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Landslide</option>
+                    <option value="volcano" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Volcanic Eruption</option>
+                    <option value="storm" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Storm</option>
+                    <option value="other" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Other</option>
                   </select>
                 </FormField>
 
@@ -492,13 +537,24 @@ export default function EditImagePage() {
 
                 {/* Country */}
                 <FormField label="Country" htmlFor="edit-country">
-                  <input
+                  <select
                     {...register('country')}
                     id="edit-country"
-                    type="text"
-                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
-                    placeholder="e.g., Fiji"
-                  />
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.5rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.5em 1.5em'
+                    }}
+                  >
+                    <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Select country</option>
+                    {vocabData?.countries?.map((country: { id: string; label: string }) => (
+                      <option key={country.id} value={country.id} style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
+                        {country.label}
+                      </option>
+                    ))}
+                  </select>
                 </FormField>
 
                 {/* Keywords */}
