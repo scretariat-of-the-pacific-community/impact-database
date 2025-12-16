@@ -10,7 +10,7 @@ interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   error: string | null;
-  signIn: (returnUrl?: string) => Promise<void>;
+  signIn: (returnUrl?: string, provider?: 'google' | 'facebook' | 'github') => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (role: string) => boolean;
   handleCallback: (code: string, state?: string) => Promise<void>;
@@ -19,15 +19,35 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// OAuth2/OIDC Configuration for SPC SSO
-const authConfig = {
-  issuer: process.env.NEXT_PUBLIC_SPC_SSO_ISSUER || 'https://sso.spc.int',
-  clientId: process.env.NEXT_PUBLIC_SPC_SSO_CLIENT_ID || 'ocean-portal',
-  redirectUri: typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '',
-  scopes: ['openid', 'profile', 'email', 'roles'],
-  responseType: 'code',
-  prompt: 'select_account',
+// OAuth2 Configuration for Social Media Providers
+type AuthProvider = 'google' | 'facebook' | 'github';
+
+const authProviders = {
+  google: {
+    authUrl: 'https://accounts.google.com/o/oauth2/v2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    userInfoUrl: 'https://www.googleapis.com/oauth2/v2/userinfo',
+    clientId: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '',
+    scopes: ['openid', 'profile', 'email'],
+  },
+  facebook: {
+    authUrl: 'https://www.facebook.com/v18.0/dialog/oauth',
+    tokenUrl: 'https://graph.facebook.com/v18.0/oauth/access_token',
+    userInfoUrl: 'https://graph.facebook.com/me?fields=id,name,email,picture',
+    clientId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID || '',
+    scopes: ['email', 'public_profile'],
+  },
+  github: {
+    authUrl: 'https://github.com/login/oauth/authorize',
+    tokenUrl: 'https://github.com/login/oauth/access_token',
+    userInfoUrl: 'https://api.github.com/user',
+    clientId: process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || '',
+    scopes: ['read:user', 'user:email'],
+  },
 };
+
+const getRedirectUri = () => 
+  typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -69,23 +89,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const signIn = async (returnUrl?: string) => {
+  const signIn = async (returnUrl?: string, provider: AuthProvider = 'google') => {
     try {
       setAuthError(null);
+      const providerConfig = authProviders[provider];
+      
+      if (!providerConfig.clientId) {
+        throw new Error(`${provider} authentication is not configured`);
+      }
+      
       // Generate PKCE challenge for security
       const { codeVerifier, codeChallenge } = await generatePKCE();
       
-      // Store PKCE verifier and return URL
+      // Store PKCE verifier, provider, and return URL
       sessionStorage.setItem('oauth_code_verifier', codeVerifier);
+      sessionStorage.setItem('oauth_provider', provider);
       const safeReturnUrl = sanitizeReturnUrl(returnUrl);
       if (safeReturnUrl) {
         sessionStorage.setItem('oauth_return_url', safeReturnUrl);
       }
 
-      // Build authorization URL
-      const authUrl = buildAuthorizationUrl(codeChallenge);
+      // Build authorization URL for selected provider
+      const params = new URLSearchParams({
+        client_id: providerConfig.clientId,
+        redirect_uri: getRedirectUri(),
+        response_type: 'code',
+        scope: providerConfig.scopes.join(' '),
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        state: Math.random().toString(36).substring(7),
+      });
       
-      // Redirect to SPC SSO
+      const authUrl = `${providerConfig.authUrl}?${params.toString()}`;
+      
+      // Redirect to social media provider
       window.location.href = authUrl;
     } catch (error) {
       console.error('Sign in failed:', error);
