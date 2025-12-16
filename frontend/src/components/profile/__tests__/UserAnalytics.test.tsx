@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 
-import UserAnalytics from '@/components/profile/UserAnalytics';
+import UserAnalytics, { formatCsv, generateTimelineSeries } from '@/components/profile/UserAnalytics';
+
+const rechartsSpies: { areaData?: any[] } = {};
 
 jest.mock('react-leaflet', () => ({
   MapContainer: ({ children }: { children: React.ReactNode }) => <div data-testid="map">{children}</div>,
@@ -23,7 +25,10 @@ jest.mock('recharts', () => ({
     </div>
   ),
   Cell: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  AreaChart: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AreaChart: ({ data, children }: any) => {
+    rechartsSpies.areaData = data;
+    return <div data-testid="area-chart">{children}</div>;
+  },
   Area: () => <div />,
   CartesianGrid: () => <div />,
   XAxis: () => <div />,
@@ -39,6 +44,7 @@ describe('UserAnalytics', () => {
   afterEach(() => {
     jest.useRealTimers();
     jest.restoreAllMocks();
+    rechartsSpies.areaData = undefined;
   });
 
   describe('data export', () => {
@@ -65,6 +71,7 @@ describe('UserAnalytics', () => {
 
       screen.getByRole('button', { name: /csv/i }).click();
 
+      expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
       expect(anchor.download).toBe('user-uploads.csv');
       const blobArg = (URL.createObjectURL as jest.Mock).mock.calls[0][0] as Blob;
       await expect(blobArg.text()).resolves.toContain('date,uploads,views');
@@ -106,5 +113,32 @@ describe('UserAnalytics', () => {
 
     const cells = screen.getAllByLabelText(/uploads$/i);
     expect(cells.length).toBeGreaterThanOrEqual(180);
+  });
+
+  it('renders map markers for each upload location', () => {
+    render(<UserAnalytics />);
+
+    const markers = screen.getAllByTestId('circle-marker');
+    expect(markers.length).toBeGreaterThanOrEqual(8);
+  });
+
+  it('passes timeline data into the area chart', () => {
+    render(<UserAnalytics />);
+
+    expect(rechartsSpies.areaData?.length).toBe(generateTimelineSeries().length);
+  });
+
+  it('renders benchmarking and leaderboard content', () => {
+    render(<UserAnalytics />);
+
+    expect(screen.getByText(/uploads map & heat intensity/i)).toBeInTheDocument();
+    expect(screen.getByText(/You vs. community average/i)).toBeInTheDocument();
+    expect(screen.getByText(/Most popular images/i)).toBeInTheDocument();
+  });
+});
+
+describe('formatCsv', () => {
+  it('returns empty string for empty datasets', () => {
+    expect(formatCsv([])).toBe('');
   });
 });

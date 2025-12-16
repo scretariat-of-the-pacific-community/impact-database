@@ -71,22 +71,25 @@ const uploadLocations: UploadLocation[] = [
   { id: 'loc-8', label: 'Sydney', latitude: -33.8688, longitude: 151.2093, hazard: 'Heatwave', uploads: 6 },
 ];
 
-const timelineSeries = [
-  { date: '2024-10-01', uploads: 3, views: 120 },
-  { date: '2024-10-08', uploads: 5, views: 220 },
-  { date: '2024-10-15', uploads: 4, views: 260 },
-  { date: '2024-10-22', uploads: 7, views: 310 },
-  { date: '2024-10-29', uploads: 6, views: 290 },
-  { date: '2024-11-05', uploads: 8, views: 350 },
-  { date: '2024-11-12', uploads: 9, views: 420 },
-  { date: '2024-11-19', uploads: 10, views: 480 },
-  { date: '2024-11-26', uploads: 8, views: 450 },
-  { date: '2024-12-03', uploads: 11, views: 520 },
-  { date: '2024-12-10', uploads: 12, views: 610 },
-  { date: '2024-12-17', uploads: 9, views: 530 },
-  { date: '2024-12-24', uploads: 14, views: 700 },
-  { date: '2024-12-31', uploads: 13, views: 740 },
-];
+export function generateTimelineSeries(weeks: number = 14) {
+  const series = [] as { date: string; uploads: number; views: number }[];
+  const today = new Date();
+  for (let i = weeks - 1; i >= 0; i -= 1) {
+    const date = new Date(today);
+    date.setDate(today.getDate() - i * 7);
+    // Demo-style data: simple, deterministic variation so visuals stay representative and testable
+    const uploads = 5 + Math.floor(Math.abs(Math.sin(i)) * 10);
+    const views = 150 + Math.floor(Math.abs(Math.cos(i)) * 700);
+    series.push({
+      date: date.toISOString().slice(0, 10),
+      uploads,
+      views,
+    });
+  }
+  return series;
+}
+
+const timelineSeries = generateTimelineSeries();
 
 const popularImages = [
   { id: 'img-1', title: 'Harbor surge baseline', views: 940, citations: 18 },
@@ -101,19 +104,27 @@ const communityBenchmark = [
 ];
 
 const contributionCalendar: Record<string, number> = {};
-const today = new Date('2024-12-31');
+const today = new Date();
+
+// Deterministic pseudo-random generator to keep demo data stable for tests
+let seed = 42;
+const seededRandom = () => {
+  seed = (seed * 1664525 + 1013904223) % 4294967296;
+  return seed / 4294967296;
+};
+
 for (let i = 0; i < 180; i += 1) {
   const date = new Date(today);
   date.setDate(today.getDate() - i);
   const key = format(date, 'yyyy-MM-dd');
-  contributionCalendar[key] = Math.floor(Math.random() * 6);
+  contributionCalendar[key] = Math.floor(seededRandom() * 6);
 }
 
 const hazardPalette = ['#0ea5e9', '#a78bfa', '#f59e0b', '#ef4444'];
 
 // Intensity thresholds for contribution calendar coloring
-// Values represent the minimum number of contributions for each activity level
-const VERY_HIGH_ACTIVITY_THRESHOLD = 12; // Very high activity
+// Tuned to mirror common activity buckets (GitHub-style) so low/medium/high cadence stays recognizable
+const VERY_HIGH_ACTIVITY_THRESHOLD = 12; // Very high activity: multiple uploads every week
 const HIGH_ACTIVITY_THRESHOLD = 8; // High activity
 const MEDIUM_ACTIVITY_THRESHOLD = 5; // Medium activity
 const LOW_ACTIVITY_THRESHOLD = 3; // Low activity
@@ -146,7 +157,7 @@ function downloadFile(content: string, filename: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-// Escape a value for CSV according to RFC 4180 and mitigate CSV injection
+// Escape a value for CSV according to RFC 4180 and mitigate CSV injection by prefixing formula-like text
 function escapeCsvValue(value: string | number): string {
   let str = String(value);
   if (/^[=+\-@]/.test(str)) {
@@ -159,7 +170,8 @@ function escapeCsvValue(value: string | number): string {
   return str;
 }
 
-function formatCsv(rows: Record<string, string | number>[]) {
+export function formatCsv(rows: Record<string, string | number>[]) {
+  if (!rows.length) return '';
   const headers = Object.keys(rows[0]);
   const csvRows = rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(','));
   return [headers.join(','), ...csvRows].join('\n');
@@ -268,7 +280,7 @@ export default function UserAnalytics() {
             </div>
           </div>
           <div className="h-[420px] overflow-hidden rounded-xl border border-white/5">
-            <MapContainer center={[-2.8, 135.9]} zoom={3} scrollWheelZoom className="h-full w-full">
+            <MapContainer center={[-2.8, 135.9]} zoom={3} scrollWheelZoom={true} className="h-full w-full">
               <TileLayer
                 attribution="&copy; OpenStreetMap contributors"
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -324,7 +336,6 @@ export default function UserAnalytics() {
                         role="button"
                         tabIndex={0}
                         aria-label={`Select ${entry.name} hazard category`}
-                        onClick={() => setSelectedHazard(entry.name)}
                         onKeyDown={(event) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
@@ -481,9 +492,7 @@ export default function UserAnalytics() {
                       )}
                       title={`${format(day.date, 'MMM d')}: ${day.count} uploads`}
                       aria-label={`${format(day.date, 'MMMM d')}: ${day.count} uploads`}
-                    >
-                      <span className="sr-only">{`${format(day.date, 'MMMM d')}: ${day.count} uploads`}</span>
-                    </div>
+                    />
                   ))}
                 </div>
               ))}
