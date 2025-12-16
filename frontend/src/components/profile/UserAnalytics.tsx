@@ -10,7 +10,6 @@ import {
   Cell,
   Legend,
   Line,
-  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -112,12 +111,20 @@ for (let i = 0; i < 180; i += 1) {
 
 const hazardPalette = ['#0ea5e9', '#a78bfa', '#f59e0b', '#ef4444'];
 
+// Intensity thresholds for contribution calendar coloring
+// Values represent the minimum number of contributions for each activity level
+const VERY_HIGH_ACTIVITY_THRESHOLD = 12; // Very high activity
+const HIGH_ACTIVITY_THRESHOLD = 8; // High activity
+const MEDIUM_ACTIVITY_THRESHOLD = 5; // Medium activity
+const LOW_ACTIVITY_THRESHOLD = 3; // Low activity
+const MINIMAL_ACTIVITY_THRESHOLD = 1; // Minimal activity
+
 const getColorForIntensity = (value: number) => {
-  if (value >= 12) return 'fill-green-500/80';
-  if (value >= 8) return 'fill-emerald-400/70';
-  if (value >= 5) return 'fill-lime-300/70';
-  if (value >= 3) return 'fill-amber-300/70';
-  if (value >= 1) return 'fill-orange-300/70';
+  if (value >= VERY_HIGH_ACTIVITY_THRESHOLD) return 'fill-green-500/80';
+  if (value >= HIGH_ACTIVITY_THRESHOLD) return 'fill-emerald-400/70';
+  if (value >= MEDIUM_ACTIVITY_THRESHOLD) return 'fill-lime-300/70';
+  if (value >= LOW_ACTIVITY_THRESHOLD) return 'fill-amber-300/70';
+  if (value >= MINIMAL_ACTIVITY_THRESHOLD) return 'fill-orange-300/70';
   return 'fill-slate-800';
 };
 
@@ -129,11 +136,6 @@ const rollingAverage = (data: typeof timelineSeries, windowSize: number) =>
     return { ...point, rolling: Number(avgUploads.toFixed(2)) };
   });
 
-const totalUploads = timelineSeries.reduce((sum, item) => sum + item.uploads, 0);
-const totalViews = timelineSeries.reduce((sum, item) => sum + item.views, 0);
-const averageViewsPerUpload = Math.round(totalViews / totalUploads);
-const totalCitations = Object.values(hazardCategories).flat().reduce((sum, item) => sum + item.citations, 0);
-
 function downloadFile(content: string, filename: string, type: string) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -141,12 +143,25 @@ function downloadFile(content: string, filename: string, type: string) {
   link.href = url;
   link.download = filename;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+// Escape a value for CSV according to RFC 4180 and mitigate CSV injection
+function escapeCsvValue(value: string | number): string {
+  let str = String(value);
+  if (/^[=+\-@]/.test(str)) {
+    str = `'${str}`;
+  }
+  str = str.replace(/"/g, '""');
+  if (/[",\n\r]/.test(str)) {
+    str = `"${str}"`;
+  }
+  return str;
 }
 
 function formatCsv(rows: Record<string, string | number>[]) {
   const headers = Object.keys(rows[0]);
-  const csvRows = rows.map((row) => headers.map((header) => row[header]).join(','));
+  const csvRows = rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(','));
   return [headers.join(','), ...csvRows].join('\n');
 }
 
@@ -162,6 +177,15 @@ export default function UserAnalytics() {
   );
 
   const timelineWithRolling = useMemo(() => rollingAverage(timelineSeries, 7), []);
+
+  const totals = useMemo(() => {
+    const uploads = timelineSeries.reduce((sum, item) => sum + item.uploads, 0);
+    const views = timelineSeries.reduce((sum, item) => sum + item.views, 0);
+    const citations = Object.values(hazardCategories)
+      .flat()
+      .reduce((sum, item) => sum + item.citations, 0);
+    return { uploads, views, averageViews: Math.round(views / uploads), citations };
+  }, []);
 
   const calendarWeeks = useMemo(() => {
     const weeks: { date: Date; key: string; count: number }[][] = [];
@@ -181,9 +205,13 @@ export default function UserAnalytics() {
     return weeks;
   }, []);
 
-  const hazardLegend = pieData.reduce(
-    (acc, item, index) => ({ ...acc, [item.name]: hazardPalette[index % hazardPalette.length] }),
-    {} as Record<string, string>,
+  const hazardLegend = useMemo(
+    () =>
+      pieData.reduce(
+        (acc, item, index) => ({ ...acc, [item.name]: hazardPalette[index % hazardPalette.length] }),
+        {} as Record<string, string>,
+      ),
+    [pieData],
   );
 
   const exportJson = () => {
@@ -293,6 +321,16 @@ export default function UserAnalytics() {
                     {pieData.map((entry, index) => (
                       <Cell
                         key={entry.name}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Select ${entry.name} hazard category`}
+                        onClick={() => setSelectedHazard(entry.name)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setSelectedHazard(entry.name);
+                          }
+                        }}
                         fill={hazardPalette[index % hazardPalette.length]}
                         opacity={entry.name === selectedHazard ? 1 : 0.6}
                         className="cursor-pointer"
@@ -335,12 +373,12 @@ export default function UserAnalytics() {
           <div className="grid grid-cols-3 gap-3">
             <div className="rounded-xl border border-white/10 bg-slate-900/80 p-3 text-white">
               <p className="text-xs text-white/60">Views per upload</p>
-              <p className="text-2xl font-semibold">{averageViewsPerUpload}</p>
+              <p className="text-2xl font-semibold">{totals.averageViews}</p>
               <p className="text-xs text-emerald-300">+18% vs. last month</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-900/80 p-3 text-white">
               <p className="text-xs text-white/60">Total citations</p>
-              <p className="text-2xl font-semibold">{totalCitations}</p>
+              <p className="text-2xl font-semibold">{totals.citations}</p>
               <p className="text-xs text-emerald-300">Peer recognition rising</p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-900/80 p-3 text-white">
@@ -360,7 +398,7 @@ export default function UserAnalytics() {
               <h2 className="text-xl font-semibold text-white">Uploads with 7-day rolling average</h2>
             </div>
             <div className="rounded-full bg-white/5 px-3 py-1 text-xs text-white">
-              {totalUploads} uploads · {totalViews} views
+              {totals.uploads} uploads · {totals.views} views
             </div>
           </div>
           <div className="h-80">
@@ -442,7 +480,10 @@ export default function UserAnalytics() {
                         getColorForIntensity(day.count),
                       )}
                       title={`${format(day.date, 'MMM d')}: ${day.count} uploads`}
-                    />
+                      aria-label={`${format(day.date, 'MMMM d')}: ${day.count} uploads`}
+                    >
+                      <span className="sr-only">{`${format(day.date, 'MMMM d')}: ${day.count} uploads`}</span>
+                    </div>
                   ))}
                 </div>
               ))}
@@ -450,7 +491,7 @@ export default function UserAnalytics() {
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/70">
             <span className="text-white">Legend:</span>
-            {[0, 1, 3, 5, 8, 12].map((value) => (
+            {[0, MINIMAL_ACTIVITY_THRESHOLD, LOW_ACTIVITY_THRESHOLD, MEDIUM_ACTIVITY_THRESHOLD, HIGH_ACTIVITY_THRESHOLD, VERY_HIGH_ACTIVITY_THRESHOLD].map((value) => (
               <div key={value} className="flex items-center gap-1">
                 <div className={clsx('h-4 w-4 rounded-sm border border-white/5', getColorForIntensity(value))} />
                 <span>{value}+ uploads</span>
