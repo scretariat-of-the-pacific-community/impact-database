@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Crown, Share2, Star, Award } from 'lucide-react';
 import {
@@ -28,7 +28,8 @@ const getTrustedShareUrl = () => {
 
   try {
     const parsed = new URL(envUrl);
-    if (parsed.hostname === 'impactdatabase.org' || parsed.hostname.endsWith('.impactdatabase.org')) {
+    const validSubdomain = /^[a-z0-9-]+\.impactdatabase\.org$/i;
+    if (parsed.hostname === 'impactdatabase.org' || validSubdomain.test(parsed.hostname)) {
       return parsed.toString();
     }
   } catch (error) {
@@ -39,6 +40,7 @@ const getTrustedShareUrl = () => {
 };
 
 const shareUrl = getTrustedShareUrl();
+// Default icon animation states; applied conditionally based on reduced motion preference.
 const unlockedAnimation = { scale: [0.8, 1.1, 1], rotate: [0, 5, 0] };
 const lockedAnimation = { scale: 1, rotate: 0 };
 const getPrefersReducedMotion = () =>
@@ -74,7 +76,10 @@ export default function AchievementsHub({
     const timeout = setTimeout(() => setShareStatus(null), 4000);
     return () => clearTimeout(timeout);
   }, [shareStatus]);
-  const unlockedBadges = achievementsData.filter((achievement) => achievement.unlocked);
+  const unlockedBadges = useMemo(
+    () => achievementsData.filter((achievement) => achievement.unlocked),
+    [achievementsData],
+  );
   const [reducedMotion, setReducedMotion] = useState<boolean>(() => getPrefersReducedMotion());
   const [leaderboardAnimating, setLeaderboardAnimating] = useState<boolean>(() => !getPrefersReducedMotion());
 
@@ -150,7 +155,7 @@ export default function AchievementsHub({
     )}&url=${encodeURIComponent(shareUrl)}`;
     const popup = window.open(twitterUrl, '_blank', 'noopener,noreferrer');
     if (!popup) {
-      setShareStatus(`Unable to open sharing for ${achievementName}. Please check your popup settings.`);
+      setShareStatus(`Unable to open sharing window for ${achievementName}. This may be blocked by your browser.`);
     } else {
       setShareStatus(`Opened Twitter to share ${achievementName}.`);
     }
@@ -169,7 +174,7 @@ export default function AchievementsHub({
       <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-pacific-500/10 via-white/5 to-black/20 p-8 shadow-lg">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="flex max-w-3xl flex-col gap-3">
-            <p className="text-sm uppercase tracking-[0.25em] text-white/60">Achievements & badges</p>
+            <p className="text-sm uppercase tracking-[0.1em] text-white/60">Achievements & badges</p>
             <h1 className="text-4xl font-semibold text-white">Progress that celebrates impact</h1>
             <p className="text-white/70">
               Track your contribution milestones, unlock animated badges across categories, and see how you rank among the

@@ -11,14 +11,22 @@ import {
   Upload,
 } from 'lucide-react';
 
+/**
+ * Notification timeline item describing a recent achievement-related event for the user.
+ */
 export interface Notification {
   id: string;
   title: string;
+  /** Human-friendly time description for when the notification occurred. */
   timestamp: string;
+  /** Short detail describing the event. */
   description: string;
   icon: React.ComponentType<{ className?: string }>;
 }
 
+/**
+ * Describes an achievement badge, including current progress and milestone metadata for rendering.
+ */
 export interface Achievement {
   id: string;
   name: string;
@@ -27,16 +35,25 @@ export interface Achievement {
   icon: React.ComponentType<{ className?: string }>;
   progress: number;
   target: number;
+  /** Unit label for the progress value, e.g., "Uploads" or "Countries mapped". */
   milestoneLabel: string;
+  /** Indicates whether the badge has been unlocked. */
   unlocked: boolean;
+  /** Guidance shown below the progress bar to help users reach the next level. */
   nextMilestone: string;
 }
 
+/**
+ * Entry displayed in the leaderboard alongside rank and contribution counts.
+ */
 export interface LeaderboardEntry {
   id: string;
   name: string;
+  /** Number of uploads contributed by the person. */
   uploads: number;
+  /** Count of achievements unlocked by the person. */
   badges: number;
+  /** Numeric ranking for ordering the leaderboard. */
   rank: number;
 }
 

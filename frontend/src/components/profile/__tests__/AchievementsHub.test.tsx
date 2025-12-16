@@ -61,7 +61,7 @@ describe('AchievementsHub', () => {
   it('never shows negative remaining counts', () => {
     render(<AchievementsHub />);
 
-    expect(screen.getByText(/next: 0 remaining/i)).toBeInTheDocument();
+    expect(screen.getByText(/Next: 0 remaining/)).toBeInTheDocument();
   });
 
   it('exposes progress bars with correct aria metadata', () => {
@@ -134,6 +134,17 @@ describe('AchievementsHub', () => {
 
     await waitFor(() => expect(consoleSpy).toHaveBeenCalled());
     expect(consoleSpy.mock.calls[0]?.[0]).toContain('Regional Explorer');
+  });
+
+  it('shows specific guidance for permission errors when sharing fails', async () => {
+    navigator.share = vi.fn().mockRejectedValue({ name: 'NotAllowedError' });
+
+    render(<AchievementsHub />);
+    screen.getByLabelText(/share regional explorer/i).click();
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/sharing blocked\. check your browser permissions/i),
+    );
   });
 
   it('renders the notification timeline items in order with timestamps', () => {
@@ -295,8 +306,6 @@ describe('AchievementsHub', () => {
       },
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
-      addListener: (listener: (event: MediaQueryListEvent) => void) => listeners.push(listener),
-      removeListener: vi.fn(),
     }));
 
     const { container } = render(<AchievementsHub />);
@@ -319,7 +328,7 @@ describe('AchievementsHub', () => {
     screen.getByLabelText(/share regional explorer/i).click();
 
     await waitFor(() =>
-      expect(screen.getByRole('status')).toHaveTextContent(/unable to open sharing for regional explorer/i),
+      expect(screen.getByRole('status')).toHaveTextContent(/unable to open sharing window for regional explorer/i),
     );
 
     act(() => {
