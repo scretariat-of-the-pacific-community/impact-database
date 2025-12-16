@@ -119,7 +119,7 @@ describe('AchievementsHub', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/shared regional explorer/i));
 
     act(() => {
-      vi.advanceTimersByTime(4000);
+      vi.advanceTimersByTime(4001);
     });
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();

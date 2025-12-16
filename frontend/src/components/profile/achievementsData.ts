@@ -195,5 +195,12 @@ export const categoryStyles: Record<Achievement['category'], string> = {
   Specialist: 'from-palm-500/20 to-palm-500/5 border-palm-500/30',
 };
 
-export const textSeparator = '•';
+export const categoryLegend = [
+  { label: 'Contributor', color: 'bg-pacific-400', initial: 'C' },
+  { label: 'Explorer', color: 'bg-sand-400', initial: 'E' },
+  { label: 'Quality', color: 'bg-coral-400', initial: 'Q' },
+  { label: 'Specialist', color: 'bg-palm-400', initial: 'S' },
+];
+
+export const textSeparator = ' • ';
 

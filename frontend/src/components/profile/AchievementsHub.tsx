@@ -8,6 +8,7 @@ import {
   LeaderboardEntry,
   Notification,
   achievements,
+  categoryLegend,
   categoryStyles,
   leaderboard,
   notifications,
@@ -114,8 +115,10 @@ export default function AchievementsHub({
    * Shares an achievement badge using the most appropriate method for the user's platform.
    *
    * Attempts to use the Web Share API when available (supported browsers/devices). If unavailable, opens
-   * a Twitter intent in a new tab so users can still share their achievement. Provides user-facing feedback
-   * when sharing fails.
+   * a Twitter/X intent in a new tab so users can still share their achievement.
+   *
+   * Side effect: sets shareStatus to surface user-facing feedback on success, cancellation, popup blocking,
+   * or permission/network errors so people understand what happened.
    */
   const shareBadge = useCallback((achievement: Achievement) => {
     const achievementName = achievement.name;
@@ -150,7 +153,7 @@ export default function AchievementsHub({
       return;
     }
 
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+    const twitterUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(
       shareText,
     )}&url=${encodeURIComponent(shareUrl)}`;
     const popup = window.open(twitterUrl, '_blank', 'noopener,noreferrer');
@@ -215,12 +218,7 @@ export default function AchievementsHub({
               <h2 className="text-2xl font-semibold text-white">Animated unlocks & progress</h2>
             </div>
             <ul className="flex gap-3 text-xs text-white/70" aria-label="Badge categories">
-              {[
-                { label: 'Contributor', color: 'bg-pacific-400', initial: 'C' },
-                { label: 'Explorer', color: 'bg-sand-400', initial: 'E' },
-                { label: 'Quality', color: 'bg-coral-400', initial: 'Q' },
-                { label: 'Specialist', color: 'bg-palm-400', initial: 'S' },
-              ].map((item) => (
+              {categoryLegend.map((item) => (
                 <li key={item.label} className="flex items-center gap-1">
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-full ${item.color} text-[10px] font-semibold text-black/80`}
@@ -283,7 +281,7 @@ export default function AchievementsHub({
                           )}
                         </div>
                         <p className="text-sm text-white/70">{achievement.description}</p>
-                        <p className="mt-1 text-xs text-white/60">{achievement.category} {textSeparator} {achievement.milestoneLabel}</p>
+                        <p className="mt-1 text-xs text-white/60">{achievement.category}{textSeparator}{achievement.milestoneLabel}</p>
                       </div>
                     </div>
                     <div className="text-right text-sm text-white/70">
@@ -343,7 +341,7 @@ export default function AchievementsHub({
                     </div>
                     <div>
                       <p className="font-semibold">{entry.name}</p>
-                      <p className="text-xs text-white/60">{entry.uploads} uploads {textSeparator} {entry.badges} badges</p>
+                      <p className="text-xs text-white/60">{entry.uploads} uploads{textSeparator}{entry.badges} badges</p>
                     </div>
                   </div>
                   <Award className="h-4 w-4 text-pacific-200" aria-hidden="true" />
