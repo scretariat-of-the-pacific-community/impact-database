@@ -5,6 +5,7 @@ import nextDynamic from 'next/dynamic';
 import Link from 'next/link';
 import NextImage from 'next/image';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/providers/auth-provider';
 import { motion } from 'framer-motion';
 import {
   Waves,
@@ -19,6 +20,8 @@ import {
   Camera,
   Clock,
   Calendar,
+  User,
+  Lock,
 } from 'lucide-react';
 
 import { imageApi } from '@/lib/api';
@@ -134,6 +137,15 @@ const navigationCards = [
     accent: 'from-coral-500/20 to-coral-500/5',
     cta: 'Open Insights',
     ctaIcon: Sparkles,
+  },
+  {
+    href: '/profile',
+    title: 'User Profile',
+    description: 'Track your uploads, achievements, and contribution statistics.',
+    icon: User,
+    accent: 'from-pacific-500/20 to-pacific-500/5',
+    cta: 'View Profile',
+    ctaIcon: User,
   },
 ];
 
@@ -418,6 +430,7 @@ const resolveDescription = (image: ImageRecord) =>
 
 export default function PacificImpactAtlasDashboard() {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
   
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-images'],
@@ -620,13 +633,44 @@ export default function PacificImpactAtlasDashboard() {
               <Search className="h-5 w-5 transition-transform group-hover:-translate-y-0.5" />
               Launch Search
             </Link>
-            <Link
-              href="/upload"
-              className="inline-flex items-center gap-2 rounded-full bg-palm-600 px-6 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40"
-            >
-              <Upload className="h-5 w-5" />
-              Upload Field Sighting
-            </Link>
+            {isAuthenticated ? (
+              <Link
+                href="/upload"
+                className="inline-flex items-center gap-2 rounded-full bg-palm-600 px-6 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40"
+              >
+                <Upload className="h-5 w-5" />
+                Upload Field Sighting
+              </Link>
+            ) : (
+              <Link
+                href="/auth/login?returnUrl=%2Fupload"
+                className="inline-flex items-center gap-2 rounded-full bg-palm-600 px-6 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40 relative"
+                title="Login required to upload"
+              >
+                <Lock className="h-4 w-4" />
+                <Upload className="h-5 w-5" />
+                Upload Field Sighting
+              </Link>
+            )}
+            {isAuthenticated ? (
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-2 rounded-full bg-pacific-600 px-6 py-3 font-semibold text-white shadow-lg shadow-pacific-600/30 transition hover:bg-pacific-500 hover:shadow-xl hover:shadow-pacific-500/40"
+              >
+                <User className="h-5 w-5" />
+                Profile
+              </Link>
+            ) : (
+              <Link
+                href="/auth/login?returnUrl=%2Fprofile"
+                className="inline-flex items-center gap-2 rounded-full bg-pacific-600 px-6 py-3 font-semibold text-white shadow-lg shadow-pacific-600/30 transition hover:bg-pacific-500 hover:shadow-xl hover:shadow-pacific-500/40"
+                title="Login required to view profile"
+              >
+                <Lock className="h-4 w-4" />
+                <User className="h-5 w-5" />
+                Profile
+              </Link>
+            )}
             <button
               type="button"
               className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 backdrop-blur-sm bg-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/20 hover:border-white/50"

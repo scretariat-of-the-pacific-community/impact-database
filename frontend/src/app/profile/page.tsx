@@ -1,6 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/providers/auth-provider';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, UploadCloud, Award, Activity, Settings, MapPin, ShieldCheck } from 'lucide-react';
 import { imageApi } from '@/lib/api';
@@ -17,7 +19,18 @@ const TABS = [
 const glassCard = 'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('uploads');
+
+  // Auth guard - redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      const returnUrl = encodeURIComponent(pathname);
+      router.push(`/auth/login?returnUrl=${returnUrl}`);
+    }
+  }, [isAuthenticated, authLoading, router, pathname]);
 
   const {
     data: stats,
@@ -41,24 +54,46 @@ export default function ProfilePage() {
     refetchOnWindowFocus: true,
   });
 
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-deep-900 via-deep-800 to-deep-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-pacific-400 animate-spin mx-auto mb-2" />
+          <p className="text-sm text-surface-soft/70">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render profile if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
   const statSummary = useMemo(() => {
     if (!stats) {
       return [];
     }
+    const totalUploads = typeof stats.total_uploads === 'number' ? stats.total_uploads : 0;
+    const approvalRate = typeof stats.approval_rate === 'number' ? stats.approval_rate : 0;
+    const impactScore =
+      typeof stats.impact_score === 'number' && Number.isFinite(stats.impact_score) ? stats.impact_score : null;
+
     return [
       {
         label: 'Total Uploads',
-        value: stats.total_uploads.toLocaleString(),
+        value: totalUploads.toLocaleString(),
         change: '+12% vs last month',
       },
       {
         label: 'Approval Rate',
-        value: `${Math.round(stats.approval_rate * 100)}%`,
-        change: stats.approval_rate > 0.8 ? 'Great job!' : 'Aim for 80%',
+        value: `${Math.round(approvalRate * 100)}%`,
+        change: approvalRate > 0.8 ? 'Great job!' : 'Aim for 80%',
       },
       {
         label: 'Impact Score',
-        value: stats.impact_score.toFixed(1),
+        value: impactScore !== null ? impactScore.toFixed(1) : '—',
         change: 'Based on reviews & usage',
       },
     ];

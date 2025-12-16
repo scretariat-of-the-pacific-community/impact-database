@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/providers/auth-provider';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import Image from 'next/image';
@@ -80,7 +81,17 @@ interface KeywordSuggestion {
 export default function EditImagePage() {
   const params = useParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const imageId = params.id as string;
+
+  // Auth guard - redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      const returnUrl = encodeURIComponent(pathname);
+      router.push(`/auth/login?returnUrl=${returnUrl}`);
+    }
+  }, [isAuthenticated, authLoading, router, pathname]);
 
   const [showMap, setShowMap] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -238,16 +249,16 @@ export default function EditImagePage() {
     },
   });
 
-  const onSubmit = (data: EditFormData, isDraftMode: boolean) => {
-    updateMutation.mutate({ ...data, is_draft: isDraftMode });
-  };
-
   const handleSaveDraft = () => {
-    handleSubmit((data) => onSubmit(data, true))();
+    handleSubmit((data) => {
+      updateMutation.mutate({ ...data, is_draft: true });
+    })();
   };
 
   const handlePublish = () => {
-    handleSubmit((data) => onSubmit(data, false))();
+    handleSubmit((data) => {
+      updateMutation.mutate({ ...data, is_draft: false });
+    })();
   };
 
   const handleCoordinatesChange = (lat: number, lng: number, locationName?: string) => {
@@ -297,6 +308,23 @@ export default function EditImagePage() {
   // Construct URLs - use thumbnail for preview, full image for download
   const thumbnailUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}/thumbnail`;
   const imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}`;
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-deep-900 via-deep-800 to-deep-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pacific-400 mx-auto mb-2" />
+          <p className="text-sm text-surface-soft/70">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render edit form if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 pb-24 text-white">
@@ -427,7 +455,7 @@ export default function EditImagePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <form className="space-y-6">
               <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/60 to-deep-900/40 p-6 backdrop-blur">
                 <h2 className="text-xl font-semibold text-white mb-6">Edit Metadata</h2>
 

@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
 import { Upload, ArrowLeft, X, FileImage, MapPin, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/providers/auth-provider';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
 
@@ -593,6 +594,36 @@ export default function UploadPage() {
               </FormField>
 
               <FormField
+                label="Country"
+                htmlFor="upload-country"
+                required
+                error={errors.country?.message}
+                hint="Auto-detected from GPS if available"
+              >
+                <select
+                  id="upload-country"
+                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.5rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.5em 1.5em'
+                  }}
+                  {...register('country', { required: 'Country is required for geographic analysis' })}
+                  disabled={isLoading}
+                >
+                  <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
+                    {isLoading ? 'Loading countries...' : 'Select country'}
+                  </option>
+                  {vocabData?.countries?.map((country: { id: string; label: string }) => (
+                    <option key={country.id} value={country.id} style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
+                      {country.label}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+
+              <FormField
                 label="Location"
                 htmlFor="upload-location"
                 required
@@ -613,30 +644,6 @@ export default function UploadPage() {
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
             <h3 className="text-lg font-medium text-white mb-4">Additional Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Country" htmlFor="upload-country" hint="Optional">
-                <select
-                  id="upload-country"
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.5rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1.5em 1.5em'
-                  }}
-                  {...register('country')}
-                  disabled={isLoading}
-                >
-                  <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
-                    {isLoading ? 'Loading countries...' : 'Select country'}
-                  </option>
-                  {vocabData?.countries?.map((country: { id: string; label: string }) => (
-                    <option key={country.id} value={country.id} style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
-                      {country.label}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-
               <FormField label="Title" htmlFor="upload-title" hint="Optional - we'll fill this from the filename if you leave it blank">
                 <input
                   id="upload-title"
