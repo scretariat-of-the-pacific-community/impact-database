@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { Globe2, Upload } from 'lucide-react';
 import { vi } from 'vitest';
 import AchievementsHub from '@/components/profile/AchievementsHub';
@@ -6,10 +6,12 @@ import AchievementsHub from '@/components/profile/AchievementsHub';
 describe('AchievementsHub', () => {
   let originalShare: Navigator['share'] | undefined;
   let originalOpen: Window['open'] | undefined;
+  let originalMatchMedia: typeof window.matchMedia | undefined;
 
   beforeEach(() => {
     originalShare = 'share' in navigator ? navigator.share : undefined;
     originalOpen = 'open' in window ? window.open : undefined;
+    originalMatchMedia = typeof window.matchMedia === 'function' ? window.matchMedia : undefined;
   });
 
   afterEach(() => {
@@ -18,6 +20,12 @@ describe('AchievementsHub', () => {
     }
     if ('open' in window) {
       window.open = originalOpen;
+    }
+    if (originalMatchMedia) {
+      window.matchMedia = originalMatchMedia;
+    } else {
+      // @ts-expect-error allow cleanup when matchMedia is unavailable in the test runtime
+      window.matchMedia = undefined;
     }
     vi.restoreAllMocks();
   });
@@ -50,7 +58,7 @@ describe('AchievementsHub', () => {
     expect(screen.getByText('You').closest('div')).toHaveClass('bg-pacific-500/10');
   });
 
-  it('falls back to window.open sharing when navigator.share is unavailable', () => {
+  it('falls back to window.open sharing when navigator.share is unavailable', async () => {
     // @ts-expect-error allow overriding for test
     navigator.share = undefined;
     window.open = vi.fn();
@@ -59,7 +67,7 @@ describe('AchievementsHub', () => {
 
     screen.getByLabelText(/share regional explorer/i).click();
 
-    return waitFor(() => expect(window.open).toHaveBeenCalled());
+    await waitFor(() => expect(window.open).toHaveBeenCalled());
   });
 
   it('uses navigator.share when available', async () => {
@@ -174,5 +182,41 @@ describe('AchievementsHub', () => {
 
     expect(screen.getAllByLabelText(/share/i)).toHaveLength(1);
     expect(screen.queryByLabelText(/share locked badge/i)).not.toBeInTheDocument();
+  });
+
+  it('updates reduced motion preference when the media query changes', () => {
+    const listeners: Array<(event: MediaQueryListEvent) => void> = [];
+
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
+        listeners.push(listener);
+      },
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+
+    const { container } = render(<AchievementsHub />);
+
+    expect(container.querySelector('[data-prefers-reduced-motion="true"]')).toBeInTheDocument();
+
+    act(() => listeners.forEach((listener) => listener({ matches: false } as MediaQueryListEvent)));
+
+    expect(container.querySelector('[data-prefers-reduced-motion="false"]')).toBeInTheDocument();
+  });
+
+  it('sets share status when popup sharing is blocked', async () => {
+    // @ts-expect-error allow overriding for test
+    navigator.share = undefined;
+    window.open = vi.fn().mockReturnValue(null);
+
+    render(<AchievementsHub />);
+
+    screen.getByLabelText(/share regional explorer/i).click();
+
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent(/unable to open sharing for regional explorer/i),
+    );
   });
 });

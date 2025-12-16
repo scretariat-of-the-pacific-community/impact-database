@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Award,
@@ -198,8 +198,9 @@ const unlockedAnimation = { scale: [0.8, 1.1, 1], rotate: [0, 5, 0] };
 const lockedAnimation = { scale: 1, rotate: 0 };
 
 /**
- * Optional data inputs for AchievementsHub. Each collection defaults to showcase fixtures but can be
- * replaced with live data when embedding in a profile view.
+ * Optional data inputs for AchievementsHub. Each collection defaults to static example data
+ * (`achievements`, `leaderboard`, and `notifications`) but can be replaced with live data when
+ * embedding in a profile view.
  */
 interface AchievementsHubProps {
   achievementsData?: Achievement[];
@@ -220,9 +221,30 @@ export default function AchievementsHub({
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const unlockedBadges = achievementsData.filter((achievement) => achievement.unlocked);
   const prefersReducedMotion = useMemo(
-    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () =>
+      typeof window !== 'undefined' &&
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
     [],
   );
+
+  const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      setReducedMotion(false);
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    const handleChange = (event: MediaQueryListEvent) => setReducedMotion(event.matches);
+
+    mediaQuery.addEventListener('change', handleChange);
+    setReducedMotion(mediaQuery.matches);
+
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [prefersReducedMotion]);
 
   /**
    * Shares an achievement badge using the most appropriate method for the user's platform.
@@ -260,12 +282,15 @@ export default function AchievementsHub({
     }
   }, []);
 
-  const cardTransition = prefersReducedMotion ? { duration: 0 } : springTransition;
-  const badgeHover = prefersReducedMotion ? undefined : { y: -4, scale: 1.02 };
-  const badgeTap = prefersReducedMotion ? undefined : { scale: 0.98 };
+  const cardTransition = reducedMotion ? { duration: 0 } : springTransition;
+  const badgeHover = reducedMotion ? undefined : { y: -4, scale: 1.02 };
+  const badgeTap = reducedMotion ? undefined : { scale: 0.98 };
 
   return (
-    <section className="mx-auto max-w-7xl space-y-10 p-6">
+    <section
+      className="mx-auto max-w-7xl space-y-10 p-6"
+      data-prefers-reduced-motion={reducedMotion ? 'true' : 'false'}
+    >
       <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-pacific-500/10 via-white/5 to-black/20 p-8 shadow-lg">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
@@ -316,7 +341,7 @@ export default function AchievementsHub({
                 <li key={item.label} className="flex items-center gap-1">
                   <span
                     className={`flex h-5 w-5 items-center justify-center rounded-full ${item.color} text-[10px] font-semibold text-black/80`}
-                    aria-hidden
+                    aria-hidden="true"
                   >
                     {item.initial}
                   </span>
@@ -332,10 +357,10 @@ export default function AchievementsHub({
                 const progressPct = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
                 const CategoryIcon = achievement.icon;
                 const badgeGradient = categoryStyles[achievement.category];
-                const iconAnimation = achievement.unlocked && !prefersReducedMotion ? unlockedAnimation : lockedAnimation;
-                const cardInitial = prefersReducedMotion ? undefined : { opacity: 0, y: 24, scale: 0.98 };
-                const cardAnimate = prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 };
-                const cardExit = prefersReducedMotion ? undefined : { opacity: 0, y: 20 };
+                const iconAnimation = achievement.unlocked && !reducedMotion ? unlockedAnimation : lockedAnimation;
+                const cardInitial = reducedMotion ? undefined : { opacity: 0, y: 24, scale: 0.98 };
+                const cardAnimate = reducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 };
+                const cardExit = reducedMotion ? undefined : { opacity: 0, y: 20 };
 
                 return (
                   <motion.div
@@ -344,7 +369,7 @@ export default function AchievementsHub({
                     initial={cardInitial}
                     animate={cardAnimate}
                     exit={cardExit}
-                    transition={{ ...cardTransition, delay: prefersReducedMotion ? 0 : index * 0.05 }}
+                    transition={{ ...cardTransition, delay: reducedMotion ? 0 : index * 0.05 }}
                     role="article"
                     aria-label={`${achievement.name} achievement card`}
                     className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${badgeGradient} p-5 shadow-lg`}
@@ -353,8 +378,8 @@ export default function AchievementsHub({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <motion.div
-                          initial={achievement.unlocked && !prefersReducedMotion ? { scale: 0.8 } : undefined}
-                          animate={iconAnimation}
+                        initial={achievement.unlocked && !reducedMotion ? { scale: 0.8 } : undefined}
+                        animate={iconAnimation}
                           transition={cardTransition}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
                           aria-label={`${achievement.category} badge icon`}
@@ -388,7 +413,7 @@ export default function AchievementsHub({
                         aria-valuenow={progressPct}
                         aria-label={`${achievement.name} progress`}
                         className="h-full rounded-full bg-gradient-to-r from-pacific-400 to-palm-400"
-                        initial={prefersReducedMotion ? false : { width: 0 }}
+                        initial={reducedMotion ? false : { width: 0 }}
                         animate={{ width: `${progressPct}%` }}
                         transition={cardTransition}
                       />
@@ -407,7 +432,7 @@ export default function AchievementsHub({
         <div className="space-y-6">
           <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-black/40 p-5 shadow-lg">
             <div className="flex items-center gap-2 text-white">
-              <Crown className="h-5 w-5 text-palm-300" />
+              <Crown className="h-5 w-5 text-palm-300" aria-hidden="true" />
               <div>
                 <p className="text-sm text-white/70">Leaderboard</p>
                 <h3 className="text-lg font-semibold">Contributor rank</h3>
@@ -433,7 +458,7 @@ export default function AchievementsHub({
                       <p className="text-xs text-white/60">{entry.uploads} uploads{badgeSeparator}{entry.badges} badges</p>
                     </div>
                   </div>
-                  <Award className="h-4 w-4 text-pacific-200" aria-hidden />
+                  <Award className="h-4 w-4 text-pacific-200" aria-hidden="true" />
                 </motion.li>
               ))}
             </ol>
@@ -444,7 +469,7 @@ export default function AchievementsHub({
             aria-label="Achievement timeline"
           >
             <div className="flex items-center gap-2 text-white">
-              <Bell className="h-5 w-5 text-coral-200" aria-hidden />
+              <Bell className="h-5 w-5 text-coral-200" aria-hidden="true" />
               <div>
                 <p className="text-sm text-white/70">Notification Center</p>
                 <h3 className="text-lg font-semibold">Achievement timeline</h3>
@@ -456,13 +481,13 @@ export default function AchievementsHub({
                 return (
                   <motion.li
                     key={notification.id}
-                    initial={prefersReducedMotion ? undefined : { opacity: 0, x: -8 }}
-                    animate={prefersReducedMotion ? undefined : { opacity: 1, x: 0 }}
-                    transition={{ ...cardTransition, delay: prefersReducedMotion ? 0 : idx * 0.05 }}
+                    initial={reducedMotion ? undefined : { opacity: 0, x: -8 }}
+                    animate={reducedMotion ? undefined : { opacity: 1, x: 0 }}
+                    transition={{ ...cardTransition, delay: reducedMotion ? 0 : idx * 0.05 }}
                     className="flex gap-3 rounded-xl bg-white/5 p-3 text-white"
                   >
                     <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-black/30">
-                      <IconComponent className="h-5 w-5 text-pacific-200" aria-hidden />
+                      <IconComponent className="h-5 w-5 text-pacific-200" aria-hidden="true" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
