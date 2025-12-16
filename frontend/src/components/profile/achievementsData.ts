@@ -200,7 +200,7 @@ export const categoryStyles: Record<Achievement['category'], string> = {
 export const categoryLegend = [
   { label: 'Contributor', color: 'bg-pacific-400', initial: 'C' },
   { label: 'Explorer', color: 'bg-sand-400', initial: 'E' },
-  { label: 'Quality', color: 'bg-coral-400', initial: 'Q' },
+  { label: 'Quality Champion', color: 'bg-coral-400', initial: 'Q' },
   { label: 'Specialist', color: 'bg-palm-400', initial: 'S' },
 ];
 
