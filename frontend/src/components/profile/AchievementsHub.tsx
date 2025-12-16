@@ -1,190 +1,18 @@
 'use client';
 
-import type React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Bell, Crown, Share2, Star, Award } from 'lucide-react';
 import {
-  Award,
-  BadgeCheck,
-  BarChart3,
-  Bell,
-  Compass,
-  Crown,
-  Flame,
-  Globe2,
-  Medal,
-  Share2,
-  ShieldCheck,
-  Star,
-  Upload,
-} from 'lucide-react';
-
-interface Notification {
-  id: string;
-  title: string;
-  timestamp: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-interface Achievement {
-  id: string;
-  name: string;
-  category: 'Contributor' | 'Explorer' | 'Quality Champion' | 'Specialist';
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  progress: number;
-  target: number;
-  milestoneLabel: string;
-  unlocked: boolean;
-  nextMilestone: string;
-}
-
-interface LeaderboardEntry {
-  id: string;
-  name: string;
-  uploads: number;
-  badges: number;
-  rank: number;
-}
-
-const achievements: Achievement[] = [
-  {
-    id: 'contributor-10',
-    name: 'Active Contributor',
-    category: 'Contributor',
-    description: 'Reach 10 verified uploads to inspire the community.',
-    icon: Upload,
-    progress: 8,
-    target: 10,
-    milestoneLabel: 'Uploads',
-    unlocked: false,
-    nextMilestone: '2 more uploads to reach Bronze Contributor',
-  },
-  {
-    id: 'contributor-50',
-    name: 'Impact Architect',
-    category: 'Contributor',
-    description: 'Share 50 high-quality uploads with metadata.',
-    icon: Medal,
-    progress: 26,
-    target: 50,
-    milestoneLabel: 'Uploads',
-    unlocked: false,
-    nextMilestone: 'Upload 24 more items for Silver status',
-  },
-  {
-    id: 'explorer-5',
-    name: 'Regional Explorer',
-    category: 'Explorer',
-    description: 'Cover 5 distinct countries with disaster imagery.',
-    icon: Globe2,
-    progress: 5,
-    target: 5,
-    milestoneLabel: 'Countries mapped',
-    unlocked: true,
-    nextMilestone: 'Next: Continental Voyager at 10 countries',
-  },
-  {
-    id: 'explorer-continents',
-    name: 'Continental Voyager',
-    category: 'Explorer',
-    description: 'Contribute imagery across three continents.',
-    icon: Compass,
-    progress: 2,
-    target: 3,
-    milestoneLabel: 'Continents reached',
-    unlocked: false,
-    nextMilestone: 'Visit 1 more continent for unlock',
-  },
-  {
-    id: 'quality-95',
-    name: 'Quality Champion',
-    category: 'Quality Champion',
-    description: 'Maintain a 95% approval rate across reviews.',
-    icon: ShieldCheck,
-    progress: 93,
-    target: 95,
-    milestoneLabel: 'Approval rate',
-    unlocked: false,
-    nextMilestone: 'Improve approval rate by 2% to unlock',
-  },
-  {
-    id: 'quality-100',
-    name: 'Perfect Steward',
-    category: 'Quality Champion',
-    description: 'Sustain 100 approved uploads in a row.',
-    icon: BadgeCheck,
-    progress: 64,
-    target: 100,
-    milestoneLabel: 'Approved streak',
-    unlocked: false,
-    nextMilestone: '36 approvals away from flawless streak',
-  },
-  {
-    id: 'specialist-flood',
-    name: 'Flood Specialist',
-    category: 'Specialist',
-    description: 'Catalog 30 high-signal flood impact scenes.',
-    icon: BarChart3,
-    progress: 30,
-    target: 30,
-    milestoneLabel: 'Flood uploads',
-    unlocked: true,
-    nextMilestone: 'Eligible for community spotlight',
-  },
-  {
-    id: 'specialist-wildfire',
-    name: 'Wildfire Analyst',
-    category: 'Specialist',
-    description: 'Document 25 wildfire hazard assessments.',
-    icon: Flame,
-    progress: 14,
-    target: 25,
-    milestoneLabel: 'Wildfire uploads',
-    unlocked: false,
-    nextMilestone: '11 more wildfire uploads for badge',
-  },
-];
-
-const leaderboard: LeaderboardEntry[] = [
-  { id: '1', name: 'Lena M.', uploads: 182, badges: 9, rank: 1 },
-  { id: '2', name: 'You', uploads: 134, badges: 7, rank: 2 },
-  { id: '3', name: 'Alex M.', uploads: 118, badges: 6, rank: 3 },
-  { id: '4', name: 'Saeed', uploads: 94, badges: 5, rank: 4 },
-  { id: '5', name: 'Priya', uploads: 88, badges: 4, rank: 5 },
-];
-
-const notifications: Notification[] = [
-  {
-    id: 'n1',
-    title: 'Unlocked: Regional Explorer',
-    timestamp: 'Today, 09:45',
-    description: 'You mapped your fifth country and unlocked a new Explorer badge.',
-    icon: Compass,
-  },
-  {
-    id: 'n2',
-    title: 'Leaderboard surge',
-    timestamp: 'Yesterday, 16:20',
-    description: 'Two new uploads helped you climb to rank #2 among contributors.',
-    icon: Crown,
-  },
-  {
-    id: 'n3',
-    title: 'Quality streak at 90%',
-    timestamp: 'Mon, 14:10',
-    description: 'Review feedback shows a 90% approval streak—keep aiming for 95%.',
-    icon: ShieldCheck,
-  },
-];
-
-const categoryStyles: Record<Achievement['category'], string> = {
-  Contributor: 'from-pacific-500/20 to-pacific-500/5 border-pacific-500/30',
-  Explorer: 'from-sand-500/20 to-sand-500/5 border-sand-500/30',
-  'Quality Champion': 'from-coral-500/20 to-coral-500/5 border-coral-500/30',
-  Specialist: 'from-palm-500/20 to-palm-500/5 border-palm-500/30',
-};
+  Achievement,
+  LeaderboardEntry,
+  Notification,
+  achievements,
+  categoryStyles,
+  leaderboard,
+  notifications,
+  textSeparator,
+} from './achievementsData';
 
 const springTransition = {
   type: 'spring',
@@ -192,7 +20,6 @@ const springTransition = {
   damping: 20,
 };
 
-const badgeSeparator = ' • ';
 const shareUrl = process.env.NEXT_PUBLIC_SHARE_URL || 'https://impactdatabase.org';
 const unlockedAnimation = { scale: [0.8, 1.1, 1], rotate: [0, 5, 0] };
 const lockedAnimation = { scale: 1, rotate: 0 };
@@ -229,6 +56,7 @@ export default function AchievementsHub({
   );
 
   const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
+  const leaderboardAnimated = useRef(true);
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -245,6 +73,10 @@ export default function AchievementsHub({
 
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [prefersReducedMotion]);
+
+  useEffect(() => {
+    leaderboardAnimated.current = false;
+  }, [leaderboardData]);
 
   /**
    * Shares an achievement badge using the most appropriate method for the user's platform.
@@ -264,9 +96,23 @@ export default function AchievementsHub({
           url: shareUrl,
         })
         .then(() => setShareStatus(`Shared ${achievement.name}!`))
-        .catch((error) => {
+        .catch((error: unknown) => {
           console.error(`Share failed for achievement "${achievement.name}" (ID: ${achievement.id})`, error);
-          setShareStatus(`Unable to share ${achievement.name}. Please try again.`);
+          const typedError = error as { name?: string; message?: string } | undefined;
+          if (typedError?.name === 'AbortError' || typedError?.message?.toLowerCase().includes('cancel')) {
+            setShareStatus('Sharing cancelled.');
+            return;
+          }
+
+          let userMessage = `Unable to share ${achievement.name}. Please try again.`;
+          if (typedError?.name === 'NotAllowedError') {
+            userMessage = `Sharing blocked. Check your browser permissions for ${achievement.name}.`;
+          } else if (typedError?.name === 'NotFoundError') {
+            userMessage = `No share target found for ${achievement.name}. Try copying the link instead.`;
+          } else if (typedError?.name === 'NetworkError') {
+            userMessage = `Network issue while sharing ${achievement.name}. Please retry when you're online.`;
+          }
+          setShareStatus(userMessage);
         });
       return;
     }
@@ -285,6 +131,7 @@ export default function AchievementsHub({
   const cardTransition = reducedMotion ? { duration: 0 } : springTransition;
   const badgeHover = reducedMotion ? undefined : { y: -4, scale: 1.02 };
   const badgeTap = reducedMotion ? undefined : { scale: 0.98 };
+  const shouldAnimateLeaderboard = !reducedMotion && leaderboardAnimated.current;
 
   return (
     <section
@@ -301,7 +148,7 @@ export default function AchievementsHub({
               most active contributors.
             </p>
           </div>
-          <nav aria-label="Share unlocked achievements" aria-live="polite" aria-atomic="true" className="flex gap-4">
+          <nav aria-label="Share unlocked achievements" className="flex gap-4">
             {unlockedBadges.map((badge) => (
               <motion.button
                 key={badge.id}
@@ -378,8 +225,12 @@ export default function AchievementsHub({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <motion.div
-                        initial={achievement.unlocked && !reducedMotion ? { scale: 0.8 } : undefined}
-                        animate={iconAnimation}
+                          initial={
+                            achievement.unlocked && !reducedMotion
+                              ? { scale: unlockedAnimation.scale[0], rotate: unlockedAnimation.rotate[0] }
+                              : undefined
+                          }
+                          animate={iconAnimation}
                           transition={cardTransition}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
                           aria-label={`${achievement.category} badge icon`}
@@ -396,7 +247,7 @@ export default function AchievementsHub({
                             )}
                           </div>
                           <p className="text-sm text-white/70">{achievement.description}</p>
-                          <p className="mt-1 text-xs text-white/60">{achievement.category}{badgeSeparator}{achievement.milestoneLabel}</p>
+                          <p className="mt-1 text-xs text-white/60">{achievement.category}{textSeparator}{achievement.milestoneLabel}</p>
                         </div>
                       </div>
                       <div className="text-right text-sm text-white/70">
@@ -442,12 +293,13 @@ export default function AchievementsHub({
               {leaderboardData.map((entry) => (
                 <motion.li
                   key={entry.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={springTransition}
+                  initial={shouldAnimateLeaderboard ? { opacity: 0, x: -8 } : false}
+                  animate={shouldAnimateLeaderboard ? { opacity: 1, x: 0 } : undefined}
+                  transition={shouldAnimateLeaderboard ? springTransition : undefined}
                   className={`flex items-center justify-between rounded-xl border border-white/5 p-3 text-sm text-white ${
                     entry.name === 'You' ? 'bg-pacific-500/10 shadow-md shadow-pacific-500/10' : 'bg-white/5'
                   }`}
+                  aria-label={`Rank ${entry.rank}: ${entry.name} with ${entry.uploads} uploads and ${entry.badges} badges`}
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-base font-semibold">
@@ -455,7 +307,7 @@ export default function AchievementsHub({
                     </div>
                     <div>
                       <p className="font-semibold">{entry.name}</p>
-                      <p className="text-xs text-white/60">{entry.uploads} uploads{badgeSeparator}{entry.badges} badges</p>
+                      <p className="text-xs text-white/60">{entry.uploads} uploads{textSeparator}{entry.badges} badges</p>
                     </div>
                   </div>
                   <Award className="h-4 w-4 text-pacific-200" aria-hidden="true" />

@@ -5,22 +5,42 @@ import AchievementsHub from '@/components/profile/AchievementsHub';
 
 describe('AchievementsHub', () => {
   let originalShare: Navigator['share'] | undefined;
+  let hadShare: boolean;
   let originalOpen: Window['open'] | undefined;
+  let hadOpen: boolean;
   let originalMatchMedia: typeof window.matchMedia | undefined;
 
   beforeEach(() => {
-    originalShare = 'share' in navigator ? navigator.share : undefined;
-    originalOpen = 'open' in window ? window.open : undefined;
+    hadShare = 'share' in navigator;
+    originalShare = hadShare ? navigator.share : undefined;
+    hadOpen = 'open' in window;
+    originalOpen = hadOpen ? window.open : undefined;
     originalMatchMedia = typeof window.matchMedia === 'function' ? window.matchMedia : undefined;
   });
 
   afterEach(() => {
-    if ('share' in navigator) {
-      navigator.share = originalShare;
+    if (hadShare) {
+      Object.defineProperty(navigator, 'share', {
+        value: originalShare,
+        configurable: true,
+        writable: true,
+      });
+    } else {
+      // @ts-expect-error cleanup for injected property
+      delete navigator.share;
     }
-    if ('open' in window) {
-      window.open = originalOpen;
+
+    if (hadOpen) {
+      Object.defineProperty(window, 'open', {
+        value: originalOpen,
+        configurable: true,
+        writable: true,
+      });
+    } else {
+      // @ts-expect-error cleanup for injected property
+      delete window.open;
     }
+
     if (originalMatchMedia) {
       window.matchMedia = originalMatchMedia;
     } else {
@@ -112,7 +132,7 @@ describe('AchievementsHub', () => {
     expect(items[2]).toHaveTextContent(/mon, 14:10/i);
   });
 
-  it('caps progress at 100% and applies category styling to achievements', () => {
+  it('caps progress at 100% for over-complete achievements', () => {
     const customAchievements = [
       {
         id: 'overachiever',
@@ -136,11 +156,36 @@ describe('AchievementsHub', () => {
       />,
     );
 
-    expect(screen.getByText(/Unlocked/i)).toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: /overachiever progress/i })).toHaveAttribute(
       'aria-valuenow',
       '100',
     );
+  });
+
+  it('applies category styling to achievements', () => {
+    const customAchievements = [
+      {
+        id: 'overachiever',
+        name: 'Overachiever',
+        category: 'Explorer' as const,
+        description: 'Exceeded progress example',
+        icon: Globe2,
+        progress: 120,
+        target: 100,
+        milestoneLabel: 'Countries mapped',
+        unlocked: true,
+        nextMilestone: 'Maxed out',
+      },
+    ];
+
+    render(
+      <AchievementsHub
+        achievementsData={customAchievements}
+        leaderboardData={[]}
+        notificationsData={[]}
+      />,
+    );
+
     expect(screen.getByLabelText(/overachiever achievement card/i).className).toContain('from-sand-500/20');
   });
 
@@ -187,15 +232,18 @@ describe('AchievementsHub', () => {
   it('updates reduced motion preference when the media query changes', () => {
     const listeners: Array<(event: MediaQueryListEvent) => void> = [];
 
-    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    window.matchMedia = vi.fn().mockImplementation((query: string): MediaQueryList => ({
       matches: true,
       media: query,
+      onchange: null,
       addEventListener: (_event: string, listener: (event: MediaQueryListEvent) => void) => {
         listeners.push(listener);
       },
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
-    })) as unknown as typeof window.matchMedia;
+      addListener: (listener: (event: MediaQueryListEvent) => void) => listeners.push(listener),
+      removeListener: vi.fn(),
+    }));
 
     const { container } = render(<AchievementsHub />);
 
