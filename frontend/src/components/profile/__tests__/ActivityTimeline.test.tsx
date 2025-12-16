@@ -1,28 +1,35 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { vi } from 'vitest';
-import ActivityTimeline from '@/components/profile/ActivityTimeline';
+import { jest } from '@jest/globals';
 
-const renderTimeline = () => {
-  const queryClient = new QueryClient({
+const createQueryClient = () =>
+  new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
 
+const renderTimeline = async (module?: typeof import('@/components/profile/ActivityTimeline')) => {
+  const activityModule = module ?? (await import('@/components/profile/ActivityTimeline'));
+  const queryClient = createQueryClient();
+
   return render(
     <QueryClientProvider client={queryClient}>
-      <ActivityTimeline />
+      <activityModule.default />
     </QueryClientProvider>,
   );
 };
 
 describe('ActivityTimeline', () => {
+  beforeEach(() => {
+    jest.resetModules();
+  });
+
   afterEach(() => {
-    vi.restoreAllMocks();
+    jest.restoreAllMocks();
   });
 
   it('renders activities with semantic list roles', async () => {
-    renderTimeline();
+    await renderTimeline();
 
     expect(await screen.findByRole('feed', { name: /activity feed/i })).toBeInTheDocument();
     const items = await screen.findAllByRole('listitem');
@@ -30,34 +37,38 @@ describe('ActivityTimeline', () => {
   });
 
   it('filters activities by type', async () => {
-    renderTimeline();
+    await renderTimeline();
 
     await userEvent.click(screen.getByRole('button', { name: /filter by uploads/i }));
 
     await waitFor(() => {
       const items = screen.getAllByRole('listitem');
-      expect(items).toHaveLength(1);
-      expect(screen.getByText(/uploaded/i)).toBeInTheDocument();
+      expect(items.length).toBeGreaterThan(0);
+      items.forEach((item) => {
+        expect(item.textContent?.toLowerCase()).toContain('upload');
+      });
     });
   });
 
   it('marks individual activities as read and updates counters', async () => {
-    renderTimeline();
+    await renderTimeline();
 
-    const unreadBadge = await screen.findByText('Unread');
-    expect(unreadBadge).toBeInTheDocument();
+    const unreadFlags = await screen.findAllByText('Unread');
+    const initialUnread = unreadFlags.length;
 
-    const markButtons = await screen.findAllByRole('button', { name: /mark as read/i });
+    const markButtons = await screen.findAllByRole('button', { name: /mark .* as read/i });
     await userEvent.click(markButtons[0]);
 
     await waitFor(() => {
       expect(screen.getByText(/marked as read/i)).toBeInTheDocument();
-      expect(screen.getByText(/Mark all as read/)).not.toBeDisabled();
+      const remainingUnread = screen.getAllByText('Unread').length;
+      expect(remainingUnread).toBe(initialUnread - 1);
+      expect(screen.getByRole('button', { name: /mark all as read/i })).not.toBeDisabled();
     });
   });
 
   it('disables bulk read when all items are read', async () => {
-    renderTimeline();
+    await renderTimeline();
 
     const bulkButton = await screen.findByRole('button', { name: /mark all as read/i });
     expect(bulkButton).toBeEnabled();
@@ -72,10 +83,33 @@ describe('ActivityTimeline', () => {
 
   it('shows error state when query fails', async () => {
     const module = await import('@/components/profile/ActivityTimeline');
-    vi.spyOn(module, 'fetchActivityTimeline').mockRejectedValueOnce(new Error('Network error'));
+    jest.spyOn(module, 'fetchActivityTimeline').mockRejectedValueOnce(new Error('Network error'));
 
-    renderTimeline();
+    await renderTimeline(module);
 
     expect(await screen.findByText(/failed to load activity timeline/i)).toBeInTheDocument();
+  });
+
+  it('shows loading and empty states appropriately', async () => {
+    const module = await import('@/components/profile/ActivityTimeline');
+    jest.spyOn(module, 'fetchActivityTimeline').mockResolvedValueOnce([]);
+
+    await renderTimeline(module);
+
+    expect(screen.getByText(/loading timeline/i)).toBeInTheDocument();
+    expect(await screen.findByText(/no activity to show/i)).toBeInTheDocument();
+  });
+
+  it('renders review, system, and achievement details', async () => {
+    await renderTimeline();
+
+    expect(await screen.findByText(/reviewed by/i)).toBeInTheDocument();
+    expect(screen.getByText(/feedback from/i)).toBeInTheDocument();
+    expect(screen.getByText(/scheduled maintenance/i)).toBeInTheDocument();
+
+    const achievement = screen.getByText(/consistency champion/i);
+    expect(achievement).toBeInTheDocument();
+    const achievementBadge = within(achievement.closest('article') as HTMLElement).getByText(/consistency champion/i);
+    expect(achievementBadge).toBeInTheDocument();
   });
 });

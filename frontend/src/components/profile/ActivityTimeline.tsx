@@ -18,18 +18,44 @@ import { formatDistanceToNow } from 'date-fns';
 
 export type ActivityType = 'upload' | 'edit' | 'review' | 'achievement' | 'system';
 
-export interface ActivityItem {
+interface BaseActivity {
   id: string;
-  type: ActivityType;
   title: string;
   description: string;
   timestamp: string;
-  reviewer?: string;
-  reviewComments?: string;
-  suggestedImprovements?: string[];
-  systemMessage?: string;
-  achievementBadge?: string;
 }
+
+export interface UploadActivity extends BaseActivity {
+  type: 'upload';
+}
+
+export interface EditActivity extends BaseActivity {
+  type: 'edit';
+}
+
+export interface ReviewActivity extends BaseActivity {
+  type: 'review';
+  reviewer: string;
+  reviewComments: string;
+  suggestedImprovements?: string[];
+}
+
+export interface AchievementActivity extends BaseActivity {
+  type: 'achievement';
+  achievementBadge: string;
+}
+
+export interface SystemActivity extends BaseActivity {
+  type: 'system';
+  systemMessage: string;
+}
+
+export type ActivityItem =
+  | UploadActivity
+  | EditActivity
+  | ReviewActivity
+  | AchievementActivity
+  | SystemActivity;
 
 const POLL_INTERVAL = 30_000;
 
@@ -129,7 +155,9 @@ export default function ActivityTimeline() {
   });
 
   const sortedActivities = useMemo(
-    () => [...activities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+    () =>
+      // Client-side sort keeps the feed chronological even if the API does not return ordered data.
+      [...activities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
     [activities],
   );
 
@@ -139,7 +167,9 @@ export default function ActivityTimeline() {
   );
 
   const unreadCount = useMemo(
-    () => activities.filter((item) => !readIds.has(item.id)).length,
+    () =>
+      // Count is intentionally global (not filtered) to reflect overall unread activity in the badge indicator.
+      activities.filter((item) => !readIds.has(item.id)).length,
     [activities, readIds],
   );
 
@@ -199,7 +229,7 @@ export default function ActivityTimeline() {
             <Bell className="h-6 w-6 text-white" />
             {unreadCount > 0 && (
               <span className="absolute -right-2 -top-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-coral-500 px-2 text-xs font-semibold text-white">
-                {unreadCount}
+                {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
           </div>
@@ -230,6 +260,8 @@ export default function ActivityTimeline() {
           <button
             onClick={markAllAsRead}
             disabled={unreadCount === 0}
+            aria-disabled={unreadCount === 0}
+            aria-label={unreadCount === 0 ? 'Mark all as read (no unread items)' : 'Mark all as read'}
             className={clsx(
               'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition',
               unreadCount === 0
@@ -238,7 +270,10 @@ export default function ActivityTimeline() {
             )}
           >
             <CheckCircle2 className="h-4 w-4" />
-            Mark all as read
+            <span className="flex items-center gap-1">
+              Mark all as read
+              {unreadCount === 0 && <span className="sr-only">(no unread items)</span>}
+            </span>
           </button>
         </div>
       </header>
@@ -295,6 +330,7 @@ export default function ActivityTimeline() {
                         {isUnread ? (
                           <button
                             onClick={() => markAsRead(item.id)}
+                            aria-label={`Mark "${item.title}" as read`}
                             className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/80 transition hover:border-white/30 hover:text-white"
                           >
                             Mark as read
