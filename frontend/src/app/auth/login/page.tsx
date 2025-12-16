@@ -55,16 +55,16 @@ function LoginPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="flex flex-col lg:flex-row min-h-screen">
         {/* Left Panel - Branding */}
-        <div className="lg:w-1/2 bg-gradient-to-r from-pacific-600 to-pacific-700 text-white p-8 flex flex-col justify-center">
+        <div className="lg:w-1/2 bg-gradient-to-br from-blue-600 via-cyan-600 to-teal-600 text-white p-8 flex flex-col justify-center">
           <div className="max-w-md mx-auto">
             <div className="flex items-center mb-8">
               <Waves className="w-12 h-12 mr-4" />
               <div>
                 <h1 className="text-3xl font-bold">Pacific Impact Atlas</h1>
-                <p className="text-pacific-100">Community Evidence Hub</p>
+                <p className="text-blue-100">Community Evidence Hub</p>
               </div>
             </div>
             
@@ -72,26 +72,26 @@ function LoginPageContent() {
               Your Photos Help Our Islands
             </h2>
             
-            <p className="text-lg text-pacific-100 mb-8">
+            <p className="text-lg text-blue-50 mb-8">
               Share field observations of cyclones, floods, tsunamis, and other hazards affecting Pacific communities. 
               Your contributions help emergency responders, climate scientists, and community leaders make better decisions.
             </p>
             
             <div className="space-y-4">
               <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 mr-3 text-palm-300" />
+                <CheckCircle className="w-5 h-5 mr-3 text-green-300" />
                 <span>Share photos from your phone or camera</span>
               </div>
               <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 mr-3 text-palm-300" />
+                <CheckCircle className="w-5 h-5 mr-3 text-green-300" />
                 <span>See how disasters affect our region</span>
               </div>
               <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 mr-3 text-palm-300" />
+                <CheckCircle className="w-5 h-5 mr-3 text-green-300" />
                 <span>Support your community's resilience</span>
               </div>
               <div className="flex items-center">
-                <CheckCircle className="w-5 h-5 mr-3 text-palm-300" />
+                <CheckCircle className="w-5 h-5 mr-3 text-green-300" />
                 <span>No technical skills needed</span>
               </div>
             </div>
@@ -123,14 +123,14 @@ function LoginPageContent() {
               )}
 
               {/* Social Media Benefits */}
-              <div className="mb-6 p-4 bg-pacific-50 rounded-lg border border-pacific-200">
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
                 <div className="flex items-start">
-                  <Shield className="w-5 h-5 text-pacific-600 mt-0.5 mr-3" />
+                  <Shield className="w-5 h-5 text-blue-600 mt-0.5 mr-3" />
                   <div>
-                    <h3 className="text-sm font-medium text-pacific-900 mb-1">
+                    <h3 className="text-sm font-medium text-blue-900 mb-1">
                       Quick & Secure Sign-In
                     </h3>
-                    <p className="text-xs text-pacific-700">
+                    <p className="text-xs text-blue-700">
                       Use your existing Google, Facebook, or GitHub account. 
                       No need to create a new password.
                     </p>
@@ -215,9 +215,9 @@ function LoginPageContent() {
               </div>
               
               {/* Guest Access Info */}
-              <div className="mt-6 p-4 bg-palm-50 rounded-lg border border-palm-200">
+              <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
                 <div className="flex items-start">
-                  <Users className="w-5 h-5 text-palm-600 mt-0.5 mr-3" />
+                  <Users className="w-5 h-5 text-green-600 mt-0.5 mr-3" />
                   <div>
                     <h3 className="text-sm font-medium text-gray-900 mb-1">
                       Just Looking Around?
@@ -228,7 +228,7 @@ function LoginPageContent() {
                     </p>
                     <button
                       onClick={() => router.push('/')}
-                      className="text-sm text-palm-600 hover:text-palm-700 font-semibold"
+                      className="text-sm text-green-600 hover:text-green-700 font-semibold"
                     >
                       Browse as Guest →
                     </button>
@@ -242,7 +242,7 @@ function LoginPageContent() {
                   <strong>Need help?</strong> Email us at{' '}
                   <a 
                     href="mailto:support@pacific-impact-atlas.org" 
-                    className="text-pacific-600 hover:text-pacific-700 font-medium"
+                    className="text-blue-600 hover:text-blue-700 font-medium"
                   >
                     support@pacific-impact-atlas.org
                   </a>
