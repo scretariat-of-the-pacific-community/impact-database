@@ -140,7 +140,8 @@ function LoginPageContent() {
               {/* Sign In Button */}
               <button
                 onClick={handleSignIn}
-                disabled={isSigningIn}4 bg-pacific-600 text-white font-semibold text-lg rounded-lg hover:bg-pacific-700 focus:ring-4 focus:ring-pacific-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                disabled={isSigningIn}
+                className="w-full flex items-center justify-center px-6 py-4 bg-pacific-600 text-white font-semibold text-lg rounded-lg hover:bg-pacific-700 focus:ring-4 focus:ring-pacific-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
               >
                 {isSigningIn ? (
                   <>
@@ -149,8 +150,7 @@ function LoginPageContent() {
                   </>
                 ) : (
                   <>
-                    Sign In to Contribute5 h-5 mr-3" />
-                    Sign In with SPC SSO
+                    Sign In to Contribute
                     <ArrowRight className="w-5 h-5 ml-3" />
                   </>
                 )}
