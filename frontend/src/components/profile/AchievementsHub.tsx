@@ -32,8 +32,12 @@ const getTrustedShareUrl = () => {
   try {
     const parsed = new URL(envUrl);
     const validSubdomain = /^[a-z0-9]+(-[a-z0-9]+)*\.impactdatabase\.org$/i;
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const allowedProtocol = isDevelopment
+      ? parsed.protocol === 'https:' || parsed.protocol === 'http:'
+      : parsed.protocol === 'https:';
     if (
-      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      allowedProtocol &&
       (parsed.hostname === 'impactdatabase.org' || validSubdomain.test(parsed.hostname))
     ) {
       return parsed.toString();
@@ -189,30 +193,34 @@ export default function AchievementsHub({
               most active contributors.
             </p>
           </div>
-          {unlockedBadges.length > 0 && (
-            <nav aria-label="Share unlocked achievements" className="flex flex-wrap gap-4">
-              {unlockedBadges.map((badge) => (
-                <motion.button
-                  key={badge.id}
-                  whileHover={badgeHover}
-                  whileTap={badgeTap}
-                  onClick={() => shareBadge(badge)}
-                  className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
-                  aria-label={`Share ${badge.name}`}
-                >
-                  <Share2
-                    className={`h-4 w-4 text-pacific-300${reducedMotion ? '' : ' group-hover:rotate-6'}`}
-                    aria-hidden="true"
-                  />
-                  Share {badge.name}
-                </motion.button>
-              ))}
-            </nav>
-          )}
-          {shareStatus && (
-            <p role="status" className="text-sm text-white/70">
-              {shareStatus}
-            </p>
+          {(unlockedBadges.length > 0 || shareStatus) && (
+            <div className="flex flex-col items-end gap-2">
+              {unlockedBadges.length > 0 && (
+                <nav aria-label="Share unlocked achievements" className="flex flex-wrap gap-4">
+                  {unlockedBadges.map((badge) => (
+                    <motion.button
+                      key={badge.id}
+                      whileHover={badgeHover}
+                      whileTap={badgeTap}
+                      onClick={() => shareBadge(badge)}
+                      className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
+                      aria-label={`Share ${badge.name}`}
+                    >
+                      <Share2
+                        className={`h-4 w-4 text-pacific-300${reducedMotion ? '' : ' group-hover:rotate-6'}`}
+                        aria-hidden="true"
+                      />
+                      Share {badge.name}
+                    </motion.button>
+                  ))}
+                </nav>
+              )}
+              {shareStatus && (
+                <p role="status" className="text-sm text-white/70">
+                  {shareStatus}
+                </p>
+              )}
+            </div>
           )}
         </div>
       </header>
