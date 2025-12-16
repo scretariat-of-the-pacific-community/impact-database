@@ -92,11 +92,13 @@ describe('ActivityTimeline', () => {
 
   it('shows loading and empty states appropriately', async () => {
     const module = await import('@/components/profile/ActivityTimeline');
-    jest.spyOn(module, 'fetchActivityTimeline').mockResolvedValueOnce([]);
+    jest.spyOn(module, 'fetchActivityTimeline').mockImplementationOnce(
+      () => new Promise((resolve) => setTimeout(() => resolve([]), 50)),
+    );
 
     await renderTimeline(module);
 
-    expect(screen.getByText(/loading timeline/i)).toBeInTheDocument();
+    expect(await screen.findByText(/loading timeline/i)).toBeInTheDocument();
     expect(await screen.findByText(/no activity to show/i)).toBeInTheDocument();
   });
 

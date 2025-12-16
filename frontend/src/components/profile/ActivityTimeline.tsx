@@ -35,7 +35,7 @@ export interface EditActivity extends BaseActivity {
 
 export interface ReviewActivity extends BaseActivity {
   type: 'review';
-  reviewer: string;
+  reviewer?: string;
   reviewComments: string;
   suggestedImprovements?: string[];
 }
@@ -119,16 +119,16 @@ const filterLabels: Record<ActivityType | 'all', string> = {
   system: 'System',
 };
 
-const iconMap: Record<ActivityType, JSX.Element> = {
-  upload: <Upload className="h-4 w-4" />,
-  edit: <FileText className="h-4 w-4" />,
-  review: <MessageSquareText className="h-4 w-4" />,
-  achievement: <Trophy className="h-4 w-4" />,
-  system: <AlertTriangle className="h-4 w-4" />,
+const iconMap: Record<ActivityType, () => JSX.Element> = {
+  upload: () => <Upload className="h-4 w-4" />,
+  edit: () => <FileText className="h-4 w-4" />,
+  review: () => <MessageSquareText className="h-4 w-4" />,
+  achievement: () => <Trophy className="h-4 w-4" />,
+  system: () => <AlertTriangle className="h-4 w-4" />,
 };
 
-const filterIcons: Record<ActivityType | 'all', JSX.Element> = {
-  all: <Filter className="h-4 w-4" />,
+const filterIcons: Record<ActivityType | 'all', () => JSX.Element> = {
+  all: () => <Filter className="h-4 w-4" />,
   upload: iconMap.upload,
   edit: iconMap.edit,
   review: iconMap.review,
@@ -192,8 +192,8 @@ export default function ActivityTimeline() {
         {item.reviewComments && <p className="text-sm text-white/80">{item.reviewComments}</p>}
         {item.suggestedImprovements?.length ? (
           <ul className="space-y-1 text-sm text-white/70">
-            {item.suggestedImprovements.map((tip) => (
-              <li key={tip} className="flex items-start gap-2">
+            {item.suggestedImprovements.map((tip, idx) => (
+              <li key={idx} className="flex items-start gap-2">
                 <span className="mt-[3px] block h-1.5 w-1.5 rounded-full bg-palm-300" />
                 <span>{tip}</span>
               </li>
@@ -228,7 +228,11 @@ export default function ActivityTimeline() {
           <div className="relative">
             <Bell className="h-6 w-6 text-white" />
             {unreadCount > 0 && (
-              <span className="absolute -right-2 -top-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-coral-500 px-2 text-xs font-semibold text-white">
+              <span
+                className="absolute -right-2 -top-2 inline-flex h-6 min-w-[1.5rem] items-center justify-center rounded-full bg-coral-500 px-2 text-xs font-semibold text-white"
+                aria-label={`unread activity count: ${unreadCount > 99 ? '99+' : unreadCount}`}
+                aria-live="polite"
+              >
                 {unreadCount > 99 ? '99+' : unreadCount}
               </span>
             )}
@@ -245,6 +249,7 @@ export default function ActivityTimeline() {
                 key={key}
                 onClick={() => setFilter(key)}
                 aria-label={`Filter by ${filterLabels[key].toLowerCase()}`}
+                aria-pressed={filter === key}
                 className={clsx(
                   'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition hover:scale-[1.01]',
                   filter === key
@@ -252,7 +257,7 @@ export default function ActivityTimeline() {
                     : 'border-white/10 bg-white/5 text-white/70 hover:text-white',
                 )}
               >
-                {filterIcons[key]}
+                {filterIcons[key]()}
                 {filterLabels[key]}
               </button>
             ))}
@@ -282,7 +287,9 @@ export default function ActivityTimeline() {
         {isLoading ? (
           <p className="text-sm text-white/60">Loading timeline…</p>
         ) : filteredActivities.length === 0 ? (
-          <p className="text-sm text-white/60">No activity to show for this filter yet.</p>
+          <p className="text-sm text-white/60">
+            {filter === 'all' ? 'No activity to show yet.' : 'No activity to show for this filter yet.'}
+          </p>
         ) : (
           <ol className="space-y-3" role="feed" aria-label="Activity feed">
             {filteredActivities.map((item) => {
@@ -296,7 +303,7 @@ export default function ActivityTimeline() {
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="rounded-full bg-white/10 p-2 text-white">{iconMap[item.type]}</div>
+                      <div className="rounded-full bg-white/10 p-2 text-white">{iconMap[item.type]()}</div>
                       <div className="flex-1 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-semibold text-white">{item.title}</h3>
@@ -319,7 +326,7 @@ export default function ActivityTimeline() {
                             <Clock3 className="h-4 w-4" />
                             {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
                           </span>
-                          {item.reviewer && item.type === 'review' && (
+                          {item.type === 'review' && item.reviewer && (
                             <span className="inline-flex items-center gap-1 text-palm-200">
                               <MessageSquareText className="h-4 w-4" /> Reviewed by {item.reviewer}
                             </span>
