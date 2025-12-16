@@ -95,7 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const providerConfig = authProviders[provider];
       
       if (!providerConfig.clientId) {
-        throw new Error(`${provider} authentication is not configured`);
+        const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
+        const errorMessage = `${providerName} authentication is not configured. Please add NEXT_PUBLIC_${provider.toUpperCase()}_CLIENT_ID to your environment variables.`;
+        setAuthError(errorMessage);
+        console.error(errorMessage);
+        console.info('See docs/SOCIAL_AUTH_SETUP.md for setup instructions');
+        throw new Error(errorMessage);
       }
       
       // Generate PKCE challenge for security
@@ -126,7 +131,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.location.href = authUrl;
     } catch (error) {
       console.error('Sign in failed:', error);
-      setAuthError('We could not start the sign-in flow. Please check your network and try again.');
+      if (!authError) { // Only set generic error if we haven't already set a specific one
+        setAuthError('We could not start the sign-in flow. Please check your configuration and try again.');
+      }
       throw error;
     }
   };

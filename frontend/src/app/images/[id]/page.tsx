@@ -246,15 +246,17 @@ export default function ImageDetailPage() {
                   </div>
                 </div>
 
-                <div className="flex items-start space-x-3">
-                  <Building className="w-5 h-5 text-pacific-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-white">Source Agency</p>
-                    <p className="text-sm text-surface-soft">
-                      {SOURCE_AGENCY_LABELS[image.source_agency] || image.source_agency}
-                    </p>
+                {image.source_agency && (
+                  <div className="flex items-start space-x-3">
+                    <Building className="w-5 h-5 text-pacific-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-white">Source Agency</p>
+                      <p className="text-sm text-surface-soft">
+                        {SOURCE_AGENCY_LABELS[image.source_agency] || image.source_agency}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div className="flex items-start space-x-3">
                   <Calendar className="w-5 h-5 text-pacific-400 mt-0.5" />
@@ -278,16 +280,18 @@ export default function ImageDetailPage() {
                   </div>
                 )}
 
-                <div className="flex items-start space-x-3">
-                  <FileText className="w-5 h-5 text-pacific-400 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-white">File Info</p>
-                    <p className="text-sm text-surface-soft">
-                      {image.format_name}
-                      {fileSizeLabel ? ` • ${fileSizeLabel}` : ''}
-                    </p>
+                {(image.format_name || fileSizeLabel) && (
+                  <div className="flex items-start space-x-3">
+                    <FileText className="w-5 h-5 text-pacific-400 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-white">File Info</p>
+                      <p className="text-sm text-surface-soft">
+                        {image.format_name || 'Unknown format'}
+                        {fileSizeLabel ? ` • ${fileSizeLabel}` : ''}
+                      </p>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -430,12 +434,23 @@ function OverviewTab({ image }: { image: ImageMetadata }) {
 }
 
 function MetadataTab({ image }: { image: ImageMetadata }) {
+  // Format date stamp safely
+  const formatDateStamp = (dateStr: string) => {
+    if (!dateStr) return null;
+    try {
+      const date = new Date(dateStr);
+      return isNaN(date.getTime()) ? null : date.toLocaleDateString();
+    } catch {
+      return null;
+    }
+  };
+
   const metadataFields = [
     { label: 'File Identifier', value: image.file_identifier, icon: Database },
     { label: 'Language', value: image.language, icon: Globe },
     { label: 'Character Set', value: image.character_set, icon: FileText },
     { label: 'Hierarchy Level', value: image.hierarchy_level, icon: Shield },
-    { label: 'Date Stamp', value: new Date(image.date_stamp).toLocaleDateString(), icon: Clock },
+    { label: 'Date Stamp', value: formatDateStamp(image.date_stamp), icon: Clock },
     { label: 'Spatial Resolution', value: image.spatial_resolution, icon: MapPin },
     { label: 'Reference System', value: image.reference_system_info, icon: Globe },
     { label: 'Format Name', value: image.format_name, icon: FileText },

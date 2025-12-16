@@ -744,6 +744,12 @@ async def upload_image(
         # Prepare high-quality metadata fallbacks
         location_value = (upload_data.location or "").strip() or None
         country_value = (upload_data.country or "").strip() or None
+        
+        # Auto-detect country from EXIF if not provided
+        if not country_value and 'country_code' in exif_data:
+            country_value = exif_data['country_code']
+            logger.info(f"Auto-detected country {country_value} from EXIF GPS data")
+        
         location_for_context = location_value or country_value or "Unknown location"
         provided_title = (upload_data.title or "").strip()
         provided_abstract = (upload_data.abstract or "").strip()

@@ -10,7 +10,8 @@ import {
   ArrowRight,
   CheckCircle,
   Github,
-  Mail
+  Mail,
+  AlertCircle
 } from 'lucide-react';
 import ErrorBanner from '@/components/ErrorBanner';
 import { sanitizeReturnUrl } from '@/lib/security';
@@ -23,6 +24,15 @@ function LoginPageContent() {
 
   const sanitizedReturnUrl = sanitizeReturnUrl(searchParams.get('returnUrl'));
   const returnUrl = sanitizedReturnUrl || '/';
+
+  // Check which providers are configured
+  const providersAvailable = {
+    google: !!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
+    facebook: !!process.env.NEXT_PUBLIC_FACEBOOK_APP_ID,
+    github: !!process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID,
+  };
+
+  const hasAnyProvider = Object.values(providersAvailable).some(available => available);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -138,13 +148,38 @@ function LoginPageContent() {
                 </div>
               </div>
               
+              {!hasAnyProvider && (
+                <div className="mb-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-start">
+                    <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 mr-3" />
+                    <div>
+                      <h3 className="text-sm font-medium text-amber-900 mb-1">
+                        OAuth Not Configured
+                      </h3>
+                      <p className="text-xs text-amber-700 mb-2">
+                        Social media login is not configured. Please set up OAuth providers to enable authentication.
+                      </p>
+                      <a 
+                        href="https://github.com/kishkumar96/impact-database/blob/main/docs/SOCIAL_AUTH_SETUP.md"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-amber-800 hover:text-amber-900 font-semibold underline"
+                      >
+                        View Setup Guide →
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Social Sign In Buttons */}
               <div className="space-y-3">
                 {/* Google Sign In */}
                 <button
                   onClick={() => handleSignIn('google')}
-                  disabled={isSigningIn}
-                  className="w-full flex items-center justify-center px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:ring-4 focus:ring-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  disabled={isSigningIn || !providersAvailable.google}
+                  className="w-full flex items-center justify-center px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 hover:border-gray-400 focus:ring-4 focus:ring-gray-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm relative"
+                  title={!providersAvailable.google ? 'Google OAuth not configured. Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to your .env file.' : ''}
                 >
                   {isSigningIn ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-700"></div>
@@ -157,6 +192,9 @@ function LoginPageContent() {
                         <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                       </svg>
                       Continue with Google
+                      {!providersAvailable.google && (
+                        <span className="ml-2 text-xs text-amber-600">(Not configured)</span>
+                      )}
                     </>
                   )}
                 </button>
@@ -164,8 +202,9 @@ function LoginPageContent() {
                 {/* Facebook Sign In */}
                 <button
                   onClick={() => handleSignIn('facebook')}
-                  disabled={isSigningIn}
+                  disabled={isSigningIn || !providersAvailable.facebook}
                   className="w-full flex items-center justify-center px-6 py-3 bg-[#1877F2] text-white font-medium rounded-lg hover:bg-[#166FE5] focus:ring-4 focus:ring-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  title={!providersAvailable.facebook ? 'Facebook OAuth not configured. Add NEXT_PUBLIC_FACEBOOK_APP_ID to your .env file.' : ''}
                 >
                   {isSigningIn ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -175,6 +214,9 @@ function LoginPageContent() {
                         <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                       </svg>
                       Continue with Facebook
+                      {!providersAvailable.facebook && (
+                        <span className="ml-2 text-xs text-amber-200">(Not configured)</span>
+                      )}
                     </>
                   )}
                 </button>
@@ -182,8 +224,9 @@ function LoginPageContent() {
                 {/* GitHub Sign In */}
                 <button
                   onClick={() => handleSignIn('github')}
-                  disabled={isSigningIn}
+                  disabled={isSigningIn || !providersAvailable.github}
                   className="w-full flex items-center justify-center px-6 py-3 bg-gray-800 text-white font-medium rounded-lg hover:bg-gray-900 focus:ring-4 focus:ring-gray-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  title={!providersAvailable.github ? 'GitHub OAuth not configured. Add NEXT_PUBLIC_GITHUB_CLIENT_ID to your .env file.' : ''}
                 >
                   {isSigningIn ? (
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
@@ -191,6 +234,9 @@ function LoginPageContent() {
                     <>
                       <Github className="w-5 h-5 mr-3" />
                       Continue with GitHub
+                      {!providersAvailable.github && (
+                        <span className="ml-2 text-xs text-gray-400">(Not configured)</span>
+                      )}
                     </>
                   )}
                 </button>

@@ -119,6 +119,8 @@ const nextConfig = {
   // Improve Fast Refresh performance
   experimental: {
     optimizeCss: false, // Disable CSS optimization in development
+    // Better Turbopack HMR handling
+    serverComponentsHmrCache: false,
   },
   async headers() {
     return [

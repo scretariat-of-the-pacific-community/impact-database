@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, AxiosResponse, isAxiosError } from 'axios';
 import { 
   SearchFilters, 
   SearchResponse, 
@@ -181,13 +181,42 @@ class APIClient {
   }
 
   async getUserStats(): Promise<UserStats> {
-    const response: AxiosResponse<UserStats> = await this.client.get('/api/user/stats');
-    return response.data;
+    try {
+      const response: AxiosResponse<UserStats> = await this.client.get('/api/user/stats');
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        // Fall back to placeholder stats when the endpoint is not available yet
+        return {
+          name: 'Impact Responder',
+          email: 'unknown@impactdatabase.org',
+          organization: 'Independent',
+          total_uploads: 0,
+          approval_rate: 0,
+          impact_score: 0,
+          last_active: new Date().toISOString(),
+          achievements: [],
+          analytics: {
+            uploads_this_month: 0,
+            average_review_time: 0,
+            top_hazard: 'unknown',
+          },
+        };
+      }
+      throw error;
+    }
   }
 
   async getUserUploads(): Promise<UserUpload[]> {
-    const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/user/uploads');
-    return response.data;
+    try {
+      const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/user/uploads');
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
   }
 
   async getCurrentUser(): Promise<User> {

@@ -35,26 +35,71 @@ def _find_image(db: Session, image_id: str) -> Optional[ImageMetadata]:
 
 
 def _serialize_image(image: ImageMetadata) -> Dict[str, Any]:
-    """Format ImageMetadata for API responses."""
+    """Format ImageMetadata for API responses with full ISO 19115 metadata."""
+    # Build contact information
+    contact_info = None
+    if hasattr(image, 'point_of_contact') and image.point_of_contact:
+        contact_info = {
+            "organisation_name": getattr(image, 'contact_organisation_name', None),
+            "individual_name": getattr(image, 'contact_individual_name', None),
+            "role": "pointOfContact",
+            "contact_info": {
+                "email": getattr(image, 'contact_email', None)
+            } if getattr(image, 'contact_email', None) else None
+        }
+    
+    # Build geographic bounding box if coordinates exist
+    geographic_element = None
+    if hasattr(image, 'latitude') and image.latitude and hasattr(image, 'longitude') and image.longitude:
+        lat = float(image.latitude)
+        lon = float(image.longitude)
+        geographic_element = {
+            "west_bound_longitude": lon,
+            "east_bound_longitude": lon,
+            "south_bound_latitude": lat,
+            "north_bound_latitude": lat
+        }
+    elif hasattr(image, 'geographic_bounding_box') and image.geographic_bounding_box:
+        geographic_element = image.geographic_bounding_box
+    
     return {
         "id": str(image.id) if hasattr(image, 'id') and image.id else image.filename,
         "filename": image.filename,
-        "title": image.title,
-        "description": image.abstract if hasattr(image, 'abstract') else None,
+        "title": image.title or "Untitled",
+        "abstract": image.abstract if hasattr(image, 'abstract') else None,
+        "purpose": getattr(image, 'purpose', None),
         "hazard_type": image.hazard_type,
-        "country": image.country,
-        "location": image.location,
+        "source_agency": getattr(image, 'source', None) or getattr(image, 'source_type', None),
+        "topic_category": image.topic_category if hasattr(image, 'topic_category') and image.topic_category else ["environment"],
         "keywords": image.keywords if hasattr(image, 'keywords') and image.keywords else [],
         "latitude": float(image.latitude) if hasattr(image, 'latitude') and image.latitude is not None else None,
         "longitude": float(image.longitude) if hasattr(image, 'longitude') and image.longitude is not None else None,
-        "upload_date": image.date_stamp.isoformat() if hasattr(image, 'date_stamp') and image.date_stamp else None,
+        "geographic_element": geographic_element,
+        "upload_date": image.datetime.isoformat() if hasattr(image, 'datetime') and image.datetime else None,
+        "date_stamp": image.date_stamp.isoformat() if hasattr(image, 'date_stamp') and image.date_stamp else None,
         "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
-        "full_url": f"/upload/images/{image.filename}" if image.filename else None,
-        "contact": {
-            "organisation_name": getattr(image, 'contact_organisation_name', None),
-            "individual_name": getattr(image, 'contact_individual_name', None),
-            "email": getattr(image, 'contact_email', None)
-        } if hasattr(image, 'point_of_contact') else None
+        "resource_locator": getattr(image, 'resource_locator', None) or f"/upload/images/{image.filename}" if image.filename else None,
+        
+        # ISO 19115 metadata fields
+        "file_identifier": str(image.id) if hasattr(image, 'id') and image.id else None,
+        "language": getattr(image, 'metadata_language', 'eng'),
+        "character_set": "UTF-8",
+        "hierarchy_level": "dataset",
+        "contact": contact_info,
+        "spatial_resolution": getattr(image, 'spatial_resolution', None),
+        "reference_system_info": "EPSG:4326",
+        "format_name": getattr(image, 'format_name', 'JPEG'),
+        "format_version": getattr(image, 'format_version', None),
+        "access_constraints": getattr(image, 'access_constraints', None),
+        "use_constraints": getattr(image, 'use_constraints', None),
+        "classification": getattr(image, 'security_classification', None),
+        "processing_level": None,  # Not in current model
+        "file_size": None,  # Not stored in current model
+        
+        # Legacy fields for backward compatibility
+        "country": image.country,
+        "location": image.location,
+        "full_url": f"/upload/images/{image.filename}" if image.filename else None
     }
 
 
@@ -475,3 +520,55 @@ async def get_stats(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
+
+
+@router.get("/images/{image_id}/history")
+async def get_image_history(
+    image_id: str,
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Return audit history entries for an image."""
+    try:
+        if (
+            "metadata:read" not in current_user.permissions
+            and "audit:view" not in current_user.permissions
+        ):
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permissions to view image history"
+            )
+        
+        from models.audit_log import AuditLog
+        
+        logs = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.table_name == "image_metadata",
+                AuditLog.record_id == image_id
+            )
+            .order_by(AuditLog.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
+        history = [
+            {
+                "id": log.id,
+                "field": log.field_name,
+                "action": log.action,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "changed_at": log.timestamp.isoformat() if log.timestamp else None,
+                "changed_by": log.username or log.user_id,
+            }
+            for log in logs
+        ]
+
+        return {"history": history}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to fetch history for {image_id}: {e}")
+        raise HTTPException(status_code=500, detail="Unable to load history for this image")

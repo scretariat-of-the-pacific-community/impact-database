@@ -6,8 +6,33 @@ import hashlib
 import logging
 from typing import Dict, Any, Optional, Tuple
 import os
+import httpx
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
+
+@lru_cache(maxsize=100)
+def reverse_geocode(latitude: float, longitude: float) -> Optional[str]:
+    """
+    Reverse geocode coordinates to get country code using Nominatim.
+    Cached to avoid repeated API calls for same coordinates.
+    """
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={latitude}&lon={longitude}&format=json&addressdetails=1"
+        headers = {'User-Agent': 'PacificImpactAtlas/1.0'}
+        
+        with httpx.Client(timeout=5.0) as client:
+            response = client.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                country_code = data.get('address', {}).get('country_code', '').upper()
+                if country_code:
+                    logger.info(f"Extracted country {country_code} from coordinates ({latitude}, {longitude})")
+                    return country_code
+    except Exception as e:
+        logger.warning(f"Failed to reverse geocode ({latitude}, {longitude}): {e}")
+    
+    return None
 
 def extract_exif_data(image_path: str) -> Dict[str, Any]:
     """Extract EXIF data from an image file."""
@@ -51,6 +76,11 @@ def extract_exif_data(image_path: str) -> Dict[str, Any]:
                         
                         exif_data['latitude'] = decimal_lat
                         exif_data['longitude'] = decimal_lon
+                        
+                        # Try to extract country from coordinates
+                        country_code = reverse_geocode(decimal_lat, decimal_lon)
+                        if country_code:
+                            exif_data['country_code'] = country_code
                     
                     exif_data['gps_data'] = gps_info
     
