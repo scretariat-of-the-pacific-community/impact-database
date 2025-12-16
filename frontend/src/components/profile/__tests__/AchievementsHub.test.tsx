@@ -1,15 +1,15 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { Globe2, Upload } from 'lucide-react';
 import { vi } from 'vitest';
 import AchievementsHub from '@/components/profile/AchievementsHub';
 
 describe('AchievementsHub', () => {
-  let originalShare: Navigator['share'];
-  let originalOpen: Window['open'];
+  let originalShare: Navigator['share'] | undefined;
+  let originalOpen: Window['open'] | undefined;
 
   beforeEach(() => {
-    originalShare = navigator.share;
-    originalOpen = window.open;
+    originalShare = 'share' in navigator ? navigator.share : undefined;
+    originalOpen = 'open' in window ? window.open : undefined;
   });
 
   afterEach(() => {
@@ -22,10 +22,11 @@ describe('AchievementsHub', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders share buttons with accessible labels', () => {
+  it('renders share buttons for all unlocked achievements with accessible labels', () => {
     render(<AchievementsHub />);
 
-    expect(screen.getByLabelText(/share regional explorer/i)).toBeInTheDocument();
+    const shareButtons = screen.getAllByLabelText(/share .*achievement|share .*explorer/i);
+    expect(shareButtons.length).toBeGreaterThanOrEqual(2);
   });
 
   it('never shows negative remaining counts', () => {
@@ -89,12 +90,18 @@ describe('AchievementsHub', () => {
     expect(consoleSpy.mock.calls[0]?.[0]).toContain('Regional Explorer');
   });
 
-  it('renders the notification timeline items', () => {
+  it('renders the notification timeline items in order with timestamps', () => {
     render(<AchievementsHub />);
 
-    expect(screen.getByText(/unlocked: regional explorer/i)).toBeInTheDocument();
-    expect(screen.getByText(/leaderboard surge/i)).toBeInTheDocument();
-    expect(screen.getByText(/quality streak at 90%/i)).toBeInTheDocument();
+    const timeline = screen.getByLabelText(/achievement timeline/i);
+    const items = within(timeline).getAllByRole('listitem');
+
+    expect(items[0]).toHaveTextContent(/unlocked: regional explorer/i);
+    expect(items[0]).toHaveTextContent(/today, 09:45/i);
+    expect(items[1]).toHaveTextContent(/leaderboard surge/i);
+    expect(items[1]).toHaveTextContent(/yesterday, 16:20/i);
+    expect(items[2]).toHaveTextContent(/quality streak at 90%/i);
+    expect(items[2]).toHaveTextContent(/mon, 14:10/i);
   });
 
   it('caps progress at 100% and applies category styling to achievements', () => {

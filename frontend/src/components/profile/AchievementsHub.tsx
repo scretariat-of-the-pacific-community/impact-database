@@ -1,7 +1,7 @@
 'use client';
 
 import type React from 'react';
-import { useCallback } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Award,
@@ -193,7 +193,7 @@ const springTransition = {
 };
 
 const badgeSeparator = ' • ';
-const shareUrl = 'https://impactdatabase.org';
+const shareUrl = process.env.NEXT_PUBLIC_SHARE_URL || 'https://impactdatabase.org';
 const unlockedAnimation = { scale: [0.8, 1.1, 1], rotate: [0, 5, 0] };
 const lockedAnimation = { scale: 1, rotate: 0 };
 
@@ -217,10 +217,19 @@ export default function AchievementsHub({
   leaderboardData = leaderboard,
   notificationsData = notifications,
 }: AchievementsHubProps) {
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
   const unlockedBadges = achievementsData.filter((achievement) => achievement.unlocked);
+  const prefersReducedMotion = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
 
   /**
-   * Shares an achievement badge via the Web Share API when available, falling back to Twitter intent on web.
+   * Shares an achievement badge using the most appropriate method for the user's platform.
+   *
+   * Attempts to use the Web Share API when available (supported browsers/devices). If unavailable, opens
+   * a Twitter intent in a new tab so users can still share their achievement. Provides user-facing feedback
+   * when sharing fails.
    */
   const shareBadge = useCallback((achievement: Achievement) => {
     const shareText = `I unlocked the ${achievement.name} badge on the Impact Database!`;
@@ -232,17 +241,28 @@ export default function AchievementsHub({
           text: shareText,
           url: shareUrl,
         })
-        .catch((error) =>
-          console.error(`Share failed for achievement "${achievement.name}" (ID: ${achievement.id})`, error),
-        );
+        .then(() => setShareStatus(`Shared ${achievement.name}!`))
+        .catch((error) => {
+          console.error(`Share failed for achievement "${achievement.name}" (ID: ${achievement.id})`, error);
+          setShareStatus(`Unable to share ${achievement.name}. Please try again.`);
+        });
       return;
     }
 
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
       shareText,
     )}&url=${encodeURIComponent(shareUrl)}`;
-    window.open(twitterUrl, '_blank');
+    const popup = window.open(twitterUrl, '_blank', 'noopener,noreferrer');
+    if (!popup) {
+      setShareStatus(`Unable to open sharing for ${achievement.name}. Please check your popup settings.`);
+    } else {
+      setShareStatus(`Opened Twitter to share ${achievement.name}.`);
+    }
   }, []);
+
+  const cardTransition = prefersReducedMotion ? { duration: 0 } : springTransition;
+  const badgeHover = prefersReducedMotion ? undefined : { y: -4, scale: 1.02 };
+  const badgeTap = prefersReducedMotion ? undefined : { scale: 0.98 };
 
   return (
     <section className="mx-auto max-w-7xl space-y-10 p-6">
@@ -256,12 +276,12 @@ export default function AchievementsHub({
               most active contributors.
             </p>
           </div>
-          <nav aria-label="Share unlocked achievements" className="flex gap-4">
+          <nav aria-label="Share unlocked achievements" aria-live="polite" aria-atomic="true" className="flex gap-4">
             {unlockedBadges.map((badge) => (
               <motion.button
                 key={badge.id}
-                whileHover={{ y: -4, scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={badgeHover}
+                whileTap={badgeTap}
                 onClick={() => shareBadge(badge)}
                 className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
                 aria-label={`Share ${badge.name}`}
@@ -270,6 +290,11 @@ export default function AchievementsHub({
                 Share {badge.name}
               </motion.button>
             ))}
+            {shareStatus && (
+              <p role="status" className="text-sm text-white/70">
+                {shareStatus}
+              </p>
+            )}
           </nav>
         </div>
       </header>
@@ -282,22 +307,22 @@ export default function AchievementsHub({
               <h2 className="text-2xl font-semibold text-white">Animated unlocks & progress</h2>
             </div>
             <ul className="flex gap-3 text-xs text-white/70" aria-label="Badge categories">
-              <li className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-pacific-400" aria-hidden />
-                Contributor
-              </li>
-              <li className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-sand-400" aria-hidden />
-                Explorer
-              </li>
-              <li className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-coral-400" aria-hidden />
-                Quality
-              </li>
-              <li className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-full bg-palm-400" aria-hidden />
-                Specialist
-              </li>
+              {[
+                { label: 'Contributor', color: 'bg-pacific-400', initial: 'C' },
+                { label: 'Explorer', color: 'bg-sand-400', initial: 'E' },
+                { label: 'Quality', color: 'bg-coral-400', initial: 'Q' },
+                { label: 'Specialist', color: 'bg-palm-400', initial: 'S' },
+              ].map((item) => (
+                <li key={item.label} className="flex items-center gap-1">
+                  <span
+                    className={`flex h-5 w-5 items-center justify-center rounded-full ${item.color} text-[10px] font-semibold text-black/80`}
+                    aria-hidden
+                  >
+                    {item.initial}
+                  </span>
+                  {item.label}
+                </li>
+              ))}
             </ul>
           </div>
 
@@ -307,15 +332,19 @@ export default function AchievementsHub({
                 const progressPct = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
                 const CategoryIcon = achievement.icon;
                 const badgeGradient = categoryStyles[achievement.category];
+                const iconAnimation = achievement.unlocked && !prefersReducedMotion ? unlockedAnimation : lockedAnimation;
+                const cardInitial = prefersReducedMotion ? undefined : { opacity: 0, y: 24, scale: 0.98 };
+                const cardAnimate = prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 };
+                const cardExit = prefersReducedMotion ? undefined : { opacity: 0, y: 20 };
 
                 return (
                   <motion.div
                     key={achievement.id}
                     layout
-                    initial={{ opacity: 0, y: 24, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 20 }}
-                    transition={{ ...springTransition, delay: index * 0.05 }}
+                    initial={cardInitial}
+                    animate={cardAnimate}
+                    exit={cardExit}
+                    transition={{ ...cardTransition, delay: prefersReducedMotion ? 0 : index * 0.05 }}
                     role="article"
                     aria-label={`${achievement.name} achievement card`}
                     className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${badgeGradient} p-5 shadow-lg`}
@@ -324,9 +353,9 @@ export default function AchievementsHub({
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         <motion.div
-                          initial={{ scale: achievement.unlocked ? 0.8 : 1 }}
-                          animate={achievement.unlocked ? unlockedAnimation : lockedAnimation}
-                          transition={springTransition}
+                          initial={achievement.unlocked && !prefersReducedMotion ? { scale: 0.8 } : undefined}
+                          animate={iconAnimation}
+                          transition={cardTransition}
                           className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
                           aria-label={`${achievement.category} badge icon`}
                         >
@@ -359,9 +388,9 @@ export default function AchievementsHub({
                         aria-valuenow={progressPct}
                         aria-label={`${achievement.name} progress`}
                         className="h-full rounded-full bg-gradient-to-r from-pacific-400 to-palm-400"
-                        initial={{ width: 0 }}
+                        initial={prefersReducedMotion ? false : { width: 0 }}
                         animate={{ width: `${progressPct}%` }}
-                        transition={springTransition}
+                        transition={cardTransition}
                       />
                     </div>
                     <div className="mt-2 flex items-center justify-between text-xs text-white/70">
@@ -410,7 +439,10 @@ export default function AchievementsHub({
             </ol>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-pacific-500/10 to-pacific-900/10 p-5 shadow-lg">
+          <div
+            className="rounded-2xl border border-white/10 bg-gradient-to-br from-pacific-500/10 to-pacific-900/10 p-5 shadow-lg"
+            aria-label="Achievement timeline"
+          >
             <div className="flex items-center gap-2 text-white">
               <Bell className="h-5 w-5 text-coral-200" aria-hidden />
               <div>
@@ -418,15 +450,15 @@ export default function AchievementsHub({
                 <h3 className="text-lg font-semibold">Achievement timeline</h3>
               </div>
             </div>
-            <div className="mt-4 space-y-4">
+            <ol className="mt-4 space-y-4">
               {notificationsData.map((notification, idx) => {
                 const IconComponent = notification.icon;
                 return (
-                  <motion.div
+                  <motion.li
                     key={notification.id}
-                    initial={{ opacity: 0, x: -8 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ ...springTransition, delay: idx * 0.05 }}
+                    initial={prefersReducedMotion ? undefined : { opacity: 0, x: -8 }}
+                    animate={prefersReducedMotion ? undefined : { opacity: 1, x: 0 }}
+                    transition={{ ...cardTransition, delay: prefersReducedMotion ? 0 : idx * 0.05 }}
                     className="flex gap-3 rounded-xl bg-white/5 p-3 text-white"
                   >
                     <div className="mt-1 flex h-9 w-9 items-center justify-center rounded-lg bg-black/30">
@@ -439,10 +471,10 @@ export default function AchievementsHub({
                       </div>
                       <p className="text-sm text-white/70">{notification.description}</p>
                     </div>
-                  </motion.div>
+                  </motion.li>
                 );
               })}
-            </div>
+            </ol>
           </div>
         </div>
       </div>
