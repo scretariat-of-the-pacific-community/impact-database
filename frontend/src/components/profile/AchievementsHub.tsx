@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { Bell, Crown, Share2, Star, Award } from 'lucide-react';
 import {
   Achievement,
@@ -23,6 +23,10 @@ const springTransition = {
 const shareUrl = process.env.NEXT_PUBLIC_SHARE_URL || 'https://impactdatabase.org';
 const unlockedAnimation = { scale: [0.8, 1.1, 1], rotate: [0, 5, 0] };
 const lockedAnimation = { scale: 1, rotate: 0 };
+const getPrefersReducedMotion = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
  * Optional data inputs for AchievementsHub. Each collection defaults to static example data
@@ -53,15 +57,7 @@ export default function AchievementsHub({
     return () => clearTimeout(timeout);
   }, [shareStatus]);
   const unlockedBadges = achievementsData.filter((achievement) => achievement.unlocked);
-  const prefersReducedMotion = useMemo(
-    () =>
-      typeof window !== 'undefined' &&
-      typeof window.matchMedia === 'function' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-    [],
-  );
-
-  const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion);
+  const [reducedMotion, setReducedMotion] = useState<boolean>(() => getPrefersReducedMotion());
   const leaderboardAnimated = useRef(true);
 
   useEffect(() => {
@@ -146,10 +142,10 @@ export default function AchievementsHub({
     >
       <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-pacific-500/10 via-white/5 to-black/20 p-8 shadow-lg">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex max-w-3xl flex-col gap-3">
             <p className="text-sm uppercase tracking-[0.25em] text-white/60">Achievements & badges</p>
-            <h1 className="mt-3 text-4xl font-semibold text-white">Progress that celebrates impact</h1>
-            <p className="mt-3 max-w-3xl text-white/70">
+            <h1 className="text-4xl font-semibold text-white">Progress that celebrates impact</h1>
+            <p className="text-white/70">
               Track your contribution milestones, unlock animated badges across categories, and see how you rank among the
               most active contributors.
             </p>
@@ -205,87 +201,83 @@ export default function AchievementsHub({
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <AnimatePresence>
-              {achievementsData.map((achievement, index) => {
-                const progressPct =
-                  typeof achievement.target === 'number' && achievement.target > 0
-                    ? Math.min(100, Math.round((achievement.progress / achievement.target) * 100))
-                    : 0;
-                const CategoryIcon = achievement.icon;
-                const badgeGradient = categoryStyles[achievement.category];
-                const iconAnimation = achievement.unlocked && !reducedMotion ? unlockedAnimation : lockedAnimation;
-                const cardInitial = reducedMotion ? undefined : { opacity: 0, y: 24, scale: 0.98 };
-                const cardAnimate = reducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 };
-                const cardExit = reducedMotion ? undefined : { opacity: 0, y: 20 };
+            {achievementsData.map((achievement, index) => {
+              const progressPct =
+                typeof achievement.target === 'number' && achievement.target > 0
+                  ? Math.min(100, Math.round((achievement.progress / achievement.target) * 100))
+                  : 0;
+              const CategoryIcon = achievement.icon;
+              const badgeGradient = categoryStyles[achievement.category];
+              const iconAnimation = achievement.unlocked && !reducedMotion ? unlockedAnimation : lockedAnimation;
+              const cardInitial = reducedMotion ? undefined : { opacity: 0, y: 24, scale: 0.98 };
+              const cardAnimate = reducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 };
 
-                return (
-                  <motion.div
-                    key={achievement.id}
-                    layout
-                    initial={cardInitial}
-                    animate={cardAnimate}
-                    exit={cardExit}
-                    transition={{ ...cardTransition, delay: reducedMotion ? 0 : index * 0.05 }}
-                    role="article"
-                    aria-label={`${achievement.name} achievement card`}
-                    className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${badgeGradient} p-5 shadow-lg`}
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-white/5 opacity-0 transition group-hover:opacity-100" />
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <motion.div
-                          initial={
-                            achievement.unlocked && !reducedMotion
-                              ? { scale: unlockedAnimation.scale[0], rotate: unlockedAnimation.rotate[0] }
-                              : undefined
-                          }
-                          animate={iconAnimation}
-                          transition={cardTransition}
-                          className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
-                          aria-label={`${achievement.category} badge icon`}
-                        >
-                          <CategoryIcon className="h-6 w-6" />
-                        </motion.div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-lg font-semibold text-white">{achievement.name}</h3>
-                            {achievement.unlocked && (
-                              <span className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs text-pacific-100">
-                                <Star className="h-3 w-3" /> Unlocked
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-white/70">{achievement.description}</p>
-                          <p className="mt-1 text-xs text-white/60">{achievement.category}{textSeparator}{achievement.milestoneLabel}</p>
-                        </div>
-                      </div>
-                      <div className="text-right text-sm text-white/70">
-                        <p className="text-xl font-semibold text-white">{achievement.progress}/{achievement.target}</p>
-                        <p>{progressPct}%</p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 h-2 w-full rounded-full bg-white/10">
+              return (
+                <motion.div
+                  key={achievement.id}
+                  layout
+                  initial={cardInitial}
+                  animate={cardAnimate}
+                  transition={{ ...cardTransition, delay: reducedMotion ? 0 : index * 0.05 }}
+                  role="article"
+                  aria-label={`${achievement.name} achievement card`}
+                  className={`group relative overflow-hidden rounded-2xl border bg-gradient-to-br ${badgeGradient} p-5 shadow-lg`}
+                >
+                  <div className="absolute inset-0 bg-gradient-to-tr from-white/5 via-transparent to-white/5 opacity-0 transition group-hover:opacity-100" />
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
                       <motion.div
-                        role="progressbar"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={progressPct}
-                        aria-label={`${achievement.name} progress`}
-                        className="h-full rounded-full bg-gradient-to-r from-pacific-400 to-palm-400"
-                        initial={reducedMotion ? false : { width: 0 }}
-                        animate={{ width: `${progressPct}%` }}
+                        initial={
+                          achievement.unlocked && !reducedMotion
+                            ? { scale: unlockedAnimation.scale[0], rotate: unlockedAnimation.rotate[0] }
+                            : undefined
+                        }
+                        animate={iconAnimation}
                         transition={cardTransition}
-                      />
+                        className="flex h-12 w-12 items-center justify-center rounded-xl bg-black/30 text-white"
+                        aria-label={`${achievement.category} badge icon`}
+                      >
+                        <CategoryIcon className="h-6 w-6" />
+                      </motion.div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-semibold text-white">{achievement.name}</h3>
+                          {achievement.unlocked && (
+                            <span className="flex items-center gap-1 rounded-full bg-white/10 px-2 py-0.5 text-xs text-pacific-100">
+                              <Star className="h-3 w-3" /> Unlocked
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-white/70">{achievement.description}</p>
+                        <p className="mt-1 text-xs text-white/60">{achievement.category}{textSeparator}{achievement.milestoneLabel}</p>
+                      </div>
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-xs text-white/70">
-                      <span>{achievement.nextMilestone}</span>
-                      <span>Next: {Math.max(0, achievement.target - achievement.progress)} remaining</span>
+                    <div className="text-right text-sm text-white/70">
+                      <p className="text-xl font-semibold text-white">{achievement.progress}/{achievement.target}</p>
+                      <p>{progressPct}%</p>
                     </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
+                  </div>
+
+                  <div className="mt-4 h-2 w-full rounded-full bg-white/10">
+                    <motion.div
+                      role="progressbar"
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-valuenow={progressPct}
+                      aria-label={`${achievement.name} progress`}
+                      className="h-full rounded-full bg-gradient-to-r from-pacific-400 to-palm-400"
+                      initial={reducedMotion ? false : { width: 0 }}
+                      animate={{ width: `${progressPct}%` }}
+                      transition={cardTransition}
+                    />
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-white/70">
+                    <span>{achievement.nextMilestone}</span>
+                    <span>Next: {Math.max(0, achievement.target - achievement.progress)} remaining</span>
+                  </div>
+                </motion.div>
+              );
+            })}
           </div>
         </div>
 

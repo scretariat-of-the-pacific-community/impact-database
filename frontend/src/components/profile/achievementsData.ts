@@ -75,7 +75,7 @@ export const achievements: Achievement[] = [
     target: 5,
     milestoneLabel: 'Countries mapped',
     unlocked: true,
-    nextMilestone: 'Next: Continental Voyager at 10 countries',
+    nextMilestone: 'Continental Voyager at 10 countries',
   },
   {
     id: 'explorer-continents',
