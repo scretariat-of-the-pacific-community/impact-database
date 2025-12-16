@@ -178,5 +178,5 @@ export const categoryStyles: Record<Achievement['category'], string> = {
   Specialist: 'from-palm-500/20 to-palm-500/5 border-palm-500/30',
 };
 
-export const textSeparator = ' • ';
+export const textSeparator = '•';
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bell, Crown, Share2, Star, Award } from 'lucide-react';
 import {
@@ -20,7 +20,25 @@ const springTransition = {
   damping: 20,
 };
 
-const shareUrl = process.env.NEXT_PUBLIC_SHARE_URL || 'https://impactdatabase.org';
+const getTrustedShareUrl = () => {
+  const fallbackUrl = 'https://impactdatabase.org';
+  const envUrl = process.env.NEXT_PUBLIC_SHARE_URL;
+
+  if (!envUrl) return fallbackUrl;
+
+  try {
+    const parsed = new URL(envUrl);
+    if (parsed.hostname === 'impactdatabase.org' || parsed.hostname.endsWith('.impactdatabase.org')) {
+      return parsed.toString();
+    }
+  } catch (error) {
+    console.warn('Invalid share URL provided, reverting to default.', error);
+  }
+
+  return fallbackUrl;
+};
+
+const shareUrl = getTrustedShareUrl();
 const unlockedAnimation = { scale: [0.8, 1.1, 1], rotate: [0, 5, 0] };
 const lockedAnimation = { scale: 1, rotate: 0 };
 const getPrefersReducedMotion = () =>
@@ -58,7 +76,7 @@ export default function AchievementsHub({
   }, [shareStatus]);
   const unlockedBadges = achievementsData.filter((achievement) => achievement.unlocked);
   const [reducedMotion, setReducedMotion] = useState<boolean>(() => getPrefersReducedMotion());
-  const leaderboardAnimated = useRef(true);
+  const [leaderboardAnimating, setLeaderboardAnimating] = useState<boolean>(() => !getPrefersReducedMotion());
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -77,8 +95,15 @@ export default function AchievementsHub({
   }, []);
 
   useEffect(() => {
-    leaderboardAnimated.current = false;
-  }, [leaderboardData]);
+    if (reducedMotion) {
+      setLeaderboardAnimating(false);
+      return undefined;
+    }
+
+    setLeaderboardAnimating(true);
+    const timeout = setTimeout(() => setLeaderboardAnimating(false), 800);
+    return () => clearTimeout(timeout);
+  }, [leaderboardData, reducedMotion]);
 
   /**
    * Shares an achievement badge using the most appropriate method for the user's platform.
@@ -88,7 +113,8 @@ export default function AchievementsHub({
    * when sharing fails.
    */
   const shareBadge = useCallback((achievement: Achievement) => {
-    const shareText = `I unlocked the ${achievement.name} badge on the Impact Database!`;
+    const achievementName = achievement.name;
+    const shareText = `I unlocked the ${achievementName} badge on the Impact Database!`;
 
     if (navigator.share) {
       navigator
@@ -97,22 +123,22 @@ export default function AchievementsHub({
           text: shareText,
           url: shareUrl,
         })
-        .then(() => setShareStatus(`Shared ${achievement.name}!`))
+        .then(() => setShareStatus(`Shared ${achievementName}!`))
         .catch((error: unknown) => {
-          console.error(`Share failed for achievement "${achievement.name}" (ID: ${achievement.id})`, error);
+          console.error(`Share failed for achievement "${achievementName}" (ID: ${achievement.id})`, error);
           const typedError = error as { name?: string; message?: string } | undefined;
           if (typedError?.name === 'AbortError' || typedError?.message?.toLowerCase().includes('cancel')) {
             setShareStatus('Sharing cancelled.');
             return;
           }
 
-          let userMessage = `Unable to share ${achievement.name}. Please try again.`;
+          let userMessage = `Unable to share ${achievementName}. Please try again.`;
           if (typedError?.name === 'NotAllowedError') {
-            userMessage = `Sharing blocked. Check your browser permissions for ${achievement.name}.`;
+            userMessage = `Sharing blocked. Check your browser permissions for ${achievementName}.`;
           } else if (typedError?.name === 'NotFoundError') {
-            userMessage = `No share target found for ${achievement.name}. Try copying the link instead.`;
+            userMessage = `No share target found for ${achievementName}. Try copying the link instead.`;
           } else if (typedError?.name === 'NetworkError') {
-            userMessage = `Network issue while sharing ${achievement.name}. Please retry when you're online.`;
+            userMessage = `Network issue while sharing ${achievementName}. Please retry when you're online.`;
           }
           setShareStatus(userMessage);
         });
@@ -124,16 +150,16 @@ export default function AchievementsHub({
     )}&url=${encodeURIComponent(shareUrl)}`;
     const popup = window.open(twitterUrl, '_blank', 'noopener,noreferrer');
     if (!popup) {
-      setShareStatus(`Unable to open sharing for ${achievement.name}. Please check your popup settings.`);
+      setShareStatus(`Unable to open sharing for ${achievementName}. Please check your popup settings.`);
     } else {
-      setShareStatus(`Opened Twitter to share ${achievement.name}.`);
+      setShareStatus(`Opened Twitter to share ${achievementName}.`);
     }
   }, []);
 
   const cardTransition = reducedMotion ? { duration: 0 } : springTransition;
   const badgeHover = reducedMotion ? undefined : { y: -4, scale: 1.02 };
   const badgeTap = reducedMotion ? undefined : { scale: 0.98 };
-  const shouldAnimateLeaderboard = !reducedMotion && leaderboardAnimated.current;
+  const animateLeaderboard = !reducedMotion && leaderboardAnimating;
 
   return (
     <section
@@ -160,7 +186,10 @@ export default function AchievementsHub({
                 className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
                 aria-label={`Share ${badge.name}`}
               >
-                <Share2 className="h-4 w-4 text-pacific-300 group-hover:rotate-6" />
+                <Share2
+                  className={`h-4 w-4 text-pacific-300${reducedMotion ? '' : ' group-hover:rotate-6'}`}
+                  aria-hidden="true"
+                />
                 Share {badge.name}
               </motion.button>
             ))}
@@ -249,7 +278,7 @@ export default function AchievementsHub({
                           )}
                         </div>
                         <p className="text-sm text-white/70">{achievement.description}</p>
-                        <p className="mt-1 text-xs text-white/60">{achievement.category}{textSeparator}{achievement.milestoneLabel}</p>
+                        <p className="mt-1 text-xs text-white/60">{achievement.category} {textSeparator} {achievement.milestoneLabel}</p>
                       </div>
                     </div>
                     <div className="text-right text-sm text-white/70">
@@ -294,9 +323,10 @@ export default function AchievementsHub({
               {leaderboardData.map((entry) => (
                 <motion.li
                   key={entry.id}
-                  initial={shouldAnimateLeaderboard ? { opacity: 0, x: -8 } : false}
-                  animate={shouldAnimateLeaderboard ? { opacity: 1, x: 0 } : undefined}
-                  transition={shouldAnimateLeaderboard ? springTransition : undefined}
+                  data-animate={animateLeaderboard ? 'true' : 'false'}
+                  initial={animateLeaderboard ? { opacity: 0, x: -8 } : false}
+                  animate={animateLeaderboard ? { opacity: 1, x: 0 } : undefined}
+                  transition={animateLeaderboard ? springTransition : undefined}
                   className={`flex items-center justify-between rounded-xl border border-white/5 p-3 text-sm text-white ${
                     entry.name === 'You' ? 'bg-pacific-500/10 shadow-md shadow-pacific-500/10' : 'bg-white/5'
                   }`}
@@ -308,7 +338,7 @@ export default function AchievementsHub({
                     </div>
                     <div>
                       <p className="font-semibold">{entry.name}</p>
-                      <p className="text-xs text-white/60">{entry.uploads} uploads{textSeparator}{entry.badges} badges</p>
+                      <p className="text-xs text-white/60">{entry.uploads} uploads {textSeparator} {entry.badges} badges</p>
                     </div>
                   </div>
                   <Award className="h-4 w-4 text-pacific-200" aria-hidden="true" />

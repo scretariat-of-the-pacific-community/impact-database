@@ -48,6 +48,7 @@ describe('AchievementsHub', () => {
       window.matchMedia = undefined;
     }
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
   it('renders share buttons for all unlocked achievements with accessible labels', () => {
@@ -79,6 +80,7 @@ describe('AchievementsHub', () => {
   });
 
   it('falls back to window.open sharing when navigator.share is unavailable', async () => {
+    vi.useFakeTimers();
     // @ts-expect-error allow overriding for test
     navigator.share = undefined;
     window.open = vi.fn();
@@ -105,6 +107,22 @@ describe('AchievementsHub', () => {
       }),
     );
     expect(window.open).not.toHaveBeenCalled();
+  });
+
+  it('shows a success status message after sharing and clears it automatically', async () => {
+    vi.useFakeTimers();
+    navigator.share = vi.fn().mockResolvedValue(undefined);
+
+    render(<AchievementsHub />);
+    screen.getByLabelText(/share regional explorer/i).click();
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/shared regional explorer/i));
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('logs share errors when navigator.share rejects', async () => {
@@ -229,6 +247,42 @@ describe('AchievementsHub', () => {
     expect(screen.queryByLabelText(/share locked badge/i)).not.toBeInTheDocument();
   });
 
+  it('toggles leaderboard animation flag when data changes', () => {
+    vi.useFakeTimers();
+    const initialLeaderboard = [
+      { id: '1', name: 'One', uploads: 10, badges: 2, rank: 1 },
+      { id: '2', name: 'You', uploads: 9, badges: 1, rank: 2 },
+    ];
+
+    const { rerender } = render(
+      <AchievementsHub
+        leaderboardData={initialLeaderboard}
+        achievementsData={[]}
+        notificationsData={[]}
+      />,
+    );
+
+    const firstRenderItems = screen.getAllByRole('listitem');
+    expect(firstRenderItems[0]).toHaveAttribute('data-animate', 'true');
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    expect(screen.getAllByRole('listitem')[0]).toHaveAttribute('data-animate', 'false');
+
+    const updatedLeaderboard = [...initialLeaderboard, { id: '3', name: 'Three', uploads: 5, badges: 1, rank: 3 }];
+    rerender(
+      <AchievementsHub
+        leaderboardData={updatedLeaderboard}
+        achievementsData={[]}
+        notificationsData={[]}
+      />,
+    );
+
+    expect(screen.getAllByRole('listitem')[0]).toHaveAttribute('data-animate', 'true');
+  });
+
   it('updates reduced motion preference when the media query changes', () => {
     const listeners: Array<(event: MediaQueryListEvent) => void> = [];
 
@@ -254,7 +308,8 @@ describe('AchievementsHub', () => {
     expect(container.querySelector('[data-prefers-reduced-motion="false"]')).toBeInTheDocument();
   });
 
-  it('sets share status when popup sharing is blocked', async () => {
+  it('sets share status when popup sharing is blocked and clears it', async () => {
+    vi.useFakeTimers();
     // @ts-expect-error allow overriding for test
     navigator.share = undefined;
     window.open = vi.fn().mockReturnValue(null);
@@ -266,5 +321,11 @@ describe('AchievementsHub', () => {
     await waitFor(() =>
       expect(screen.getByRole('status')).toHaveTextContent(/unable to open sharing for regional explorer/i),
     );
+
+    act(() => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 });
