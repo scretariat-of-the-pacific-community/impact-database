@@ -46,6 +46,12 @@ export default function AchievementsHub({
   notificationsData = notifications,
 }: AchievementsHubProps) {
   const [shareStatus, setShareStatus] = useState<string | null>(null);
+  useEffect(() => {
+    if (!shareStatus) return undefined;
+
+    const timeout = setTimeout(() => setShareStatus(null), 4000);
+    return () => clearTimeout(timeout);
+  }, [shareStatus]);
   const unlockedBadges = achievementsData.filter((achievement) => achievement.unlocked);
   const prefersReducedMotion = useMemo(
     () =>
@@ -72,7 +78,7 @@ export default function AchievementsHub({
     setReducedMotion(mediaQuery.matches);
 
     return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [prefersReducedMotion]);
+  }, []);
 
   useEffect(() => {
     leaderboardAnimated.current = false;
@@ -140,7 +146,7 @@ export default function AchievementsHub({
     >
       <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-pacific-500/10 via-white/5 to-black/20 p-8 shadow-lg">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <p className="text-sm uppercase tracking-[0.25em] text-white/60">Achievements & badges</p>
             <h1 className="mt-3 text-4xl font-semibold text-white">Progress that celebrates impact</h1>
             <p className="mt-3 max-w-3xl text-white/70">
@@ -148,7 +154,7 @@ export default function AchievementsHub({
               most active contributors.
             </p>
           </div>
-          <nav aria-label="Share unlocked achievements" className="flex gap-4">
+          <nav aria-label="Share unlocked achievements" className="flex flex-wrap gap-4">
             {unlockedBadges.map((badge) => (
               <motion.button
                 key={badge.id}
@@ -201,7 +207,10 @@ export default function AchievementsHub({
           <div className="grid gap-4 md:grid-cols-2">
             <AnimatePresence>
               {achievementsData.map((achievement, index) => {
-                const progressPct = Math.min(100, Math.round((achievement.progress / achievement.target) * 100));
+                const progressPct =
+                  typeof achievement.target === 'number' && achievement.target > 0
+                    ? Math.min(100, Math.round((achievement.progress / achievement.target) * 100))
+                    : 0;
                 const CategoryIcon = achievement.icon;
                 const badgeGradient = categoryStyles[achievement.category];
                 const iconAnimation = achievement.unlocked && !reducedMotion ? unlockedAnimation : lockedAnimation;
