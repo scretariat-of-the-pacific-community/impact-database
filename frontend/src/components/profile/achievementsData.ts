@@ -202,5 +202,5 @@ export const categoryLegend = [
   { label: 'Specialist', color: 'bg-palm-400', initial: 'S' },
 ];
 
-export const textSeparator = ' • ';
+export const textSeparator = '•';
 

@@ -29,7 +29,7 @@ const getTrustedShareUrl = () => {
 
   try {
     const parsed = new URL(envUrl);
-    const validSubdomain = /^[a-z0-9-]+\.impactdatabase\.org$/i;
+    const validSubdomain = /^[a-z0-9]+(-[a-z0-9]+)*\.impactdatabase\.org$/i;
     if (parsed.hostname === 'impactdatabase.org' || validSubdomain.test(parsed.hostname)) {
       return parsed.toString();
     }
@@ -281,7 +281,7 @@ export default function AchievementsHub({
                           )}
                         </div>
                         <p className="text-sm text-white/70">{achievement.description}</p>
-                        <p className="mt-1 text-xs text-white/60">{achievement.category}{textSeparator}{achievement.milestoneLabel}</p>
+                        <p className="mt-1 text-xs text-white/60">{achievement.category} {textSeparator} {achievement.milestoneLabel}</p>
                       </div>
                     </div>
                     <div className="text-right text-sm text-white/70">
@@ -341,7 +341,7 @@ export default function AchievementsHub({
                     </div>
                     <div>
                       <p className="font-semibold">{entry.name}</p>
-                      <p className="text-xs text-white/60">{entry.uploads} uploads{textSeparator}{entry.badges} badges</p>
+                      <p className="text-xs text-white/60">{entry.uploads} uploads {textSeparator} {entry.badges} badges</p>
                     </div>
                   </div>
                   <Award className="h-4 w-4 text-pacific-200" aria-hidden="true" />
