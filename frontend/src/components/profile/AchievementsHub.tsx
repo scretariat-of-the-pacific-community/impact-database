@@ -21,6 +21,8 @@ const springTransition = {
   damping: 20,
 };
 
+export const SHARE_STATUS_DURATION_MS = 4000;
+
 const getTrustedShareUrl = () => {
   const fallbackUrl = 'https://impactdatabase.org';
   const envUrl = process.env.NEXT_PUBLIC_SHARE_URL;
@@ -30,7 +32,10 @@ const getTrustedShareUrl = () => {
   try {
     const parsed = new URL(envUrl);
     const validSubdomain = /^[a-z0-9]+(-[a-z0-9]+)*\.impactdatabase\.org$/i;
-    if (parsed.hostname === 'impactdatabase.org' || validSubdomain.test(parsed.hostname)) {
+    if (
+      (parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+      (parsed.hostname === 'impactdatabase.org' || validSubdomain.test(parsed.hostname))
+    ) {
       return parsed.toString();
     }
   } catch (error) {
@@ -74,7 +79,7 @@ export default function AchievementsHub({
   useEffect(() => {
     if (!shareStatus) return undefined;
 
-    const timeout = setTimeout(() => setShareStatus(null), 4000);
+    const timeout = setTimeout(() => setShareStatus(null), SHARE_STATUS_DURATION_MS);
     return () => clearTimeout(timeout);
   }, [shareStatus]);
   const unlockedBadges = useMemo(
@@ -184,29 +189,31 @@ export default function AchievementsHub({
               most active contributors.
             </p>
           </div>
-          <nav aria-label="Share unlocked achievements" className="flex flex-wrap gap-4">
-            {unlockedBadges.map((badge) => (
-              <motion.button
-                key={badge.id}
-                whileHover={badgeHover}
-                whileTap={badgeTap}
-                onClick={() => shareBadge(badge)}
-                className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
-                aria-label={`Share ${badge.name}`}
-              >
-                <Share2
-                  className={`h-4 w-4 text-pacific-300${reducedMotion ? '' : ' group-hover:rotate-6'}`}
-                  aria-hidden="true"
-                />
-                Share {badge.name}
-              </motion.button>
-            ))}
-            {shareStatus && (
-              <p role="status" className="text-sm text-white/70">
-                {shareStatus}
-              </p>
-            )}
-          </nav>
+          {unlockedBadges.length > 0 && (
+            <nav aria-label="Share unlocked achievements" className="flex flex-wrap gap-4">
+              {unlockedBadges.map((badge) => (
+                <motion.button
+                  key={badge.id}
+                  whileHover={badgeHover}
+                  whileTap={badgeTap}
+                  onClick={() => shareBadge(badge)}
+                  className="group flex items-center gap-2 rounded-full border border-pacific-500/40 bg-pacific-500/10 px-4 py-2 text-sm text-white shadow-lg backdrop-blur"
+                  aria-label={`Share ${badge.name}`}
+                >
+                  <Share2
+                    className={`h-4 w-4 text-pacific-300${reducedMotion ? '' : ' group-hover:rotate-6'}`}
+                    aria-hidden="true"
+                  />
+                  Share {badge.name}
+                </motion.button>
+              ))}
+            </nav>
+          )}
+          {shareStatus && (
+            <p role="status" className="text-sm text-white/70">
+              {shareStatus}
+            </p>
+          )}
         </div>
       </header>
 
@@ -331,7 +338,7 @@ export default function AchievementsHub({
                   animate={animateLeaderboard ? { opacity: 1, x: 0 } : undefined}
                   transition={animateLeaderboard ? springTransition : undefined}
                   className={`flex items-center justify-between rounded-xl border border-white/5 p-3 text-sm text-white ${
-                    entry.name === 'You' ? 'bg-pacific-500/10 shadow-md shadow-pacific-500/10' : 'bg-white/5'
+                    entry.isCurrentUser ? 'bg-pacific-500/10 shadow-md shadow-pacific-500/10' : 'bg-white/5'
                   }`}
                   aria-label={`Rank ${entry.rank}: ${entry.name} with ${entry.uploads} uploads and ${entry.badges} badges`}
                 >

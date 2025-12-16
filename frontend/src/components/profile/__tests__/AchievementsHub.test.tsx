@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { Globe2, Upload } from 'lucide-react';
 import { vi } from 'vitest';
-import AchievementsHub from '@/components/profile/AchievementsHub';
+import AchievementsHub, { SHARE_STATUS_DURATION_MS } from '@/components/profile/AchievementsHub';
 
 describe('AchievementsHub', () => {
   let originalShare: Navigator['share'] | undefined;
@@ -76,7 +76,8 @@ describe('AchievementsHub', () => {
   it('highlights the current user in the leaderboard', () => {
     render(<AchievementsHub />);
 
-    expect(screen.getByText('You').closest('div')).toHaveClass('bg-pacific-500/10');
+    const youEntry = screen.getByRole('listitem', { name: /rank 2: you/i });
+    expect(youEntry).toHaveClass('bg-pacific-500/10');
   });
 
   it('falls back to window.open sharing when navigator.share is unavailable', async () => {
@@ -119,7 +120,7 @@ describe('AchievementsHub', () => {
     await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent(/shared regional explorer/i));
 
     act(() => {
-      vi.advanceTimersByTime(4001);
+      vi.advanceTimersByTime(SHARE_STATUS_DURATION_MS + 1);
     });
 
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
@@ -262,7 +263,7 @@ describe('AchievementsHub', () => {
     vi.useFakeTimers();
     const initialLeaderboard = [
       { id: '1', name: 'One', uploads: 10, badges: 2, rank: 1 },
-      { id: '2', name: 'You', uploads: 9, badges: 1, rank: 2 },
+      { id: '2', name: 'You', uploads: 9, badges: 1, rank: 2, isCurrentUser: true },
     ];
 
     const { rerender } = render(
@@ -282,7 +283,10 @@ describe('AchievementsHub', () => {
 
     expect(screen.getAllByRole('listitem')[0]).toHaveAttribute('data-animate', 'false');
 
-    const updatedLeaderboard = [...initialLeaderboard, { id: '3', name: 'Three', uploads: 5, badges: 1, rank: 3 }];
+    const updatedLeaderboard = [
+      ...initialLeaderboard,
+      { id: '3', name: 'Three', uploads: 5, badges: 1, rank: 3 },
+    ];
     rerender(
       <AchievementsHub
         leaderboardData={updatedLeaderboard}

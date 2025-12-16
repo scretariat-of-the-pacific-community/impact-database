@@ -55,6 +55,8 @@ export interface LeaderboardEntry {
   badges: number;
   /** Numeric ranking for ordering the leaderboard. */
   rank: number;
+  /** Marks the current user so the UI can highlight their row without string matching. */
+  isCurrentUser?: boolean;
 }
 
 export const achievements: Achievement[] = [
@@ -158,7 +160,7 @@ export const achievements: Achievement[] = [
 
 export const leaderboard: LeaderboardEntry[] = [
   { id: '1', name: 'Lena M.', uploads: 182, badges: 9, rank: 1 },
-  { id: '2', name: 'You', uploads: 134, badges: 7, rank: 2 },
+  { id: '2', name: 'You', uploads: 134, badges: 7, rank: 2, isCurrentUser: true },
   { id: '3', name: 'Alex M.', uploads: 118, badges: 6, rank: 3 },
   { id: '4', name: 'Saeed', uploads: 94, badges: 5, rank: 4 },
   { id: '5', name: 'Priya', uploads: 88, badges: 4, rank: 5 },
