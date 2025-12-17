@@ -5,7 +5,7 @@ import { jest } from '@jest/globals';
 
 const createQueryClient = () =>
   new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: { queries: { retry: false, refetchInterval: false } },
   });
 
 const renderTimeline = async (module?: typeof import('@/components/profile/ActivityTimeline')) => {
@@ -109,9 +109,9 @@ describe('ActivityTimeline', () => {
     expect(screen.getByText(/feedback from/i)).toBeInTheDocument();
     expect(screen.getByText(/scheduled maintenance/i)).toBeInTheDocument();
 
-    const achievement = screen.getByText(/consistency champion/i);
-    expect(achievement).toBeInTheDocument();
-    const achievementBadge = within(achievement.closest('article') as HTMLElement).getByText(/consistency champion/i);
-    expect(achievementBadge).toBeInTheDocument();
+    const achievementHeading = screen.getByRole('heading', { name: /consistency champion/i });
+    expect(achievementHeading).toBeInTheDocument();
+    const achievementBadge = within(achievementHeading.closest('article') as HTMLElement).getByText(/consistency champion/i);
+    expect(achievementBadge).toHaveClass('rounded-full');
   });
 });

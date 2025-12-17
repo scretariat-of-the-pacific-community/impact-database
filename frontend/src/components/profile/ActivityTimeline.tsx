@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import clsx from 'clsx';
 import {
@@ -148,6 +148,24 @@ export default function ActivityTimeline() {
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('activity-timeline-read-ids');
+    if (stored) {
+      try {
+        const parsed: string[] = JSON.parse(stored);
+        setReadIds(new Set(parsed));
+      } catch (error) {
+        console.error('Failed to parse stored read ids', error);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('activity-timeline-read-ids', JSON.stringify([...readIds]));
+  }, [readIds]);
+
   const { data: activities = [], isLoading, error } = useQuery({
     queryKey: ['profile-activity-timeline'],
     queryFn: fetchActivityTimeline,
@@ -215,7 +233,11 @@ export default function ActivityTimeline() {
 
   if (error) {
     return (
-      <div className="rounded-xl border border-coral-500/30 bg-coral-500/10 p-4 text-sm text-white">
+      <div
+        className="rounded-xl border border-coral-500/30 bg-coral-500/10 p-4 text-sm text-white"
+        role="alert"
+        aria-live="assertive"
+      >
         Failed to load activity timeline. Please try again later.
       </div>
     );
