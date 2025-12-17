@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { jest } from '@jest/globals';
+import { vi } from 'vitest';
 
 const createQueryClient = () =>
   new QueryClient({
@@ -21,11 +21,11 @@ const renderTimeline = async (module?: typeof import('@/components/profile/Activ
 
 describe('ActivityTimeline', () => {
   beforeEach(() => {
-    jest.resetModules();
+    vi.resetModules();
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it('renders activities with semantic list roles', async () => {
@@ -83,7 +83,7 @@ describe('ActivityTimeline', () => {
 
   it('shows error state when query fails', async () => {
     const module = await import('@/components/profile/ActivityTimeline');
-    jest.spyOn(module, 'fetchActivityTimeline').mockRejectedValueOnce(new Error('Network error'));
+    vi.spyOn(module, 'fetchActivityTimeline').mockRejectedValueOnce(new Error('Network error'));
 
     await renderTimeline(module);
 
@@ -92,7 +92,7 @@ describe('ActivityTimeline', () => {
 
   it('shows loading and empty states appropriately', async () => {
     const module = await import('@/components/profile/ActivityTimeline');
-    jest.spyOn(module, 'fetchActivityTimeline').mockImplementationOnce(
+    vi.spyOn(module, 'fetchActivityTimeline').mockImplementationOnce(
       () => new Promise((resolve) => setTimeout(() => resolve([]), 50)),
     );
 

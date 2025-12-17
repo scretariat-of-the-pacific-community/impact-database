@@ -37,7 +37,7 @@ export interface ReviewActivity extends BaseActivity {
   type: 'review';
   reviewer?: string;
   reviewComments: string;
-  suggestedImprovements?: string[];
+  suggestedImprovements?: { id: string; text: string }[];
 }
 
 export interface AchievementActivity extends BaseActivity {
@@ -82,8 +82,8 @@ const mockActivities: ActivityItem[] = [
     reviewer: 'Dr. Amina Clarke',
     reviewComments: 'Great documentation of field notes. Consider clarifying sensor calibration steps.',
     suggestedImprovements: [
-      'Add calibration photos for sensors used on March 3rd.',
-      'Include a short summary of QA/QC checks in the metadata.',
+      { id: 'review-1-tip-1', text: 'Add calibration photos for sensors used on March 3rd.' },
+      { id: 'review-1-tip-2', text: 'Include a short summary of QA/QC checks in the metadata.' },
     ],
     timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
   },
@@ -210,10 +210,10 @@ export default function ActivityTimeline() {
         {item.reviewComments && <p className="text-sm text-white/80">{item.reviewComments}</p>}
         {item.suggestedImprovements?.length ? (
           <ul className="space-y-1 text-sm text-white/70">
-            {item.suggestedImprovements.map((tip, idx) => (
-              <li key={idx} className="flex items-start gap-2">
+            {item.suggestedImprovements.map((tip) => (
+              <li key={tip.id} className="flex items-start gap-2">
                 <span className="mt-[3px] block h-1.5 w-1.5 rounded-full bg-palm-300" />
-                <span>{tip}</span>
+                <span>{tip.text}</span>
               </li>
             ))}
           </ul>
