@@ -86,6 +86,17 @@ export function QueryProvider({ children }: QueryProviderProps) {
 
             const normalized = normalizeError(error);
 
+            // Suppress 404 errors for settings endpoints that don't exist yet
+            if (
+              normalized.message === 'Not Found' &&
+              query?.queryKey &&
+              (query.queryKey.includes('user-settings') ||
+                query.queryKey.includes('storage-quota') ||
+                query.queryKey.includes('api-tokens'))
+            ) {
+              return;
+            }
+
             console.error('Query error:', normalized.message, {
               details: normalized.details,
               query: {

@@ -80,16 +80,20 @@ def get_user_from_db(username: str, db: Session):
     """Get user from database using injected session.
     
     Args:
-        username: Username to look up
+        username: Username or email to look up
         db: Database session (dependency injected)
     
     Returns:
         UserInDB if found and active, None otherwise
     """
     from models.rbac import User as DBUser
+    from sqlalchemy import or_
     
     try:
-        db_user = db.query(DBUser).filter(DBUser.username == username).first()
+        # Look up user by username OR email
+        db_user = db.query(DBUser).filter(
+            or_(DBUser.username == username, DBUser.email == username)
+        ).first()
         if db_user and db_user.is_active:
             return UserInDB(
                 username=db_user.username,
@@ -109,10 +113,10 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def authenticate_user(username: str, password: str, db: Session) -> Optional[UserInDB]:
-    """Authenticate user with username and password.
+    """Authenticate user with username/email and password.
     
     Args:
-        username: Username to authenticate
+        username: Username or email to authenticate
         password: Plain text password
         db: Database session (dependency injected)
     
@@ -224,7 +228,10 @@ async def register(
         # Fallback: create contributor role if it doesn't exist
         default_role = Role(
             name="contributor",
-            description="Can upload and manage own content"
+            display_name="Contributor",
+            description="Can upload and manage own content",
+            level=1,
+            is_system_role=False
         )
         db.add(default_role)
         db.flush()

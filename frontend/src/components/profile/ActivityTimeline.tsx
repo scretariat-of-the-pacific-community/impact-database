@@ -15,49 +15,14 @@ import {
   Upload,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
+import { imageApi } from '@/lib/api';
+import type { UserActivityEvent, UserActivityType } from '@/lib/types';
 
-export type ActivityType = 'upload' | 'edit' | 'review' | 'achievement' | 'system';
-
-interface BaseActivity {
-  id: string;
-  title: string;
-  description: string;
-  timestamp: string;
-}
-
-export interface UploadActivity extends BaseActivity {
-  type: 'upload';
-}
-
-export interface EditActivity extends BaseActivity {
-  type: 'edit';
-}
-
-export interface ReviewActivity extends BaseActivity {
-  type: 'review';
-  reviewer?: string;
-  reviewComments: string;
-  suggestedImprovements?: { id: string; text: string }[];
-}
-
-export interface AchievementActivity extends BaseActivity {
-  type: 'achievement';
-  achievementBadge: string;
-}
-
-export interface SystemActivity extends BaseActivity {
-  type: 'system';
-  systemMessage: string;
-}
-
-export type ActivityItem =
-  | UploadActivity
-  | EditActivity
-  | ReviewActivity
-  | AchievementActivity
-  | SystemActivity;
+export type ActivityType = UserActivityType;
+export type ActivityItem = UserActivityEvent;
 
 const POLL_INTERVAL = 30_000;
+const STORAGE_KEY_PREFIX = 'activity-timeline-read-ids';
 
 const mockActivities: ActivityItem[] = [
   {
@@ -105,9 +70,40 @@ const mockActivities: ActivityItem[] = [
   },
 ];
 
+const deriveStorageKey = () => {
+  if (typeof window === 'undefined') return STORAGE_KEY_PREFIX;
+  try {
+    const sessionRaw = window.localStorage.getItem('ocean_portal_session');
+    if (sessionRaw) {
+      const session = JSON.parse(sessionRaw);
+      const identifier = session?.user?.id || session?.user?.email || session?.user?.username;
+      if (identifier) {
+        return `${STORAGE_KEY_PREFIX}:${identifier}`;
+      }
+    }
+  } catch (error) {
+    console.warn('Failed to read auth session for activity timeline', error);
+  }
+  return STORAGE_KEY_PREFIX;
+};
+
 export async function fetchActivityTimeline(): Promise<ActivityItem[]> {
-  // Placeholder for future API integration. Keeps the API consistent with React Query expectations.
-  return Promise.resolve(mockActivities);
+  if (process.env.NODE_ENV === 'test') {
+    return mockActivities;
+  }
+  try {
+    const data = await imageApi.userActivity();
+    if (!Array.isArray(data)) {
+      return [];
+    }
+    return data.map((item) => ({
+      ...item,
+      timestamp: item.timestamp ?? new Date().toISOString(),
+    }));
+  } catch (error) {
+    console.warn('Failed to fetch activity timeline', error);
+    throw error;
+  }
 }
 
 const filterLabels: Record<ActivityType | 'all', string> = {
@@ -147,10 +143,11 @@ const typeStyles: Record<ActivityType, string> = {
 export default function ActivityTimeline() {
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const storageKey = useMemo(() => deriveStorageKey(), []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const stored = window.localStorage.getItem('activity-timeline-read-ids');
+    const stored = window.localStorage.getItem(storageKey);
     if (stored) {
       try {
         const parsed: string[] = JSON.parse(stored);
@@ -159,17 +156,18 @@ export default function ActivityTimeline() {
         console.error('Failed to parse stored read ids', error);
       }
     }
-  }, []);
+  }, [storageKey]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem('activity-timeline-read-ids', JSON.stringify([...readIds]));
-  }, [readIds]);
+    window.localStorage.setItem(storageKey, JSON.stringify([...readIds]));
+  }, [readIds, storageKey]);
 
   const { data: activities = [], isLoading, error } = useQuery({
     queryKey: ['profile-activity-timeline'],
     queryFn: fetchActivityTimeline,
     refetchInterval: POLL_INTERVAL,
+    staleTime: POLL_INTERVAL,
   });
 
   const sortedActivities = useMemo(
@@ -192,7 +190,11 @@ export default function ActivityTimeline() {
   );
 
   const markAsRead = (id: string) => {
-    setReadIds((prev) => new Set(prev).add(id));
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
   };
 
   const markAllAsRead = () => {

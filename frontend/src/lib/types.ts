@@ -260,6 +260,19 @@ export const HAZARD_TYPE_LABELS: Record<HazardType, string> = {
   other: 'Other'
 };
 
+export const HAZARD_TYPES = [
+  { value: 'earthquake', label: 'Earthquake' },
+  { value: 'flood', label: 'Flood' },
+  { value: 'tsunami', label: 'Tsunami' },
+  { value: 'cyclone', label: 'Cyclone' },
+  { value: 'drought', label: 'Drought' },
+  { value: 'landslide', label: 'Landslide' },
+  { value: 'wildfire', label: 'Wildfire' },
+  { value: 'volcanic', label: 'Volcanic Activity' },
+  { value: 'coastal_erosion', label: 'Coastal Erosion' },
+  { value: 'other', label: 'Other' },
+] as const;
+
 export const SOURCE_AGENCY_LABELS: Record<SourceAgency, string> = {
   usgs: 'USGS',
   noaa: 'NOAA',
@@ -314,12 +327,28 @@ export interface UserStats {
     title: string;
     description: string;
     icon: string;
+    earned_at?: string;
   }>;
   analytics: {
     uploads_this_month: number;
     average_review_time: number;
     top_hazard: string;
   };
+}
+
+export type UserActivityType = 'upload' | 'edit' | 'review' | 'achievement' | 'system';
+
+export interface UserActivityEvent {
+  id: string;
+  type: UserActivityType;
+  title: string;
+  description: string;
+  timestamp: string;
+  reviewer?: string;
+  reviewComments?: string;
+  suggestedImprovements?: { id: string; text: string }[];
+  achievementBadge?: string;
+  systemMessage?: string;
 }
 
 export interface UserUpload {

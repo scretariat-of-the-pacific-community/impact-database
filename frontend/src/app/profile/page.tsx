@@ -1,20 +1,26 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, UploadCloud, Award, Activity, Settings, MapPin, ShieldCheck } from 'lucide-react';
+import { Loader2, UploadCloud, Award, Activity, Settings, MapPin, ShieldCheck, Users } from 'lucide-react';
 import { imageApi } from '@/lib/api';
 import { HAZARD_TYPE_LABELS, UserStats, UserUpload } from '@/lib/types';
 import { Card, Button } from '@/components/design-system';
 import ActivityTimeline from '@/components/profile/ActivityTimeline';
+import Collaboration from '@/components/profile/Collaboration';
+import MobileBottomNav, { PROFILE_NAV_ITEMS } from '@/components/profile/MobileBottomNav';
+import SwipeableTabs from '@/components/profile/SwipeableTabs';
+import InfiniteUploadList from '@/components/profile/InfiniteUploadList';
+import ErrorBanner from '@/components/ErrorBanner';
 
 const TABS = [
   { id: 'uploads', label: 'Uploads', icon: UploadCloud },
   { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'achievements', label: 'Achievements', icon: Award },
   { id: 'analytics', label: 'Analytics', icon: Activity },
+  { id: 'collaboration', label: 'Collaboration', icon: Users },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -23,8 +29,10 @@ const glassCard = 'rounded-3xl border border-white/10 bg-white/5 backdrop-blur s
 export default function ProfilePage() {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('uploads');
+  const queriesEnabled = !authLoading && isAuthenticated;
 
   // Auth guard - redirect to login if not authenticated
   useEffect(() => {
@@ -34,27 +42,87 @@ export default function ProfilePage() {
     }
   }, [isAuthenticated, authLoading, router, pathname]);
 
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && TABS.some((tab) => tab.id === tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams, activeTab]);
+
   const {
     data: stats,
     isLoading: statsLoading,
+    isFetching: statsFetching,
     refetch: refetchStats,
-  } = useQuery<UserStats>({
+    error: statsError,
+  } = useQuery<UserStats, Error>({
     queryKey: ['user-profile-stats'],
     queryFn: () => imageApi.userStats(),
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
+    enabled: queriesEnabled,
+    retry: 1,
   });
 
   const {
     data: uploads,
     isLoading: uploadsLoading,
+    isFetching: uploadsFetching,
     refetch: refetchUploads,
-  } = useQuery<UserUpload[]>({
+    error: uploadsError,
+  } = useQuery<UserUpload[], Error>({
     queryKey: ['user-profile-uploads'],
     queryFn: () => imageApi.userUploads(),
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
+    enabled: queriesEnabled,
+    retry: 1,
   });
+  const isRefreshing = statsFetching || uploadsFetching;
+  const shouldShowStatsError = !!statsError && !statsLoading && queriesEnabled;
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Profile Debug:', {
+      authLoading,
+      isAuthenticated,
+      queriesEnabled,
+      uploadsLoading,
+      uploadsError: uploadsError?.message,
+      uploadsCount: uploads?.length,
+      activeTab,
+    });
+  }, [authLoading, isAuthenticated, queriesEnabled, uploadsLoading, uploadsError, uploads, activeTab]);
+
+  // Compute stat summary (must be before early returns due to Rules of Hooks)
+  const statSummary = useMemo(() => {
+    if (!stats) {
+      return [];
+    }
+    const totalUploads = typeof stats.total_uploads === 'number' ? stats.total_uploads : 0;
+    const approvalRate = typeof stats.approval_rate === 'number' ? stats.approval_rate : 0;
+    const impactScore =
+      typeof stats.impact_score === 'number' && Number.isFinite(stats.impact_score) ? stats.impact_score : null;
+    const uploadsThisMonth = stats.analytics?.uploads_this_month ?? 0;
+
+    return [
+      {
+        label: 'Total Uploads',
+        value: totalUploads.toLocaleString(),
+        change: `${uploadsThisMonth.toLocaleString()} in the last 30 days`,
+      },
+      {
+        label: 'Approval Rate',
+        value: `${Math.round(approvalRate * 100)}%`,
+        change: approvalRate > 0.8 ? 'Consistent quality' : 'Aim for 80%',
+      },
+      {
+        label: 'Impact Score',
+        value: impactScore !== null ? impactScore.toFixed(1) : '—',
+        change: 'Based on approvals and recency',
+      },
+    ];
+  }, [stats]);
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -73,100 +141,8 @@ export default function ProfilePage() {
     return null;
   }
 
-  const statSummary = useMemo(() => {
-    if (!stats) {
-      return [];
-    }
-    const totalUploads = typeof stats.total_uploads === 'number' ? stats.total_uploads : 0;
-    const approvalRate = typeof stats.approval_rate === 'number' ? stats.approval_rate : 0;
-    const impactScore =
-      typeof stats.impact_score === 'number' && Number.isFinite(stats.impact_score) ? stats.impact_score : null;
-
-    return [
-      {
-        label: 'Total Uploads',
-        value: totalUploads.toLocaleString(),
-        change: '+12% vs last month',
-      },
-      {
-        label: 'Approval Rate',
-        value: `${Math.round(approvalRate * 100)}%`,
-        change: approvalRate > 0.8 ? 'Great job!' : 'Aim for 80%',
-      },
-      {
-        label: 'Impact Score',
-        value: impactScore !== null ? impactScore.toFixed(1) : '—',
-        change: 'Based on reviews & usage',
-      },
-    ];
-  }, [stats]);
-
   const renderUploads = () => {
-    if (uploadsLoading) {
-      return (
-        <div className="flex items-center gap-3 text-white/70">
-          <Loader2 className="h-5 w-5 animate-spin text-pacific-300" />
-          Fetching your uploads...
-        </div>
-      );
-    }
-
-    if (!uploads || uploads.length === 0) {
-      return (
-        <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-8 text-center text-white/70">
-          No uploads yet. Share your first impact image to unlock insights.
-        </div>
-      );
-    }
-
-    return (
-      <div className="grid gap-4 md:grid-cols-2">
-        {uploads.map((upload) => (
-          <Card
-            key={upload.id}
-            className={`${glassCard} border-white/5 bg-gradient-to-br from-deep-900/40 to-deep-900/20`}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-medium text-white/60">{new Date(upload.uploaded_at).toLocaleString()}</p>
-                <h4 className="mt-1 text-lg font-semibold text-white line-clamp-1">
-                  {upload.title || upload.filename}
-                </h4>
-                <p className="text-sm text-white/60">
-                  {HAZARD_TYPE_LABELS[upload.hazard_type] || upload.hazard_type}
-                  {upload.location ? ` • ${upload.location}` : ''}
-                </p>
-              </div>
-              <span
-                className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                  upload.approval_status === 'approved'
-                    ? 'bg-emerald-400/20 text-emerald-200'
-                    : upload.approval_status === 'rejected'
-                    ? 'bg-coral-500/20 text-coral-200'
-                    : 'bg-amber-400/20 text-amber-100'
-                }`}
-              >
-                {upload.approval_status.replace('_', ' ')}
-              </span>
-            </div>
-            <div className="mt-4 flex items-center justify-between text-sm text-white/60">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-pacific-300" />
-                <span>{upload.location || 'Location pending'}</span>
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="bg-white/10 text-white hover:bg-white/20"
-                onClick={() => window.open(`/images/${upload.id}`, '_blank')}
-              >
-                View
-              </Button>
-            </div>
-          </Card>
-        ))}
-      </div>
-    );
+    return <InfiniteUploadList />;
   };
 
   const renderAchievements = () => {
@@ -226,6 +202,14 @@ export default function ProfilePage() {
     );
   };
 
+  const handleManagePreferences = () => {
+    router.push('/profile/settings');
+  };
+
+  const handleGenerateToken = () => {
+    router.push('/profile/settings?section=api');
+  };
+
   const renderSettings = () => (
     <div className="space-y-4">
       <Card className={`${glassCard} border-white/5`}>
@@ -235,6 +219,7 @@ export default function ProfilePage() {
           variant="secondary"
           size="sm"
           className="mt-4 bg-white/10 text-white hover:bg-white/20"
+          onClick={handleManagePreferences}
         >
           Manage Preferences
         </Button>
@@ -244,7 +229,12 @@ export default function ProfilePage() {
         <p className="mt-1 text-sm text-white/60">
           Generate scoped tokens for integrating automation or bulk upload tooling.
         </p>
-        <Button variant='secondary' size='sm' className="mt-4 bg-white/10 text-white hover:bg-white/20">
+        <Button 
+          variant='secondary' 
+          size='sm' 
+          className="mt-4 bg-white/10 text-white hover:bg-white/20"
+          onClick={handleGenerateToken}
+        >
           Generate Token
         </Button>
       </Card>
@@ -261,11 +251,29 @@ export default function ProfilePage() {
         return renderAchievements();
       case 'analytics':
         return renderAnalytics();
+      case 'collaboration':
+        return <Collaboration uploads={uploads || []} stats={stats} />;
       case 'settings':
         return renderSettings();
       default:
         return null;
     }
+  };
+
+  const handleTabSelect = (tabId: string) => {
+    setActiveTab(tabId);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tabId);
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleUploadClick = () => {
+    router.push('/upload');
+  };
+
+  const handleRefresh = () => {
+    refetchStats();
+    refetchUploads();
   };
 
   return (
@@ -302,19 +310,30 @@ export default function ProfilePage() {
               <Button
                 variant="secondary"
                 className="bg-white/10 text-white hover:bg-white/20"
-                onClick={() => {
-                  refetchStats();
-                  refetchUploads();
-                }}
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                aria-busy={isRefreshing}
               >
                 Refresh Data
               </Button>
-              <Button variant="primary" className="bg-pacific-500 text-white hover:bg-pacific-400">
+              <Button
+                variant="primary"
+                className="bg-pacific-500 text-white hover:bg-pacific-400"
+                onClick={handleUploadClick}
+              >
                 Upload New Image
               </Button>
             </div>
           </div>
         </Card>
+
+        {shouldShowStatsError && (
+          <ErrorBanner
+            title="Unable to load profile insights"
+            message={statsError?.message || 'Please try again in a moment.'}
+            onRetry={handleRefresh}
+          />
+        )}
 
         <div className="grid gap-4 md:grid-cols-3">
           {statSummary.map((stat) => (
@@ -326,7 +345,8 @@ export default function ProfilePage() {
           ))}
         </div>
 
-        <div className={`${glassCard} border-white/5`}>
+        {/* Desktop tabs */}
+        <div className={`hidden md:block ${glassCard} border-white/5`}>
           <div className="flex flex-wrap border-b border-white/10">
             {TABS.map((tab) => {
               const Icon = tab.icon;
@@ -334,7 +354,7 @@ export default function ProfilePage() {
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabSelect(tab.id)}
                   className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
                     isActive ? 'bg-white/10 text-white' : 'text-white/60 hover:text-white'
                   }`}
@@ -346,6 +366,26 @@ export default function ProfilePage() {
             })}
           </div>
           <div className="p-6">{renderTabContent()}</div>
+        </div>
+
+        {/* Mobile swipeable tabs */}
+        <div className="block md:hidden">
+          <SwipeableTabs 
+            activeTab={activeTab} 
+            onTabChange={handleTabSelect} 
+            tabs={TABS}
+          >
+            <div className="p-4 pb-24">{renderTabContent()}</div>
+          </SwipeableTabs>
+        </div>
+
+        {/* Mobile bottom navigation */}
+        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
+          <MobileBottomNav 
+            activeTab={activeTab} 
+            onTabChange={handleTabSelect} 
+            items={PROFILE_NAV_ITEMS} 
+          />
         </div>
 
         {stats && (

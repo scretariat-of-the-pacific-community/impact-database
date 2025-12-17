@@ -1,14 +1,15 @@
 import axios, { AxiosInstance, AxiosResponse, isAxiosError } from 'axios';
-import { 
-  SearchFilters, 
-  SearchResponse, 
-  ImageMetadata, 
+import {
+  SearchFilters,
+  SearchResponse,
+  ImageMetadata,
   User,
   APIError,
   BoundingBox,
   VocabulariesResponse,
   UserStats,
-  UserUpload 
+  UserUpload,
+  UserActivityEvent,
 } from './types';
 import { config, getApiUrl } from './config';
 
@@ -209,10 +210,22 @@ class APIClient {
 
   async getUserUploads(): Promise<UserUpload[]> {
     try {
-      const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/user/uploads');
+      const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/images/user/uploads');
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  async getUserActivity(): Promise<UserActivityEvent[]> {
+    try {
+      const response: AxiosResponse<UserActivityEvent[]> = await this.client.get('/api/user/activity');
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 403)) {
         return [];
       }
       throw error;
@@ -232,6 +245,92 @@ class APIClient {
   async checkHealth(): Promise<any> {
     const response = await this.client.get('/api/health');
     return response.data;
+  }
+
+  // Settings API Methods
+  async getUserSettings(): Promise<any> {
+    try {
+      const response = await this.client.get('/api/user/settings');
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        // Return default settings if endpoint doesn't exist yet
+        return {
+          profile: { avatar_url: '', bio: '', location: '', organization: '' },
+          privacy: { public_profile: true, hide_stats: false, anonymous_contributions: false },
+          notifications: {
+            email: { uploads: true, reviews: true, comments: true, achievements: false },
+            in_app: { uploads: true, reviews: true, comments: true, achievements: true },
+            push: { uploads: false, reviews: false, comments: false, achievements: false },
+          },
+          default_metadata: { tags: [] },
+        };
+      }
+      throw error;
+    }
+  }
+
+  async updateUserSettings(data: any): Promise<any> {
+    const response = await this.client.put('/api/user/settings', data);
+    return response.data;
+  }
+
+  async getStorageQuota(): Promise<any> {
+    try {
+      const response = await this.client.get('/api/user/storage');
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        // Return mock data if endpoint doesn't exist yet
+        return {
+          used: 0,
+          total: 10 * 1024 * 1024 * 1024, // 10 GB
+          by_type: { images: 0, videos: 0, documents: 0 },
+        };
+      }
+      throw error;
+    }
+  }
+
+  async getAPITokens(): Promise<any[]> {
+    try {
+      const response = await this.client.get('/api/user/tokens');
+      return response.data;
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 404) {
+        return [];
+      }
+      throw error;
+    }
+  }
+
+  async generateAPIToken(name: string): Promise<any> {
+    const response = await this.client.post('/api/user/tokens', { name });
+    return response.data;
+  }
+
+  async deleteAPIToken(tokenId: string): Promise<void> {
+    await this.client.delete(`/api/user/tokens/${tokenId}`);
+  }
+
+  async uploadAvatar(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    const response = await this.client.post('/api/user/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
+  async exportUserData(): Promise<Blob> {
+    const response = await this.client.get('/api/user/export', {
+      responseType: 'blob',
+    });
+    return response.data;
+  }
+
+  async deleteAccount(): Promise<void> {
+    await this.client.delete('/api/user/account');
   }
 
   // Admin API Methods
@@ -434,6 +533,16 @@ export const imageApi = {
   history: async (imageId: string) => oceanPortalApi.getImageHistory(imageId),
   userStats: () => oceanPortalApi.getUserStats(),
   userUploads: () => oceanPortalApi.getUserUploads(),
+  userActivity: () => oceanPortalApi.getUserActivity(),
+  userSettings: () => oceanPortalApi.getUserSettings(),
+  updateSettings: (data: any) => oceanPortalApi.updateUserSettings(data),
+  storageQuota: () => oceanPortalApi.getStorageQuota(),
+  apiTokens: () => oceanPortalApi.getAPITokens(),
+  generateToken: (name: string) => oceanPortalApi.generateAPIToken(name),
+  deleteToken: (tokenId: string) => oceanPortalApi.deleteAPIToken(tokenId),
+  uploadAvatar: (file: File) => oceanPortalApi.uploadAvatar(file),
+  exportData: () => oceanPortalApi.exportUserData(),
+  deleteAccount: () => oceanPortalApi.deleteAccount(),
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
   updateImage: async (imageId: string, data: any) => {
     const response = await apiClient.put(`/api/images/${imageId}`, data);

@@ -119,7 +119,7 @@ const nextConfig = {
   // Improve Fast Refresh performance
   experimental: {
     optimizeCss: false, // Disable CSS optimization in development
-    // Better Turbopack HMR handling
+    // Disable server components HMR cache to prevent framer-motion factory issues
     serverComponentsHmrCache: false,
   },
   async headers() {

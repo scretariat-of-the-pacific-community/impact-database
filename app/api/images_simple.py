@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, asc
+from sqlalchemy import desc, asc, func, or_
 from geoalchemy2 import WKTElement
 
 from models.database import get_db, ImageMetadata
@@ -363,6 +363,10 @@ async def search_images(
     q: Optional[str] = Query(None, description="Search query"),
     hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
     country: Optional[str] = Query(None, description="Filter by country"),
+    source_agency: Optional[List[str]] = Query(
+        None,
+        description="Filter by source agency (pass multiple values to match any)",
+    ),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
     sort_by: Optional[str] = Query("upload_date", description="Sort field"),
@@ -378,10 +382,18 @@ async def search_images(
             query = query.filter(ImageMetadata.hazard_type == hazard_type)
         if country:
             query = query.filter(ImageMetadata.country == country)
+        if source_agency:
+            normalized_agencies = [agency.strip().lower() for agency in source_agency if agency]
+            if normalized_agencies:
+                query = query.filter(
+                    or_(
+                        func.lower(ImageMetadata.source).in_(normalized_agencies),
+                        func.lower(ImageMetadata.source_type).in_(normalized_agencies),
+                    )
+                )
         
         # Apply text search if query provided
         if q:
-            from sqlalchemy import or_
             search_pattern = f"%{q}%"
             query = query.filter(
                 or_(
@@ -572,3 +584,39 @@ async def get_image_history(
     except Exception as e:
         logger.error(f"Failed to fetch history for {image_id}: {e}")
         raise HTTPException(status_code=500, detail="Unable to load history for this image")
+
+
+@router.get("/user/uploads", response_model=List[Dict[str, Any]])
+async def get_user_uploads(
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Get all uploads for the current authenticated user."""
+    try:
+        # Query images uploaded by current user
+        user_identifier = str(current_user.id) if hasattr(current_user, 'id') else current_user.username
+        
+        images = db.query(ImageMetadata).filter(
+            ImageMetadata.uploader_id == user_identifier
+        ).order_by(desc(ImageMetadata.datetime)).all()
+        
+        # Serialize to match frontend UserUpload type
+        uploads = []
+        for img in images:
+            uploads.append({
+                "id": str(img.id),
+                "filename": img.filename,
+                "title": img.title or img.filename,
+                "hazard_type": img.hazard_type,
+                "location": img.location or img.country,
+                "uploaded_at": img.datetime.isoformat() if img.datetime else None,
+                "approval_status": getattr(img, 'status', 'pending_review'),
+                "views": getattr(img, 'views', 0),
+                "latitude": float(img.latitude) if img.latitude else None,
+                "longitude": float(img.longitude) if img.longitude else None
+            })
+        
+        return uploads
+    except Exception as e:
+        logger.error(f"Error fetching user uploads: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch user uploads: {str(e)}")

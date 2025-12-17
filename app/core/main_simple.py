@@ -2,14 +2,24 @@
 Simplified FastAPI main application for local development
 This version excludes complex middleware and auth for easier startup
 """
-from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-import os
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 import logging
-from datetime import datetime, timedelta
-from collections import defaultdict
+import os
 import random
+import uuid
+from typing import Any, Dict, List, Optional
+
+from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy import desc, func, or_
+from sqlalchemy.orm import Session
+
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced
+from models.database import ImageMetadata, get_db
+from models.rbac import User as DBUser
+from models.review_workflow import ReviewItem
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -43,6 +53,195 @@ async def health_check():
 async def root():
     return {"message": "Impact Database API - Simple Mode"}
 
+# Helper utilities for profile stats/activity
+def _ensure_aware(dt: Optional[datetime]) -> Optional[datetime]:
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _get_db_user(db: Session, current_user: EnhancedUser) -> Optional[DBUser]:
+    if not current_user or not getattr(current_user, "username", None):
+        return None
+    return db.query(DBUser).filter(DBUser.username == current_user.username).first()
+
+
+def _resolve_user_identifier(current_user: EnhancedUser, db_user: Optional[DBUser]) -> Optional[str]:
+    if db_user and getattr(db_user, "id", None):
+        return str(db_user.id)
+    if getattr(current_user, "id", None):
+        return str(current_user.id)
+    return getattr(current_user, "username", None)
+
+
+def _resolve_user_uuid(current_user: EnhancedUser, db_user: Optional[DBUser]) -> Optional[uuid.UUID]:
+    candidate = None
+    if db_user and getattr(db_user, "id", None):
+        candidate = db_user.id
+    elif getattr(current_user, "id", None):
+        candidate = current_user.id
+    if not candidate:
+        return None
+    if isinstance(candidate, uuid.UUID):
+        return candidate
+    try:
+        return uuid.UUID(str(candidate))
+    except (ValueError, TypeError):
+        return None
+
+
+def _build_upload_query(db: Session, user_identifier: Optional[str], username: Optional[str]):
+    filters = []
+    if user_identifier:
+        filters.append(ImageMetadata.uploader_id == user_identifier)
+    if username and username != user_identifier:
+        filters.append(ImageMetadata.uploader_id == username)
+    if not filters:
+        raise HTTPException(status_code=400, detail="Unable to determine user identity for uploads")
+    criterion = or_(*filters) if len(filters) > 1 else filters[0]
+    return db.query(ImageMetadata).filter(criterion)
+
+
+def _calculate_achievements(total_uploads: int, approval_rate: float, uploads_this_month: int) -> List[Dict[str, Any]]:
+    achievements: List[Dict[str, Any]] = []
+    now_iso = datetime.now(timezone.utc).isoformat()
+    if total_uploads >= 1:
+        achievements.append({
+            "id": "first-upload",
+            "title": "First Steps",
+            "description": "Uploaded your first impact assessment.",
+            "icon": "🚀",
+            "earned_at": now_iso,
+        })
+    if total_uploads >= 10:
+        achievements.append({
+            "id": "consistent-contributor",
+            "title": "Consistency Champion",
+            "description": "10+ verified submissions keeping reviewers busy.",
+            "icon": "🏅",
+            "earned_at": now_iso,
+        })
+    if approval_rate >= 0.9:
+        achievements.append({
+            "id": "quality-guardian",
+            "title": "Quality Guardian",
+            "description": "Maintained a 90%+ approval rate.",
+            "icon": "🛡️",
+            "earned_at": now_iso,
+        })
+    if uploads_this_month >= 5:
+        achievements.append({
+            "id": "momentum",
+            "title": "Momentum Builder",
+            "description": "5 uploads in the last 30 days.",
+            "icon": "📈",
+            "earned_at": now_iso,
+        })
+    return achievements
+
+
+def _resolve_user_display_name(db: Session, user_id: Optional[uuid.UUID]) -> str:
+    if not user_id:
+        return "review team"
+    record = db.query(DBUser).filter(DBUser.id == user_id).first()
+    if record and record.full_name:
+        return record.full_name
+    if record and record.username:
+        return record.username
+    return "review team"
+
+
+def _activity_timestamp(value: Optional[datetime]) -> str:
+    aware = _ensure_aware(value) or datetime.now(timezone.utc)
+    return aware.isoformat()
+
+
+def _extract_review_tips(review: ReviewItem) -> List[Dict[str, str]]:
+    tips: List[Dict[str, str]] = []
+    metadata = review.review_metadata or {}
+    candidates = metadata.get("suggested_improvements") or metadata.get("tips") or []
+    if isinstance(candidates, list):
+        for idx, raw in enumerate(candidates[:3]):
+            tips.append({
+                "id": f"{review.id}-tip-{idx}",
+                "text": str(raw),
+            })
+    return tips
+
+
+def _build_activity_timeline(
+    *,
+    db: Session,
+    uploads: List[ImageMetadata],
+    review_items: List[ReviewItem],
+    achievements: List[Dict[str, Any]],
+    username: Optional[str],
+) -> List[Dict[str, Any]]:
+    activities: List[Dict[str, Any]] = []
+
+    # Upload events
+    for upload in uploads:
+        activities.append({
+            "id": f"upload-{upload.id}",
+            "type": "upload",
+            "title": f"Uploaded “{upload.title or upload.filename}”",
+            "description": upload.abstract or upload.location or "New field imagery submitted",
+            "timestamp": _activity_timestamp(upload.datetime or upload.date_stamp),
+        })
+
+    # Review feedback
+    for review in review_items:
+        if not review.reviewed_at:
+            continue
+        reviewer_name = _resolve_user_display_name(db, review.reviewed_by)
+        activities.append({
+            "id": f"review-{review.id}",
+            "type": "review",
+            "title": f"Review {review.status.replace('_', ' ').title()}",
+            "description": review.reviewer_notes or "Review feedback received",
+            "reviewer": reviewer_name,
+            "reviewComments": review.reviewer_notes,
+            "suggestedImprovements": _extract_review_tips(review),
+            "timestamp": _activity_timestamp(review.reviewed_at),
+        })
+
+    # Achievement unlocks
+    for achievement in achievements:
+        activities.append({
+            "id": f"achievement-{achievement['id']}",
+            "type": "achievement",
+            "title": f"Unlocked “{achievement['title']}” badge",
+            "description": achievement["description"],
+            "achievementBadge": achievement["title"],
+            "timestamp": achievement.get("earned_at") or _activity_timestamp(None),
+        })
+
+    # System notice
+    activities.append({
+        "id": f"system-maintenance-{username or 'user'}",
+        "type": "system",
+        "title": "Scheduled maintenance",
+        "description": "Platform resilience upgrades roll out this weekend.",
+        "systemMessage": "Uploads may be briefly paused Saturday 02:00–02:20 UTC. Pending items resume automatically.",
+        "timestamp": _activity_timestamp(None),
+    })
+
+    activities.sort(key=lambda item: item["timestamp"], reverse=True)
+    return activities
+
+
+def _query_review_items(db: Session, user_uuid: Optional[uuid.UUID], limit: Optional[int] = None) -> List[ReviewItem]:
+    if not user_uuid:
+        return []
+    query = db.query(ReviewItem).filter(ReviewItem.submitted_by == user_uuid)
+    query = query.order_by(desc(ReviewItem.reviewed_at), desc(ReviewItem.submitted_at))
+    if limit:
+        query = query.limit(limit)
+    return query.all()
+
+
 # Include only essential routers
 try:
     # Import auth API for authentication
@@ -69,7 +268,15 @@ try:
     from api.featured import router as featured_router
     app.include_router(featured_router, prefix="/api", tags=["featured"])
     
-    logger.info("Auth API, Images API, Upload API, RBAC API, Review Workflow API, and Featured Stories API routers included")
+    # Import User API for profile, stats, and settings
+    from api.user import router as user_router
+    app.include_router(user_router, prefix="/api", tags=["user"])
+    
+    # Import Push Notifications API
+    from api.push_notifications import router as push_router
+    app.include_router(push_router, prefix="/api", tags=["push-notifications"])
+    
+    logger.info("Auth API, Images API, Upload API, RBAC API, Review Workflow API, Featured Stories API, User API, and Push Notifications API routers included")
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
 
@@ -257,6 +464,9 @@ async def api_search(
     q: str = None,
     hazard_type: str = None,
     country: str = None,
+    source_agency: Optional[List[str]] = Query(
+        None, description="Filter by source agency (repeat to select multiple)"
+    ),
     sort_by: str = "upload_date",
     sort_order: str = "desc",
     limit: int = 24,
@@ -287,6 +497,7 @@ async def api_search(
                 q=q,
                 hazard_type=hazard_type,
                 country=country,
+                source_agency=source_agency,
                 skip=offset,
                 limit=limit,
                 sort_by=sort_by,
@@ -307,14 +518,67 @@ async def api_search(
         )
 
 @app.get("/api/user/stats")
-async def get_user_stats():
-    """Get user statistics - placeholder for development"""
-    return {
-        "total_uploads": 0,
-        "approved_images": 0,
-        "pending_review": 0,
-        "rejected_images": 0
-    }
+async def get_user_stats(
+    current_user: EnhancedUser = Depends(get_current_user_enhanced),
+    db: Session = Depends(get_db),
+):
+    """Return profile statistics for the authenticated user."""
+    try:
+        db_user = _get_db_user(db, current_user)
+        user_identifier = _resolve_user_identifier(current_user, db_user)
+        uploads_query = _build_upload_query(db, user_identifier, getattr(current_user, "username", None))
+        uploads = uploads_query.order_by(desc(ImageMetadata.datetime)).all()
+
+        total_uploads = len(uploads)
+        status_counter = Counter((img.status or "pending_review") for img in uploads)
+        approved_count = status_counter.get("approved", 0)
+        approval_rate = approved_count / total_uploads if total_uploads else 0
+
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        uploads_this_month = sum(
+            1 for img in uploads
+            if _ensure_aware(img.datetime or img.date_stamp or datetime.now(timezone.utc)) >= thirty_days_ago
+        )
+        hazard_counter = Counter(img.hazard_type for img in uploads if img.hazard_type)
+        top_hazard = hazard_counter.most_common(1)[0][0] if hazard_counter else "unknown"
+
+        user_uuid = _resolve_user_uuid(current_user, db_user)
+        review_items = _query_review_items(db, user_uuid)
+        review_durations = [item.review_duration_minutes for item in review_items if item.review_duration_minutes]
+        avg_review_minutes = sum(review_durations) / len(review_durations) if review_durations else 0
+        average_review_time = round(avg_review_minutes / 60, 1) if avg_review_minutes else 0
+
+        achievements = _calculate_achievements(total_uploads, approval_rate, uploads_this_month)
+        impact_score = round(min(100, approved_count * 4 + uploads_this_month * 2 + approval_rate * 40))
+
+        last_active_sources = [
+            _ensure_aware(img.datetime or img.date_stamp) for img in uploads if (img.datetime or img.date_stamp)
+        ]
+        if db_user and db_user.last_login:
+            last_active_sources.append(_ensure_aware(db_user.last_login))
+        last_active = max(last_active_sources) if last_active_sources else datetime.now(timezone.utc)
+
+        return {
+            "name": (db_user.full_name if db_user and db_user.full_name else getattr(current_user, "full_name", None)) or getattr(current_user, "username", "Impact Responder"),
+            "email": getattr(current_user, "email", None),
+            "organization": (db_user.department if db_user and db_user.department else getattr(db_user, "position", None)) or "Independent",
+            "avatar_url": getattr(db_user, "avatar_url", None),
+            "total_uploads": total_uploads,
+            "approval_rate": approval_rate,
+            "impact_score": impact_score,
+            "last_active": last_active.isoformat(),
+            "achievements": achievements,
+            "analytics": {
+                "uploads_this_month": uploads_this_month,
+                "average_review_time": average_review_time,
+                "top_hazard": top_hazard or "unknown",
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Failed to compute user stats: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to load user stats")
 
 @app.get("/upload/images/{image_id}/metadata")
 async def get_image_metadata(image_id: str):
@@ -350,8 +614,51 @@ async def get_image_metadata(image_id: str):
         logging.error(f"Get image metadata error: {e}")
         return JSONResponse(
             status_code=500,
-            content={"detail": "Failed to get image metadata"}
+        content={"detail": "Failed to get image metadata"}
+    )
+
+
+@app.get("/api/user/activity")
+async def get_user_activity(
+    current_user: EnhancedUser = Depends(get_current_user_enhanced),
+    db: Session = Depends(get_db),
+):
+    """Return recent activity timeline items for the authenticated user."""
+    try:
+        db_user = _get_db_user(db, current_user)
+        user_identifier = _resolve_user_identifier(current_user, db_user)
+        uploads_query = _build_upload_query(db, user_identifier, getattr(current_user, "username", None))
+        uploads = uploads_query.order_by(desc(ImageMetadata.datetime)).all()
+
+        total_uploads = len(uploads)
+        status_counter = Counter((img.status or "pending_review") for img in uploads)
+        approved_count = status_counter.get("approved", 0)
+        approval_rate = approved_count / total_uploads if total_uploads else 0
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        uploads_this_month = sum(
+            1 for img in uploads
+            if _ensure_aware(img.datetime or img.date_stamp or datetime.now(timezone.utc)) >= thirty_days_ago
         )
+        achievements = _calculate_achievements(total_uploads, approval_rate, uploads_this_month)
+
+        user_uuid = _resolve_user_uuid(current_user, db_user)
+        review_items = _query_review_items(db, user_uuid, limit=25)
+        recent_uploads = uploads[:25]
+
+        activities = _build_activity_timeline(
+            db=db,
+            uploads=recent_uploads,
+            review_items=review_items,
+            achievements=achievements,
+            username=getattr(current_user, "username", None),
+        )
+        return activities
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Failed to build user activity: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to load activity timeline")
+
 
 # Error handlers
 @app.exception_handler(500)

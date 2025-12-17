@@ -54,6 +54,9 @@ if settings.REDIS_URL:
 # app.add_middleware(SecurityHeadersMiddleware)  # Commented out - not imported
 # app.add_middleware(RateLimitMiddleware, redis_client=redis_client)  # Commented out - not imported
 
+# Import user API
+from api import user as user_api
+
 # Configure CORS - more restrictive in production
 if settings.ENVIRONMENT.lower() == "production":
     allowed_origins = [
@@ -109,6 +112,9 @@ app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
 # API endpoints - now require authentication
 app.include_router(images.router, prefix="/api", tags=["api", "images"])
 app.include_router(metadata.router, prefix="/api", tags=["metadata"])
+
+# User endpoints - profile, stats, settings
+app.include_router(user_api.router, prefix="/api", tags=["user"])
 
 # RBAC endpoints - Phase 0: Foundation
 app.include_router(rbac.router, tags=["rbac", "roles", "permissions", "users"])

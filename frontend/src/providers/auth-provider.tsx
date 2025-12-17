@@ -72,8 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(storedSession);
         setUser(storedSession.user);
         
-        // Refresh token if needed
-        if (shouldRefreshToken(storedSession)) {
+        // Refresh token if needed (only if we have a refresh token)
+        if (storedSession.refresh_token && shouldRefreshToken(storedSession)) {
           await refreshAccessToken(storedSession.refresh_token);
         }
       } else {
@@ -399,7 +399,8 @@ async function getUserInfo(accessToken: string): Promise<User> {
 
 async function refreshAccessToken(refreshToken?: string) {
   if (!refreshToken) {
-    throw new Error('No refresh token available');
+    console.warn('Skipping token refresh because no refresh token is stored.');
+    return null;
   }
 
   const response = await fetch(`${authConfig.issuer}/token`, {

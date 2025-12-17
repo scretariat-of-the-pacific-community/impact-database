@@ -265,7 +265,7 @@ function LoginPageContent() {
                     
                     try {
                       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-                      const endpoint = isRegistering ? '/register' : '/login';
+                      const endpoint = isRegistering ? '/api/v1/auth/register' : '/api/v1/auth/login';
                       const body = isRegistering 
                         ? { username: email.split('@')[0], email, password, full_name: email.split('@')[0] }
                         : { username: email, password };
@@ -278,15 +278,28 @@ function LoginPageContent() {
                       
                       if (response.ok) {
                         const data = await response.json();
-                        // Store token and user info
-                        localStorage.setItem('auth_token', data.access_token);
-                        localStorage.setItem('user', JSON.stringify({
-                          id: data.id,
-                          username: data.username,
-                          email: data.email,
-                          full_name: data.full_name
-                        }));
-                        router.push(returnUrl);
+                        
+                        // Store session in format expected by AuthProvider
+                        const session = {
+                          user: {
+                            id: data.id,
+                            username: data.username,
+                            email: data.email,
+                            full_name: data.full_name,
+                            roles: ['contributor']
+                          },
+                          access_token: data.access_token,
+                          refresh_token: data.refresh_token || undefined,
+                          expires_at: Date.now() + (60 * 60 * 1000), // 1 hour from now
+                        };
+                        
+                        localStorage.setItem('ocean_portal_session', JSON.stringify(session));
+                        
+                        // Set auth cookie
+                        document.cookie = `ocean_portal_token=${encodeURIComponent(data.access_token)}; Max-Age=3600; path=/; Secure; SameSite=Strict`;
+                        
+                        // Force page reload to reinitialize AuthProvider
+                        window.location.href = returnUrl;
                       } else {
                         const error = await response.json();
                         alert(error.detail || (isRegistering ? 'Registration failed' : 'Login failed. Please check your credentials.'));
