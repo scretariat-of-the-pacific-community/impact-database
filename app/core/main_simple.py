@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import desc, func, or_
+from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced

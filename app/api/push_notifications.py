@@ -5,14 +5,13 @@ Handles web push subscriptions and sending notifications to users
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from datetime import datetime
 from typing import Optional, Dict, Any
 import json
 import logging
 
 from models.database import get_db, Base
-from models.rbac import User as DBUser
 from api.auth_rbac import get_current_user_enhanced, EnhancedUser
 
 logger = logging.getLogger(__name__)

@@ -67,7 +67,7 @@ export default function EnhancedAnalytics() {
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'charts' | 'map'>('charts');
   const [mounted, setMounted] = useState(false);
-  const [showInsights, setShowInsights] = useState(true);
+  const [showInsights] = useState(true);
   
   const [filters, setFilters] = useState<Filters>({
     startDate: '',

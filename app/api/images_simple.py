@@ -26,6 +26,7 @@ def _find_image(db: Session, image_id: str) -> Optional[ImageMetadata]:
         uuid_value = UUID(image_id)
         image = db.query(ImageMetadata).filter(ImageMetadata.id == uuid_value).first()
     except (ValueError, TypeError, AttributeError):
+        # If image_id is not a valid UUID, silently fall back to filename lookup below
         pass
 
     if image:

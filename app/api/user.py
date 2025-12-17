@@ -1,9 +1,9 @@
 """User API endpoints for profile, stats, activity, and settings."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, and_, or_
+from sqlalchemy import func, desc, and_
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
@@ -163,7 +163,6 @@ async def get_user_uploads(
 
         # Calculate pagination
         offset = (page - 1) * limit
-        total = query.count()
         
         uploads = query.offset(offset).limit(limit).all()
 
@@ -238,48 +237,44 @@ async def get_user_settings(
     current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Get user settings and preferences."""
-    try:
-        # In a real implementation, these would be stored in the database
-        # For now, return default settings
-        return {
-            "profile": {
-                "avatar_url": "",
-                "bio": "",
-                "location": "",
-                "organization": ""
+    # In a real implementation, these would be stored in the database
+    # For now, return default settings
+    return {
+        "profile": {
+            "avatar_url": "",
+            "bio": "",
+            "location": "",
+            "organization": ""
+        },
+        "privacy": {
+            "public_profile": True,
+            "hide_stats": False,
+            "anonymous_contributions": False
+        },
+        "notifications": {
+            "email": {
+                "uploads": True,
+                "reviews": True,
+                "comments": True,
+                "achievements": False
             },
-            "privacy": {
-                "public_profile": True,
-                "hide_stats": False,
-                "anonymous_contributions": False
+            "in_app": {
+                "uploads": True,
+                "reviews": True,
+                "comments": True,
+                "achievements": True
             },
-            "notifications": {
-                "email": {
-                    "uploads": True,
-                    "reviews": True,
-                    "comments": True,
-                    "achievements": False
-                },
-                "in_app": {
-                    "uploads": True,
-                    "reviews": True,
-                    "comments": True,
-                    "achievements": True
-                },
-                "push": {
-                    "uploads": False,
-                    "reviews": False,
-                    "comments": False,
-                    "achievements": False
-                }
-            },
-            "default_metadata": {
-                "tags": []
+            "push": {
+                "uploads": False,
+                "reviews": False,
+                "comments": False,
+                "achievements": False
             }
+        },
+        "default_metadata": {
+            "tags": []
         }
-    except Exception as e:
-        logger.error(f"Error fetching user settings: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch settings: {str(e)}")
+    }
 
 
 @router.put("/user/settings")
@@ -339,13 +334,9 @@ async def get_api_tokens(
     current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Get user's API tokens."""
-    try:
-        # In a real implementation, fetch from database
-        # For now, return empty list
-        return []
-    except Exception as e:
-        logger.error(f"Error fetching API tokens: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch tokens: {str(e)}")
+    # In a real implementation, fetch from database
+    # For now, return empty list
+    return []
 
 
 @router.post("/user/tokens")
