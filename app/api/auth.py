@@ -187,6 +187,80 @@ async def login(
     }
 
 
+class RegisterRequest(BaseModel):
+    username: str
+    email: str
+    password: str
+    full_name: Optional[str] = None
+
+
+@router.post("/register")
+async def register(
+    register_data: RegisterRequest,
+    db: Session = Depends(get_db)
+):
+    """Register a new user account"""
+    from models.rbac import User as DBUser, Role
+    
+    # Check if username already exists
+    existing_user = db.query(DBUser).filter(DBUser.username == register_data.username).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+    
+    # Check if email already exists
+    existing_email = db.query(DBUser).filter(DBUser.email == register_data.email).first()
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Get default role (contributor)
+    default_role = db.query(Role).filter(Role.name == "contributor").first()
+    if not default_role:
+        # Fallback: create contributor role if it doesn't exist
+        default_role = Role(
+            name="contributor",
+            description="Can upload and manage own content"
+        )
+        db.add(default_role)
+        db.flush()
+    
+    # Create new user
+    hashed_password = pwd_context.hash(register_data.password)
+    new_user = DBUser(
+        username=register_data.username,
+        email=register_data.email,
+        full_name=register_data.full_name or register_data.username,
+        hashed_password=hashed_password,
+        is_active=True,
+        role_id=default_role.id
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    # Generate access token for immediate login
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": new_user.username}, expires_delta=access_token_expires
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "id": str(new_user.id),
+        "username": new_user.username,
+        "email": new_user.email,
+        "full_name": new_user.full_name,
+        "message": "Account created successfully"
+    }
+
+
 async def get_current_user(
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)

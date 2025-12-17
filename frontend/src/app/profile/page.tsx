@@ -8,9 +8,11 @@ import { Loader2, UploadCloud, Award, Activity, Settings, MapPin, ShieldCheck } 
 import { imageApi } from '@/lib/api';
 import { HAZARD_TYPE_LABELS, UserStats, UserUpload } from '@/lib/types';
 import { Card, Button } from '@/components/design-system';
+import ActivityTimeline from '@/components/profile/ActivityTimeline';
 
 const TABS = [
   { id: 'uploads', label: 'Uploads', icon: UploadCloud },
+  { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'achievements', label: 'Achievements', icon: Award },
   { id: 'analytics', label: 'Analytics', icon: Activity },
   { id: 'settings', label: 'Settings', icon: Settings },
@@ -253,6 +255,8 @@ export default function ProfilePage() {
     switch (activeTab) {
       case 'uploads':
         return renderUploads();
+      case 'activity':
+        return <ActivityTimeline />;
       case 'achievements':
         return renderAchievements();
       case 'analytics':

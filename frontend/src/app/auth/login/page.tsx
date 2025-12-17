@@ -21,6 +21,10 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const { isAuthenticated, signIn, isLoading, error: authError, clearError } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isRegistering, setIsRegistering] = useState(false);
 
   const sanitizedReturnUrl = sanitizeReturnUrl(searchParams.get('returnUrl'));
   const returnUrl = sanitizedReturnUrl || '/';
@@ -244,21 +248,124 @@ function LoginPageContent() {
 
               <div className="my-6 flex items-center">
                 <div className="flex-1 border-t border-gray-300"></div>
-                <span className="px-4 text-sm text-gray-500">Why we use social login</span>
+                <button 
+                  onClick={() => setShowEmailForm(!showEmailForm)}
+                  className="px-4 text-sm text-gray-500 hover:text-gray-700 font-medium"
+                >
+                  {showEmailForm ? 'Use social login instead' : 'Or use email'}
+                </button>
                 <div className="flex-1 border-t border-gray-300"></div>
               </div>
 
-              <div className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3">
-                <p className="mb-2">
-                  <strong>✓ Faster:</strong> No forms to fill, no passwords to remember
-                </p>
-                <p className="mb-2">
-                  <strong>✓ Safer:</strong> We never see your password, managed by trusted providers
-                </p>
-                <p>
-                  <strong>✓ Easier:</strong> One click to get started sharing your observations
-                </p>
-              </div>
+              {showEmailForm ? (
+                <div className="space-y-4">
+                  <form onSubmit={async (e) => {
+                    e.preventDefault();
+                    setIsSigningIn(true);
+                    
+                    try {
+                      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+                      const endpoint = isRegistering ? '/register' : '/login';
+                      const body = isRegistering 
+                        ? { username: email.split('@')[0], email, password, full_name: email.split('@')[0] }
+                        : { username: email, password };
+                      
+                      const response = await fetch(`${apiUrl}${endpoint}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(body),
+                      });
+                      
+                      if (response.ok) {
+                        const data = await response.json();
+                        // Store token and user info
+                        localStorage.setItem('auth_token', data.access_token);
+                        localStorage.setItem('user', JSON.stringify({
+                          id: data.id,
+                          username: data.username,
+                          email: data.email,
+                          full_name: data.full_name
+                        }));
+                        router.push(returnUrl);
+                      } else {
+                        const error = await response.json();
+                        alert(error.detail || (isRegistering ? 'Registration failed' : 'Login failed. Please check your credentials.'));
+                      }
+                    } catch (error) {
+                      console.error('Auth error:', error);
+                      alert('Unable to connect to server. Please try again.');
+                    } finally {
+                      setIsSigningIn(false);
+                    }
+                  }} className="space-y-3">
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                        {isRegistering ? 'Email' : 'Username or Email'}
+                      </label>
+                      <input
+                        id="email"
+                        type={isRegistering ? 'email' : 'text'}
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        placeholder={isRegistering ? 'your.email@example.com' : 'username or email'}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                        Password
+                      </label>
+                      <input
+                        id="password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder="••••••••"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSigningIn}
+                      className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSigningIn ? (
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      ) : (
+                        <>
+                          <Mail className="w-5 h-5 mr-2" />
+                          {isRegistering ? 'Create Account' : 'Sign In'}
+                        </>
+                      )}
+                    </button>
+                  </form>
+
+                  <div className="text-center">
+                    <button
+                      onClick={() => setIsRegistering(!isRegistering)}
+                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                    >
+                      {isRegistering ? 'Already have an account? Sign in' : "Don't have an account? Register"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3">
+                  <p className="mb-2">
+                    <strong>✓ Faster:</strong> No forms to fill, no passwords to remember
+                  </p>
+                  <p className="mb-2">
+                    <strong>✓ Safer:</strong> We never see or store your password
+                  </p>
+                  <p>
+                    <strong>✓ Easier:</strong> One account across devices and platforms
+                  </p>
+                </div>
+              )}
               
               {/* Guest Access Info */}
               <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">

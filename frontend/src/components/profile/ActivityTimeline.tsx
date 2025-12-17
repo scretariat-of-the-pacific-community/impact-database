@@ -10,7 +10,7 @@ import {
   Clock3,
   FileText,
   Filter,
-  MessageSquareText,
+  MessageSquare,
   Trophy,
   Upload,
 } from 'lucide-react';
@@ -122,7 +122,7 @@ const filterLabels: Record<ActivityType | 'all', string> = {
 const iconMap: Record<ActivityType, () => JSX.Element> = {
   upload: () => <Upload className="h-4 w-4" />,
   edit: () => <FileText className="h-4 w-4" />,
-  review: () => <MessageSquareText className="h-4 w-4" />,
+  review: () => <MessageSquare className="h-4 w-4" />,
   achievement: () => <Trophy className="h-4 w-4" />,
   system: () => <AlertTriangle className="h-4 w-4" />,
 };
@@ -350,7 +350,7 @@ export default function ActivityTimeline() {
                           </span>
                           {item.type === 'review' && item.reviewer && (
                             <span className="inline-flex items-center gap-1 text-palm-200">
-                              <MessageSquareText className="h-4 w-4" /> Reviewed by {item.reviewer}
+                              <MessageSquare className="h-4 w-4" /> Reviewed by {item.reviewer}
                             </span>
                           )}
                         </div>
