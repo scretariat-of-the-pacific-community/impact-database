@@ -36,54 +36,52 @@ docker exec $(docker ps -qf "name=api") pip install pywebpush > /dev/null 2>&1
 echo -e "${GREEN}✓ Backend dependencies installed (pywebpush)${NC}"
 echo ""
 
-# 4. Create frontend .env.local if it doesn't exist
-echo -e "${BLUE}[4/6] Configuring environment variables...${NC}"
-if [ ! -f "frontend/.env.local" ]; then
-    echo "Creating frontend/.env.local..."
-    cat > frontend/.env.local << EOF
-# Push Notifications VAPID Public Key
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=BElxhpt18ThIRqB2SxIShTi8AOrsQFP0u9eLBJEr9s-hzaoacMWsq-XSH0zgZXR5lBhe36P75alTPA-qXZPn-TU
-
-# Service Worker
-NEXT_PUBLIC_SW_ENABLED=true
-EOF
-    echo -e "${GREEN}✓ Created frontend/.env.local${NC}"
-else
-    # Check if VAPID key exists
-    if ! grep -q "NEXT_PUBLIC_VAPID_PUBLIC_KEY" frontend/.env.local; then
-        echo "" >> frontend/.env.local
-        echo "# Push Notifications VAPID Public Key" >> frontend/.env.local
-        echo "NEXT_PUBLIC_VAPID_PUBLIC_KEY=BElxhpt18ThIRqB2SxIShTi8AOrsQFP0u9eLBJEr9s-hzaoacMWsq-XSH0zgZXR5lBhe36P75alTPA-qXZPn-TU" >> frontend/.env.local
-        echo -e "${GREEN}✓ Added VAPID key to frontend/.env.local${NC}"
-    else
-        echo -e "${GREEN}✓ VAPID key already configured${NC}"
-    fi
-fi
+# 4. Generate VAPID keys for push notifications
+echo -e "${BLUE}[4/6] Configuring push notifications...${NC}"
+echo ""
+echo -e "${YELLOW}⚠️  IMPORTANT: VAPID Key Security${NC}"
+echo ""
+echo "Push notifications require VAPID keys. For security:"
+echo "1. NEVER commit VAPID keys to version control"
+echo "2. Generate unique keys per environment"
+echo "3. Store them securely in environment variables"
+echo ""
+echo "To generate VAPID keys, run:"
+echo -e "${GREEN}  python3 -c 'from pywebpush import webpush; vapid = webpush.vapid_key(); print(f\"Public: {vapid.public_key.decode()}\\nPrivate: {vapid.private_key.decode()}\")'${NC}"
+echo ""
+echo "Then add them to your environment files:"
+echo ""
+echo "  frontend/.env.local:"
+echo "    NEXT_PUBLIC_VAPID_PUBLIC_KEY=<your_public_key>"
+echo "    NEXT_PUBLIC_SW_ENABLED=true"
+echo ""
+echo "  app/.env:"
+echo "    VAPID_PRIVATE_KEY=<your_private_key>"
+echo "    VAPID_SUBJECT=mailto:your@email.com"
+echo ""
+echo -e "${YELLOW}Skipping VAPID setup - please generate your own keys${NC}"
 echo ""
 
-# 5. Check/create backend .env
-echo -e "${BLUE}[5/6] Configuring backend environment...${NC}"
-if [ ! -f "app/.env" ]; then
-    echo "Creating app/.env..."
-    cat > app/.env << EOF
-# Push Notifications VAPID Private Key (keep secret!)
-VAPID_PRIVATE_KEY=zn2JQDGe0YC0L75BW-6LSTnnCxrQmBogn-VBvjngxZY
-
-# VAPID Subject (change to your email)
-VAPID_SUBJECT=mailto:admin@impactdatabase.com
-EOF
-    echo -e "${GREEN}✓ Created app/.env${NC}"
-else
-    # Check if VAPID key exists
-    if ! grep -q "VAPID_PRIVATE_KEY" app/.env; then
-        echo "" >> app/.env
-        echo "# Push Notifications VAPID Private Key (keep secret!)" >> app/.env
-        echo "VAPID_PRIVATE_KEY=zn2JQDGe0YC0L75BW-6LSTnnCxrQmBogn-VBvjngxZY" >> app/.env
-        echo "VAPID_SUBJECT=mailto:admin@impactdatabase.com" >> app/.env
-        echo -e "${GREEN}✓ Added VAPID key to app/.env${NC}"
+# 5. Check environment files exist
+echo -e "${BLUE}[5/6] Checking environment configuration...${NC}"
+if [ -f "frontend/.env.local" ]; then
+    if grep -q "NEXT_PUBLIC_VAPID_PUBLIC_KEY" frontend/.env.local; then
+        echo -e "${GREEN}✓ Frontend VAPID key configured${NC}"
     else
-        echo -e "${GREEN}✓ VAPID key already configured${NC}"
+        echo -e "${YELLOW}⚠️  Frontend VAPID key not found in .env.local${NC}"
     fi
+else
+    echo -e "${YELLOW}⚠️  frontend/.env.local not found${NC}"
+fi
+
+if [ -f "app/.env" ]; then
+    if grep -q "VAPID_PRIVATE_KEY" app/.env; then
+        echo -e "${GREEN}✓ Backend VAPID key configured${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Backend VAPID key not found in app/.env${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  app/.env not found${NC}"
 fi
 echo ""
 

@@ -151,16 +151,23 @@ This PR adds comprehensive mobile-first features to the Impact Database, includi
 
 2. **Configure environment variables:**
    
+   **⚠️ Generate VAPID Keys:**
+   ```bash
+   python3 -c 'from pywebpush import webpush; vapid = webpush.vapid_key(); print(f"Public: {vapid.public_key.decode()}\nPrivate: {vapid.private_key.decode()}")'
+   ```
+   
    **Frontend (.env.local):**
    ```env
-   NEXT_PUBLIC_VAPID_PUBLIC_KEY=BElxhpt18ThIRqB2SxIShTi8AOrsQFP0u9eLBJEr9s-hzaoacMWsq-XSH0zgZXR5lBhe36P75alTPA-qXZPn-TU
+   NEXT_PUBLIC_VAPID_PUBLIC_KEY=<your_generated_public_key>
    ```
    
    **Backend (app/.env):**
    ```env
-   VAPID_PRIVATE_KEY=zn2JQDGe0YC0L75BW-6LSTnnCxrQmBogn-VBvjngxZY
-   VAPID_SUBJECT=mailto:admin@impactdatabase.com
+   VAPID_PRIVATE_KEY=<your_generated_private_key>
+   VAPID_SUBJECT=mailto:your@email.com
    ```
+   
+   Never commit VAPID keys to version control!
 
 3. **Restart services:**
    ```bash
