@@ -81,7 +81,18 @@ function generateFuturePeriods(
   
   // Validate input
   if (!lastPeriod || count <= 0) {
-    console.warn('generateFuturePeriods: Invalid input', { lastPeriod, count });
+    console.warn(
+      'generateFuturePeriods: Invalid input parameters detected.',
+      'Expected lastPeriod (non-empty string) and count (positive number).',
+      'Received:',
+      { 
+        lastPeriod: lastPeriod ?? 'undefined', 
+        lastPeriodType: typeof lastPeriod,
+        count,
+        countType: typeof count,
+        granularity 
+      }
+    );
     return [];
   }
   

@@ -157,16 +157,35 @@ function downloadFile(content: string, filename: string, type: string) {
   setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
-// Escape a value for CSV according to RFC 4180 and mitigate CSV injection by prefixing formula-like text
+/**
+ * Escape a value for CSV according to RFC 4180 and mitigate CSV injection attacks.
+ * 
+ * CSV Injection Prevention:
+ * Values starting with formula characters (=, +, -, @, \t, \r) are prefixed
+ * with a single quote to prevent execution in spreadsheet applications.
+ * 
+ * ⚠️ WARNING: Users should be cautious when opening exported CSV files.
+ * Always inspect data before enabling macros or formulas in spreadsheet apps.
+ * 
+ * For additional security, consider opening CSV files in plain text editors first.
+ */
 function escapeCsvValue(value: string | number): string {
   let str = String(value);
-  if (/^[=+\-@]/.test(str)) {
+  
+  // Prevent CSV injection by prefixing formula-like values
+  // This protects against attacks where malicious formulas are embedded in data
+  if (/^[=+\-@\t\r]/.test(str)) {
     str = `'${str}`;
   }
+  
+  // Escape double quotes per RFC 4180
   str = str.replace(/"/g, '""');
+  
+  // Wrap in quotes if contains special characters
   if (/[",\n\r]/.test(str)) {
     str = `"${str}"`;
   }
+  
   return str;
 }
 
