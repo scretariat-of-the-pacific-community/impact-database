@@ -142,7 +142,7 @@ export default function ProfilePage() {
   }
 
   const renderUploads = () => {
-    return <InfiniteUploadList />;
+    return <InfiniteUploadList enabled={activeTab === 'uploads'} />;
   };
 
   const renderAchievements = () => {

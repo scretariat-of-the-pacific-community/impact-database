@@ -49,6 +49,16 @@ const authProviders = {
 const getRedirectUri = () => 
   typeof window !== 'undefined' ? `${window.location.origin}/auth/callback` : '';
 
+// SPC SSO Configuration (OIDC/OAuth2)
+const authConfig = {
+  issuer: process.env.NEXT_PUBLIC_SPC_SSO_ISSUER || 'https://sso.spc.int',
+  clientId: process.env.NEXT_PUBLIC_SPC_SSO_CLIENT_ID || 'ocean-portal',
+  redirectUri: getRedirectUri(),
+  responseType: 'code',
+  scopes: ['openid', 'profile', 'email'],
+  prompt: 'select_account',
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<AuthSession | null>(null);

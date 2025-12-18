@@ -115,7 +115,7 @@ const filterLabels: Record<ActivityType | 'all', string> = {
   system: 'System',
 };
 
-const iconMap: Record<ActivityType, () => JSX.Element> = {
+const iconMap: Record<ActivityType, () => React.ReactElement> = {
   upload: () => <Upload className="h-4 w-4" />,
   edit: () => <FileText className="h-4 w-4" />,
   review: () => <MessageSquare className="h-4 w-4" />,
@@ -123,7 +123,7 @@ const iconMap: Record<ActivityType, () => JSX.Element> = {
   system: () => <AlertTriangle className="h-4 w-4" />,
 };
 
-const filterIcons: Record<ActivityType | 'all', () => JSX.Element> = {
+const filterIcons: Record<ActivityType | 'all', () => React.ReactElement> = {
   all: () => <Filter className="h-4 w-4" />,
   upload: iconMap.upload,
   edit: iconMap.edit,

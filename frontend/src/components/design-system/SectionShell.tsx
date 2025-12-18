@@ -24,12 +24,11 @@ const SectionShell: React.FC<SectionShellProps> = ({
   titleClassName,
   descriptionClassName,
   children,
-  variant = 'tide',
+  variant = 'elevated',
   padding = 'lg',
   ...cardProps
 }) => {
-  const isDark =
-    variant === 'tide' || variant === 'dark' || variant === 'gradient';
+  const isDark = false;
 
   return (
     <Card variant={variant} padding={padding} {...cardProps}>

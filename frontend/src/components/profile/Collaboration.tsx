@@ -130,7 +130,7 @@ export default function Collaboration({ uploads = [], stats }: CollaborationProp
       label: mapHazardLabel(key as HazardType),
       type: 'hazard' as const,
       context: data.sample?.location || data.sample?.country || 'No location provided',
-      severity: index === 0 ? 'high' : index === 1 ? 'medium' : 'low',
+      severity: (index === 0 ? 'high' : index === 1 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
       followers: data.count,
     }));
     const regionEntries = regionAggregates.map(([region, data], index) => ({
@@ -138,7 +138,7 @@ export default function Collaboration({ uploads = [], stats }: CollaborationProp
       label: region,
       type: 'region' as const,
       context: mapHazardLabel(data.hazard),
-      severity: index === 0 ? 'medium' : 'low',
+      severity: (index === 0 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
       followers: data.count,
     }));
     return [...hazardEntries, ...regionEntries].slice(0, 4);

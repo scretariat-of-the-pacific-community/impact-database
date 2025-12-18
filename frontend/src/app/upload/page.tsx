@@ -751,14 +751,12 @@ export default function UploadPage() {
                             });
                           },
                           (error) => {
-                            const errorCode = (error as GeolocationPositionError | undefined)?.code;
-                            const errorName = (error as DOMException | undefined)?.name;
-                            const errorMessage = (error as GeolocationPositionError | undefined)?.message;
+                            const errorCode = error?.code;
+                            const errorMessage = error?.message;
                             
                             console.error('Geolocation error:', {
                               raw: error ?? 'null/undefined',
                               code: errorCode,
-                              name: errorName,
                               message: errorMessage,
                               hasProperties: error ? Object.keys(error).length : 0
                             });
@@ -780,7 +778,7 @@ export default function UploadPage() {
                               /Google Inc/.test(navigator.vendor);
                             
                             // Handle case where error object is null, undefined, or empty
-                            const hasValidError = error && (errorCode !== undefined || errorName || errorMessage);
+                            const hasValidError = error && (errorCode !== undefined || errorMessage);
                             
                             if (!hasValidError) {
                               // Empty or invalid error object - common in Chrome with blocked permissions
@@ -805,13 +803,8 @@ export default function UploadPage() {
                                   userDescription = errorMessage || 'Please check your browser permissions or select location on map.';
                               }
                             } else {
-                              // DOMException or other error type
-                              const blockedByPolicy = errorName && BLOCKED_ERROR_NAMES.includes(errorName);
-                              if (blockedByPolicy) {
-                                userDescription = 'Your browser blocked location sharing due to site settings or security policy. Please allow location access or use the map picker.';
-                              } else {
-                                userDescription = errorMessage || 'Please check your browser permissions or select location on map.';
-                              }
+                              // Other error type (e.g., network issues)
+                              userDescription = errorMessage || 'Please check your browser permissions or select location on map.';
                             }
                             
                             toast.error(userMessage, {

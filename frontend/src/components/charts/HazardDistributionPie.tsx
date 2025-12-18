@@ -159,9 +159,9 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
       </div>
       <div className="relative h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <PieChart margin={{ top: 10, bottom: 10 }}>
+          <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
             <Pie
-              data={chartData}
+              data={chartData as any}
               cx="50%"
               cy="50%"
               innerRadius={70}

@@ -6,7 +6,7 @@ import React, { forwardRef } from 'react';
 type SelectVariant = 'dark' | 'light';
 type SelectSize = 'sm' | 'md';
 
-export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   variant?: SelectVariant;
   size?: SelectSize;
   fullWidth?: boolean;

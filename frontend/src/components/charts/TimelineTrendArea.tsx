@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 interface TimelineData {
   date: string;
   count: number;
+  rollingAvg?: number;
 }
 
 interface Props {
