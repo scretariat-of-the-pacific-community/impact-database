@@ -121,6 +121,8 @@ const nextConfig = {
     optimizeCss: false, // Disable CSS optimization in development
     // Disable server components HMR cache to prevent framer-motion factory issues
     serverComponentsHmrCache: false,
+    // Skip prerendering for error pages to avoid Next.js 16 Turbopack issues
+    skipTrailingSlashRedirect: true,
   },
   async headers() {
     return [
