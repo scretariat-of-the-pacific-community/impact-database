@@ -30,17 +30,28 @@ export default function MobileUploadPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const previousPreviewRef = useRef<string | null>(null);
 
-  // Cleanup blob URL when captured image changes
+  // Cleanup blob URL when captured image changes or unmounts
   useEffect(() => {
+    // Revoke previous blob URL if it exists
+    if (previousPreviewRef.current && previousPreviewRef.current !== captured?.preview) {
+      URL.revokeObjectURL(previousPreviewRef.current);
+    }
+    
+    // Update reference to current preview
+    previousPreviewRef.current = captured?.preview || null;
+
+    // Cleanup on unmount
     return () => {
-      if (captured?.preview) {
-        URL.revokeObjectURL(captured.preview);
+      if (previousPreviewRef.current) {
+        URL.revokeObjectURL(previousPreviewRef.current);
+        previousPreviewRef.current = null;
       }
     };
   }, [captured?.preview]);
 
-  // Request GPS location immediately on mount
+  // Request GPS location immediately on mount and cleanup camera stream on unmount
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -61,7 +72,7 @@ export default function MobileUploadPage() {
     // Cleanup camera stream on unmount
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
       }
     };
