@@ -31,12 +31,21 @@ export default function MobileUploadPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  // Cleanup blob URL when captured image changes
+  useEffect(() => {
+    return () => {
+      if (captured?.preview) {
+        URL.revokeObjectURL(captured.preview);
+      }
+    };
+  }, [captured?.preview]);
+
   // Request GPS location immediately on mount
   useEffect(() => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          console.log('[MobileUpload] GPS acquired:', position.coords);
+          // GPS acquired successfully
         },
         (error) => {
           setLocationError(`GPS Error: ${error.message}`);
@@ -48,6 +57,14 @@ export default function MobileUploadPage() {
         }
       );
     }
+
+    // Cleanup camera stream on unmount
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
   }, []);
 
   // Open camera

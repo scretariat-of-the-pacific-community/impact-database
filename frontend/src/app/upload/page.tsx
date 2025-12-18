@@ -734,9 +734,9 @@ export default function UploadPage() {
                               return;
                             }
                             
-                            console.log('Chrome geolocation permission state:', permissionStatus.state);
+                            // Permission state checked
                           } catch (e) {
-                            console.log('Could not check permissions:', e);
+                            // Could not check permissions API
                           }
                         }
                         

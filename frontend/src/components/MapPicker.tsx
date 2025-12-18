@@ -134,9 +134,15 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
         {
           headers: {
             'Accept-Language': 'en',
+            'User-Agent': 'PacificImpactAtlas/1.0',
           },
+          signal: AbortSignal.timeout(10000),
         }
       );
+      
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
       
       if (!response.ok) {
         throw new Error('Geocoding service unavailable');
@@ -177,9 +183,15 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
         {
           headers: {
             'Accept-Language': 'en',
+            'User-Agent': 'PacificImpactAtlas/1.0',
           },
+          signal: AbortSignal.timeout(10000),
         }
       );
+      
+      if (response.status === 429) {
+        throw new Error('Too many requests. Please wait a moment and try again.');
+      }
       
       if (!response.ok) {
         throw new Error('Search service unavailable');

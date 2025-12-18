@@ -81,18 +81,7 @@ export default function ProfilePage() {
   const isRefreshing = statsFetching || uploadsFetching;
   const shouldShowStatsError = !!statsError && !statsLoading && queriesEnabled;
 
-  // Debug logging
-  useEffect(() => {
-    console.log('Profile Debug:', {
-      authLoading,
-      isAuthenticated,
-      queriesEnabled,
-      uploadsLoading,
-      uploadsError: uploadsError?.message,
-      uploadsCount: uploads?.length,
-      activeTab,
-    });
-  }, [authLoading, isAuthenticated, queriesEnabled, uploadsLoading, uploadsError, uploads, activeTab]);
+  // Profile data loaded and ready
 
   // Compute stat summary (must be before early returns due to Rules of Hooks)
   const statSummary = useMemo(() => {
