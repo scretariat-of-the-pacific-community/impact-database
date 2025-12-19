@@ -1,7 +1,7 @@
 """Add thumbnail fields to ImageMetadata
 
 Revision ID: 002_add_thumbnail_fields
-Revises: 
+Revises: None (base migration)
 Create Date: 2025-08-10 12:00:00.000000
 
 """

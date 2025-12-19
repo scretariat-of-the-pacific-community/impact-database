@@ -745,7 +745,7 @@ async def upload_image(
         existing = db.query(ImageMetadata).filter(ImageMetadata.filename == unique_filename).first()
         if existing:
             # This should never happen with UUIDs, but handle gracefully
-            unique_filename = f"{uuid.uuid4().hex}_{sanitized_name}"
+            unique_filename = f"{uuid.uuid4().hex[:12]}_{sanitized_name}"
 
         # Validate extension
         extension = FilePath(unique_filename).suffix.lower()
@@ -804,13 +804,23 @@ async def upload_image(
         duplicate = db.query(ImageMetadata).filter(
             ImageMetadata.lineage_statement.contains(content_hash)
         ).first()
-        
+        duplicate_flagged_for_review = False
+
         if duplicate:
             logger.warning(
                 f"Duplicate content detected: hash {content_hash} matches existing image {duplicate.filename}"
             )
-            # Allow upload but log the duplication for review
-            # In production, consider: raise HTTPException(409, "Duplicate image detected") or require confirmation
+            duplicate_policy = getattr(settings, "UPLOAD_DUPLICATE_POLICY", "allow").lower()
+            if duplicate_policy == "reject":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Duplicate image detected"
+                )
+            if duplicate_policy == "review":
+                duplicate_flagged_for_review = True
+                logger.info(
+                    "Duplicate upload flagged for review per UPLOAD_DUPLICATE_POLICY"
+                )
 
         # TRANSACTION FIX: Determine geometry BEFORE uploading to storage
         # This ensures we reject uploads that would fail DB constraint before storing bytes
@@ -922,10 +932,14 @@ async def upload_image(
         location_for_context = location_value or country_value or "Unknown location"
         provided_title = sanitize_text(upload_data.title or "")
         provided_abstract = sanitize_text(upload_data.abstract or "")
-        
+
         # Sanitize keywords (limit to 20 keywords, max 50 chars each)
         keywords = upload_data.keywords or []
         keywords = [sanitize_text(kw)[:50] for kw in keywords[:20] if kw]
+        # If duplicate detection marked this upload for review, tag it so downstream
+        # consumers can filter or surface duplicate-flagged items consistently.
+        if duplicate_flagged_for_review and "duplicate-flagged" not in keywords:
+            keywords.append("duplicate-flagged")
 
         try:
             iso_title = generate_iso_title(
@@ -982,7 +996,14 @@ async def upload_image(
                 location=location_value,
                 country=country_value,
                 keywords=keywords or None,
-                lineage_statement=f"Uploaded via web interface. Content hash: {content_hash}"
+                lineage_statement=(
+                    f"Uploaded via web interface. Content hash: {content_hash}"
+                    + (
+                        f" Duplicate detected for review: matches existing image {duplicate.filename}."
+                        if duplicate_flagged_for_review and duplicate
+                        else ""
+                    )
+                )
             )
 
             db.add(image_metadata)

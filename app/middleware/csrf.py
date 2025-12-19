@@ -3,13 +3,15 @@ CSRF Protection Middleware
 Protects against Cross-Site Request Forgery attacks on state-changing operations
 """
 
+import os
+import secrets
+import logging
+from typing import Callable
+
 from fastapi import Request, HTTPException
 from fastapi.responses import Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.datastructures import MutableHeaders
-import secrets
-import logging
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,23 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         exempt_paths: list = None
     ):
         super().__init__(app)
-        self.secret_key = secret_key or secrets.token_urlsafe(32)
+        # Prefer an explicitly provided secret key, then a configured environment or settings value.
+        self.secret_key = secret_key or os.getenv("SECRET_KEY")
+        if not self.secret_key:
+            try:
+                from core.config import settings
+                self.secret_key = getattr(settings, "SECRET_KEY", None)
+            except Exception:
+                self.secret_key = None
+
+        # Fall back to an ephemeral key in development so startup does not fail without SECRET_KEY.
+        if not self.secret_key:
+            logger.warning(
+                "CSRFMiddleware initialized without SECRET_KEY or explicit secret_key; "
+                "using a randomly generated ephemeral key. "
+                "This is suitable for development only, as CSRF tokens will reset on restart."
+            )
+            self.secret_key = secrets.token_urlsafe(32)
         self.cookie_name = cookie_name
         self.header_name = header_name
         self.cookie_secure = cookie_secure
