@@ -5,7 +5,7 @@ from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 import logging
 import json
@@ -134,14 +134,18 @@ async def get_user_stats(
     
     try:
         # Query user's uploads
+        user_identifiers = {current_user.username}
+        if hasattr(current_user, "id") and current_user.id:
+            user_identifiers.add(str(current_user.id))
+
         total_uploads = db.query(func.count(ImageMetadata.id)).filter(
-            ImageMetadata.uploader_id == current_user.username
+            ImageMetadata.uploader_id.in_(user_identifiers)
         ).scalar() or 0
 
         # Calculate approval rate
         approved_count = db.query(func.count(ImageMetadata.id)).filter(
             and_(
-                ImageMetadata.uploader_id == current_user.username,
+                ImageMetadata.uploader_id.in_(user_identifiers),
                 ImageMetadata.status == "approved"
             )
         ).scalar() or 0
@@ -149,10 +153,10 @@ async def get_user_stats(
         approval_rate = approved_count / total_uploads if total_uploads > 0 else 0.0
 
         # Get uploads this month
-        month_ago = datetime.utcnow() - timedelta(days=30)
+        month_ago = datetime.now(timezone.utc) - timedelta(days=30)
         uploads_this_month = db.query(func.count(ImageMetadata.id)).filter(
             and_(
-                ImageMetadata.uploader_id == current_user.username,
+                ImageMetadata.uploader_id.in_(user_identifiers),
                 ImageMetadata.datetime >= month_ago
             )
         ).scalar() or 0
@@ -165,7 +169,7 @@ async def get_user_stats(
             ImageMetadata.hazard_type,
             func.count(ImageMetadata.id).label('count')
         ).filter(
-            ImageMetadata.uploader_id == current_user.username
+            ImageMetadata.uploader_id.in_(user_identifiers)
         ).group_by(
             ImageMetadata.hazard_type
         ).order_by(
@@ -214,7 +218,7 @@ async def get_user_stats(
             "total_uploads": total_uploads,
             "approval_rate": approval_rate,
             "impact_score": float(impact_score),
-            "last_active": datetime.utcnow().isoformat(),
+            "last_active": datetime.now(timezone.utc).isoformat(),
             "achievements": achievements_with_progress,
             "analytics": {
                 "uploads_this_month": uploads_this_month,
@@ -369,7 +373,7 @@ async def get_user_activity(
                 "type": event_type,
                 "title": title,
                 "description": description,
-                "timestamp": activity.timestamp.isoformat() if activity.timestamp else datetime.utcnow().isoformat(),
+                "timestamp": activity.timestamp.isoformat() if activity.timestamp else datetime.now(timezone.utc).isoformat(),
                 "is_read": False,
                 "metadata": {
                     "table_name": activity.table_name,
@@ -473,7 +477,7 @@ async def update_user_settings(
             settings.default_metadata = settings_update.default_metadata.dict()
         
         # Update timestamp
-        settings.updated_at = datetime.utcnow()
+        settings.updated_at = datetime.now(timezone.utc)
         
         db.commit()
         db.refresh(settings)
@@ -701,7 +705,7 @@ async def delete_api_token(
         
         # Soft delete (mark as inactive and set revoked_at)
         token.is_active = False
-        token.revoked_at = datetime.utcnow()
+        token.revoked_at = datetime.now(timezone.utc)
         
         db.commit()
         
@@ -766,7 +770,7 @@ async def export_user_data(
                 }
                 for upload in uploads
             ],
-            "exported_at": datetime.utcnow().isoformat()
+            "exported_at": datetime.now(timezone.utc).isoformat()
         }
 
         # Convert to JSON and create streaming response
@@ -777,7 +781,7 @@ async def export_user_data(
             buffer,
             media_type="application/json",
             headers={
-                "Content-Disposition": f"attachment; filename=impact-portal-data-{datetime.utcnow().strftime('%Y-%m-%d')}.json"
+                "Content-Disposition": f"attachment; filename=impact-portal-data-{datetime.now(timezone.utc).strftime('%Y-%m-%d')}.json"
             }
         )
     except Exception as e:
@@ -800,7 +804,7 @@ async def delete_account(
         return {
             "status": "scheduled",
             "message": "Account deletion scheduled. You have 7 days to recover your account.",
-            "deletion_date": (datetime.utcnow() + timedelta(days=7)).isoformat()
+            "deletion_date": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
         }
     except Exception as e:
         logger.error(f"Error deleting account: {e}")
@@ -819,7 +823,7 @@ async def get_user_analytics(
 ):
     """Get comprehensive analytics with engagement metrics, geographic data, and benchmarks."""
     try:
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(timezone.utc) - timedelta(days=days)
         
         # Get user's UUID
         user = db.query(DBUser).filter(DBUser.username == current_user.username).first()

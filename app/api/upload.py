@@ -739,7 +739,7 @@ async def upload_image(
         import uuid
         original_filename = file.filename
         sanitized_name = os.path.basename(original_filename).replace(' ', '_')
-        unique_filename = f"{uuid.uuid4().hex[:12]}_{sanitized_name}"
+        unique_filename = f"{uuid.uuid4().hex}_{sanitized_name}"
         
         # Check if file already exists (should be impossible with UUID, but double-check)
         existing = db.query(ImageMetadata).filter(ImageMetadata.filename == unique_filename).first()
@@ -804,13 +804,21 @@ async def upload_image(
         duplicate = db.query(ImageMetadata).filter(
             ImageMetadata.lineage_statement.contains(content_hash)
         ).first()
-        
+
         if duplicate:
             logger.warning(
                 f"Duplicate content detected: hash {content_hash} matches existing image {duplicate.filename}"
             )
-            # Allow upload but log the duplication for review
-            # In production, consider: raise HTTPException(409, "Duplicate image detected") or require confirmation
+            duplicate_policy = getattr(settings, "UPLOAD_DUPLICATE_POLICY", "allow").lower()
+            if duplicate_policy == "reject":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Duplicate image detected"
+                )
+            if duplicate_policy == "review":
+                logger.info(
+                    "Duplicate upload flagged for review per UPLOAD_DUPLICATE_POLICY"
+                )
 
         # TRANSACTION FIX: Determine geometry BEFORE uploading to storage
         # This ensures we reject uploads that would fail DB constraint before storing bytes

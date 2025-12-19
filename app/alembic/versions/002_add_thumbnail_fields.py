@@ -1,7 +1,7 @@
 """Add thumbnail fields to ImageMetadata
 
 Revision ID: 002_add_thumbnail_fields
-Revises: 
+Revises: 001_initial_migration
 Create Date: 2025-08-10 12:00:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '002_add_thumbnail_fields'
-down_revision = None
+down_revision = '001_initial_migration'
 branch_labels = None
 depends_on = None
 

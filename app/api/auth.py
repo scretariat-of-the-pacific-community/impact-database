@@ -93,7 +93,7 @@ if not SECRET_KEY:
         logger.warning(f"Failed to persist SECRET_KEY ({e}), using ephemeral key for this session")
 
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days default
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))  # 30 minutes default
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -244,9 +244,9 @@ async def login(
     
     # SECURITY: Set HttpOnly cookie server-side to prevent XSS attacks
     is_secure = request.url.scheme == "https"
-    # Use "lax" SameSite in development to allow cross-origin requests from frontend (localhost:3000) to backend (localhost:8000)
-    # In production with same domain, "strict" would be ideal, but "lax" is secure enough for most cases
-    samesite_policy = "lax"  # Allows cookies on top-level navigation and safe HTTP methods
+    environment = os.getenv("ENVIRONMENT", "development").lower()
+    # Prefer strict SameSite in production; allow lax in development for local cross-origin flows
+    samesite_policy = "strict" if environment == "production" else "lax"
     
     response.set_cookie(
         key="ocean_portal_token",
@@ -435,7 +435,8 @@ async def refresh_token(
     
     # Update cookie with new token
     is_secure = request.url.scheme == "https"
-    samesite_policy = "lax"
+    environment = os.getenv("ENVIRONMENT", "development").lower()
+    samesite_policy = "strict" if environment == "production" else "lax"
     
     response.set_cookie(
         key="ocean_portal_token",

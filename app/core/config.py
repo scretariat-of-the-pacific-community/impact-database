@@ -1,11 +1,12 @@
 import os
-import sys
-import secrets
+import json
 import logging
+import secrets
+import sys
 from typing import Optional, List, Dict, Any, Union
+
 from pydantic import BaseModel, Field, field_validator, model_validator, validator
 from pydantic_settings import BaseSettings
-import json
 
 
 # Configure logging for config validation
@@ -285,6 +286,12 @@ class Settings(BaseSettings):
     SCAN_UPLOADS: bool = Field(
         default=get_env("SCAN_UPLOADS", "false").lower() == "true",
         description="Enable virus/malware scanning for uploads"
+    )
+
+    UPLOAD_DUPLICATE_POLICY: str = Field(
+        default=get_env("UPLOAD_DUPLICATE_POLICY", "allow"),
+        pattern=r"^(allow|reject|review)$",
+        description="Policy for handling duplicate image uploads"
     )
     
     # CORS Configuration

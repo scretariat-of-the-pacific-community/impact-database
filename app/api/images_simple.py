@@ -661,11 +661,13 @@ async def get_user_uploads(
 ):
     """Get all uploads for the current authenticated user."""
     try:
-        # Query images uploaded by current user
-        user_identifier = str(current_user.id) if hasattr(current_user, 'id') else current_user.username
-        
+        # Query images uploaded by current user (support legacy username identifiers)
+        user_identifiers = {current_user.username}
+        if hasattr(current_user, "id") and current_user.id:
+            user_identifiers.add(str(current_user.id))
+
         images = db.query(ImageMetadata).filter(
-            ImageMetadata.uploader_id == user_identifier
+            ImageMetadata.uploader_id.in_(user_identifiers)
         ).order_by(desc(ImageMetadata.datetime)).all()
         
         # Serialize to match frontend UserUpload type
