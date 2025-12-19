@@ -739,13 +739,13 @@ async def upload_image(
         import uuid
         original_filename = file.filename
         sanitized_name = os.path.basename(original_filename).replace(' ', '_')
-        unique_filename = f"{uuid.uuid4().hex}_{sanitized_name}"
+        unique_filename = f"{uuid.uuid4().hex[:12]}_{sanitized_name}"
         
         # Check if file already exists (should be impossible with UUID, but double-check)
         existing = db.query(ImageMetadata).filter(ImageMetadata.filename == unique_filename).first()
         if existing:
             # This should never happen with UUIDs, but handle gracefully
-            unique_filename = f"{uuid.uuid4().hex}_{sanitized_name}"
+            unique_filename = f"{uuid.uuid4().hex[:12]}_{sanitized_name}"
 
         # Validate extension
         extension = FilePath(unique_filename).suffix.lower()
@@ -804,6 +804,7 @@ async def upload_image(
         duplicate = db.query(ImageMetadata).filter(
             ImageMetadata.lineage_statement.contains(content_hash)
         ).first()
+        duplicate_flagged_for_review = False
 
         if duplicate:
             logger.warning(
@@ -816,6 +817,8 @@ async def upload_image(
                     detail="Duplicate image detected"
                 )
             if duplicate_policy == "review":
+                duplicate_flagged_for_review = True
+                duplicate.status = "pending_review"
                 logger.info(
                     "Duplicate upload flagged for review per UPLOAD_DUPLICATE_POLICY"
                 )
@@ -930,10 +933,12 @@ async def upload_image(
         location_for_context = location_value or country_value or "Unknown location"
         provided_title = sanitize_text(upload_data.title or "")
         provided_abstract = sanitize_text(upload_data.abstract or "")
-        
+
         # Sanitize keywords (limit to 20 keywords, max 50 chars each)
         keywords = upload_data.keywords or []
         keywords = [sanitize_text(kw)[:50] for kw in keywords[:20] if kw]
+        if duplicate_flagged_for_review and "duplicate-flagged" not in keywords:
+            keywords.append("duplicate-flagged")
 
         try:
             iso_title = generate_iso_title(
@@ -990,7 +995,14 @@ async def upload_image(
                 location=location_value,
                 country=country_value,
                 keywords=keywords or None,
-                lineage_statement=f"Uploaded via web interface. Content hash: {content_hash}"
+                lineage_statement=(
+                    f"Uploaded via web interface. Content hash: {content_hash}"
+                    + (
+                        f" Duplicate detected for review: matches existing image {duplicate.filename}."
+                        if duplicate_flagged_for_review and duplicate
+                        else ""
+                    )
+                )
             )
 
             db.add(image_metadata)
