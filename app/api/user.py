@@ -892,6 +892,7 @@ async def get_user_analytics(
                 })
         
         # Views metrics - use placeholder since views tracking not yet implemented
+        # TODO: Replace placeholder view multipliers with real view tracking data (tracking issue #1234)
         total_views = total_uploads * 10  # Placeholder: estimate 10 views per upload
         avg_views = round(total_views / total_uploads, 1) if total_uploads > 0 else 0
         max_views = max(10, total_uploads * 5)  # Placeholder max

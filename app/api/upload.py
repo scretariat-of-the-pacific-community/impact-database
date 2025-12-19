@@ -889,6 +889,13 @@ async def upload_image(
                         f"User coords ({lat:.4f},{lon:.4f}) vs EXIF ({exif_lat:.4f},{exif_lon:.4f}) "
                         f"distance: {distance:.1f}km"
                     )
+                    raise HTTPException(
+                        status_code=400,
+                        detail=(
+                            "The provided location does not match the image's embedded GPS data "
+                            "by more than 100 km and has been rejected to prevent GPS spoofing."
+                        ),
+                    )
         elif 'latitude' in exif_data and 'longitude' in exif_data:
             # No user coordinates, but image has GPS EXIF - use those
             lat = exif_data['latitude']
