@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Award, Star, Upload, CheckCircle, TrendingUp, Zap, Target, Shield } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
+import { imageApi } from '@/lib/api';
 
 interface Badge {
   id: string;
@@ -35,19 +36,15 @@ export default function GamificationBadges() {
     queryKey: ['contributor-stats'],
     queryFn: async () => {
       try {
-        const response = await fetch('/api/user/stats');
-        if (!response.ok) {
-          // Return default stats if endpoint doesn't exist yet
-          return {
-            totalUploads: 0,
-            reviewedImages: 0,
-            qualityScore: 0,
-            streak: 0,
-          };
-        }
-        return response.json();
+        const stats = await imageApi.userStats();
+        return {
+          totalUploads: stats.uploads || 0,
+          reviewedImages: 0,
+          qualityScore: 0,
+          streak: 0,
+        };
       } catch (error) {
-        // Silently return default stats if fetch fails
+        // Silently return default stats if not authenticated or fetch fails
         return {
           totalUploads: 0,
           reviewedImages: 0,
@@ -57,7 +54,7 @@ export default function GamificationBadges() {
       }
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: false, // Don't retry if endpoint doesn't exist
+    retry: false, // Don't retry if not authenticated
     meta: {
       // Suppress error logging for this query since endpoint may not exist
       errorMessage: 'User stats endpoint not yet implemented',

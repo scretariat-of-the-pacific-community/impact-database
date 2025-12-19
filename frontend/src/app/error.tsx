@@ -148,7 +148,7 @@ export default function Error({
               {/* Rain */}
               {[...Array(15)].map((_, i) => (
                 <motion.line
-                  key={i}
+                  key={`raindrop-${i}`}
                   x1={20 + i * 25}
                   y1="20"
                   x2={15 + i * 25}

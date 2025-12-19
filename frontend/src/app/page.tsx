@@ -101,8 +101,6 @@ const ImpactMetricsBar = nextDynamic(() => import('@/components/charts/ImpactMet
 
 // Configuration constants
 const RECENT_LIMIT = 60; // Fetch last 60 images for dashboard stats and gallery
-const HERO_VIDEO =
-  'https://cdn.coverr.co/videos/coverr-ocean-waves-at-sunset-3418/1080p.mp4';
 const SPARKLINE_COLORS = ['#009ee0', '#ff6b4a', '#18b374']; // Pacific, Coral, Palm theme colors
 const ACTIVITY_POLL_INTERVAL = 30000; // 30 seconds - balance between freshness and server load
 export const dynamic = 'force-dynamic';
@@ -453,7 +451,11 @@ export default function PacificImpactAtlasDashboard() {
   const stats = useMemo(() => {
     const hazardSet = new Set(images.map((img) => img.hazard_type).filter(Boolean));
     const orgSet = new Set(images.map((img) => img.contact?.organisation_name).filter(Boolean));
-    const withCoordinates = images.filter((img) => img.latitude && img.longitude).length;
+    // Fix: Use explicit null/undefined checks to support equator (lat=0) and prime meridian (lon=0)
+    const withCoordinates = images.filter((img) => 
+      img.latitude !== null && img.latitude !== undefined && 
+      img.longitude !== null && img.longitude !== undefined
+    ).length;
     
     // Prepare hazard distribution data for pie chart
     const hazardCounts = new Map<string, number>();
@@ -503,12 +505,15 @@ export default function PacificImpactAtlasDashboard() {
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
     
+    // Fix: Calculate actual 30-day uploads by summing the timeline counts
+    const recentUploads = timeline.reduce((sum, day) => sum + day.count, 0);
+    
     return {
       total: data?.total ?? images.length ?? 0,
       hazardTypes: hazardSet.size,
       organizations: orgSet.size,
       withCoordinates,
-      recentUploads: Math.min(images.length, 24),
+      recentUploads,
       hazardDistribution,
       timeline,
       impactMetrics,
@@ -555,7 +560,7 @@ export default function PacificImpactAtlasDashboard() {
     },
   });
 
-  // Prepare featured stories data - use API data if available, otherwise use curated local stories
+  // Prepare featured stories data - use API data only, no hardcoded fallbacks with non-existent images
   const featuredStories = useMemo(() => {
     if (featuredStoriesData && Array.isArray(featuredStoriesData) && featuredStoriesData.length > 0) {
       // Map API response to FeaturedStories component format
@@ -572,31 +577,8 @@ export default function PacificImpactAtlasDashboard() {
       }));
     }
 
-    // Curated featured stories with real satellite imagery
-    return [
-      {
-        id: '1',
-        title: 'Cyclone Winston: Namacu Village, Fiji',
-        description: 'DigitalGlobe satellite imagery documenting the catastrophic impact of Category 5 Cyclone Winston on Namacu village, February 21-22, 2016. The before image shows a thriving coastal community with dense vegetation, while the after reveals widespread devastation with structures destroyed and vegetation completely stripped.',
-        beforeImage: '/stories/cyclone-winston/namacu-before.jpg',
-        afterImage: '/stories/cyclone-winston/namacu-after.jpg',
-        location: 'Namacu Village, Fiji',
-        date: '2016-02-22',
-        hazardType: 'Cyclone',
-        impact: '44 deaths, $1.4B damages, 40,000 homes destroyed',
-      },
-      {
-        id: '2',
-        title: 'Hunga Tonga-Hunga Haʻapai: December 2021 Eruption',
-        description: 'MAXAR satellite imagery documenting the volcanic activity in December 2021 that foreshadowed the catastrophic January 2022 eruption. The images show Nukuʻalofa harbor and coastal infrastructure before and during the eruption phase, with ash plumes reaching the stratosphere and Surtseyan explosions reshaping the volcanic island.',
-        beforeImage: '/stories/tonga-tsunami/nuku-before.jpg',
-        afterImage: '/stories/tonga-tsunami/nuku-after.jpg',
-        location: 'Nukuʻalofa, Tonga',
-        date: '2021-12-20',
-        hazardType: 'Volcano',
-        impact: 'Ash plumes disrupted air travel, island growth by hundreds of meters, precursor to January 2022 global tsunami',
-      },
-    ];
+    // Return empty array - FeaturedStories component will handle empty state gracefully
+    return [];
   }, [featuredStoriesData]);
 
   return (
@@ -671,13 +653,15 @@ export default function PacificImpactAtlasDashboard() {
                 Profile
               </Link>
             )}
-            <button
-              type="button"
+            <Link
+              href="https://github.com/kishkumar96/impact-database"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full border-2 border-white/30 backdrop-blur-sm bg-white/10 px-6 py-3 font-semibold text-white transition hover:bg-white/20 hover:border-white/50"
             >
               <Sparkles className="h-5 w-5" />
-              Watch the Story
-            </button>
+              View Documentation
+            </Link>
           </div>
           <div className="mt-12 grid gap-6 sm:grid-cols-3">
             {heroStats.map((stat) => (
@@ -733,7 +717,7 @@ export default function PacificImpactAtlasDashboard() {
                         {stats.hazardDistribution[0]?.hazard_type?.replace(/_/g, ' ').toUpperCase() || 'Unknown'} most documented
                       </p>
                       <p className="text-xs text-surface-soft">
-                        {stats.hazardDistribution[0]?.count || 0} of {stats.total} images ({Math.round((stats.hazardDistribution[0]?.count || 0) / stats.total * 100)}%)
+                        {stats.hazardDistribution[0]?.count || 0} of {stats.total} images ({stats.total > 0 ? Math.round((stats.hazardDistribution[0]?.count || 0) / stats.total * 100) : 0}%)
                       </p>
                     </div>
                   </div>
@@ -863,8 +847,8 @@ export default function PacificImpactAtlasDashboard() {
                 icon={Camera}
                 accent="from-pacific-500/20 to-pacific-500/5"
                 loading={isLoading}
-                sparkline={sparklineSeries[0]?.values}
-                sparkColor={sparklineSeries[0]?.color}
+                sparkline={sparklineSeries[0]?.values ?? undefined}
+                sparkColor={sparklineSeries[0]?.color ?? SPARKLINE_COLORS[0]}
               />
               <MetricCard
                 label="Hazard Archetypes"
@@ -872,8 +856,8 @@ export default function PacificImpactAtlasDashboard() {
                 icon={Compass}
                 accent="from-palm-500/20 to-palm-500/5"
                 loading={isLoading}
-                sparkline={sparklineSeries[1]?.values}
-                sparkColor={sparklineSeries[1]?.color}
+                sparkline={sparklineSeries[1]?.values ?? undefined}
+                sparkColor={sparklineSeries[1]?.color ?? SPARKLINE_COLORS[1]}
               />
               <MetricCard
                 label="Active Contributors"
@@ -881,8 +865,8 @@ export default function PacificImpactAtlasDashboard() {
                 icon={Globe}
                 accent="from-coral-500/20 to-coral-500/5"
                 loading={isLoading}
-                sparkline={sparklineSeries[2]?.values}
-                sparkColor={sparklineSeries[2]?.color}
+                sparkline={sparklineSeries[2]?.values ?? undefined}
+                sparkColor={sparklineSeries[2]?.color ?? SPARKLINE_COLORS[2]}
               />
               <MetricCard
                 label="With Coordinates"
@@ -972,6 +956,7 @@ export default function PacificImpactAtlasDashboard() {
                           src={imageUrl}
                           alt={sanitizeText(image.title || image.filename)}
                           fill
+                          sizes="80px"
                           className="object-cover"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -1019,13 +1004,13 @@ export default function PacificImpactAtlasDashboard() {
                 );
               })}
               
-              {/* View all link */}
+              {/* View all link - Fix: Use actual repository total instead of page size */}
               {images.length > 5 && (
                 <Link
                   href="/search"
                   className="block mt-4 text-center py-3 rounded-lg border border-white/10 text-sm text-pacific-400 hover:bg-white/5 hover:border-pacific-500/50 transition-all"
                 >
-                  View all {images.length} evidence submissions →
+                  View all {(data?.total ?? images.length).toLocaleString()} evidence submissions →
                 </Link>
               )}
             </div>

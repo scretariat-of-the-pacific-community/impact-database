@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { useForm } from 'react-hook-form';
+import { useForm, RegisterOptions } from 'react-hook-form';
 import Image from 'next/image';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -27,6 +27,9 @@ import {
 import { imageApi } from '@/lib/api';
 import { FormField, Button, Tag as TagComponent } from '@/components/design-system';
 import { toast } from 'sonner';
+import dompurify from 'dompurify';
+
+const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
 // Dynamic import for MapPicker (Leaflet requires window)
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
@@ -50,6 +53,18 @@ const WaveLoader = () => (
     </p>
   </div>
 );
+
+const INPUT_SANITIZE_CONFIG = {
+  ALLOWED_TAGS: [],
+  ALLOWED_ATTR: [],
+  KEEP_CONTENT: true,
+} as const;
+
+type SanitizeSetValueOptions = {
+  shouldDirty?: boolean;
+  shouldValidate?: boolean;
+  shouldTouch?: boolean;
+};
 
 interface EditFormData {
   title: string;
@@ -136,26 +151,74 @@ export default function EditImagePage() {
     watch,
     formState: { errors, isDirty },
   } = useForm<EditFormData>();
+  const sanitizeInputValue = useCallback(
+    (value: string | null | undefined) =>
+      DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG),
+    []
+  );
+
+  const registerSanitizedField = useCallback(
+    <TFieldName extends keyof EditFormData>(
+      name: TFieldName,
+      options?: RegisterOptions<EditFormData, TFieldName>
+    ) =>
+      register(name, {
+        ...options,
+        onChange: (event) => {
+          const inputValue = (event.target.value ?? '') as string;
+          const sanitizedValue = sanitizeInputValue(inputValue);
+          if (sanitizedValue !== inputValue) {
+            event.target.value = sanitizedValue;
+          }
+          setValue(name, sanitizedValue as EditFormData[TFieldName], {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+          if (options?.onChange) {
+            options.onChange(event);
+          }
+        },
+      }),
+    [register, sanitizeInputValue, setValue]
+  );
+
+  const setSanitizedFieldValue = useCallback(
+    <TFieldName extends keyof EditFormData>(
+      name: TFieldName,
+      value: string | null | undefined,
+      options?: SanitizeSetValueOptions
+    ) => {
+      setValue(name, sanitizeInputValue(value) as EditFormData[TFieldName], options);
+    },
+    [sanitizeInputValue, setValue]
+  );
 
   const watchedValues = watch();
 
   // Populate form with existing data
   useEffect(() => {
     if (image) {
-      setValue('title', image.title || '');
-      setValue('description', image.abstract || '');
+      setSanitizedFieldValue('title', image.title || '');
+      setSanitizedFieldValue('description', image.abstract || '');
       setValue('hazard_type', image.hazard_type || '');
       setValue('country', image.contact?.organisation_name || '');
-      setValue('location', image.purpose || '');
-      setValue('keywords', Array.isArray(image.keywords) ? image.keywords.join(', ') : '');
+      setSanitizedFieldValue('location', image.purpose || '');
+      setSanitizedFieldValue(
+        'keywords',
+        Array.isArray(image.keywords) ? image.keywords.join(', ') : ''
+      );
       setValue('latitude', image.latitude || 0);
       setValue('longitude', image.longitude || 0);
 
       if (image.keywords && Array.isArray(image.keywords)) {
-        setSelectedKeywords(image.keywords.filter(Boolean));
+        setSelectedKeywords(
+          image.keywords
+            .filter((keyword): keyword is string => Boolean(keyword))
+            .map((keyword) => sanitizeInputValue(keyword))
+        );
       }
     }
-  }, [image, setValue]);
+  }, [image, sanitizeInputValue, setSanitizedFieldValue, setValue]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -265,14 +328,18 @@ export default function EditImagePage() {
     setValue('latitude', lat, { shouldDirty: true });
     setValue('longitude', lng, { shouldDirty: true });
     if (locationName) {
-      setValue('location', locationName, { shouldDirty: true });
+      setSanitizedFieldValue('location', locationName, { shouldDirty: true });
     }
     setShowMap(false);
   };
 
   const addKeyword = (keyword: string) => {
-    if (!selectedKeywords.includes(keyword)) {
-      setSelectedKeywords([...selectedKeywords, keyword]);
+    const sanitizedKeyword = sanitizeInputValue(keyword).trim();
+    if (!sanitizedKeyword) {
+      return;
+    }
+    if (!selectedKeywords.includes(sanitizedKeyword)) {
+      setSelectedKeywords([...selectedKeywords, sanitizedKeyword]);
       setHasUnsavedChanges(true);
     }
   };
@@ -467,7 +534,7 @@ export default function EditImagePage() {
                   required
                 >
                   <input
-                    {...register('title', { required: 'Title is required' })}
+                    {...registerSanitizedField('title', { required: 'Title is required' })}
                     id="edit-title"
                     type="text"
                     className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
@@ -482,7 +549,7 @@ export default function EditImagePage() {
                   hint="Detailed description of what this image shows"
                 >
                   <textarea
-                    {...register('description')}
+                    {...registerSanitizedField('description')}
                     id="edit-description"
                     rows={4}
                     className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition resize-none"
@@ -526,7 +593,7 @@ export default function EditImagePage() {
                 <FormField label="Location" htmlFor="edit-location">
                   <div className="space-y-2">
                     <input
-                      {...register('location')}
+                      {...registerSanitizedField('location')}
                       id="edit-location"
                       type="text"
                       className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"

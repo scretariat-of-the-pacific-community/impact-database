@@ -327,7 +327,13 @@ export interface UserStats {
     title: string;
     description: string;
     icon: string;
-    earned_at?: string;
+    unlocked?: boolean;
+    unlocked_at?: string;
+    tier?: string;
+    points?: number;
+    progress?: number;
+    total?: number;
+    category?: string;
   }>;
   analytics: {
     uploads_this_month: number;
@@ -337,6 +343,20 @@ export interface UserStats {
 }
 
 export type UserActivityType = 'upload' | 'edit' | 'review' | 'achievement' | 'system';
+
+export interface PaginationMetadata {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  events: T[];
+  pagination: PaginationMetadata;
+}
 
 export interface UserActivityEvent {
   id: string;

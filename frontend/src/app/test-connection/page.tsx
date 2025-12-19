@@ -1,37 +1,58 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 
 function DevTestConnection() {
   const [backendStatus, setBackendStatus] = useState<string>('Testing...');
   const [apiResponse, setApiResponse] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
-    testBackendConnection();
+    const controller = new AbortController();
+    testBackendConnection(controller.signal);
+    
+    return () => controller.abort();
   }, []);
 
-  const testBackendConnection = async () => {
+  const testBackendConnection = async (signal?: AbortSignal) => {
     try {
       // Test basic connection
-      const response = await fetch('http://localhost:8000/');
+      const response = await fetch('http://localhost:8000/', {
+        signal
+      });
       const data = await response.json();
       setBackendStatus('✅ Connected successfully!');
       setApiResponse(data as Record<string, unknown>);
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was cancelled, ignore
+        return;
+      }
       setBackendStatus(`❌ Connection failed: ${error}`);
       console.error('Backend connection error:', error);
     }
   };
 
   const testAPIEndpoint = async () => {
+    const controller = new AbortController();
     try {
-      const response = await fetch('http://localhost:8000/search?limit=1');
+      const response = await fetch('http://localhost:8000/search?limit=1', {
+        signal: controller.signal
+      });
       const data = await response.json();
       console.log('API test response:', data);
-      alert('API test successful! Check console for details.');
+      toast.success('API test successful!', {
+        description: 'Check console for details.',
+      });
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        // Request was cancelled, ignore
+        return;
+      }
       console.error('API test error:', error);
-      alert(`API test failed: ${error}`);
+      toast.error('API test failed', {
+        description: String(error),
+      });
     }
   };
 
@@ -55,7 +76,7 @@ function DevTestConnection() {
 
       <div>
         <button
-          onClick={testBackendConnection}
+          onClick={() => testBackendConnection()}
           style={{ marginRight: '10px', padding: '10px 20px', cursor: 'pointer' }}
         >
           Test Connection Again

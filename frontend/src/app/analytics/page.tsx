@@ -82,7 +82,7 @@ export default function EnhancedAnalytics() {
     setMounted(true);
   }, []);
 
-  const fetchAnalyticsData = useCallback(async () => {
+  const fetchAnalyticsData = useCallback(async (signal: AbortSignal) => {
     try {
       setLoading(true);
       setError(null);
@@ -94,7 +94,9 @@ export default function EnhancedAnalytics() {
       if (filters.hazardType) params.append('hazardType', filters.hazardType);
       if (filters.country) params.append('country', filters.country);
       
-      const response = await fetch(`/api/analytics?${params.toString()}`);
+      const response = await fetch(`/api/analytics?${params.toString()}`, {
+        signal
+      });
       
       if (response.ok) {
         const data = await response.json();
@@ -103,6 +105,10 @@ export default function EnhancedAnalytics() {
         throw new Error('Failed to fetch analytics');
       }
     } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // Request was cancelled, ignore
+        return;
+      }
       setError(err instanceof Error ? err.message : 'Failed to load analytics');
     } finally {
       setLoading(false);
@@ -110,7 +116,10 @@ export default function EnhancedAnalytics() {
   }, [filters]);
 
   useEffect(() => {
-    fetchAnalyticsData();
+    const controller = new AbortController();
+    fetchAnalyticsData(controller.signal);
+    
+    return () => controller.abort();
   }, [fetchAnalyticsData]);
 
   const timeSeriesData = useMemo(() => {
@@ -172,7 +181,10 @@ export default function EnhancedAnalytics() {
             <h2 className="text-2xl font-bold text-white mb-2">Unable to Load Analytics</h2>
             <p className="text-white/70 mb-4">{error || 'Please try again later.'}</p>
             <button
-              onClick={fetchAnalyticsData}
+              onClick={() => {
+                const controller = new AbortController();
+                fetchAnalyticsData(controller.signal);
+              }}
               className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -245,7 +257,10 @@ export default function EnhancedAnalytics() {
             </div>
             
             <button
-              onClick={fetchAnalyticsData}
+              onClick={() => {
+                const controller = new AbortController();
+                fetchAnalyticsData(controller.signal);
+              }}
               className="inline-flex items-center px-4 py-2 bg-white/5 border border-white/20 text-white/80 rounded-lg hover:shadow-md transition-all"
             >
               <RefreshCw className="w-4 h-4" />
@@ -513,7 +528,10 @@ export default function EnhancedAnalytics() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                   {analyticsData.recentActivity.slice(0, 10).map((activity, index) => (
-                    <div key={index} className="p-4 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/15">
+                    <div
+                      key={`${activity.type}-${activity.country}-${activity.timestamp}-${index}`}
+                      className="p-4 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/15"
+                    >
                     <div className="flex items-start space-x-3">
                       <div className="flex-shrink-0">
                         <div className="w-10 h-10 rounded-full flex items-center justify-center bg-orange-500/15 border border-orange-400/30">
@@ -571,7 +589,7 @@ export default function EnhancedAnalytics() {
                     
                     return (
                       <CircleMarker
-                        key={index}
+                        key={`${point.hazard}-${point.lat}-${point.lon}-${point.date}`}
                         center={[point.lat, point.lon]}
                         radius={8}
                         fillColor={color}

@@ -6,6 +6,7 @@ import { useAuth } from '@/providers/auth-provider';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, UploadCloud, Award, Activity, Settings, MapPin, ShieldCheck, Users } from 'lucide-react';
 import { imageApi } from '@/lib/api';
+import { getApiUrl } from '@/lib/config';
 import { HAZARD_TYPE_LABELS, UserStats, UserUpload } from '@/lib/types';
 import { Card, Button } from '@/components/design-system';
 import ActivityTimeline from '@/components/profile/ActivityTimeline';
@@ -14,6 +15,17 @@ import MobileBottomNav, { PROFILE_NAV_ITEMS } from '@/components/profile/MobileB
 import SwipeableTabs from '@/components/profile/SwipeableTabs';
 import InfiniteUploadList from '@/components/profile/InfiniteUploadList';
 import ErrorBanner from '@/components/ErrorBanner';
+import dynamic from 'next/dynamic';
+
+// Dynamically import UserAnalyticsReal to prevent SSR (Leaflet requires window object)
+const UserAnalyticsReal = dynamic(() => import('@/components/profile/UserAnalyticsReal'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center py-12">
+      <Loader2 className="w-8 h-8 text-pacific-400 animate-spin" />
+    </div>
+  ),
+});
 
 const TABS = [
   { id: 'uploads', label: 'Uploads', icon: UploadCloud },
@@ -138,57 +150,78 @@ export default function ProfilePage() {
     if (!stats?.achievements?.length) {
       return (
         <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-8 text-center text-white/70">
-          Achievements will appear as you contribute more assessments.
+          {statsLoading ? 'Loading achievements...' : 'Achievements will appear as you contribute more assessments.'}
         </div>
       );
     }
 
     return (
       <div className="grid gap-4 sm:grid-cols-2">
-        {stats.achievements.map((achievement) => (
-          <Card key={achievement.id} className={`${glassCard} border-white/5`}>
-            <div className="flex items-start gap-4">
-              <div className="rounded-2xl bg-pacific-500/20 p-3 text-3xl">{achievement.icon}</div>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-pacific-200">Unlocked</p>
-                <h4 className="text-xl font-bold text-white">{achievement.title}</h4>
-                <p className="mt-1 text-sm text-white/70">{achievement.description}</p>
+        {stats.achievements.map((achievement, index) => {
+          const total = achievement.total ?? 0;
+          const progressValue = achievement.progress ?? 0;
+          const progressPct = total > 0 ? Math.min(100, Math.round((progressValue / total) * 100)) : achievement.unlocked ? 100 : 0;
+          const unlocked = Boolean(achievement.unlocked);
+
+          return (
+            <Card key={achievement.id} className={`${glassCard} border-white/5`}>
+              <div className="flex items-start gap-4">
+                <div className="rounded-2xl bg-pacific-500/20 p-3 text-3xl">{achievement.icon}</div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold uppercase tracking-wide text-pacific-200">
+                      {unlocked ? 'Unlocked' : 'In Progress'}
+                    </p>
+                    {!unlocked && (
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs text-white/70">
+                        {progressPct}% complete
+                      </span>
+                    )}
+                  </div>
+                  <h4 className="text-xl font-bold text-white">{achievement.title}</h4>
+                  <p className="mt-1 text-sm text-white/70">{achievement.description}</p>
+                  <div className="mt-3">
+                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500 ease-out"
+                        style={{ width: `${Math.max(2, Math.min(100, progressPct))}%` }}
+                      />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-white/60">
+                      <span>
+                        {progressValue.toLocaleString()} / {total ? total.toLocaleString() : '—'}
+                      </span>
+                      {!unlocked && <span>{Math.max(0, (total || 0) - progressValue).toLocaleString()} to go</span>}
+                      {unlocked && <span className="text-emerald-400 font-semibold">✓ Unlocked</span>}
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
       </div>
     );
   };
 
+  const {
+    data: analyticsData,
+    isLoading: analyticsLoading,
+  } = useQuery({
+    queryKey: ['user-analytics', 30],
+    queryFn: async () => {
+      const response = await fetch(getApiUrl('/api/user/analytics?days=30'), {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch analytics');
+      return response.json();
+    },
+    enabled: queriesEnabled && activeTab === 'analytics',
+    staleTime: 60000,
+  });
+
   const renderAnalytics = () => {
-    if (!stats?.analytics) {
-      return null;
-    }
-
-    const { uploads_this_month, average_review_time, top_hazard } = stats.analytics;
-
-    return (
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className={`${glassCard} border-white/5`}>
-          <p className="text-sm text-white/60">Uploads (30d)</p>
-          <p className="mt-2 text-3xl font-bold text-white">{uploads_this_month}</p>
-          <p className="text-xs text-white/50">Outperforms 72% of responders</p>
-        </Card>
-        <Card className={`${glassCard} border-white/5`}>
-          <p className="text-sm text-white/60">Avg. Review Time</p>
-          <p className="mt-2 text-3xl font-bold text-white">{average_review_time}h</p>
-          <p className="text-xs text-white/50">From upload to approval</p>
-        </Card>
-        <Card className={`${glassCard} border-white/5`}>
-          <p className="text-sm text-white/60">Top Hazard</p>
-          <p className="mt-2 text-3xl font-bold text-white">
-            {HAZARD_TYPE_LABELS[top_hazard as keyof typeof HAZARD_TYPE_LABELS] || top_hazard}
-          </p>
-          <p className="text-xs text-white/50">Most documented category</p>
-        </Card>
-      </div>
-    );
+    return <UserAnalyticsReal />;
   };
 
   const handleManagePreferences = () => {
@@ -230,23 +263,25 @@ export default function ProfilePage() {
     </div>
   );
 
+  // Render all tabs but only show active one to prevent unmounting/remounting
+  const tabsContent = useMemo(() => ({
+    uploads: renderUploads(),
+    activity: <ActivityTimeline />,
+    achievements: renderAchievements(),
+    analytics: renderAnalytics(),
+    collaboration: <Collaboration uploads={uploads || []} stats={stats} />,
+    settings: renderSettings(),
+  }), [uploads, stats, statsLoading, activeTab]);
+
   const renderTabContent = () => {
-    switch (activeTab) {
-      case 'uploads':
-        return renderUploads();
-      case 'activity':
-        return <ActivityTimeline />;
-      case 'achievements':
-        return renderAchievements();
-      case 'analytics':
-        return renderAnalytics();
-      case 'collaboration':
-        return <Collaboration uploads={uploads || []} stats={stats} />;
-      case 'settings':
-        return renderSettings();
-      default:
-        return null;
-    }
+    return Object.entries(tabsContent).map(([tabId, content]) => (
+      <div
+        key={tabId}
+        className={`transition-opacity duration-200 ${activeTab === tabId ? 'block opacity-100' : 'hidden opacity-0'}`}
+      >
+        {content}
+      </div>
+    ));
   };
 
   const handleTabSelect = (tabId: string) => {

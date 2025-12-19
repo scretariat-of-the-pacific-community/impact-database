@@ -342,9 +342,9 @@ export default function FieldGuide({ type }: FieldGuideProps) {
 
       {/* Sections */}
       <div className="space-y-6">
-        {currentGuide.sections.map((section, index) => (
+        {currentGuide.sections.map((section) => (
           <div
-            key={index}
+            key={section.title}
             className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
           >
             <div className="flex items-center gap-2 mb-3">
@@ -364,8 +364,8 @@ export default function FieldGuide({ type }: FieldGuideProps) {
                   <h3 className="font-medium text-gray-900">Tips:</h3>
                 </div>
                 <ul className="space-y-1 ml-6">
-                  {section.tips.map((tip, i) => (
-                    <li key={i} className="text-gray-700 text-sm">
+                  {section.tips.map((tip) => (
+                    <li key={`${section.title}-tip-${tip}`} className="text-gray-700 text-sm">
                       • {tip}
                     </li>
                   ))}
@@ -381,8 +381,8 @@ export default function FieldGuide({ type }: FieldGuideProps) {
                   <h3 className="font-medium text-green-700">Do:</h3>
                 </div>
                 <ul className="space-y-1 ml-6">
-                  {section.dos.map((item, i) => (
-                    <li key={i} className="text-gray-700 text-sm">
+                  {section.dos.map((item) => (
+                    <li key={`${section.title}-do-${item}`} className="text-gray-700 text-sm">
                       ✓ {item}
                     </li>
                   ))}
@@ -398,8 +398,8 @@ export default function FieldGuide({ type }: FieldGuideProps) {
                   <h3 className="font-medium text-red-700">Don&apos;t:</h3>
                 </div>
                 <ul className="space-y-1 ml-6">
-                  {section.donts.map((item, i) => (
-                    <li key={i} className="text-gray-700 text-sm">
+                  {section.donts.map((item) => (
+                    <li key={`${section.title}-dont-${item}`} className="text-gray-700 text-sm">
                       ✗ {item}
                     </li>
                   ))}

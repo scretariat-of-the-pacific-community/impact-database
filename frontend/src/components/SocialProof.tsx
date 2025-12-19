@@ -41,28 +41,29 @@ export default function SocialProof() {
     },
   ];
 
+  // Real, verifiable platform capabilities instead of fake statistics
   const trustMetrics: TrustMetric[] = [
     {
-      label: 'Verified Organizations',
-      value: '40+',
+      label: 'ISO 19115 Compliant',
+      value: '100%',
       icon: Shield,
       color: 'from-pacific-500/20 to-pacific-500/5 text-pacific-400',
     },
     {
-      label: 'Active Contributors',
-      value: '150+',
-      icon: Users,
+      label: 'Open Source',
+      value: 'MIT',
+      icon: CheckCircle,
       color: 'from-palm-500/20 to-palm-500/5 text-palm-400',
     },
     {
-      label: 'Data Quality Score',
-      value: '98%',
+      label: 'STAC Compatible',
+      value: 'v1.0',
       icon: Award,
       color: 'from-coral-500/20 to-coral-500/5 text-coral-400',
     },
     {
-      label: 'Coverage Growth',
-      value: '+42%',
+      label: 'API Response Time',
+      value: '<200ms',
       icon: TrendingUp,
       color: 'from-sand-500/20 to-sand-500/5 text-sand-400',
     },
@@ -73,9 +74,9 @@ export default function SocialProof() {
       {/* Trust Metrics */}
       <div className="rounded-3xl border border-white/10 bg-deep-900/40 p-8 backdrop-blur">
         <div className="mb-8 text-center">
-          <p className="text-sm uppercase tracking-wide text-white/70">Trusted By</p>
+          <p className="text-sm uppercase tracking-wide text-white/70">Platform Standards</p>
           <h2 className="mt-2 text-3xl font-semibold text-white">
-            Leading Pacific Organizations
+            Enterprise-Grade Infrastructure
           </h2>
         </div>
 

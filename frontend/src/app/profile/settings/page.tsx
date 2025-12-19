@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   User,
   Bell,
@@ -19,6 +20,7 @@ import {
   Copy,
   RefreshCw,
   HardDrive,
+  LogOut,
 } from 'lucide-react';
 import { Card, Button } from '@/components/design-system';
 import ErrorBanner from '@/components/ErrorBanner';
@@ -89,7 +91,7 @@ const glassTextarea = 'rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 
 export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, signOut } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -186,7 +188,9 @@ export default function SettingsPage() {
         updateSettingsMutation.mutate({ profile: { ...formData.profile, avatar_url: result.url } });
       } catch (error) {
         console.error('Failed to upload avatar:', error);
-        alert('Failed to upload avatar. Please try again.');
+        toast.error('Failed to upload avatar', {
+          description: 'Please try again.',
+        });
       }
     }
   };
@@ -206,7 +210,9 @@ export default function SettingsPage() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to export data:', error);
-      alert('Failed to export data. Please try again.');
+      toast.error('Failed to export data', {
+        description: 'Please try again.',
+      });
     }
   };
 
@@ -219,14 +225,16 @@ export default function SettingsPage() {
       window.location.href = '/';
     } catch (error) {
       console.error('Failed to delete account:', error);
-      alert('Failed to delete account. Please try again or contact support.');
+      toast.error('Failed to delete account', {
+        description: 'Please try again or contact support.',
+      });
       setShowDeleteConfirm(false);
     }
   };
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert('Copied to clipboard!');
+    toast.success('Copied to clipboard!');
   };
 
   const formatBytes = (bytes: number) => {
@@ -647,6 +655,26 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <h3 className="text-xl font-semibold text-white mb-4">Account Management</h3>
       <div className="space-y-4">
+        <div className="p-4 rounded-xl bg-white/5 border border-white/10">
+          <div className="flex items-start gap-3 mb-4">
+            <LogOut className="h-5 w-5 text-pacific-300 mt-0.5" />
+            <div>
+              <h4 className="font-medium text-white mb-1">Sign Out</h4>
+              <p className="text-sm text-white/60 mb-3">
+                Sign out of your account and return to the home page.
+              </p>
+              <Button
+                variant="secondary"
+                className="bg-white/10 hover:bg-white/20"
+                onClick={signOut}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
           <div className="flex items-start gap-3 mb-4">
             <Download className="h-5 w-5 text-pacific-300 mt-0.5" />

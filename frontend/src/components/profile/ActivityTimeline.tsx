@@ -88,15 +88,12 @@ const deriveStorageKey = () => {
 };
 
 export async function fetchActivityTimeline(): Promise<ActivityItem[]> {
-  if (process.env.NODE_ENV === 'test') {
-    return mockActivities;
-  }
   try {
     const data = await imageApi.userActivity();
-    if (!Array.isArray(data)) {
+    if (!data || !Array.isArray(data.events)) {
       return [];
     }
-    return data.map((item) => ({
+    return data.events.map((item) => ({
       ...item,
       timestamp: item.timestamp ?? new Date().toISOString(),
     }));
@@ -121,6 +118,13 @@ const iconMap: Record<ActivityType, () => React.ReactElement> = {
   review: () => <MessageSquare className="h-4 w-4" />,
   achievement: () => <Trophy className="h-4 w-4" />,
   system: () => <AlertTriangle className="h-4 w-4" />,
+};
+
+// Helper to safely get icon with fallback
+const getIcon = (type: string): React.ReactElement => {
+  const normalizedType = type.toLowerCase() as ActivityType;
+  const iconFn = iconMap[normalizedType] || iconMap.system;
+  return iconFn();
 };
 
 const filterIcons: Record<ActivityType | 'all', () => React.ReactElement> = {
@@ -323,11 +327,11 @@ export default function ActivityTimeline() {
                   <article
                     className={clsx(
                       'relative overflow-hidden rounded-xl border p-4 transition hover:border-white/30',
-                      typeStyles[item.type],
+                      typeStyles[item.type as ActivityType] || typeStyles.system,
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="rounded-full bg-white/10 p-2 text-white">{iconMap[item.type]()}</div>
+                      <div className="rounded-full bg-white/10 p-2 text-white">{getIcon(item.type)}</div>
                       <div className="flex-1 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <h3 className="text-base font-semibold text-white">{item.title}</h3>

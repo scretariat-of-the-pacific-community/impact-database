@@ -246,9 +246,9 @@ export default function TrainingHubPage() {
                         {guide.description}
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        {guide.topics.map((topic, idx) => (
+                        {guide.topics.map((topic) => (
                           <span
-                            key={idx}
+                            key={`${guide.id}-${topic}`}
                             className="text-xs bg-white px-2 py-1 rounded text-gray-700"
                           >
                             {topic}
@@ -270,9 +270,9 @@ export default function TrainingHubPage() {
             Video Tutorials
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {videoTutorials.map((video, idx) => (
+            {videoTutorials.map((video) => (
               <div
-                key={idx}
+                key={video.title}
                 className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden"
               >
                 <div className="relative bg-gray-100 h-48 flex items-center justify-center">
@@ -309,11 +309,11 @@ export default function TrainingHubPage() {
             Downloadable Resources
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {resources.map((resource, idx) => {
+            {resources.map((resource) => {
               const Icon = resource.icon;
               return (
                 <button
-                  key={idx}
+                  key={resource.title}
                   className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-shadow text-left"
                 >
                   <div className="flex items-start gap-3">
@@ -345,9 +345,9 @@ export default function TrainingHubPage() {
             Earn Certifications
           </h2>
           <div className="space-y-4">
-            {certifications.map((cert, idx) => (
+            {certifications.map((cert) => (
               <div
-                key={idx}
+                key={cert.title}
                 className={`bg-white rounded-lg shadow-sm border-2 p-6 ${
                   cert.status === 'coming-soon'
                     ? 'border-gray-200 opacity-60'

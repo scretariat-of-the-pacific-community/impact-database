@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
+from collections import defaultdict
 
 import os
 import secrets
 import logging
+import time
 
-from fastapi import Depends, HTTPException, status, APIRouter
+from fastapi import Depends, HTTPException, status, APIRouter, Request, Response
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -14,6 +16,51 @@ from sqlalchemy.orm import Session
 from models.database import get_db
 
 logger = logging.getLogger(__name__)
+
+# Simple in-memory rate limiter (replace with Redis in production)
+rate_limit_storage: Dict[str, list] = defaultdict(list)
+RATE_LIMIT_WINDOW = 900  # 15 minutes (for auth endpoints)
+RATE_LIMIT_MAX_ATTEMPTS = 5  # Max attempts for auth endpoints
+
+# Upload-specific rate limits
+UPLOAD_RATE_LIMIT_WINDOW = 3600  # 1 hour
+UPLOAD_RATE_LIMIT_MAX_ATTEMPTS = 10  # 10 uploads per hour
+
+def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int = None) -> None:
+    """Check if identifier has exceeded rate limit.
+    
+    Args:
+        identifier: IP address or username to check
+        custom_window: Optional custom time window in seconds
+        custom_max: Optional custom maximum attempts
+        
+    Raises:
+        HTTPException: If rate limit exceeded
+    """
+    # Use upload limits if identifier starts with 'upload:'
+    if identifier.startswith('upload:'):
+        window = custom_window or UPLOAD_RATE_LIMIT_WINDOW
+        max_attempts = custom_max or UPLOAD_RATE_LIMIT_MAX_ATTEMPTS
+    else:
+        window = custom_window or RATE_LIMIT_WINDOW
+        max_attempts = custom_max or RATE_LIMIT_MAX_ATTEMPTS
+    
+    now = time.time()
+    # Clean old attempts
+    rate_limit_storage[identifier] = [
+        timestamp for timestamp in rate_limit_storage[identifier]
+        if now - timestamp < window
+    ]
+    
+    # Check limit
+    if len(rate_limit_storage[identifier]) >= max_attempts:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Too many attempts. Please try again in {window // 60} minutes."
+        )
+    
+    # Record attempt
+    rate_limit_storage[identifier].append(now)
 
 # Configuration via environment variables
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -46,7 +93,7 @@ if not SECRET_KEY:
         logger.warning(f"Failed to persist SECRET_KEY ({e}), using ephemeral key for this session")
 
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days default
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -141,15 +188,21 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
     """Login endpoint - returns JWT token for authentication"""
+    # Rate limiting by username and IP
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(f"token:{form_data.username}")
+    check_rate_limit(f"token_ip:{client_ip}")
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
+        # Generic error message to prevent username enumeration
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -166,21 +219,45 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 async def login(
+    request: Request,
+    response: Response,
     login_data: LoginRequest,
     db: Session = Depends(get_db)
 ):
-    """Login endpoint that accepts JSON credentials"""
+    """Login endpoint that accepts JSON credentials and sets HttpOnly cookie"""
+    # Rate limiting by username and IP
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(f"login:{login_data.username}")
+    check_rate_limit(f"login_ip:{client_ip}")
     user = authenticate_user(login_data.username, login_data.password, db)
     if not user:
+        # Generic error message to prevent username enumeration
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
+    
+    # SECURITY: Set HttpOnly cookie server-side to prevent XSS attacks
+    is_secure = request.url.scheme == "https"
+    # Use "lax" SameSite in development to allow cross-origin requests from frontend (localhost:3000) to backend (localhost:8000)
+    # In production with same domain, "strict" would be ideal, but "lax" is secure enough for most cases
+    samesite_policy = "lax"  # Allows cookies on top-level navigation and safe HTTP methods
+    
+    response.set_cookie(
+        key="ocean_portal_token",
+        value=access_token,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Same as token expiration
+        path="/",
+        httponly=True,  # Prevent JavaScript access
+        secure=is_secure,  # HTTPS only in production
+        samesite=samesite_policy  # CSRF protection with dev-friendly policy
+    )
+    
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -200,18 +277,51 @@ class RegisterRequest(BaseModel):
 
 @router.post("/register")
 async def register(
+    request: Request,
     register_data: RegisterRequest,
     db: Session = Depends(get_db)
 ):
     """Register a new user account"""
+    # Rate limiting by email and IP
+    client_ip = request.client.host if request.client else "unknown"
+    check_rate_limit(f"register:{register_data.email}")
+    check_rate_limit(f"register_ip:{client_ip}")
     from models.rbac import User as DBUser, Role
+    import re
+    
+    # Validate password strength
+    if len(register_data.password) < 12:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 12 characters long"
+        )
+    if not re.search(r'[a-z]', register_data.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain lowercase letters"
+        )
+    if not re.search(r'[A-Z]', register_data.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain uppercase letters"
+        )
+    if not re.search(r'\d', register_data.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain numbers"
+        )
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', register_data.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must contain special characters"
+        )
     
     # Check if username already exists
     existing_user = db.query(DBUser).filter(DBUser.username == register_data.username).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
+            detail="Username or email already registered"
         )
     
     # Check if email already exists
@@ -219,7 +329,7 @@ async def register(
     if existing_email:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+            detail="Username or email already registered"
         )
     
     # Get default role (contributor)
@@ -269,25 +379,21 @@ async def register(
 
 
 async def get_current_user(
+    request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
     """Get current authenticated user from JWT token.
     
-    Development mode: Returns mock user if no token provided and ENVIRONMENT=development
-    Production mode: Requires valid JWT token for all requests
+    SECURITY: No authentication bypass - all requests require valid tokens
+    Token can be provided via Authorization header OR HttpOnly cookie
     """
-    # Development mode bypass - allows uploads without authentication for testing
-    environment = os.getenv("ENVIRONMENT", "development").lower()
-    if not token and environment == "development":
-        logger.info("Development mode: Using mock user for unauthenticated request")
-        return User(
-            username="dev_user",
-            email="dev@example.com",
-            full_name="Development User",
-            disabled=False,
-            id="dev-user-id"
-        )
+    # REMOVED: Development bypass to prevent accidental production exposure
+    # If you need testing, create a test user account instead
+    
+    # Check for token in Authorization header first, then cookie
+    if not token:
+        token = request.cookies.get("ocean_portal_token")
     
     if not token:
         raise HTTPException(
@@ -313,6 +419,42 @@ async def get_current_user(
     if user is None:
         raise credentials_exception
     return user
+
+
+@router.post("/refresh")
+async def refresh_token(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user)
+):
+    """Refresh authentication token to extend session."""
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": current_user.username}, expires_delta=access_token_expires
+    )
+    
+    # Update cookie with new token
+    is_secure = request.url.scheme == "https"
+    samesite_policy = "lax"
+    
+    response.set_cookie(
+        key="ocean_portal_token",
+        value=access_token,
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+        httponly=True,
+        secure=is_secure,
+        samesite=samesite_policy
+    )
+    
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "id": getattr(current_user, "id", current_user.username),
+        "username": current_user.username,
+        "email": current_user.email,
+        "full_name": current_user.full_name
+    }
 
 
 @router.get("/me", response_model=User)

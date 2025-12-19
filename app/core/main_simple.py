@@ -41,6 +41,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    max_age=86400,  # Cache preflight responses for 24 hours (reduces 300ms overhead)
 )
 
 # Health check endpoint
@@ -246,7 +247,7 @@ def _query_review_items(db: Session, user_uuid: Optional[uuid.UUID], limit: Opti
 try:
     # Import auth API for authentication
     from api.auth import router as auth_router
-    app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
+    app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
     
     # Import simplified images API
     from api.images_simple import router as images_router
@@ -272,11 +273,34 @@ try:
     from api.user import router as user_router
     app.include_router(user_router, prefix="/api", tags=["user"])
     
+    # Import Avatar upload API
+    from api.avatar import router as avatar_router
+    app.include_router(avatar_router, prefix="/api", tags=["avatar"])
+    
     # Import Push Notifications API
     from api.push_notifications import router as push_router
     app.include_router(push_router, prefix="/api", tags=["push-notifications"])
     
-    logger.info("Auth API, Images API, Upload API, RBAC API, Review Workflow API, Featured Stories API, User API, and Push Notifications API routers included")
+    # Initialize cache manager
+    try:
+        import redis
+        from core.config import settings
+        from middleware.cache import init_cache
+        
+        if settings.REDIS_URL:
+            redis_client = redis.from_url(settings.REDIS_URL)
+            redis_client.ping()
+            init_cache(redis_client, default_ttl=300)
+            logger.info("Cache manager initialized with Redis")
+        else:
+            init_cache(None)
+            logger.info("Cache manager initialized (disabled - no Redis)")
+    except Exception as e:
+        from middleware.cache import init_cache
+        init_cache(None)
+        logger.warning(f"Failed to initialize Redis cache: {e}")
+    
+    logger.info("Auth API, Images API, Upload API, RBAC API, Review Workflow API, Featured Stories API, User API, Avatar API, and Push Notifications API routers included")
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
 
@@ -293,7 +317,9 @@ async def get_vocabularies():
             {"id": "landslide", "label": "Landslide"},
             {"id": "earthquake", "label": "Earthquake"},
             {"id": "wildfire", "label": "Wildfire"},
-            {"id": "storm_surge", "label": "Storm Surge"}
+            {"id": "volcanic", "label": "Volcanic Activity"},
+            {"id": "coastal_erosion", "label": "Coastal Erosion"},
+            {"id": "other", "label": "Other"}
         ],
         "source_agencies": [
             {"id": "spc", "label": "Pacific Community (SPC)"},
@@ -461,13 +487,17 @@ async def search_images(
 
 @app.get("/api/search")
 async def api_search(
-    q: str = None,
-    hazard_type: str = None,
-    country: str = None,
+    q: Optional[str] = None,
+    hazard_type: Optional[List[str]] = Query(
+        None, description="Filter by hazard type (repeat parameter to select multiple)"
+    ),
+    country: Optional[str] = None,
     source_agency: Optional[List[str]] = Query(
         None, description="Filter by source agency (repeat to select multiple)"
     ),
-    sort_by: str = "upload_date",
+    date_from: Optional[str] = Query(None, description="Filter on/after this date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter on/before this date (YYYY-MM-DD)"),
+    sort_by: str = "relevance",
     sort_order: str = "desc",
     limit: int = 24,
     offset: int = 0,
@@ -498,6 +528,8 @@ async def api_search(
                 hazard_type=hazard_type,
                 country=country,
                 source_agency=source_agency,
+                date_from=date_from,
+                date_to=date_to,
                 skip=offset,
                 limit=limit,
                 sort_by=sort_by,

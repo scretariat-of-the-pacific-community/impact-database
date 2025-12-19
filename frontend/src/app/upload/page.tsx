@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, RegisterOptions } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
 import { Upload, ArrowLeft, X, FileImage, MapPin, Loader2 } from 'lucide-react';
@@ -10,6 +10,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
+import dompurify from 'dompurify';
+
+// Client-side DOMPurify singleton
+const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
 // Dynamically import MapPicker to avoid SSR issues with Leaflet
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
@@ -36,6 +40,18 @@ import {
   QueuedUploadPayload,
 } from '@/lib/offline-uploads';
 
+const INPUT_SANITIZE_CONFIG = {
+  ALLOWED_TAGS: [],
+  ALLOWED_ATTR: [],
+  KEEP_CONTENT: true,
+} as const;
+
+type SanitizeSetValueOptions = {
+  shouldDirty?: boolean;
+  shouldValidate?: boolean;
+  shouldTouch?: boolean;
+};
+
 interface UploadForm {
   file: FileList;
   hazard_type: string;
@@ -43,6 +59,8 @@ interface UploadForm {
   country?: string;
   latitude?: number;
   longitude?: number;
+  altitude?: number;
+  altitude_ref?: number;
   title?: string;
   abstract?: string;
   keywords?: string;
@@ -54,6 +72,8 @@ interface ApiUploadMetadata {
   hazard_type: string;
   event_id: string | null;
   geometry: { type: 'Point'; coordinates: number[] } | null;
+  altitude: number | null;
+  altitude_ref: number;
   data_license: string;
   source_type: string;
   positional_accuracy: number | null;
@@ -151,16 +171,6 @@ const buildApiMetadata = (metadata: MetadataLike, fileName: string): ApiUploadMe
   };
 };
 
-const base64ToBlob = (base64: string, type: string) => {
-  const binary = atob(base64);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new Blob([bytes], { type: type || 'application/octet-stream' });
-};
-
 export default function UploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -171,10 +181,25 @@ export default function UploadPage() {
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [isChrome, setIsChrome] = useState(false);
+  const [exifMetadata, setExifMetadata] = useState<{
+    camera?: string;
+    orientation?: number;
+    altitude?: number;
+    hasGPS?: boolean;
+  } | null>(null);
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const refreshQueuedUploads = useCallback(async () => {
+    try {
+      const queue = await getQueuedUploads();
+      setQueuedUploads(queue);
+    } catch (error) {
+      console.error('Failed to load queued uploads:', error);
+    }
+  }, []);
   const { data: vocabData, isLoading, error, refetch } = useQuery({
     queryKey: ['vocabularies'],
     queryFn: () => imageApi.vocabularies(),
@@ -187,14 +212,49 @@ export default function UploadPage() {
     setIsChrome(/Chrome/.test(userAgent) && /Google Inc/.test(vendor));
   }, []);
   
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Upload page - vocabData:', vocabData);
-    console.log('Upload page - isLoading:', isLoading);
-    console.log('Upload page - error:', error);
-  }, [vocabData, isLoading, error]);
-  
   const { register, handleSubmit, formState: { errors }, setValue, clearErrors, watch, getValues } = useForm<UploadForm>();
+
+  const sanitizeInputValue = useCallback(
+    (value: string | null | undefined) =>
+      DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG),
+    []
+  );
+
+  const registerSanitizedField = useCallback(
+    <TFieldName extends keyof UploadForm>(
+      name: TFieldName,
+      options?: RegisterOptions<UploadForm, TFieldName>
+    ) =>
+      register(name, {
+        ...options,
+        onChange: (event) => {
+          const inputValue = (event.target.value ?? '') as string;
+          const sanitizedValue = sanitizeInputValue(inputValue);
+          if (sanitizedValue !== inputValue) {
+            event.target.value = sanitizedValue;
+          }
+          setValue(name, sanitizedValue as UploadForm[TFieldName], {
+            shouldDirty: true,
+            shouldValidate: true,
+          });
+          if (options?.onChange) {
+            options.onChange(event);
+          }
+        },
+      }),
+    [register, sanitizeInputValue, setValue]
+  );
+
+  const setSanitizedFieldValue = useCallback(
+    <TFieldName extends keyof UploadForm>(
+      name: TFieldName,
+      value: string | null | undefined,
+      options?: SanitizeSetValueOptions
+    ) => {
+      setValue(name, sanitizeInputValue(value) as UploadForm[TFieldName], options);
+    },
+    [sanitizeInputValue, setValue]
+  );
   
   // Watch coordinates for MapPicker
   const latitude = watch('latitude');
@@ -230,7 +290,7 @@ export default function UploadPage() {
   }, []);
 
   // Handle file selection
-  const handleFileSelect = useCallback((file: File) => {
+  const handleFileSelect = useCallback(async (file: File) => {
     const error = validateFile(file);
     if (error) {
       setValidationError(error);
@@ -261,9 +321,113 @@ export default function UploadPage() {
     
     const existingTitle = getValues('title');
     if (!existingTitle || existingTitle.trim().length === 0) {
-      setValue('title', humanizeFilename(file.name));
+      setSanitizedFieldValue('title', humanizeFilename(file.name));
     }
-  }, [validateFile, previewUrl, setValue, clearErrors, getValues]);
+
+    // Extract EXIF GPS data and metadata from image
+    try {
+      // @ts-ignore - exif-js types
+      const EXIF = await import('exif-js');
+      
+      EXIF.getData(file as any, function(this: any) {
+        const metadata: any = {};
+        
+        // Extract GPS coordinates
+        // @ts-ignore
+        const lat = EXIF.getTag(this, 'GPSLatitude');
+        // @ts-ignore  
+        const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
+        // @ts-ignore
+        const lon = EXIF.getTag(this, 'GPSLongitude');
+        // @ts-ignore
+        const lonRef = EXIF.getTag(this, 'GPSLongitudeRef');
+        
+        // Extract GPS altitude
+        // @ts-ignore
+        const altitude = EXIF.getTag(this, 'GPSAltitude');
+        // @ts-ignore
+        const altitudeRef = EXIF.getTag(this, 'GPSAltitudeRef');
+        
+        // Extract camera info
+        // @ts-ignore
+        const make = EXIF.getTag(this, 'Make');
+        // @ts-ignore
+        const model = EXIF.getTag(this, 'Model');
+        
+        // Extract orientation
+        // @ts-ignore
+        const orientation = EXIF.getTag(this, 'Orientation');
+        
+        if (lat && lon) {
+          // Convert to decimal degrees
+          const convertToDecimal = (coords: number[]) => {
+            return coords[0] + coords[1] / 60 + coords[2] / 3600;
+          };
+          
+          let latitude = convertToDecimal(lat);
+          let longitude = convertToDecimal(lon);
+          
+          // Apply direction
+          if (latRef === 'S') latitude = -latitude;
+          if (lonRef === 'W') longitude = -longitude;
+          
+          // Only set if coordinates fields are empty
+          const currentLat = getValues('latitude');
+          const currentLon = getValues('longitude');
+          
+          if (!currentLat && !currentLon) {
+            setValue('latitude', latitude);
+            setValue('longitude', longitude);
+            console.log(`✅ Auto-extracted GPS coordinates: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          }
+          
+          metadata.hasGPS = true;
+        }
+        
+        // Extract and set altitude
+        if (altitude !== undefined) {
+          const altMeters = typeof altitude === 'number' ? altitude : parseFloat(altitude);
+          const currentAlt = getValues('altitude');
+          
+          if (!currentAlt) {
+            // Apply altitude reference (0=above sea level, 1=below)
+            const finalAlt = altitudeRef === 1 ? -altMeters : altMeters;
+            setValue('altitude', finalAlt);
+            setValue('altitude_ref', altitudeRef || 0);
+            metadata.altitude = finalAlt;
+            console.log(`✅ Auto-extracted altitude: ${finalAlt}m`);
+          }
+        }
+        
+        // Store camera info and orientation for display
+        if (make || model) {
+          metadata.camera = `${make || ''} ${model || ''}`.trim();
+        }
+        if (orientation) {
+          metadata.orientation = orientation;
+        }
+        
+        setExifMetadata(metadata);
+        
+        // Show comprehensive toast notification
+        if (metadata.hasGPS || metadata.altitude || metadata.camera) {
+          const details: string[] = [];
+          if (metadata.hasGPS) details.push('GPS coordinates');
+          if (metadata.altitude) details.push(`Altitude: ${metadata.altitude.toFixed(0)}m`);
+          if (metadata.camera) details.push(`Camera: ${metadata.camera}`);
+          
+          toast.success('EXIF metadata extracted', {
+            description: details.join(' • ')
+          });
+        } else {
+          console.log('ℹ️ No GPS data found in image EXIF');
+        }
+      });
+    } catch (error) {
+      console.warn('Could not extract EXIF data:', error);
+      // Fail silently - EXIF extraction is optional
+    }
+  }, [validateFile, previewUrl, setValue, clearErrors, getValues, setSanitizedFieldValue]);
 
   // Remove selected file
   const removeSelectedFile = useCallback(() => {
@@ -285,9 +449,10 @@ export default function UploadPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleQueuedUpload = async (payload: QueuedUploadPayload) => {
-    const blob = base64ToBlob(payload.fileData, payload.fileType);
-    const file = new File([blob], payload.fileName, { type: payload.fileType || 'application/octet-stream' });
+  const handleQueuedUpload = useCallback(async (payload: QueuedUploadPayload) => {
+    const file = new File([payload.fileData], payload.fileName, {
+      type: payload.fileType || 'application/octet-stream',
+    });
 
     const apiMetadata = buildApiMetadata(payload.metadata as MetadataLike, payload.fileName);
     
@@ -295,7 +460,7 @@ export default function UploadPage() {
     formData.append('file', file);
     formData.append('metadata_json', JSON.stringify(apiMetadata));
     await imageApi.upload(formData);
-  };
+  }, []);
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -305,20 +470,56 @@ export default function UploadPage() {
         setUploadProgress(progress);
       });
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       setUploadProgress(100);
       trackUploadEvent('succeeded');
       queryClient.invalidateQueries({ queryKey: ['images'] });
+      const unlocked = response?.new_achievements || [];
+      if (Array.isArray(unlocked) && unlocked.length > 0) {
+        unlocked.forEach((achievement: any) => {
+          toast.success(`Achievement unlocked: ${achievement.name || achievement.id}`, {
+            description: achievement.description || 'You hit a new milestone!',
+            duration: 6000,
+          });
+        });
+      }
       setTimeout(() => router.push('/'), 1000); // Small delay to show completion
     },
     onError: (error) => {
       setUploadProgress(0);
       trackUploadEvent('failed');
       console.error('Upload failed:', error);
+      const message = error instanceof Error ? error.message : String(error);
+      if (message.toLowerCase().includes('validate credentials') || message.includes('401')) {
+        toast.error('Session expired. Please sign in to continue uploading.');
+        router.push(`/auth/login?returnUrl=${encodeURIComponent(pathname)}`);
+      } else {
+        toast.error('Upload failed', {
+          description: message,
+        });
+      }
     },
   });
 
-  const onSubmit = (data: UploadForm) => {
+  const onSubmit = async (data: UploadForm) => {
+    if (authLoading) {
+      toast.info('Checking your session. Please try again in a moment.');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      toast.error('Please sign in to upload images.', {
+        description: 'You need an active session to submit uploads.',
+      });
+      router.push(`/auth/login?returnUrl=${encodeURIComponent(pathname)}`);
+      return;
+    }
+
+    // Prevent double-submission
+    if (uploadMutation.isPending) {
+      return;
+    }
+
     if (!selectedFile) {
       setValidationError('Please select a file to upload');
       return;
@@ -330,12 +531,16 @@ export default function UploadPage() {
     const apiMetadata = buildApiMetadata(data, selectedFile.name);
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
-      queueUpload(apiMetadata, selectedFile).then(() => {
+      try {
+        await queueUpload(apiMetadata, selectedFile);
         setQueueMessage('Stored offline. We will sync this upload when you reconnect.');
-        setQueuedUploads(getQueuedUploads());
+        await refreshQueuedUploads();
         setSelectedFile(null);
         setUploadProgress(0);
-      });
+      } catch (error) {
+        console.error('Failed to queue upload offline:', error);
+        setQueueMessage('We could not store this upload offline. Please try again when you are online.');
+      }
       return;
     }
 
@@ -356,16 +561,18 @@ export default function UploadPage() {
   }, [previewUrl]);
 
   React.useEffect(() => {
-    setQueuedUploads(getQueuedUploads());
-    const flush = () =>
-      flushQueuedUploads(handleQueuedUpload).then(() => setQueuedUploads(getQueuedUploads()));
+    const flush = async () => {
+      await flushQueuedUploads(handleQueuedUpload);
+      await refreshQueuedUploads();
+    };
+
+    refreshQueuedUploads();
     const unsubscribe = subscribeToOnlineFlush(flush);
-    // Attempt immediate flush in case we're back online
     flush();
     return () => {
       unsubscribe?.();
     };
-  }, []);
+  }, [handleQueuedUpload, refreshQueuedUploads]);
 
   React.useEffect(() => {
     if (!queueMessage) return;
@@ -395,7 +602,7 @@ export default function UploadPage() {
 
   const handleSyncQueuedUploads = async () => {
     await flushQueuedUploads(handleQueuedUpload);
-    setQueuedUploads(getQueuedUploads());
+    await refreshQueuedUploads();
     setQueueMessage('Queued uploads synced successfully.');
   };
 
@@ -634,7 +841,7 @@ export default function UploadPage() {
                   type="text"
                   className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
                   placeholder="e.g., Port Vila, Vanuatu"
-                  {...register('location', { required: 'Location is required' })}
+                  {...registerSanitizedField('location', { required: 'Location is required' })}
                 />
               </FormField>
             </div>
@@ -650,7 +857,7 @@ export default function UploadPage() {
                   type="text"
                   className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
                   placeholder="Descriptive title for the image"
-                  {...register('title')}
+                  {...registerSanitizedField('title')}
                 />
               </FormField>
 
@@ -683,6 +890,45 @@ export default function UploadPage() {
                       />
                     </div>
                   </div>
+                  
+                  {/* Altitude field (optional) */}
+                  <div className="mt-3">
+                    <label htmlFor="upload-altitude" className="block text-xs text-surface-soft mb-1">
+                      Altitude (meters) <span className="text-surface-soft/50">• Optional</span>
+                    </label>
+                    <input
+                      id="upload-altitude"
+                      type="number"
+                      step="0.1"
+                      className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
+                      placeholder="e.g., 15.5 (positive=above sea level, negative=below)"
+                      {...register('altitude', { valueAsNumber: true })}
+                    />
+                  </div>
+                  
+                  {/* Display extracted EXIF metadata */}
+                  {exifMetadata && (exifMetadata.camera || exifMetadata.orientation || exifMetadata.altitude) && (
+                    <div className="mt-3 p-3 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
+                      <p className="text-xs font-medium text-pacific-300 mb-2">📷 Camera Metadata</p>
+                      <div className="space-y-1">
+                        {exifMetadata.camera && (
+                          <p className="text-xs text-surface-soft">
+                            <span className="text-white">Camera:</span> {exifMetadata.camera}
+                          </p>
+                        )}
+                        {exifMetadata.orientation && (
+                          <p className="text-xs text-surface-soft">
+                            <span className="text-white">Orientation:</span> {exifMetadata.orientation}
+                          </p>
+                        )}
+                        {exifMetadata.altitude && (
+                          <p className="text-xs text-surface-soft">
+                            <span className="text-white">Altitude:</span> {exifMetadata.altitude.toFixed(1)}m
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Chrome Location Permission Hint */}
                   {isChrome && (
@@ -842,7 +1088,7 @@ export default function UploadPage() {
                   rows={3}
                   className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
                   placeholder="Brief description of the image content"
-                  {...register('abstract')}
+                  {...registerSanitizedField('abstract')}
                 />
               </FormField>
 
@@ -852,7 +1098,7 @@ export default function UploadPage() {
                   type="text"
                   className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
                   placeholder="Comma-separated keywords (e.g., flooding, damage, infrastructure)"
-                  {...register('keywords')}
+                  {...registerSanitizedField('keywords')}
                 />
                 <p className="mt-1 text-xs text-surface-soft/70">
                   Add descriptive keywords separated by commas to help others find your image.
@@ -876,7 +1122,7 @@ export default function UploadPage() {
                 
                 // Auto-fill location if empty
                 if (!location) {
-                  setValue('location', data.placeName);
+                  setSanitizedFieldValue('location', data.placeName, { shouldDirty: true });
                 }
                 
                 // Auto-fill country if available and empty

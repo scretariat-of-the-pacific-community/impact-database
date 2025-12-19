@@ -168,7 +168,7 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
         </div>
       )}
 
-      <ResponsiveContainer width="100%" height={Math.max(300, rankedData.length * 45)}>
+      <ResponsiveContainer width="100%" height={Math.max(300, rankedData.length * 45)} minHeight={300}>
         <BarChart
           data={rankedData}
           layout="vertical"

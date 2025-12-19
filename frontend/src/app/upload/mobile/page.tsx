@@ -7,6 +7,19 @@ import { Button, Card } from '@/components/design-system';
 import { imageApi } from '@/lib/api';
 import { queuePendingUpload } from '@/lib/offline-storage';
 import { HAZARD_TYPES } from '@/lib/types';
+import dompurify from 'dompurify';
+import { toast } from 'sonner';
+
+const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
+
+const INPUT_SANITIZE_CONFIG = {
+  ALLOWED_TAGS: [],
+  ALLOWED_ATTR: [],
+  KEEP_CONTENT: true,
+} as const;
+
+const sanitizeInputValue = (value: string) =>
+  DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG);
 
 interface CapturedImage {
   file: File | null;
@@ -32,6 +45,16 @@ export default function MobileUploadPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const previousPreviewRef = useRef<string | null>(null);
 
+  const handleDescriptionChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const sanitizedValue = sanitizeInputValue(event.target.value);
+    setFormData((prev) => ({ ...prev, description: sanitizedValue }));
+  };
+
+  const handleManualLocationChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const sanitizedValue = sanitizeInputValue(event.target.value);
+    setFormData((prev) => ({ ...prev, location: sanitizedValue }));
+  };
+
   // Cleanup blob URL when captured image changes or unmounts
   useEffect(() => {
     // Revoke previous blob URL if it exists
@@ -53,7 +76,8 @@ export default function MobileUploadPage() {
 
   // Request GPS location immediately on mount and cleanup camera stream on unmount
   useEffect(() => {
-    if ('geolocation' in navigator) {
+    // SSR-safe: Check for browser environment and navigator availability
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           // GPS acquired successfully
@@ -80,6 +104,12 @@ export default function MobileUploadPage() {
 
   // Open camera
   const openCamera = async () => {
+    // SSR-safe: Check for browser environment
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+      console.error('Camera access not available during server render');
+      return;
+    }
+    
     try {
       setIsCapturing(true);
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -96,7 +126,9 @@ export default function MobileUploadPage() {
       }
     } catch (error) {
       console.error('[MobileUpload] Camera access error:', error);
-      alert('Camera access denied. Please enable camera permissions.');
+      toast.error('Camera access denied', {
+        description: 'Please enable camera permissions in your browser settings.',
+      });
       setIsCapturing(false);
     }
   };
@@ -119,8 +151,8 @@ export default function MobileUploadPage() {
             type: 'image/jpeg',
           });
 
-          // Get current GPS location
-          if ('geolocation' in navigator) {
+          // Get current GPS location (SSR-safe)
+          if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
             navigator.geolocation.getCurrentPosition(
               (position) => {
                 setCaptured({
@@ -175,8 +207,8 @@ export default function MobileUploadPage() {
 
     const preview = URL.createObjectURL(file);
 
-    // Get GPS location
-    if ('geolocation' in navigator) {
+    // Get GPS location (SSR-safe)
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setCaptured({
@@ -227,10 +259,12 @@ export default function MobileUploadPage() {
       }
       uploadFormData.append('captured_at', captured.timestamp.toISOString());
 
-      // Try online upload first
-      if (navigator.onLine) {
+      // Try online upload first (SSR-safe)
+      if (typeof navigator !== 'undefined' && navigator.onLine) {
         await imageApi.upload(uploadFormData);
-        alert('Upload successful! Your image is being reviewed.');
+        toast.success('Upload successful!', {
+          description: 'Your image is being reviewed.',
+        });
         router.push('/profile?tab=uploads');
       } else {
         // Queue for background sync if offline
@@ -242,7 +276,9 @@ export default function MobileUploadPage() {
           captured_at: captured.timestamp.toISOString(),
         };
         await queuePendingUpload(captured.file, metadata);
-        alert('Offline mode: Upload queued. Will sync when online.');
+        toast.info('Offline mode', {
+          description: 'Upload queued. Will sync when you\'re back online.',
+        });
         router.push('/profile?tab=uploads');
       }
     } catch (error) {
@@ -256,11 +292,15 @@ export default function MobileUploadPage() {
           captured_at: captured.timestamp.toISOString(),
         };
         await queuePendingUpload(captured.file, metadata);
-        alert('Upload queued. Will retry automatically when connection improves.');
+        toast.warning('Upload queued', {
+          description: 'Will retry automatically when connection improves.',
+        });
         router.push('/profile?tab=uploads');
       } catch (queueError) {
         console.error('[MobileUpload] Failed to queue upload:', queueError);
-        alert('Upload failed. Please try again later.');
+        toast.error('Upload failed', {
+          description: 'Please try again later.',
+        });
       }
     } finally {
       setIsUploading(false);
@@ -377,15 +417,13 @@ export default function MobileUploadPage() {
                   <label className="mb-1 block text-sm text-white/80">
                     Description
                   </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    rows={3}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"
-                    placeholder="Brief description of what you're documenting..."
-                  />
+                <textarea
+                  value={formData.description}
+                  onChange={handleDescriptionChange}
+                  rows={3}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"
+                  placeholder="Brief description of what you're documenting..."
+                />
                 </div>
 
                 {!captured.location && (
@@ -396,9 +434,7 @@ export default function MobileUploadPage() {
                     <input
                       type="text"
                       value={formData.location}
-                      onChange={(e) =>
-                        setFormData({ ...formData, location: e.target.value })
-                      }
+                      onChange={handleManualLocationChange}
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"
                       placeholder="City, Country"
                     />
@@ -482,7 +518,7 @@ export default function MobileUploadPage() {
             />
           </div>
 
-          {!navigator.onLine && (
+          {typeof navigator !== 'undefined' && !navigator.onLine && (
             <Card className="mt-6 border-amber-500/30 bg-amber-500/10 p-3 text-center">
               <p className="text-sm text-amber-200">
                 📴 Offline Mode: Uploads will sync automatically when online

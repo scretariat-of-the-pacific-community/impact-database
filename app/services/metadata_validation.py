@@ -122,7 +122,9 @@ def _validate_hazard_type(metadata: Dict[str, Any], result: Dict[str, Any]):
 def _is_in_pacific_region(lat: float, lon: float) -> bool:
     """Check if coordinates are in Pacific Island region."""
     # Broad Pacific region bounds
-    return (-25 <= lat <= 25) and (120 <= lon <= -120)
+    # Pacific spans from ~120°E to ~240°E (or -120°W), crossing dateline
+    # Accept either 120 <= lon <= 180 (west Pacific) or -180 <= lon <= -120 (east Pacific)
+    return (-25 <= lat <= 25) and ((120 <= lon <= 180) or (-180 <= lon <= -120))
 
 def clean_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     """Clean and normalize metadata."""

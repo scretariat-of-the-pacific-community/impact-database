@@ -10,6 +10,7 @@ import { imageApi } from '@/lib/api';
 import { HAZARD_TYPE_LABELS } from '@/lib/types';
 
 const glassCard = 'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
+const PAGE_SIZE = 20;
 
 interface Upload {
   id: string;
@@ -40,11 +41,13 @@ export default function InfiniteUploadList({ enabled }: InfiniteUploadListProps)
     error,
   } = useInfiniteQuery({
     queryKey: ['user-uploads-infinite'],
-    queryFn: ({ pageParam = 1 }) => imageApi.userUploads(),
+    queryFn: ({ pageParam = 1 }) =>
+      imageApi.userUploads({ page: pageParam, limit: PAGE_SIZE }),
     getNextPageParam: (lastPage, allPages) => {
-      // In a real implementation, the API would return pagination metadata
-      // For now, we'll stop after the first page since the endpoint doesn't support pagination yet
-      return undefined;
+      if (!lastPage || lastPage.length < PAGE_SIZE) {
+        return undefined;
+      }
+      return allPages.length + 1;
     },
     enabled,
     initialPageParam: 1,

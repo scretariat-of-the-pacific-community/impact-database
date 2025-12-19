@@ -10,6 +10,7 @@ import {
   UserStats,
   UserUpload,
   UserActivityEvent,
+  PaginatedResponse,
 } from './types';
 import { config, getApiUrl } from './config';
 
@@ -23,12 +24,15 @@ class APIClient {
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: config.API.TIMEOUT,
+      withCredentials: true,  // Send HttpOnly cookies with requests
       headers: {
         'Content-Type': 'application/json',
       },
     });
 
     // Request interceptor to add auth token
+    // Note: HttpOnly cookie is sent automatically via withCredentials
+    // This interceptor is for fallback to localStorage token if needed
     this.client.interceptors.request.use(
       (config) => {
         const token = this.getAuthToken();
@@ -187,6 +191,9 @@ class APIClient {
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
+        // Log warning - stats endpoint should exist in production
+        console.warn('⚠️ Stats endpoint returned 404 - using fallback data. This should not happen in production!');
+        
         // Fall back to placeholder stats when the endpoint is not available yet
         return {
           name: 'Impact Responder',
@@ -208,9 +215,11 @@ class APIClient {
     }
   }
 
-  async getUserUploads(): Promise<UserUpload[]> {
+  async getUserUploads(params?: { page?: number; limit?: number }): Promise<UserUpload[]> {
     try {
-      const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/images/user/uploads');
+      const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/images/user/uploads', {
+        params,
+      });
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
@@ -220,13 +229,13 @@ class APIClient {
     }
   }
 
-  async getUserActivity(): Promise<UserActivityEvent[]> {
+  async getUserActivity(): Promise<PaginatedResponse<UserActivityEvent>> {
     try {
-      const response: AxiosResponse<UserActivityEvent[]> = await this.client.get('/api/user/activity');
+      const response: AxiosResponse<PaginatedResponse<UserActivityEvent>> = await this.client.get('/api/user/activity');
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 403)) {
-        return [];
+        return { events: [], pagination: { total: 0, page: 1, limit: 50, total_pages: 0, has_next: false, has_prev: false } };
       }
       throw error;
     }
@@ -511,11 +520,9 @@ export const imageApi = {
       
       xhr.onerror = () => reject(new Error('Upload failed: Network error'));
       
-      // Add auth token if available
-      const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-      if (token) {
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      }
+      // Use cookie-based authentication (secure, XSS-proof)
+      // Cookies are sent automatically with credentials, no manual Authorization header needed
+      xhr.withCredentials = true;
       
       // Send request
       xhr.open('POST', getApiUrl('/upload/upload'));
@@ -532,7 +539,8 @@ export const imageApi = {
   },
   history: async (imageId: string) => oceanPortalApi.getImageHistory(imageId),
   userStats: () => oceanPortalApi.getUserStats(),
-  userUploads: () => oceanPortalApi.getUserUploads(),
+  userUploads: (params?: { page?: number; limit?: number }) =>
+    oceanPortalApi.getUserUploads(params),
   userActivity: () => oceanPortalApi.getUserActivity(),
   userSettings: () => oceanPortalApi.getUserSettings(),
   updateSettings: (data: any) => oceanPortalApi.updateUserSettings(data),

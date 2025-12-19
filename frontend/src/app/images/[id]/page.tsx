@@ -108,13 +108,7 @@ export default function ImageDetailPage() {
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center space-x-4">
               <button
-                onClick={() => {
-                  if (window.history.length > 1) {
-                    router.back();
-                  } else {
-                    router.push('/search');
-                  }
-                }}
+                onClick={() => router.push('/')}
                 className="flex items-center text-surface-soft hover:text-white transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 mr-2" />
@@ -302,7 +296,7 @@ export default function ImageDetailPage() {
                 <div className="flex flex-wrap gap-2">
                   {image.keywords.map((keyword, index) => (
                     <span
-                      key={index}
+                      key={`${keyword}-${image.id}-${index}`}
                       className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pacific-500/20 text-pacific-300 border border-pacific-500/30"
                     >
                       {keyword}
@@ -379,16 +373,16 @@ function OverviewTab({ image }: { image: ImageMetadata }) {
       )}
 
       {/* Topic Categories */}
-      {image.topic_category && image.topic_category.length > 0 && (
-        <div>
-          <h3 className="text-lg font-medium text-white mb-3">Topic Categories</h3>
-          <div className="flex flex-wrap gap-2">
-            {image.topic_category.map((category, index) => (
-              <span
-                key={index}
-                className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-green-500/20 text-green-300 border border-green-500/30"
-              >
-                {TOPIC_CATEGORY_LABELS[category] || category}
+            {image.topic_category && image.topic_category.length > 0 && (
+              <div>
+                <h3 className="text-lg font-medium text-white mb-3">Topic Categories</h3>
+                <div className="flex flex-wrap gap-2">
+                  {image.topic_category.map((category) => (
+                    <span
+                      key={`${category}-${image.id}`}
+                      className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-green-500/20 text-green-300 border border-green-500/30"
+                    >
+                      {TOPIC_CATEGORY_LABELS[category] || category}
               </span>
             ))}
           </div>
@@ -472,10 +466,10 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
       </div>
 
       <div className="grid gap-4">
-        {validFields.map((field, index) => {
+        {validFields.map((field) => {
           const IconComponent = field.icon;
           return (
-            <div key={index} className="flex items-start space-x-3 py-3 border-b border-white/10 last:border-b-0">
+            <div key={field.label} className="flex items-start space-x-3 py-3 border-b border-white/10 last:border-b-0">
               <IconComponent className="w-5 h-5 text-pacific-400 mt-0.5 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-white">{field.label}</p>

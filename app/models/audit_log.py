@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON, text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
+import uuid as uuid_pkg
 
 # Import Base from database module to ensure same declarative base
 from models.database import Base
@@ -9,7 +11,7 @@ class AuditLog(Base):
     """Audit log for tracking all metadata changes"""
     __tablename__ = "audit_logs"
     
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"), index=True)
     
     # What was changed
     table_name = Column(String(50), nullable=False, index=True)

@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Card, Button } from '@/components/design-system';
 import { imageApi } from '@/lib/api';
-import type { UserStats, UserUpload, UserActivityEvent, HazardType } from '@/lib/types';
+import type { UserStats, UserUpload, UserActivityEvent, HazardType, PaginatedResponse } from '@/lib/types';
 import { HAZARD_TYPE_LABELS } from '@/lib/types';
 
 type Role = 'admin' | 'editor' | 'viewer';
@@ -93,11 +93,13 @@ const relativeTimeFrom = (isoDate?: string) => {
 };
 
 export default function Collaboration({ uploads = [], stats }: CollaborationProps) {
-  const { data: activityEvents } = useQuery<UserActivityEvent[], Error>({
+  const { data: activityData } = useQuery<PaginatedResponse<UserActivityEvent>, Error>({
     queryKey: ['collaboration-activity'],
     queryFn: () => imageApi.userActivity(),
     staleTime: 60_000,
   });
+
+  const activityEvents = activityData?.events || [];
 
   const hazardAggregates = useMemo(() => {
     const counts = new Map<string, { count: number; sample?: UserUpload }>();
@@ -208,7 +210,7 @@ export default function Collaboration({ uploads = [], stats }: CollaborationProp
 
   const mentionableTeammates: Mentionable[] = useMemo(() => {
     const reviewers = new Map<string, Mentionable>();
-    activityEvents?.forEach((event, index) => {
+    activityEvents.forEach((event, index) => {
       if (event.reviewer) {
         const handle = event.reviewer.trim().toLowerCase().replace(/\s+/g, '.');
         reviewers.set(handle, {
@@ -471,11 +473,11 @@ export default function Collaboration({ uploads = [], stats }: CollaborationProp
             <Target className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
           <div className="mt-4 space-y-3">
-            <label htmlFor="mention-note" className="text-sm text-white/70">
+            <label htmlFor="collab-mention-note" className="text-sm text-white/70">
               Draft a note to your team
             </label>
             <textarea
-              id="mention-note"
+              id="collab-mention-note"
               value={note}
               onChange={(event) => setNote(event.target.value)}
               placeholder="Tag teammates with @name to request reviews or share updates..."
@@ -551,11 +553,11 @@ export default function Collaboration({ uploads = [], stats }: CollaborationProp
             <UserPlus className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
           <form className="mt-4 space-y-3" onSubmit={handleInviteSubmit}>
-            <label className="text-sm text-white/70" htmlFor="invite-email">
+            <label className="text-sm text-white/70" htmlFor="collab-invite-email">
               Email address
             </label>
             <input
-              id="invite-email"
+              id="collab-invite-email"
               type="email"
               required
               value={inviteForm.email}
@@ -565,11 +567,11 @@ export default function Collaboration({ uploads = [], stats }: CollaborationProp
             />
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className="text-sm text-white/70" htmlFor="invite-role">
+                <label className="text-sm text-white/70" htmlFor="collab-invite-role">
                   Role
                 </label>
                 <select
-                  id="invite-role"
+                  id="collab-invite-role"
                   value={inviteForm.role}
                   onChange={(event) => setInviteForm((prev) => ({ ...prev, role: event.target.value as Role }))}
                   className="mt-1 w-full rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/40"
@@ -580,11 +582,11 @@ export default function Collaboration({ uploads = [], stats }: CollaborationProp
                 </select>
               </div>
               <div>
-                <label className="text-sm text-white/70" htmlFor="invite-workspace">
+                <label className="text-sm text-white/70" htmlFor="collab-invite-workspace">
                   Workspace
                 </label>
                 <select
-                  id="invite-workspace"
+                  id="collab-invite-workspace"
                   value={inviteForm.workspaceId}
                   onChange={(event) => setInviteForm((prev) => ({ ...prev, workspaceId: event.target.value }))}
                   className="mt-1 w-full rounded-2xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/40"

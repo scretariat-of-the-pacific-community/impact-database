@@ -17,13 +17,51 @@ import { Suspense } from "react";
 
 export const metadata: Metadata = {
   title: "Pacific Impact Atlas - Disaster Evidence Documentation",
-  description: "Disaster and hazard image metadata management system for Pacific Island communities",
+  description: "Centralized repository of verified disaster impact imagery across Pacific island nations. ISO 19115 compliant disaster documentation, STAC-compatible geospatial catalog, and evidence-based climate resilience for cyclones, tsunamis, floods, and volcanic activity.",
   manifest: "/manifest.json",
   icons: { icon: "/favicon.ico" },
-  keywords: ["disaster", "hazard", "images", "metadata", "pacific", "ocean", "impact", "assessment"],
+  keywords: [
+    "disaster documentation",
+    "pacific islands",
+    "climate resilience",
+    "hazard mapping",
+    "cyclone impact",
+    "tsunami evidence",
+    "volcanic activity",
+    "flood assessment",
+    "satellite imagery",
+    "ISO 19115",
+    "STAC catalog",
+    "geospatial data",
+    "emergency response",
+    "disaster risk reduction",
+    "Pacific Community",
+    "SPC",
+  ],
   authors: [{ name: "Pacific Impact Atlas Team" }],
   creator: "SPC (Pacific Community)",
   publisher: "Pacific Impact Atlas",
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://impact.pacificdata.org",
+    title: "Pacific Impact Atlas - Disaster Evidence Repository",
+    description: "Verified disaster impact imagery and evidence-based climate resilience for Pacific island nations",
+    siteName: "Pacific Impact Atlas",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Pacific Impact Atlas - Disaster Evidence Repository",
+    description: "Verified disaster impact imagery for Pacific climate resilience",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+    },
+  },
 };
 
 export const viewport: Viewport = {

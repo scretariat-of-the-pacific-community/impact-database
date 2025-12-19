@@ -116,16 +116,23 @@ function SearchPageContent() {
       const persistedFilters = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY) ?? 'null');
       const persistedView = localStorage.getItem(VIEW_MODE_STORAGE_KEY) as SearchPageState['viewMode'] | null;
       
+      // Priority: URL params > localStorage > defaults
+      // Parse hazards from URL (comma-separated)
+      const urlHazards = searchParams.get('hazards')?.split(',').filter(Boolean) as HazardType[] || [];
+      const urlAgencies = searchParams.get('agencies')?.split(',').filter(Boolean) as SourceAgency[] || [];
+      const urlDateFrom = searchParams.get('date_from') || '';
+      const urlDateTo = searchParams.get('date_to') || '';
+      
       setState(prev => ({
         ...prev,
         searchQuery: searchParams.get('q') || persistedFilters?.searchQuery || prev.searchQuery,
-        selectedHazards: persistedFilters?.selectedHazards || prev.selectedHazards,
-        selectedAgencies: persistedFilters?.selectedAgencies || prev.selectedAgencies,
-        dateFrom: persistedFilters?.dateFrom || prev.dateFrom,
-        dateTo: persistedFilters?.dateTo || prev.dateTo,
+        selectedHazards: urlHazards.length > 0 ? urlHazards : (persistedFilters?.selectedHazards || prev.selectedHazards),
+        selectedAgencies: urlAgencies.length > 0 ? urlAgencies : (persistedFilters?.selectedAgencies || prev.selectedAgencies),
+        dateFrom: urlDateFrom || persistedFilters?.dateFrom || prev.dateFrom,
+        dateTo: urlDateTo || persistedFilters?.dateTo || prev.dateTo,
         viewMode: (searchParams.get('view') as SearchPageState['viewMode']) || persistedView || prev.viewMode,
-        sortBy: persistedFilters?.sortBy || prev.sortBy,
-        sortOrder: persistedFilters?.sortOrder || prev.sortOrder
+        sortBy: (searchParams.get('sort_by') as SearchPageState['sortBy']) || persistedFilters?.sortBy || prev.sortBy,
+        sortOrder: (searchParams.get('sort_order') as SearchPageState['sortOrder']) || persistedFilters?.sortOrder || prev.sortOrder
       }));
       
       setIsHydrated(true);
@@ -135,6 +142,7 @@ function SearchPageContent() {
     const initial = Number(searchParams.get('page') || '1');
     return Number.isNaN(initial) || initial < 1 ? 1 : initial;
   });
+  const [isFiltering, setIsFiltering] = useState(false);
 
   // Build search filters from state
   const filters: SearchFilters = {
@@ -154,6 +162,13 @@ function SearchPageContent() {
     queryKey: ['search', filters],
     queryFn: () => imageApi.search(filters),
   });
+  
+  // Reset filtering state when data loads
+  useEffect(() => {
+    if (!isLoading && searchResults) {
+      setIsFiltering(false);
+    }
+  }, [isLoading, searchResults]);
   const images = useMemo(() => searchResults?.images || [], [searchResults]);
   const totalResults = searchResults?.total || 0;
   const totalPages =
@@ -165,35 +180,56 @@ function SearchPageContent() {
     setState(prev => ({ ...prev, searchQuery: newQuery }));
     setCurrentPage(1);
     
-    // Update URL
+    // Update URL with search query
     const params = new URLSearchParams(searchParams);
     if (newQuery) {
       params.set('q', newQuery);
     } else {
       params.delete('q');
     }
+    params.set('page', '1');
     router.push(`/search?${params.toString()}`);
   }, [router, searchParams]);
 
   const toggleHazardFilter = useCallback((hazard: HazardType) => {
-    setState(prev => ({
-      ...prev,
-      selectedHazards: prev.selectedHazards.includes(hazard)
-        ? prev.selectedHazards.filter(h => h !== hazard)
-        : [...prev.selectedHazards, hazard]
-    }));
+    const newHazards = state.selectedHazards.includes(hazard)
+      ? state.selectedHazards.filter(h => h !== hazard)
+      : [...state.selectedHazards, hazard];
+    
+    setState(prev => ({ ...prev, selectedHazards: newHazards }));
     setCurrentPage(1);
-  }, []);
+    setIsFiltering(true);
+    
+    // Encode filters in URL for sharing
+    const params = new URLSearchParams(searchParams);
+    if (newHazards.length > 0) {
+      params.set('hazards', newHazards.join(','));
+    } else {
+      params.delete('hazards');
+    }
+    params.set('page', '1');
+    router.push(`/search?${params.toString()}`);
+  }, [state.selectedHazards, searchParams, router]);
 
   const toggleAgencyFilter = useCallback((agency: SourceAgency) => {
-    setState(prev => ({
-      ...prev,
-      selectedAgencies: prev.selectedAgencies.includes(agency)
-        ? prev.selectedAgencies.filter(a => a !== agency)
-        : [...prev.selectedAgencies, agency]
-    }));
+    const newAgencies = state.selectedAgencies.includes(agency)
+      ? state.selectedAgencies.filter(a => a !== agency)
+      : [...state.selectedAgencies, agency];
+    
+    setState(prev => ({ ...prev, selectedAgencies: newAgencies }));
     setCurrentPage(1);
-  }, []);
+    setIsFiltering(true);
+    
+    // Encode filters in URL for sharing
+    const params = new URLSearchParams(searchParams);
+    if (newAgencies.length > 0) {
+      params.set('agencies', newAgencies.join(','));
+    } else {
+      params.delete('agencies');
+    }
+    params.set('page', '1');
+    router.push(`/search?${params.toString()}`);
+  }, [state.selectedAgencies, searchParams, router]);
 
   const clearFilters = useCallback(() => {
     setState(prev => ({
@@ -204,6 +240,7 @@ function SearchPageContent() {
       dateTo: '',
       searchQuery: ''
     }));
+    // Clear all filter parameters from URL
     router.push('/search');
     setCurrentPage(1);
   }, [router]);
@@ -369,8 +406,19 @@ function SearchPageContent() {
                           type="date"
                           value={state.dateFrom}
                           onChange={(e) => {
-                            setState(prev => ({ ...prev, dateFrom: e.target.value }));
+                            const newDate = e.target.value;
+                            setState(prev => ({ ...prev, dateFrom: newDate }));
                             setCurrentPage(1);
+                            setIsFiltering(true);
+                            // Encode date in URL for sharing
+                            const params = new URLSearchParams(searchParams);
+                            if (newDate) {
+                              params.set('date_from', newDate);
+                            } else {
+                              params.delete('date_from');
+                            }
+                            params.set('page', '1');
+                            router.push(`/search?${params.toString()}`);
                           }}
                           className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                         />
@@ -381,8 +429,19 @@ function SearchPageContent() {
                           type="date"
                           value={state.dateTo}
                           onChange={(e) => {
-                            setState(prev => ({ ...prev, dateTo: e.target.value }));
+                            const newDate = e.target.value;
+                            setState(prev => ({ ...prev, dateTo: newDate }));
                             setCurrentPage(1);
+                            setIsFiltering(true);
+                            // Encode date in URL for sharing
+                            const params = new URLSearchParams(searchParams);
+                            if (newDate) {
+                              params.set('date_to', newDate);
+                            } else {
+                              params.delete('date_to');
+                            }
+                            params.set('page', '1');
+                            router.push(`/search?${params.toString()}`);
                           }}
                           className="w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-white/40 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                         />
@@ -399,10 +458,16 @@ function SearchPageContent() {
                         const [sortBy, sortOrder] = e.target.value.split('-');
                         setState(prev => ({
                           ...prev,
-                          sortBy: sortBy as any,
+                          sortBy: sortBy as SearchPageState['sortBy'],
                           sortOrder: sortOrder as 'asc' | 'desc'
                         }));
                         setCurrentPage(1);
+                        setIsFiltering(true);
+                        const params = new URLSearchParams(searchParams);
+                        params.set('sort_by', sortBy);
+                        params.set('sort_order', sortOrder);
+                        params.set('page', '1');
+                        router.push(`/search?${params.toString()}`);
                       }}
                       className="w-full rounded-lg border border-white/15 bg-deep-900/60 px-3 py-2 text-sm text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                     >
@@ -460,6 +525,11 @@ function SearchPageContent() {
                   onClick={() => {
                     setState(prev => ({ ...prev, dateFrom: '' }));
                     setCurrentPage(1);
+                    setIsFiltering(true);
+                    const params = new URLSearchParams(searchParams);
+                    params.delete('date_from');
+                    params.set('page', '1');
+                    router.push(`/search?${params.toString()}`);
                   }}
                   className="ml-2 hover:text-pacific-200"
                 >
@@ -474,6 +544,11 @@ function SearchPageContent() {
                   onClick={() => {
                     setState(prev => ({ ...prev, dateTo: '' }));
                     setCurrentPage(1);
+                    setIsFiltering(true);
+                    const params = new URLSearchParams(searchParams);
+                    params.delete('date_to');
+                    params.set('page', '1');
+                    router.push(`/search?${params.toString()}`);
                   }}
                   className="ml-2 hover:text-pacific-200"
                 >
@@ -485,19 +560,28 @@ function SearchPageContent() {
         )}
 
         {/* Results */}
-        <div className="rounded-3xl border border-white/10 bg-white/5 shadow-card backdrop-blur">
+        <div className="rounded-3xl border border-white/10 bg-white/5 shadow-card backdrop-blur relative">
+          {/* Filter loading overlay */}
+          {isFiltering && !isLoading && (
+            <div className="absolute inset-0 bg-deep-950/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-3xl">
+              <div className="text-white text-sm flex items-center gap-2">
+                <div className="animate-spin h-4 w-4 border-2 border-pacific-400 border-t-transparent rounded-full"></div>
+                Applying filters...
+              </div>
+            </div>
+          )}
           {isLoading ? (
             <div className="p-6">
               {state.viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {Array.from({ length: RESULTS_PER_PAGE }).map((_, index) => (
-                    <ImageGridCardSkeleton key={index} />
+                    <ImageGridCardSkeleton key={`grid-skeleton-${index}`} />
                   ))}
                 </div>
               ) : (
                 <div className="space-y-4">
                   {Array.from({ length: RESULTS_PER_PAGE }).map((_, index) => (
-                    <ImageListCardSkeleton key={index} />
+                    <ImageListCardSkeleton key={`list-skeleton-${index}`} />
                   ))}
                 </div>
               )}
@@ -505,11 +589,11 @@ function SearchPageContent() {
           ) : error ? (
             <div className="px-4 py-6">
               <ErrorBanner
-                title="We couldn't load the catalog"
+                title="Search Failed"
                 message={
                   error instanceof Error
-                    ? error.message
-                    : 'Something went wrong while searching. Please try again.'
+                    ? `Failed to load search results: ${error.message}`
+                    : 'Unable to connect to the search service. Please check your connection and try again.'
                 }
                 tone="error"
                 onRetry={() => refetch()}
@@ -558,13 +642,13 @@ function SearchPageContent() {
               </div>
               {state.viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {images.map((image) => (
+                  {images.map((image: ImageMetadata) => (
                     <MemoizedImageGridCard key={image.id} image={image} />
                   ))}
                 </div>
               ) : state.viewMode === 'list' ? (
                 <div className="space-y-4">
-                  {images.map((image) => (
+                  {images.map((image: ImageMetadata) => (
                     <MemoizedImageListCard key={image.id} image={image} />
                   ))}
                 </div>
@@ -575,7 +659,7 @@ function SearchPageContent() {
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       attribution="&copy; OpenStreetMap contributors"
                     />
-                    {images.filter(img => img.latitude && img.longitude).map(image => (
+                    {images.filter((img: ImageMetadata) => img.latitude && img.longitude).map((image: ImageMetadata) => (
                       <Marker
                         key={image.id}
                         position={[image.latitude, image.longitude] as [number, number]}
@@ -634,7 +718,7 @@ export default function SearchPage() {
 // but individual image data hasn't changed
 function ImageGridCard({ image }: { image: ImageMetadata }) {
   const safeTitle = sanitizeText(image.title);
-  const safeAbstract = sanitizeText(image.abstract || 'No description available');
+  const safeAbstract = sanitizeText(image.abstract || (image as any).description || 'No description available');
   const safeLocation = sanitizeText(image.latitude && image.longitude ? `${image.latitude.toFixed(2)}, ${image.longitude.toFixed(2)}` : 'No location');
   return (
     <Link href={`/images/${image.id}`} className="group">
@@ -697,7 +781,7 @@ function ImageGridCard({ image }: { image: ImageMetadata }) {
 
 function ImageListCard({ image }: { image: ImageMetadata }) {
   const safeTitle = sanitizeText(image.title);
-  const safeAbstract = sanitizeText(image.abstract || 'No description available');
+  const safeAbstract = sanitizeText(image.abstract || (image as any).description || 'No description available');
   const safeLocation = sanitizeText(
     image.latitude && image.longitude
       ? `${image.latitude.toFixed(4)}, ${image.longitude.toFixed(4)}`

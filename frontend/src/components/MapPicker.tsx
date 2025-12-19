@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -46,6 +46,13 @@ const createCustomIcon = () => {
     iconAnchor: [18, 36],
   });
 };
+
+const NOMINATIM_HEADERS = {
+  'Accept-Language': 'en',
+  'User-Agent': 'PacificImpactAtlas/1.0 (contact@example.com)',
+};
+const NOMINATIM_RATE_LIMIT_MS = 1000;
+const NOMINATIM_MAX_RETRIES = 2;
 
 interface GeocodingResult {
   lat: number;
@@ -122,6 +129,58 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
   const [countryCode, setCountryCode] = useState<string>('');
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const lastRequestTimeRef = useRef(0);
+
+  const fetchWithNominatim = useCallback(
+    async (url: string, attempt = 0): Promise<Response> => {
+      const elapsed = Date.now() - lastRequestTimeRef.current;
+      if (elapsed < NOMINATIM_RATE_LIMIT_MS) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, NOMINATIM_RATE_LIMIT_MS - elapsed)
+        );
+      }
+      lastRequestTimeRef.current = Date.now();
+
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: NOMINATIM_HEADERS,
+          signal: AbortSignal.timeout(5000),
+        });
+      } catch (error) {
+        if (attempt < NOMINATIM_MAX_RETRIES) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, NOMINATIM_RATE_LIMIT_MS * (attempt + 1))
+          );
+          return fetchWithNominatim(url, attempt + 1);
+        }
+        throw error;
+      }
+
+      if (response.status === 429) {
+        if (attempt < NOMINATIM_MAX_RETRIES) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, NOMINATIM_RATE_LIMIT_MS * (attempt + 1))
+          );
+          return fetchWithNominatim(url, attempt + 1);
+        }
+        throw new Error('Rate limited. Please try again in a moment.');
+      }
+
+      if (!response.ok) {
+        if (attempt < NOMINATIM_MAX_RETRIES) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, NOMINATIM_RATE_LIMIT_MS * (attempt + 1))
+          );
+          return fetchWithNominatim(url, attempt + 1);
+        }
+        throw new Error('Geocoding service unavailable');
+      }
+
+      return response;
+    },
+    []
+  );
 
   // Reverse geocode a position to get place name
   const reverseGeocode = useCallback(async (lat: number, lng: number) => {
@@ -129,25 +188,9 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
     setSearchError(null);
     
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-        {
-          headers: {
-            'Accept-Language': 'en',
-            'User-Agent': 'PacificImpactAtlas/1.0',
-          },
-          signal: AbortSignal.timeout(10000),
-        }
+      const response = await fetchWithNominatim(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
       );
-      
-      if (response.status === 429) {
-        throw new Error('Too many requests. Please wait a moment and try again.');
-      }
-      
-      if (!response.ok) {
-        throw new Error('Geocoding service unavailable');
-      }
-      
       const data: GeocodingResult = await response.json();
       
       // Build a human-readable place name
@@ -164,11 +207,15 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
     } catch (error) {
       console.error('Reverse geocoding error:', error);
       setPlaceName(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-      setSearchError('Could not determine place name');
+      setSearchError(
+        error instanceof Error
+          ? error.message
+          : 'Could not determine place name'
+      );
     } finally {
       setIsReverseGeocoding(false);
     }
-  }, []);
+  }, [fetchWithNominatim]);
 
   // Search for a location by name
   const handleSearch = useCallback(async () => {
@@ -178,25 +225,11 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
     setSearchError(null);
     
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&addressdetails=1&limit=1`,
-        {
-          headers: {
-            'Accept-Language': 'en',
-            'User-Agent': 'PacificImpactAtlas/1.0',
-          },
-          signal: AbortSignal.timeout(10000),
-        }
+      const response = await fetchWithNominatim(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
+          searchQuery
+        )}&format=json&addressdetails=1&limit=1`
       );
-      
-      if (response.status === 429) {
-        throw new Error('Too many requests. Please wait a moment and try again.');
-      }
-      
-      if (!response.ok) {
-        throw new Error('Search service unavailable');
-      }
-      
       const results: GeocodingResult[] = await response.json();
       
       if (results.length === 0) {
@@ -222,11 +255,15 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
       
     } catch (error) {
       console.error('Search error:', error);
-      setSearchError('Search failed. Please try again.');
+      setSearchError(
+        error instanceof Error
+          ? error.message
+          : 'Search service is temporarily unavailable'
+      );
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery, fetchWithNominatim]);
 
   // Handle position change
   const handlePositionChange = useCallback((newPosition: [number, number]) => {

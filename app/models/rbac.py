@@ -141,6 +141,10 @@ class User(Base):
 
     # Relationships
     role = relationship("Role", back_populates="users")
+    # Extended user data relationships (commented out to avoid forward ref issues)
+    # profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # api_tokens = relationship("APIToken", back_populates="user", cascade="all, delete-orphan")
 
     def to_dict(self):
         """Convert user to dictionary (safe for API responses - no password)"""

@@ -157,7 +157,7 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
           <p className="text-lg font-semibold text-white">What hazards are being reported?</p>
         </div>
       </div>
-      <div className="relative h-80">
+      <div className="relative h-80" style={{ minHeight: '320px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
             <Pie

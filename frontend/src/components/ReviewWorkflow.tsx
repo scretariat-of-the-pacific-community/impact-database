@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import {
   CheckCircleIcon,
   XCircleIcon,
@@ -78,11 +79,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
   const { data: item, isLoading, error } = useQuery<ReviewItem>({
     queryKey: ['review-item', itemId],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/curation/queue/${itemId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch(`/api/admin/curation/queue/${itemId}`);
       if (!response.ok) throw new Error('Failed to fetch review item');
       return response.json();
     }
@@ -91,12 +88,8 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
   // Update status mutation
   const updateStatusMutation = useMutation({
     mutationFn: async ({ status, notes }: { status: string; notes?: string }) => {
-      const response = await fetch(`/api/admin/curation/queue/${itemId}`, {
+      const response = await authFetch(`/api/admin/curation/queue/${itemId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({
           status,
           reviewer_notes: notes,
@@ -116,11 +109,8 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
   // Assign to self mutation
   const assignMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch(`/api/admin/curation/queue/${itemId}/assign`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await authFetch(`/api/admin/curation/queue/${itemId}/assign`, {
+        method: 'POST'
       });
       if (!response.ok) throw new Error('Failed to assign item');
       return response.json();
@@ -133,12 +123,8 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
   // Flag mutation
   const flagMutation = useMutation({
     mutationFn: async (reason: string) => {
-      const response = await fetch(`/api/admin/curation/queue/${itemId}/flag`, {
+      const response = await authFetch(`/api/admin/curation/queue/${itemId}/flag`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ reason })
       });
       if (!response.ok) throw new Error('Failed to flag item');
@@ -152,12 +138,8 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
   // Mark as duplicate mutation
   const duplicateMutation = useMutation({
     mutationFn: async (originalItemId: string) => {
-      const response = await fetch(`/api/admin/curation/queue/${itemId}/duplicate`, {
+      const response = await authFetch(`/api/admin/curation/queue/${itemId}/duplicate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ original_item_id: originalItemId })
       });
       if (!response.ok) throw new Error('Failed to mark as duplicate');
@@ -168,10 +150,28 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
     }
   });
 
+  // Use refs for values that change frequently to avoid re-registering keyboard listener
+  const reviewNotesRef = useRef(reviewNotes);
+  const updateStatusMutationRef = useRef(updateStatusMutation);
+  const flagMutationRef = useRef(flagMutation);
+
+  // Keep refs in sync with current values
+  useEffect(() => {
+    reviewNotesRef.current = reviewNotes;
+  }, [reviewNotes]);
+
+  useEffect(() => {
+    updateStatusMutationRef.current = updateStatusMutation;
+  }, [updateStatusMutation]);
+
+  useEffect(() => {
+    flagMutationRef.current = flagMutation;
+  }, [flagMutation]);
+
   const handleStatusUpdate = useCallback((status: string) => {
     setSelectedAction(status);
-    updateStatusMutation.mutate({ status, notes: reviewNotes });
-  }, [reviewNotes, updateStatusMutation]);
+    updateStatusMutationRef.current.mutate({ status, notes: reviewNotesRef.current });
+  }, []);
 
   const handleAssignToSelf = useCallback(() => {
     assignMutation.mutate();
@@ -180,9 +180,9 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
   const handleFlag = useCallback(() => {
     const reason = prompt('Please provide a reason for flagging this item:');
     if (reason && reason.trim()) {
-      flagMutation.mutate(reason.trim());
+      flagMutationRef.current.mutate(reason.trim());
     }
-  }, [flagMutation]);
+  }, []);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -218,13 +218,18 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
     }
   };
 
+  // Keyboard shortcuts - register once, use refs for dynamic values
   useEffect(() => {
     if (!item) return;
     if (typeof window === 'undefined') return;
+    
     const handler = (event: KeyboardEvent) => {
+      // Ignore shortcuts when typing in input fields
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes((event.target as HTMLElement)?.tagName || '')) {
         return;
       }
+      
+      // Keyboard shortcuts for review actions
       if (event.key.toLowerCase() === 'a') {
         handleStatusUpdate('approved');
       } else if (event.key.toLowerCase() === 'r') {
@@ -235,9 +240,10 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({ itemId, onStatusChange,
         handleFlag();
       }
     };
+    
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleFlag, handleStatusUpdate, item, updateStatusMutation.isPending, reviewNotes]);
+  }, [item, handleFlag, handleStatusUpdate]); // Minimal deps - handlers are stable with useCallback
 
   if (isLoading) {
     return (

@@ -49,6 +49,26 @@ def get_env(name: str, default: Optional[str] = None, required_in_production: bo
 class SecuritySettings(BaseModel):
     """Security-specific settings with strict validation"""
     
+    # EXIF/Metadata Settings
+    EXIF_LIBRARY: str = Field(
+        default="PIL",
+        description="EXIF extraction library: 'PIL' (default) or 'exifread' (more comprehensive)"
+    )
+    ENABLE_XMP_EXTRACTION: bool = Field(
+        default=False,
+        description="Enable XMP metadata extraction (requires python-xmp-toolkit)"
+    )
+    AUTO_CONVERT_HEIF: bool = Field(
+        default=True,
+        description="Automatically convert HEIF/HEIC to JPEG"
+    )
+    HEIF_JPEG_QUALITY: int = Field(
+        default=95,
+        ge=1,
+        le=100,
+        description="JPEG quality for HEIF conversion (1-100)"
+    )
+    
     # JWT Configuration
     SECRET_KEY: str = Field(
         default_factory=lambda: get_env("SECRET_KEY", required_in_production=True) or secrets.token_urlsafe(32),

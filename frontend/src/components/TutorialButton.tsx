@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { HelpCircle, Play, RotateCcw } from 'lucide-react';
 import { useTutorial, tutorialSteps } from '@/lib/tutorial';
+import { toast } from 'sonner';
 
 interface TutorialButtonProps {
   tourName?: keyof typeof tutorialSteps;
@@ -36,7 +37,9 @@ export default function TutorialButton({
   const handleResetTours = () => {
     tutorial.resetTours();
     setMenuOpen(false);
-    alert('All tutorials have been reset. They will show again on next visit.');
+    toast.success('Tutorials reset', {
+      description: 'They will show again on your next visit.',
+    });
   };
 
   if (variant === 'fab') {

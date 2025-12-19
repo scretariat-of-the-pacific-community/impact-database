@@ -51,8 +51,26 @@ if settings.REDIS_URL:
         logger.warning(f"Failed to connect to Redis: {e}. Using in-memory fallbacks.")
 
 # Add security middleware (order matters - add from outermost to innermost)
-# app.add_middleware(SecurityHeadersMiddleware)  # Commented out - not imported
-# app.add_middleware(RateLimitMiddleware, redis_client=redis_client)  # Commented out - not imported
+# Import rate limiting middleware
+from middleware.rate_limit import RateLimitMiddleware, RedisRateLimitMiddleware
+
+# Add rate limiting (10 requests per minute per user)
+if redis_client:
+    logger.info("Using Redis-based rate limiting")
+    app.add_middleware(
+        RedisRateLimitMiddleware,
+        redis_client=redis_client,
+        requests_per_minute=10,
+        exclude_paths=['/api/health', '/api/docs', '/docs', '/openapi.json', '/redoc']
+    )
+else:
+    logger.info("Using in-memory rate limiting")
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=10,
+        burst_size=15,
+        exclude_paths=['/api/health', '/api/docs', '/docs', '/openapi.json', '/redoc']
+    )
 
 # Import user API
 from api import user as user_api
@@ -71,6 +89,25 @@ else:
         "http://127.0.0.1:3001"
     ]
 
+# Add CSRF protection (before CORS)
+from middleware.csrf import CSRFMiddleware
+
+app.add_middleware(
+    CSRFMiddleware,
+    cookie_secure=settings.ENVIRONMENT.lower() == "production",
+    cookie_samesite="lax",
+    exempt_paths=[
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+        "/api/auth/login",
+        "/api/auth/register",
+        "/api/auth/refresh",
+        "/api/health",
+        "/favicon.ico"
+    ]
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -80,10 +117,12 @@ app.add_middleware(
         "Authorization", 
         "Content-Type", 
         "Accept",
+        "X-CSRF-Token",  # Allow CSRF token header
         "X-Requested-With",
         "X-CSRF-Token"
     ],
-    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-Process-Time"]
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-Process-Time"],
+    max_age=86400,  # Cache preflight responses for 24 hours (reduces 300ms overhead)
 )
 
 # Include routers with enhanced security

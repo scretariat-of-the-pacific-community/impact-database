@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import {
   CloudArrowUpIcon,
   CloudArrowDownIcon,
@@ -76,11 +77,7 @@ const BulkImportExport: React.FC = () => {
   const { data: importJobs, isLoading: importLoading } = useQuery({
     queryKey: ['import-jobs'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/imports', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch('/api/admin/imports');
       if (!response.ok) throw new Error('Failed to fetch import jobs');
       return response.json();
     },
@@ -91,11 +88,7 @@ const BulkImportExport: React.FC = () => {
   const { data: exportJobs, isLoading: exportLoading } = useQuery({
     queryKey: ['export-jobs'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/exports', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch('/api/admin/exports');
       if (!response.ok) throw new Error('Failed to fetch export jobs');
       return response.json();
     },
@@ -110,11 +103,8 @@ const BulkImportExport: React.FC = () => {
       formData.append('type', type);
       formData.append('dry_run', dryRun.toString());
 
-      const response = await fetch('/api/admin/imports', {
+      const response = await authFetch('/api/admin/imports', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: formData
       });
       if (!response.ok) throw new Error('Failed to start import');
@@ -129,12 +119,8 @@ const BulkImportExport: React.FC = () => {
   // Start export
   const exportMutation = useMutation({
     mutationFn: async ({ format, filters }: { format: string; filters: any }) => {
-      const response = await fetch('/api/admin/exports', {
+      const response = await authFetch('/api/admin/exports', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ format, filters })
       });
       if (!response.ok) throw new Error('Failed to start export');
@@ -471,9 +457,9 @@ const BulkImportExport: React.FC = () => {
                             <div className="mt-2">
                               <h6 className="text-xs font-medium text-yellow-900">Warnings:</h6>
                               <ul className="text-xs text-yellow-800 mt-1 space-y-1">
-                                {job.validationReport.warnings.map((warning, idx) => (
-                                  <li key={idx}>• {warning}</li>
-                                ))}
+                              {job.validationReport.warnings.map((warning, idx) => (
+                                <li key={`${job.id}-warning-${idx}-${warning}`}>• {warning}</li>
+                              ))}
                               </ul>
                             </div>
                           )}
@@ -489,7 +475,10 @@ const BulkImportExport: React.FC = () => {
                             </summary>
                             <div className="mt-2 p-3 bg-red-50 rounded-lg max-h-32 overflow-y-auto">
                               {job.errors.map((error, idx) => (
-                                <div key={idx} className="text-xs text-red-800 mb-1">
+                                <div
+                                  key={`${job.id}-error-${error.item}-${error.line ?? idx}`}
+                                  className="text-xs text-red-800 mb-1"
+                                >
                                   <span className="font-medium">{error.item}</span>
                                   {error.line && <span className="text-red-600"> (line {error.line})</span>}
                                   : {error.error}

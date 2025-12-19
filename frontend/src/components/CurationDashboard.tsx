@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import {
   ChartBarIcon,
   ClockIcon,
@@ -39,11 +40,7 @@ const CurationDashboard: React.FC = () => {
   const { data: stats, isLoading, error } = useQuery<DashboardStats>({
     queryKey: ['curation-dashboard', timeRange],
     queryFn: async () => {
-      const response = await fetch(`/api/admin/dashboard?period=${timeRange}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch(`/api/admin/dashboard?period=${timeRange}`);
       if (!response.ok) throw new Error('Failed to fetch dashboard data');
       return response.json();
     },

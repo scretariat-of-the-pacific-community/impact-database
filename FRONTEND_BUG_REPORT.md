@@ -1,570 +1,132 @@
 # Frontend Bug Report & Code Quality Issues
 
-**Date:** December 18, 2025  
+**Date:** December 19, 2025  
 **Severity Legend:** 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low
 
 ---
 
 ## Critical Bugs 🔴
 
-### 1. Memory Leak: Camera Stream Not Cleaned Up
-**File:** [src/app/upload/mobile/page.tsx](frontend/src/app/upload/mobile/page.tsx#L30-L52)
+### 1. Missing OAuth `state` Validation (Open Redirect / CSRF)
+**File:** [frontend/src/providers/auth-provider.tsx](frontend/src/providers/auth-provider.tsx#L102-L218)
 
-**Issue:** The camera stream (`streamRef.current`) is opened but never cleaned up when the component unmounts. This causes the camera to stay active even after leaving the page.
-
-**Current Code:**
-```tsx
-useEffect(() => {
-  if ('geolocation' in navigator') {
-    navigator.geolocation.getCurrentPosition(/* ... */);
-  }
-}, []);
-
-// No cleanup for streamRef!
-```
+**Issue:** The PKCE flow generates a random `state` value before redirecting to the identity provider, but the value is never stored or compared when `handleCallback` runs. The `state` argument that comes back from the IdP is ignored entirely.
 
 **Impact:**
-- Camera stays on after navigation
-- Battery drain
-- Privacy concern (camera indicator stays on)
-- Memory leak
+- Enables CSRF/authorization code injection: an attacker can complete the flow against their own account and push the victim’s browser through the callback URL, forcing the victim to sign in as the attacker.
+- Breaks the threat model required by OAuth/OIDC; auditors will flag this immediately.
 
 **Fix:**
-```tsx
-useEffect(() => {
-  // Cleanup camera stream on unmount
-  return () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-  };
-}, []);
+1. Persist the generated `state` in `sessionStorage` (e.g., `sessionStorage.setItem('oauth_state', state)`).
+2. In `handleCallback`, read the stored value and verify it matches the `state` param. Reject the callback and clear storage if it does not.
+
+```ts
+const state = crypto.randomUUID();
+sessionStorage.setItem('oauth_state', state);
+// ...
+const storedState = sessionStorage.getItem('oauth_state');
+if (!state || state !== storedState) throw new Error('State mismatch');
 ```
 
 ---
 
-### 2. Race Condition: Blob URL Not Revoked
-**File:** [src/app/upload/mobile/page.tsx](frontend/src/app/upload/mobile/page.tsx#L95-L105)
+### 2. Upload Requests Ignore Cookie-Based Auth
+**File:** [frontend/src/lib/api.ts](frontend/src/lib/api.ts#L471-L525)
 
-**Issue:** `URL.createObjectURL()` creates blob URLs that are never revoked, causing memory leaks.
-
-**Current Code:**
-```tsx
-setCaptured({
-  file,
-  preview: URL.createObjectURL(blob),  // Never revoked!
-  location: { /* ... */ },
-  timestamp: new Date(),
-});
-```
+**Issue:** The `imageApi.upload` helper bypasses the shared Axios client and rolls its own `XMLHttpRequest`:
+- It only adds an `Authorization` header if it finds `authToken` in `localStorage`. When tokens live in httpOnly cookies (per security policy), uploads immediately fail with 401.
+- The request never sets `xhr.withCredentials = true`, so browser cookies are not sent to the API origin even if they exist.
 
 **Impact:**
-- Memory leak (blob URLs accumulate)
-- Can cause browser to run out of memory on repeated captures
-- 50-100MB leak per captured image
+- Core upload flow is broken for any account that completed the cookie-based login. QA reproduced this with a `401 Unauthorized` every time.
+- Developers are forced to keep tokens in `localStorage`, re‑introducing the very XSS risk we were trying to remove.
 
 **Fix:**
-```tsx
-useEffect(() => {
-  // Cleanup blob URL when captured changes or unmounts
-  return () => {
-    if (captured?.preview) {
-      URL.revokeObjectURL(captured.preview);
-    }
-  };
-}, [captured?.preview]);
-```
-
----
-
-### 3. Missing Error Handling: OpenStreetMap API
-**File:** [src/components/MapPicker.tsx](frontend/src/components/MapPicker.tsx#L132-L158)
-
-**Issue:** Nominatim API calls have no retry logic, timeout handling, or rate limiting. OpenStreetMap has a 1 req/sec rate limit and can ban IPs.
-
-**Current Code:**
-```tsx
-const response = await fetch(
-  `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-  {
-    headers: {
-      'Accept-Language': 'en',
-    },
-  }
-);
-```
-
-**Missing:**
-- User-Agent header (required by OSM policy)
-- Rate limiting (1 request per second)
-- Retry logic
-- Timeout handling
-- 429 status code handling
-
-**Impact:**
-- IP ban from OpenStreetMap (permanent)
-- Terms of Service violation
-- App breaks for all users if IP is banned
-
-**Fix:**
-```tsx
-const response = await fetch(
-  `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`,
-  {
-    headers: {
-      'Accept-Language': 'en',
-      'User-Agent': 'PacificImpactAtlas/1.0 (contact@example.com)',  // Required!
-    },
-    signal: AbortSignal.timeout(5000),  // 5 second timeout
-  }
-);
-
-if (response.status === 429) {
-  throw new Error('Rate limited. Please try again in a moment.');
-}
-```
+1. Replace the custom XHR with `fetch`/`axios` configured with `credentials: 'include'`, or at minimum set `xhr.withCredentials = true`.
+2. Stop reading from `localStorage`—rely on cookies that the browser attaches automatically.
+3. Prefer reusing the hardened `authFetch` helper so progress callbacks and errors stay consistent.
 
 ---
 
 ## High Priority Bugs 🟠
 
-### 4. Insecure Token Storage
-**File:** Multiple files ([UserManagement.tsx](frontend/src/components/UserManagement.tsx#L79), [ReviewWorkflow.tsx](frontend/src/components/ReviewWorkflow.tsx#L83), etc.)
+### 3. Session Tokens Persist in `localStorage`
+**File:** [frontend/src/providers/auth-provider.tsx](frontend/src/providers/auth-provider.tsx#L200-L296)
 
-**Issue:** Authentication tokens stored in `localStorage` are vulnerable to XSS attacks. All localStorage data is accessible to JavaScript.
-
-**Current Code:**
-```tsx
-headers: {
-  'Authorization': `Bearer ${localStorage.getItem('token')}`
-}
-```
+**Issue:** `storeSession` serializes the entire `AuthSession` (including `access_token` + `refresh_token`) into `localStorage` under `ocean_portal_session`. This contradicts the documented “cookies only” posture and leaves bearer tokens readable by any script on the page.
 
 **Impact:**
-- XSS vulnerability
-- Token theft if any XSS vulnerability exists
-- No expiration enforcement
-- Tokens persist across sessions
-
-**Recommendation:**
-- Use httpOnly cookies for auth tokens (immune to XSS)
-- Or use secure session storage with automatic expiration
-- Never store sensitive tokens in localStorage
-
-**Better Approach:**
-```tsx
-// Let the browser handle auth tokens via httpOnly cookies
-// Remove manual Authorization headers
-// Backend should set: Set-Cookie: token=...; HttpOnly; Secure; SameSite=Strict
-```
-
----
-
-### 5. Infinite Query Pagination Not Implemented
-**File:** [src/components/profile/InfiniteUploadList.tsx](frontend/src/components/profile/InfiniteUploadList.tsx#L43)
-
-**Issue:** Infinite scroll is configured but pagination doesn't work. Always returns `undefined` for next page.
-
-**Current Code:**
-```tsx
-queryFn: ({ pageParam = 1 }) => imageApi.userUploads(),  // Doesn't use pageParam!
-getNextPageParam: (lastPage, allPages) => {
-  // Comment says "doesn't support pagination yet"
-  return undefined;  // Always undefined = no pagination
-},
-```
-
-**Impact:**
-- Only loads first page of uploads
-- Users with 100+ uploads can't see them
-- Intersection Observer runs unnecessarily
-- UX broken for power users
+- Any XSS (even a minor content injection) can exfiltrate long‑lived access and refresh tokens.
+- PWAs running on shared devices can leak credentials between users because `localStorage` lacks per-session isolation.
 
 **Fix:**
-```tsx
-queryFn: ({ pageParam = 1 }) => imageApi.userUploads({ page: pageParam, limit: 20 }),
-getNextPageParam: (lastPage, allPages) => {
-  if (lastPage.length < 20) return undefined;  // No more data
-  return allPages.length + 1;  // Next page number
-},
-```
-
----
-
-### 6. Missing Abort Controllers for API Calls
-**File:** Multiple files with fetch() calls
-
-**Issue:** No AbortController for fetch requests. If user navigates away, requests continue running.
-
-**Impact:**
-- Wasted bandwidth
-- Memory leaks (responses stored in unmounted components)
-- Race conditions (stale data updating state)
-- 429 errors from excessive requests
-
-**Example Fix:**
-```tsx
-useEffect(() => {
-  const controller = new AbortController();
-  
-  const fetchData = async () => {
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal
-      });
-      // ... handle response
-    } catch (error) {
-      if (error.name === 'AbortError') {
-        // Request was cancelled, ignore
-        return;
-      }
-      // ... handle other errors
-    }
-  };
-  
-  fetchData();
-  
-  return () => controller.abort();  // Cancel on unmount
-}, []);
-```
+1. Move token storage entirely to server-set httpOnly cookies; the frontend should only cache non-sensitive display data.
+2. If offline support is mandatory, encrypt tokens with WebCrypto + device binding and store them in IndexedDB, never plain `localStorage`.
+3. After migrating, make `AuthProvider` read session info via a `/api/auth/me` call instead of trusting client storage.
 
 ---
 
 ## Medium Priority Bugs 🟡
 
-### 7. Console Logs Left in Production
-**File:** Multiple files
+### 4. Search Filters Are Not Shareable or Restorable
+**File:** [frontend/src/app/search/page.tsx](frontend/src/app/search/page.tsx#L164-L234)
 
-**Issue:** Production code contains debug console.log statements.
-
-**Locations:**
-- `src/app/upload/mobile/page.tsx:39` - GPS coordinates logged
-- `src/app/upload/page.tsx:192-194` - Vocabulary data logged
-- `src/app/upload/page.tsx:737-739` - Geolocation debugging
-- `src/app/profile/page.tsx:86` - Profile debug object
+**Issue:** Filter interactions (hazard, agency, date, sort) mutate component state and `localStorage`, but only the `q` and `page` parameters are synced to the URL. Sharing `/search?...` links therefore drops every filter except the keyword, and users who clear their storage lose their saved view.
 
 **Impact:**
-- Performance overhead
-- Sensitive data exposure in browser console
-- Log spam for users
-- Debug info visible to attackers
+- Analysts cannot share an exact filtered view with colleagues—links reopen with default filters, leading to inconsistent reviews.
+- Browser navigation/back-forward feels broken because the filter state is not encoded in history entries.
 
 **Fix:**
-```tsx
-// Remove all console.log in production
-// Keep only console.error and console.warn
-// Or use a logger that respects NODE_ENV
-```
+1. Push filter selections into the URL query string whenever they change (e.g., `hazard=flood&agency=spc&date_from=...`).
+2. Read from the URL first, falling back to `localStorage` only if no params are set.
+3. Consider using `router.replace` to avoid cluttering history for rapid toggles.
 
 ---
 
-### 8. Missing Keyboard Event Cleanup
-**File:** [src/components/ReviewWorkflow.tsx](frontend/src/components/ReviewWorkflow.tsx#L223-L243)
+### 5. `navigator` Referenced During Server Render (Mobile Upload Offline Banner)
+**File:** [frontend/src/app/upload/mobile/page.tsx](frontend/src/app/upload/mobile/page.tsx#L502-L519)
 
-**Issue:** Keyboard event listener properly cleaned up, but dependency array is too large.
-
-**Current Code:**
-```tsx
-useEffect(() => {
-  // ... keyboard handler
-  window.addEventListener('keydown', handler);
-  return () => window.removeEventListener('keydown', handler);
-}, [handleFlag, handleStatusUpdate, item, updateStatusMutation.isPending, reviewNotes]);
-```
-
-**Problem:**
-- Re-registers listener on every state change
-- Handler functions recreated frequently
-- Performance overhead
-
-**Fix:**
-```tsx
-// Memoize handlers with useCallback
-const handleFlag = useCallback(() => {
-  // ... implementation
-}, []); // Stable dependencies only
-
-// Or use refs for dynamic values
-const reviewNotesRef = useRef(reviewNotes);
-reviewNotesRef.current = reviewNotes;
-
-useEffect(() => {
-  const handler = (e: KeyboardEvent) => {
-    // Use reviewNotesRef.current instead of reviewNotes
-  };
-  window.addEventListener('keydown', handler);
-  return () => window.removeEventListener('keydown', handler);
-}, []); // Empty deps = register once
-```
-
----
-
-### 9. No Loading State for File Upload
-**File:** [src/app/upload/page.tsx](frontend/src/app/upload/page.tsx#L730-L760)
-
-**Issue:** Geolocation shows loading toast, but no loading state for the actual upload button.
+**Issue:** The JSX renders `{!navigator.onLine && (...)}`. Next.js still evaluates Client Components on the server during the build/initial render, where `navigator` is undefined. This crashes `next build`, Storybook, and any Jest test that imports the page (`ReferenceError: navigator is not defined`).
 
 **Impact:**
-- Users can click "Upload" multiple times
-- Duplicate uploads sent to server
-- No visual feedback during upload
-- Poor UX for slow connections
+- The mobile upload route cannot be pre-rendered, so CI builds fail unless the file is stubbed.
+- Local developers running `next build` hit a hard crash before deployment.
 
 **Fix:**
+Wrap the check in a browser guard (or derive `isOffline` from `useState`):
 ```tsx
-const [isUploading, setIsUploading] = useState(false);
-
-const handleSubmit = async (data: FormData) => {
-  if (isUploading) return;  // Prevent double-submit
-  
-  setIsUploading(true);
-  try {
-    await imageApi.upload(data);
-    // ... success handling
-  } finally {
-    setIsUploading(false);
+const [isOffline, setIsOffline] = useState(false);
+useEffect(() => {
+  if (typeof navigator !== 'undefined') {
+    setIsOffline(!navigator.onLine);
+    const handler = () => setIsOffline(!navigator.onLine);
+    window.addEventListener('online', handler);
+    window.addEventListener('offline', handler);
+    return () => {
+      window.removeEventListener('online', handler);
+      window.removeEventListener('offline', handler);
+    };
   }
-};
-
-// In JSX:
-<Button disabled={isUploading}>
-  {isUploading ? 'Uploading...' : 'Upload Image'}
-</Button>
+}, []);
+// ...
+{isOffline && <Card>...</Card>}
 ```
-
----
-
-### 10. Potential XSS: User Input Not Sanitized
-**File:** Multiple forms without sanitization
-
-**Issue:** User input (descriptions, notes) submitted to API without client-side sanitization.
-
-**Risk:**
-- Stored XSS if backend doesn't sanitize
-- Script injection in metadata
-- Database poisoning
-
-**Example Vulnerable Code:**
-```tsx
-<input
-  value={description}
-  onChange={(e) => setDescription(e.target.value)}  // No sanitization
-/>
-```
-
-**Fix:**
-```tsx
-import DOMPurify from 'isomorphic-dompurify';
-
-const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const sanitized = DOMPurify.sanitize(e.target.value, {
-    ALLOWED_TAGS: [],  // Strip all HTML
-    KEEP_CONTENT: true,
-  });
-  setDescription(sanitized);
-};
-```
-
----
-
-## Low Priority Issues 🟢
-
-### 11. Hardcoded API Endpoints
-**Files:** Multiple components
-
-**Issue:** Some components use hardcoded `/api/...` paths instead of environment variables.
-
-**Examples:**
-- `/api/admin/users`
-- `/api/analytics?${params}`
-- `/api/admin/dashboard`
-
-**Better Approach:**
-```tsx
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-const response = await fetch(`${API_BASE}/api/admin/users`);
-```
-
----
-
-### 12. Missing Key Props Warning
-**Build Output:** "Each child in a list should have a unique key prop"
-
-**Issue:** Some lists don't have proper key props.
-
-**Impact:**
-- React warnings during build
-- Poor reconciliation performance
-- Potential UI bugs with list reordering
-
-**Fix:** Add unique key props to all mapped arrays.
-
----
-
-### 13. Error Handling is Inconsistent
-**Files:** Various
-
-**Issue:** Some errors show toast, some use alert(), some are silent.
-
-**Examples:**
-```tsx
-// Using alert() (mobile/page.tsx)
-alert('Upload successful!');
-
-// Using toast (upload/page.tsx)
-toast.success('Location detected');
-
-// Silent error (MapPicker.tsx)
-catch (error) {
-  console.error(error);  // No user feedback
-}
-```
-
-**Recommendation:**
-- Standardize on toast notifications
-- Remove all alert() calls
-- Always provide user feedback for errors
-
----
-
-## Security Recommendations 🔒
-
-### Critical Security Issues
-
-1. **Token in localStorage** (see Bug #4)
-   - Move to httpOnly cookies
-   - Implement token rotation
-   - Add expiration enforcement
-
-2. **No CSRF Protection**
-   - Add CSRF tokens for state-changing operations
-   - Use SameSite cookie attribute
-
-3. **Missing Content Security Policy**
-   - Already configured in next.config.js but validate headers
-
-4. **No Request Size Limits**
-   - File upload has no client-side size check
-   - Could DoS server with huge files
-
-5. **Geolocation Data Leakage**
-   - GPS coordinates logged to console (see Bug #7)
-   - Remove all location logging
-
----
-
-## Performance Issues ⚡
-
-1. **Unnecessary Re-renders**
-   - Large dependency arrays in useEffect
-   - Missing useMemo for expensive computations
-   - Missing useCallback for event handlers
-
-2. **Bundle Size**
-   - 250KB gzipped (acceptable but could be optimized)
-   - Consider code splitting for admin panels
-
-3. **API Request Optimization**
-   - No request deduplication
-   - No caching strategy for static data
-   - No request batching
-
----
-
-## Code Quality Issues 📝
-
-1. **TypeScript `any` Types**
-   - Several places use `as any` type assertions
-   - Reduces type safety
-
-2. **Magic Numbers**
-   - Hardcoded values (e.g., timeout: 5000)
-   - Should be constants
-
-3. **Duplicate Code**
-   - Authorization header repeated in every component
-   - Extract to utility function
-
-4. **Error Messages**
-   - Generic error messages
-   - Should be more specific and actionable
-
----
-
-## Immediate Action Items (Priority Order)
-
-### Must Fix Before Production 🔴
-1. **Add camera stream cleanup** (Bug #1) - 30 minutes
-2. **Add blob URL revocation** (Bug #2) - 15 minutes
-3. **Fix OSM API headers** (Bug #3) - 1 hour
-4. **Move tokens to httpOnly cookies** (Bug #4) - 2-3 hours
-
-### Should Fix This Week 🟠
-5. **Add AbortControllers** (Bug #6) - 2 hours
-6. **Remove console.logs** (Bug #7) - 30 minutes
-7. **Fix infinite scroll pagination** (Bug #5) - 1 hour
-8. **Add upload loading state** (Bug #9) - 30 minutes
-
-### Can Fix Later 🟡
-9. **Optimize keyboard handlers** (Bug #8) - 1 hour
-10. **Standardize error handling** (Bug #13) - 2 hours
-11. **Add input sanitization** (Bug #10) - 1 hour
-12. **Extract hardcoded endpoints** (Bug #11) - 1 hour
 
 ---
 
 ## Testing Recommendations
-
-### Manual Testing Needed
-- [ ] Test camera cleanup (leave mobile upload page, check camera indicator)
-- [ ] Test repeated image captures (check memory usage)
-- [ ] Test offline upload queue
-- [ ] Test with >100 uploads (infinite scroll)
-- [ ] Test rapid form submissions
-
-### Automated Tests Missing
-- [ ] Camera stream cleanup test
-- [ ] Blob URL revocation test
-- [ ] API abort controller test
-- [ ] localStorage XSS test
-- [ ] Rate limiting test for OSM API
+- [ ] Regression test OAuth login: verify mismatched `state` rejects the callback.
+- [ ] Upload an image with tokens stored only in cookies to confirm the XHR path works after the fix.
+- [ ] Automated security test ensuring `localStorage` never contains `access_token` or `refresh_token`.
+- [ ] E2E search test that reloads a filtered URL and checks the filters stay applied.
+- [ ] `next build` / Jest smoke test for the mobile upload page to ensure no `navigator` reference remains in render.
 
 ---
 
-## Estimated Fix Time
+## Estimated Fix Effort
+- Critical items (#1–2): ~6–8 hours (auth flow refactor + upload client rewrite).
+- High (#3): ~4 hours (session storage redesign, QA).
+- Medium (#4–5): ~3 hours (URL sync + render guard).
 
-**Critical Bugs (1-4):** 4-5 hours  
-**High Priority (5-9):** 6-7 hours  
-**Medium/Low:** 4-5 hours  
-
-**Total:** 14-17 hours of development time
-
----
-
-## Summary
-
-**Total Bugs Found:** 13  
-**Critical:** 3  
-**High:** 3  
-**Medium:** 4  
-**Low:** 3  
-
-**Most Serious:**
-1. Memory leaks (camera stream, blob URLs)
-2. OSM API policy violation (can result in IP ban)
-3. Token storage vulnerability (XSS risk)
-
-**Quick Wins:**
-- Remove console.log statements (30 min)
-- Add camera cleanup (30 min)
-- Add blob URL revocation (15 min)
-
-**Biggest Impact:**
-- Fix token storage → Prevents XSS attacks
-- Fix OSM API → Prevents app breaking for all users
-- Fix memory leaks → Better mobile performance
-
----
-
-**Recommendation:** Address critical bugs #1-4 before production launch. These are blockers that can cause serious issues in production (memory leaks, API bans, security vulnerabilities).
+**Total:** Roughly 13–15 engineering hours including testing.

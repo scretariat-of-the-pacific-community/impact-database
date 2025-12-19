@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import Image from 'next/image';
 import { sanitizeText } from '@/lib/sanitize';
 import {
@@ -74,11 +75,7 @@ const UserManagement: React.FC = () => {
         if (value) params.append(key, value.toString());
       });
 
-      const response = await fetch(`/api/admin/users?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch(`/api/admin/users?${params}`);
       if (!response.ok) throw new Error('Failed to fetch users');
       return response.json();
     }
@@ -88,11 +85,7 @@ const UserManagement: React.FC = () => {
   const { data: roles } = useQuery({
     queryKey: ['admin-roles'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/roles', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch('/api/admin/roles');
       if (!response.ok) throw new Error('Failed to fetch roles');
       return response.json();
     }
@@ -101,12 +94,8 @@ const UserManagement: React.FC = () => {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: CreateUserData) => {
-      const response = await fetch('/api/admin/users', {
+      const response = await authFetch('/api/admin/users', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify(userData)
       });
       if (!response.ok) throw new Error('Failed to create user');
@@ -121,11 +110,8 @@ const UserManagement: React.FC = () => {
   // Lock/unlock user mutation
   const lockUserMutation = useMutation({
     mutationFn: async ({ userId, lock }: { userId: string; lock: boolean }) => {
-      const response = await fetch(`/api/admin/users/${userId}/${lock ? 'lock' : 'unlock'}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await authFetch(`/api/admin/users/${userId}/${lock ? 'lock' : 'unlock'}`, {
+        method: 'POST'
       });
       if (!response.ok) throw new Error(`Failed to ${lock ? 'lock' : 'unlock'} user`);
       return response.json();
@@ -138,11 +124,8 @@ const UserManagement: React.FC = () => {
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
-      const response = await fetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await authFetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE'
       });
       if (!response.ok) throw new Error('Failed to delete user');
       return response.json();

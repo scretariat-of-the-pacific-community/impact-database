@@ -6,7 +6,7 @@ Provides permission checking and role-based access control
 from typing import Optional, List
 from datetime import datetime, timezone
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -34,6 +34,7 @@ class EnhancedUser(AuthUser):
 
 
 async def get_current_user_enhanced(
+    request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> EnhancedUser:
@@ -41,6 +42,10 @@ async def get_current_user_enhanced(
     Get current authenticated user with RBAC information
     Falls back to development mode if needed
     """
+    
+    # Check for token in Authorization header first, then cookie
+    if not token:
+        token = request.cookies.get("ocean_portal_token")
     
     # Try to authenticate with token first (even in development)
     if token:

@@ -7,8 +7,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, asc, func, or_
+from sqlalchemy import desc, asc, func, or_, case
 from geoalchemy2 import WKTElement
+from datetime import datetime, time, timezone
 
 from models.database import get_db, ImageMetadata
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced
@@ -17,6 +18,36 @@ from pydantic import BaseModel
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _escape_ilike(value: str) -> str:
+    """Escape special characters for ILIKE patterns to prevent SQL injection."""
+    if value is None:
+        return value
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
+def _parse_date_param(value: Optional[str], clamp: str = "start") -> Optional[datetime]:
+    """Parse ISO date strings (YYYY-MM-DD) into datetime boundaries."""
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        try:
+            parsed = datetime.strptime(value, "%Y-%m-%d")
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        # Treat naive dates as UTC to keep comparisons consistent.
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    if clamp == "start":
+        return datetime.combine(parsed.date(), time.min, tzinfo=parsed.tzinfo)
+    return datetime.combine(parsed.date(), time.max, tzinfo=parsed.tzinfo)
 
 
 def _find_image(db: Session, image_id: str) -> Optional[ImageMetadata]:
@@ -361,30 +392,47 @@ async def update_image_by_id(
 
 @router.get("/search", response_model=Dict[str, Any])
 async def search_images(
-    q: Optional[str] = Query(None, description="Search query"),
-    hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
-    country: Optional[str] = Query(None, description="Filter by country"),
+    q: Optional[str] = Query(None, max_length=500, description="Search query"),
+    hazard_type: Optional[List[str]] = Query(
+        None,
+        description="Filter by hazard type (repeat to select multiple, comma-separated supported)",
+    ),
+    country: Optional[str] = Query(None, max_length=100, description="Filter by country"),
     source_agency: Optional[List[str]] = Query(
         None,
         description="Filter by source agency (pass multiple values to match any)",
     ),
-    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    date_from: Optional[str] = Query(None, description="Filter results captured on/after this date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter results captured on/before this date (YYYY-MM-DD)"),
+    skip: int = Query(0, ge=0, le=10000, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
-    sort_by: Optional[str] = Query("upload_date", description="Sort field"),
+    sort_by: Optional[str] = Query("relevance", description="Sort field: relevance, date, upload_date, title"),
     sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
     db: Session = Depends(get_db)
 ):
     """Search images with text query, filters, and sorting."""
     try:
         query = db.query(ImageMetadata)
-        
-        # Apply filters
+        date_field = ImageMetadata.date_stamp if hasattr(ImageMetadata, "date_stamp") else ImageMetadata.datetime
+
+        # Hazard filters (support single, repeated, or comma-delimited values)
+        hazard_filters: List[str] = []
         if hazard_type:
-            query = query.filter(ImageMetadata.hazard_type == hazard_type)
+            for hazard in hazard_type:
+                if not hazard:
+                    continue
+                hazard_filters.extend([h.strip().lower() for h in hazard.split(",") if h.strip()])
+        if hazard_filters:
+            query = query.filter(func.lower(ImageMetadata.hazard_type).in_(hazard_filters))
+
         if country:
-            query = query.filter(ImageMetadata.country == country)
+            safe_country = _escape_ilike(country)
+            query = query.filter(
+                ImageMetadata.country.ilike(f"%{safe_country}%", escape='\\')
+            )
+
         if source_agency:
-            normalized_agencies = [agency.strip().lower() for agency in source_agency if agency]
+            normalized_agencies = [agency.strip().lower() for agency in source_agency if agency and agency.strip()]
             if normalized_agencies:
                 query = query.filter(
                     or_(
@@ -392,39 +440,58 @@ async def search_images(
                         func.lower(ImageMetadata.source_type).in_(normalized_agencies),
                     )
                 )
-        
-        # Apply text search if query provided
+
+        captured_from = _parse_date_param(date_from, "start")
+        captured_to = _parse_date_param(date_to, "end")
+        if captured_from:
+            query = query.filter(date_field >= captured_from)
+        if captured_to:
+            query = query.filter(date_field <= captured_to)
+
+        search_pattern = None
         if q:
-            search_pattern = f"%{q}%"
+            safe_q = _escape_ilike(q)
+            search_pattern = f"%{safe_q}%"
             query = query.filter(
                 or_(
-                    ImageMetadata.title.ilike(search_pattern),
-                    ImageMetadata.abstract.ilike(search_pattern),
-                    ImageMetadata.location.ilike(search_pattern),
-                    ImageMetadata.hazard_type.ilike(search_pattern)
+                    ImageMetadata.title.ilike(search_pattern, escape='\\'),
+                    ImageMetadata.abstract.ilike(search_pattern, escape='\\'),
+                    ImageMetadata.location.ilike(search_pattern, escape='\\'),
+                    ImageMetadata.hazard_type.ilike(search_pattern, escape='\\')
                 )
             )
-        
-        # Apply sorting
-        order_field = ImageMetadata.date_stamp  # Default
-        if sort_by == "title":
+
+        sort_field = (sort_by or "relevance").lower()
+        sort_direction = (sort_order or "desc").lower()
+        order_field = date_field
+        if sort_field == "title":
             order_field = ImageMetadata.title
-        elif sort_by == "hazard_type":
+        elif sort_field == "hazard_type":
             order_field = ImageMetadata.hazard_type
-        
-        if sort_order == "asc":
-            query = query.order_by(asc(order_field))
+        elif sort_field == "upload_date":
+            order_field = ImageMetadata.datetime
+        elif sort_field == "date":
+            order_field = date_field
+
+        if sort_field == "relevance" and search_pattern:
+            relevance_case = case(
+                (ImageMetadata.title.ilike(search_pattern, escape='\\'), 3),
+                (ImageMetadata.abstract.ilike(search_pattern, escape='\\'), 2),
+                (ImageMetadata.location.ilike(search_pattern, escape='\\'), 1),
+                else_=0
+            )
+            query = query.order_by(desc(relevance_case), desc(date_field))
         else:
-            query = query.order_by(desc(order_field))
-        
-        # Get total count and paginated results
+            if sort_direction == "asc":
+                query = query.order_by(asc(order_field))
+            else:
+                query = query.order_by(desc(order_field))
+
         total = query.count()
         images = query.offset(skip).limit(limit).all()
-        
-        # Debug logging
+
         logger.info(f"Search query returned {total} total images, fetched {len(images)} images")
-        
-        # Convert to response format matching frontend expectations
+
         image_list = []
         for img in images:
             image_data = {
@@ -448,7 +515,7 @@ async def search_images(
                 } if hasattr(img, 'point_of_contact') else None
             }
             image_list.append(image_data)
-        
+
         return {
             "images": image_list,
             "total": total,
@@ -457,7 +524,7 @@ async def search_images(
             "total_pages": (total + limit - 1) // limit,
             "has_more": skip + limit < total
         }
-        
+
     except Exception as e:
         logger.error(f"Error searching images: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to search images: {str(e)}")

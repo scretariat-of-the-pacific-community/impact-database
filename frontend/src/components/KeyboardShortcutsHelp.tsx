@@ -110,14 +110,14 @@ export default function KeyboardShortcutsHelp() {
               <div className="space-y-2">
                 {section.shortcuts.map((shortcut, index) => (
                   <div
-                    key={index}
+                    key={`${section.title}-${shortcut.description}`}
                     className="flex items-center justify-between rounded-lg bg-gray-50 p-3"
                   >
                     <span className="text-sm text-gray-700">{shortcut.description}</span>
                     <div className="flex gap-1">
                       {shortcut.keys.map((key, keyIndex) => (
                         <kbd
-                          key={keyIndex}
+                          key={`${section.title}-${shortcut.description}-${key}-${keyIndex}`}
                           className="rounded border border-gray-300 bg-white px-2 py-1 text-xs font-semibold text-gray-800 shadow-sm"
                         >
                           {key}

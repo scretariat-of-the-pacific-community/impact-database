@@ -90,14 +90,44 @@ const securityHeaders = () => {
   return headers;
 };
 
+// Extract API hostname for Next.js Image optimization
+const getApiHostname = () => {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  try {
+    const url = new URL(apiUrl);
+    return url.hostname;
+  } catch {
+    return 'localhost';
+  }
+};
+
 const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
   transpilePackages: ['framer-motion'],
   images: {
-    domains: ['localhost', '127.0.0.1', '0.0.0.0'],
     remotePatterns: [
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+      },
+      {
+        protocol: 'http',
+        hostname: '0.0.0.0',
+      },
+      {
+        protocol: 'http',
+        hostname: getApiHostname(),
+      },
+      {
+        protocol: 'https',
+        hostname: getApiHostname(),
+      },
       {
         protocol: 'https',
         hostname: '**.abc-cdn.net.au',
@@ -116,13 +146,13 @@ const nextConfig = {
   allowedDevOrigins: ['127.0.0.1'],
   // Enable strict mode for better performance
   reactStrictMode: true,
+  // Skip trailing slash redirects (moved from experimental)
+  skipTrailingSlashRedirect: true,
   // Improve Fast Refresh performance
   experimental: {
     optimizeCss: false, // Disable CSS optimization in development
     // Disable server components HMR cache to prevent framer-motion factory issues
     serverComponentsHmrCache: false,
-    // Skip prerendering for error pages to avoid Next.js 16 Turbopack issues
-    skipTrailingSlashRedirect: true,
   },
   async headers() {
     return [

@@ -1,5 +1,23 @@
 /**
  * Configuration settings for the frontend application
+ * 
+ * API Architecture:
+ * ================
+ * 
+ * 1. Next.js API Routes (/api/*):
+ *    - Use relative paths: '/api/admin/users', '/api/analytics'
+ *    - Handled by Next.js server-side (app/api/ directory)
+ *    - Work in any deployment without configuration
+ *    - These routes proxy to backend using environment variables
+ * 
+ * 2. Direct Backend API Calls:
+ *    - Use imageApi from '@/lib/api'
+ *    - Configured with BASE_URL from environment variables
+ *    - Example: imageApi.searchImages(), imageApi.upload()
+ * 
+ * Environment Variables:
+ * - NEXT_PUBLIC_API_URL: External backend URL (browser access)
+ * - NEXT_PUBLIC_API_URL_INTERNAL: Internal backend URL (SSR in Docker)
  */
 
 // Helper to determine the correct API URL based on execution context

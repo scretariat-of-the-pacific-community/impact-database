@@ -73,6 +73,13 @@ const normalizeError = (error: unknown): NormalizedError => {
   };
 };
 
+// Throttle connection errors to avoid console spam
+const connectionErrorTracker = {
+  lastError: 0,
+  count: 0,
+  THROTTLE_MS: 5000, // Only log connection errors every 5 seconds
+};
+
 export function QueryProvider({ children }: QueryProviderProps) {
   const [queryClient] = useState(
     () =>
@@ -94,6 +101,38 @@ export function QueryProvider({ children }: QueryProviderProps) {
                 query.queryKey.includes('storage-quota') ||
                 query.queryKey.includes('api-tokens'))
             ) {
+              return;
+            }
+
+            // Throttle connection/network errors to avoid console spam
+            const isConnectionError = 
+              normalized.message.includes('Unable to connect') ||
+              normalized.message.includes('Network Error') ||
+              normalized.message.includes('ECONNREFUSED') ||
+              (normalized.details.status === undefined && isAxiosError(error));
+
+            if (isConnectionError) {
+              const now = Date.now();
+              const timeSinceLastError = now - connectionErrorTracker.lastError;
+              
+              if (timeSinceLastError < connectionErrorTracker.THROTTLE_MS) {
+                connectionErrorTracker.count++;
+                return; // Suppress logging
+              }
+
+              // Log with count if there were suppressed errors
+              if (connectionErrorTracker.count > 0) {
+                console.warn(
+                  `Connection error (${connectionErrorTracker.count + 1} occurrences suppressed):`,
+                  normalized.message
+                );
+                connectionErrorTracker.count = 0;
+              } else {
+                console.warn('Connection error:', normalized.message);
+              }
+              
+              connectionErrorTracker.lastError = now;
+              trackQueryError(query?.queryHash, normalized.message);
               return;
             }
 
