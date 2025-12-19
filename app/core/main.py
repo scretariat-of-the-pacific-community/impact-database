@@ -102,6 +102,7 @@ app.add_middleware(
         "/redoc",
         "/api/auth/login",
         "/api/auth/register",
+        "/api/auth/token",
         "/api/auth/refresh",
         "/api/health",
         "/favicon.ico"

@@ -55,16 +55,17 @@ def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int
         rate_limit_storage[identifier] = cleaned_attempts
     else:
         rate_limit_storage.pop(identifier, None)
-    
-    # Check limit
-    if len(rate_limit_storage[identifier]) >= max_attempts:
+
+    # Check limit using cleaned attempts to avoid defaultdict re-creation
+    if len(cleaned_attempts) >= max_attempts:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Too many attempts. Please try again in {window // 60} minutes."
         )
-    
+
     # Record attempt
-    rate_limit_storage[identifier].append(now)
+    cleaned_attempts.append(now)
+    rate_limit_storage[identifier] = cleaned_attempts
 
 # Configuration via environment variables
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -82,13 +83,16 @@ if not SECRET_KEY:
                 for line in f:
                     if line.startswith("SECRET_KEY="):
                         candidate_key = line.split("=", 1)[1].strip()
-                        if candidate_key and len(candidate_key) < 32:
-                            logger.warning(
-                                "SECRET_KEY loaded from .env.local is too short; regenerating a secure key."
-                            )
+                        if candidate_key:
+                            if len(candidate_key) < 32:
+                                logger.warning(
+                                    "SECRET_KEY loaded from .env.local is too short; regenerating a secure key."
+                                )
+                            else:
+                                SECRET_KEY = candidate_key
+                                logger.info("Loaded SECRET_KEY from .env.local")
                         else:
-                            SECRET_KEY = candidate_key
-                            logger.info("Loaded SECRET_KEY from .env.local")
+                            logger.warning("SECRET_KEY entry in .env.local is empty; regenerating a secure key.")
                         break
 
         if not SECRET_KEY or len(SECRET_KEY) < 32:
