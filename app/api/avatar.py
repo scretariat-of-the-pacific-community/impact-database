@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from PIL import Image
 import io
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 
 from models.database import get_db
@@ -111,7 +111,7 @@ async def upload_avatar(
         processed_bytes, content_type = await validate_and_process_avatar(file)
         
         # Generate unique filename
-        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
         file_hash = hashlib.md5(processed_bytes).hexdigest()[:8]
         object_name = f"{AVATAR_PREFIX}{current_user.username}_{timestamp}_{file_hash}.jpg"
         

@@ -102,6 +102,7 @@ app.add_middleware(
         "/redoc",
         "/api/auth/login",
         "/api/auth/register",
+        "/api/auth/token",
         "/api/auth/refresh",
         "/api/health",
         "/favicon.ico"
@@ -114,12 +115,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
-        "Authorization", 
-        "Content-Type", 
+        "Authorization",
+        "Content-Type",
         "Accept",
         "X-CSRF-Token",  # Allow CSRF token header
-        "X-Requested-With",
-        "X-CSRF-Token"
+        "X-Requested-With"
     ],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-Process-Time"],
     max_age=86400,  # Cache preflight responses for 24 hours (reduces 300ms overhead)

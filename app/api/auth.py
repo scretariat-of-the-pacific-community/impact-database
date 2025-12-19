@@ -47,20 +47,25 @@ def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int
     
     now = time.time()
     # Clean old attempts
-    rate_limit_storage[identifier] = [
+    cleaned_attempts = [
         timestamp for timestamp in rate_limit_storage[identifier]
         if now - timestamp < window
     ]
-    
-    # Check limit
-    if len(rate_limit_storage[identifier]) >= max_attempts:
+    if cleaned_attempts:
+        rate_limit_storage[identifier] = cleaned_attempts
+    else:
+        rate_limit_storage.pop(identifier, None)
+
+    # Check limit using cleaned attempts to avoid defaultdict re-creation
+    if len(cleaned_attempts) >= max_attempts:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Too many attempts. Please try again in {window // 60} minutes."
         )
-    
+
     # Record attempt
-    rate_limit_storage[identifier].append(now)
+    cleaned_attempts.append(now)
+    rate_limit_storage[identifier] = cleaned_attempts
 
 # Configuration via environment variables
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -68,7 +73,7 @@ if not SECRET_KEY:
     environment = os.getenv("ENVIRONMENT", "development").lower()
     if environment == "production":
         raise ValueError("SECRET_KEY must be set in production")
-    
+
     # Development: Persist SECRET_KEY to .env.local if it doesn't exist
     secret_key_file = os.path.join(os.path.dirname(__file__), "..", "..", ".env.local")
     try:
@@ -77,15 +82,38 @@ if not SECRET_KEY:
             with open(secret_key_file, "r") as f:
                 for line in f:
                     if line.startswith("SECRET_KEY="):
-                        SECRET_KEY = line.split("=", 1)[1].strip()
-                        logger.info("Loaded SECRET_KEY from .env.local")
+                        candidate_key = line.split("=", 1)[1].strip()
+                        if candidate_key:
+                            if len(candidate_key) < 32:
+                                logger.warning(
+                                    "SECRET_KEY loaded from .env.local is too short; regenerating a secure key."
+                                )
+                            else:
+                                SECRET_KEY = candidate_key
+                                logger.info("Loaded SECRET_KEY from .env.local")
+                        else:
+                            logger.warning("SECRET_KEY entry in .env.local is empty; regenerating a secure key.")
                         break
-        
-        if not SECRET_KEY:
+
+        if not SECRET_KEY or len(SECRET_KEY) < 32:
             # Generate and save new key
             SECRET_KEY = secrets.token_urlsafe(32)
-            with open(secret_key_file, "a") as f:
-                f.write(f"\nSECRET_KEY={SECRET_KEY}\n")
+            try:
+                with open(secret_key_file, "r") as fr:
+                    lines = fr.readlines()
+            except FileNotFoundError:
+                lines = []
+
+            replaced = False
+            with open(secret_key_file, "w") as fw:
+                for line in lines:
+                    if line.startswith("SECRET_KEY=") and not replaced:
+                        fw.write(f"SECRET_KEY={SECRET_KEY}\n")
+                        replaced = True
+                    else:
+                        fw.write(line)
+                if not replaced:
+                    fw.write(f"\nSECRET_KEY={SECRET_KEY}\n")
             logger.warning(f"Generated new SECRET_KEY and saved to {secret_key_file}")
     except Exception as e:
         # Fallback if file operations fail
@@ -193,9 +221,8 @@ async def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     """Login endpoint - returns JWT token for authentication"""
-    # Rate limiting by username and IP
+    # Rate limiting by client IP to reduce username enumeration risk
     client_ip = request.client.host if request.client else "unknown"
-    check_rate_limit(f"token:{form_data.username}")
     check_rate_limit(f"token_ip:{client_ip}")
     user = authenticate_user(form_data.username, form_data.password, db)
     if not user:
@@ -225,9 +252,8 @@ async def login(
     db: Session = Depends(get_db)
 ):
     """Login endpoint that accepts JSON credentials and sets HttpOnly cookie"""
-    # Rate limiting by username and IP
+    # Rate limiting by client IP to reduce username enumeration risk
     client_ip = request.client.host if request.client else "unknown"
-    check_rate_limit(f"login:{login_data.username}")
     check_rate_limit(f"login_ip:{client_ip}")
     user = authenticate_user(login_data.username, login_data.password, db)
     if not user:
