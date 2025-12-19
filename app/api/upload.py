@@ -818,7 +818,6 @@ async def upload_image(
                 )
             if duplicate_policy == "review":
                 duplicate_flagged_for_review = True
-                duplicate.status = "pending_review"
                 logger.info(
                     "Duplicate upload flagged for review per UPLOAD_DUPLICATE_POLICY"
                 )
@@ -937,6 +936,8 @@ async def upload_image(
         # Sanitize keywords (limit to 20 keywords, max 50 chars each)
         keywords = upload_data.keywords or []
         keywords = [sanitize_text(kw)[:50] for kw in keywords[:20] if kw]
+        # If duplicate detection marked this upload for review, tag it so downstream
+        # consumers can filter or surface duplicate-flagged items consistently.
         if duplicate_flagged_for_review and "duplicate-flagged" not in keywords:
             keywords.append("duplicate-flagged")
 
