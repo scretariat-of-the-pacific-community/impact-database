@@ -390,17 +390,15 @@ export default function ProfileClient() {
       const params = new URLSearchParams(searchParams.toString());
       params.set('tab', tabId);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-
-      // Fade in new content
-      const fadeInId = window.setTimeout(() => {
-        setContentVisible(true);
-        setIsLoading(false);
-      }, 50);
-
-      transitionTimers.current.push(fadeInId);
     }, 150);
 
-    transitionTimers.current.push(fadeOutId);
+    // Fade in new content after the fade out completes
+    const fadeInId = window.setTimeout(() => {
+      setContentVisible(true);
+      setIsLoading(false);
+    }, 200);
+
+    transitionTimers.current.push(fadeOutId, fadeInId);
   };
 
   const handleUploadClick = () => {
