@@ -18,7 +18,7 @@ import SwipeableTabs from '@/components/profile/SwipeableTabs';
 import InfiniteUploadList from '@/components/profile/InfiniteUploadList';
 import ErrorBanner from '@/components/ErrorBanner';
 import dynamic from 'next/dynamic';
-import { PermissionGate as PermissionGateDup } from '@/components/PermissionGate';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 // Dynamically import UserAnalyticsReal to prevent SSR (Leaflet requires window object)
 const UserAnalyticsReal = dynamic(() => import('@/components/profile/UserAnalyticsReal'), {
@@ -41,6 +41,23 @@ const TABS = [
 
 const glassCard = 'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
 
+const defaultStats: UserStats = {
+  name: 'Your profile',
+  email: '',
+  organization: 'Independent',
+  avatar_url: undefined,
+  total_uploads: 0,
+  approval_rate: 0,
+  impact_score: 0,
+  last_active: new Date().toISOString(),
+  achievements: [],
+  analytics: {
+    uploads_this_month: 0,
+    average_review_time: 0,
+    top_hazard: 'unknown',
+  },
+};
+
 export default function ProfileClient() {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,6 +67,7 @@ export default function ProfileClient() {
   const [isLoading, setIsLoading] = useState(false);
   const [contentVisible, setContentVisible] = useState(true);
   const tablistRef = useRef<HTMLDivElement>(null);
+  const transitionTimers = useRef<number[]>([]);
   
   // Enable queries only when authenticated
   const queriesEnabled = !authLoading && isAuthenticated;
@@ -132,9 +150,12 @@ export default function ProfileClient() {
     staleTime: 5000,
   });
   const isRefreshing = statsFetching || uploadsFetching;
+  const safeStats = stats ?? defaultStats;
   // Only show error banner if authenticated and it's not a 401 (auth errors are handled by AuthProvider)
-  const shouldShowStatsError = isAuthenticated && !!statsError && !statsLoading && queriesEnabled && 
+  const shouldShowStatsError = isAuthenticated && !!statsError && !statsLoading && queriesEnabled &&
     !statsError.message.includes('401') && !statsError.message.includes('Unauthorized');
+  const shouldShowUploadsError = isAuthenticated && !!uploadsError && !uploadsLoading && queriesEnabled &&
+    !uploadsError.message.includes('401') && !uploadsError.message.includes('Unauthorized');
 
   // Analytics query (must be before early returns due to Rules of Hooks)
   const {
@@ -155,14 +176,14 @@ export default function ProfileClient() {
 
   // Compute stat summary (must be before early returns due to Rules of Hooks)
   const statSummary = useMemo(() => {
-    if (!stats) {
+    if (!safeStats) {
       return [];
     }
-    const totalUploads = typeof stats.total_uploads === 'number' ? stats.total_uploads : 0;
-    const approvalRate = typeof stats.approval_rate === 'number' ? stats.approval_rate : 0;
+    const totalUploads = typeof safeStats.total_uploads === 'number' ? safeStats.total_uploads : 0;
+    const approvalRate = typeof safeStats.approval_rate === 'number' ? safeStats.approval_rate : 0;
     const impactScore =
-      typeof stats.impact_score === 'number' && Number.isFinite(stats.impact_score) ? stats.impact_score : null;
-    const uploadsThisMonth = stats.analytics?.uploads_this_month ?? 0;
+      typeof safeStats.impact_score === 'number' && Number.isFinite(safeStats.impact_score) ? safeStats.impact_score : null;
+    const uploadsThisMonth = safeStats.analytics?.uploads_this_month ?? 0;
 
     return [
       {
@@ -181,7 +202,14 @@ export default function ProfileClient() {
         change: 'Based on approvals and recency',
       },
     ];
-  }, [stats]);
+  }, [safeStats]);
+
+  useEffect(() => {
+    return () => {
+      transitionTimers.current.forEach((timerId) => clearTimeout(timerId));
+      transitionTimers.current = [];
+    };
+  }, []);
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -205,7 +233,7 @@ export default function ProfileClient() {
   };
 
   const renderAchievements = () => {
-    if (!stats?.achievements?.length) {
+    if (!safeStats?.achievements?.length) {
       return (
         <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-8 text-center text-white/70">
           {statsLoading ? 'Loading achievements...' : 'Achievements will appear as you contribute more assessments.'}
@@ -215,7 +243,7 @@ export default function ProfileClient() {
 
     return (
       <div className="grid gap-4 sm:grid-cols-2">
-        {stats.achievements.map((achievement, index) => {
+        {safeStats.achievements.map((achievement, index) => {
           const total = achievement.total ?? 0;
           const progressValue = achievement.progress ?? 0;
           const progressPct = total > 0 ? Math.min(100, Math.round((progressValue / total) * 100)) : achievement.unlocked ? 100 : 0;
@@ -340,7 +368,7 @@ export default function ProfileClient() {
               />
             }
           >
-            <Collaboration uploads={uploads || []} stats={stats} />
+            <Collaboration uploads={uploads || []} stats={safeStats} />
           </PermissionGate>
         );
       case 'settings':
@@ -355,20 +383,24 @@ export default function ProfileClient() {
     
     setIsLoading(true);
     setContentVisible(false);
-    
+
     // Wait for fade out before changing content
-    setTimeout(() => {
+    const fadeOutId = window.setTimeout(() => {
       setActiveTab(tabId);
       const params = new URLSearchParams(searchParams.toString());
       params.set('tab', tabId);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
-      
+
       // Fade in new content
-      setTimeout(() => {
+      const fadeInId = window.setTimeout(() => {
         setContentVisible(true);
         setIsLoading(false);
       }, 50);
+
+      transitionTimers.current.push(fadeInId);
     }, 150);
+
+    transitionTimers.current.push(fadeOutId);
   };
 
   const handleUploadClick = () => {
@@ -381,32 +413,33 @@ export default function ProfileClient() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 px-4 py-10 text-white sm:px-6 lg:px-10">
-      <div className="mx-auto max-w-6xl space-y-8">
+    <ErrorBoundary boundaryName="profile">
+      <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 px-4 py-10 text-white sm:px-6 lg:px-10">
+        <div className="mx-auto max-w-6xl space-y-8">
         <Card className={`${glassCard} border-white/5 bg-gradient-to-br from-pacific-900/30 to-deep-900/40`}>
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <div className="h-20 w-20 rounded-3xl bg-gradient-to-br from-pacific-400 to-palm-400 p-1">
                 <div className="flex h-full w-full items-center justify-center rounded-2xl bg-deep-950/70 text-3xl font-bold text-white">
-                  {stats?.avatar_url ? (
+                  {safeStats?.avatar_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={stats.avatar_url}
-                      alt={stats.name}
+                      src={safeStats.avatar_url}
+                      alt={safeStats.name}
                       className="h-full w-full rounded-2xl object-cover"
                     />
                   ) : (
-                    (stats?.name || 'U').slice(0, 1).toUpperCase()
+                    (safeStats?.name || 'U').slice(0, 1).toUpperCase()
                   )}
                 </div>
               </div>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">Impact Responder</p>
                 <h1 className="text-3xl font-bold text-white">
-                  {statsLoading ? 'Loading profile…' : stats?.name || 'Your profile'}
+                  {statsLoading ? 'Loading profile…' : safeStats?.name || 'Your profile'}
                 </h1>
                 <p className="text-sm text-white/70">
-                  {stats?.organization || 'Independent'} • Active {stats?.last_active ? new Date(stats.last_active).toLocaleDateString() : 'recently'}
+                  {safeStats?.organization || 'Independent'} • Active {safeStats?.last_active ? new Date(safeStats.last_active).toLocaleDateString() : 'recently'}
                 </p>
               </div>
             </div>
@@ -436,10 +469,10 @@ export default function ProfileClient() {
           </div>
         </Card>
 
-        {shouldShowStatsError && (
+        {(shouldShowStatsError || shouldShowUploadsError) && (
           <ErrorBanner
-            title="Unable to load profile insights"
-            message={statsError?.message || 'Please try again in a moment.'}
+            title="We hit a snag loading your profile"
+            message={statsError?.message || uploadsError?.message || 'Please try again in a moment.'}
             onRetry={handleRefresh}
           />
         )}
@@ -545,7 +578,7 @@ export default function ProfileClient() {
           />
         </div>
 
-        {stats && (
+        {safeStats && (
           <div className="grid gap-4 md:grid-cols-2">
             <Card className={`${glassCard} border-white/5`}>
               <div className="flex items-center gap-3">
@@ -553,7 +586,7 @@ export default function ProfileClient() {
                 <div>
                   <p className="text-sm text-white/60">Review Confidence</p>
                   <p className="text-2xl font-semibold text-white">
-                    {Math.round((stats.approval_rate || 0) * 100)}%
+                    {Math.round((safeStats.approval_rate || 0) * 100)}%
                   </p>
                 </div>
               </div>
@@ -572,7 +605,8 @@ export default function ProfileClient() {
             </Card>
           </div>
         )}
+        </div>
       </div>
-    </div>
+    </ErrorBoundary>
   );
 }
