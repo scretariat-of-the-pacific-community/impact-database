@@ -14,6 +14,7 @@ import GlobalShortcutsProvider from "@/components/GlobalShortcutsProvider";
 import TutorialProvider from "@/components/TutorialProvider";
 import TutorialButton from "@/components/TutorialButton";
 import { Suspense } from "react";
+import SessionExpirationBanner from "@/components/SessionExpirationBanner";
 
 export const metadata: Metadata = {
   title: "Pacific Impact Atlas - Disaster Evidence Documentation",
@@ -68,7 +69,6 @@ export const viewport: Viewport = {
   themeColor: "#0ea5e9",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
 };
 
 export default function RootLayout({
@@ -91,6 +91,7 @@ export default function RootLayout({
                 <TutorialProvider autoStart={true}>
                   <ErrorBoundary boundaryName="application">
                     <NetworkStatusBanner />
+                    <SessionExpirationBanner />
                     <Toaster position="top-right" richColors closeButton />
                     <KeyboardShortcutsHelp />
                     <PWAInstallPrompt />

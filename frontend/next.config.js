@@ -105,6 +105,10 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
+  turbopack: {
+    // Silence inferred-root warning by pinning the project root to this package
+    root: __dirname,
+  },
   transpilePackages: ['framer-motion'],
   images: {
     remotePatterns: [

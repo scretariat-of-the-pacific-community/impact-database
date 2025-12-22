@@ -35,10 +35,8 @@ function AuthCallbackContent() {
         
         setStatus('success');
         
-        // Redirect after success
-        setTimeout(() => {
-          router.push('/');
-        }, 2000);
+        // handleCallback already handles redirect to returnUrl
+        // No additional redirect needed here
         
       } catch (err) {
         console.error('Auth callback error:', err);

@@ -7,19 +7,19 @@ import { Button, Card } from '@/components/design-system';
 import { imageApi } from '@/lib/api';
 import { queuePendingUpload } from '@/lib/offline-storage';
 import { HAZARD_TYPES } from '@/lib/types';
-import dompurify from 'dompurify';
+import dompurify, { type Config as DOMPurifyConfig } from 'dompurify';
 import { toast } from 'sonner';
 
 const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
-const INPUT_SANITIZE_CONFIG = {
+const INPUT_SANITIZE_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [],
   ALLOWED_ATTR: [],
   KEEP_CONTENT: true,
-} as const;
+};
 
 const sanitizeInputValue = (value: string) =>
-  DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG);
+  DOMPurify ? DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG) : value ?? '';
 
 interface CapturedImage {
   file: File | null;

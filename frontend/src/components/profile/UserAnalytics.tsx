@@ -338,8 +338,8 @@ export default function UserAnalytics() {
               </div>
               <div className="rounded-full bg-white/5 px-3 py-1 text-xs text-white">Click a slice to drill down</div>
             </div>
-            <div className="h-72" style={{ minHeight: '288px' }}>
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-72 w-full" style={{ minHeight: '288px', minWidth: '200px' }}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={288}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -431,8 +431,8 @@ export default function UserAnalytics() {
               {totals.uploads} uploads · {totals.views} views
             </div>
           </div>
-          <div className="h-80" style={{ minHeight: '320px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-80 w-full" style={{ minHeight: '320px', minWidth: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={320}>
               <AreaChart data={timelineWithRolling} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorUploads" x1="0" y1="0" x2="0" y2="1">

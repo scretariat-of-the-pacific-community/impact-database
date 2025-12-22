@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
@@ -18,9 +18,8 @@ import ErrorBanner from '@/components/ErrorBanner';
 import { sanitizeReturnUrl } from '@/lib/security';
 import { oceanPortalApi } from '@/lib/api';
 
-function LoginPageContent() {
+function LoginPageContent({ returnUrl }: { returnUrl: string }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { isAuthenticated, signIn, isLoading, error: authError, clearError } = useAuth();
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [showEmailForm, setShowEmailForm] = useState(false);
@@ -47,9 +46,6 @@ function LoginPageContent() {
   };
   
   const passwordStrength = isRegistering ? getPasswordStrength(password) : null;
-
-  const sanitizedReturnUrl = sanitizeReturnUrl(searchParams.get('returnUrl'));
-  const returnUrl = sanitizedReturnUrl || '/';
 
   // Check which providers are configured
   const providersAvailable = {
@@ -554,9 +550,9 @@ function LoginPageContent() {
 }
 
 export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-blue-50 to-cyan-50" />}>
-      <LoginPageContent />
-    </Suspense>
-  );
+  const params = useSearchParams();
+  const sanitizedReturnUrl = sanitizeReturnUrl(params?.get('returnUrl'));
+  const returnUrl = sanitizedReturnUrl || '/';
+
+  return <LoginPageContent returnUrl={returnUrl} />;
 }

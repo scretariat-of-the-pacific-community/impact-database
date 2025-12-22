@@ -27,7 +27,7 @@ import {
 import { imageApi } from '@/lib/api';
 import { FormField, Button, Tag as TagComponent } from '@/components/design-system';
 import { toast } from 'sonner';
-import dompurify from 'dompurify';
+import dompurify, { type Config as DOMPurifyConfig } from 'dompurify';
 
 const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
@@ -54,17 +54,19 @@ const WaveLoader = () => (
   </div>
 );
 
-const INPUT_SANITIZE_CONFIG = {
+const INPUT_SANITIZE_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [],
   ALLOWED_ATTR: [],
   KEEP_CONTENT: true,
-} as const;
+};
 
 type SanitizeSetValueOptions = {
   shouldDirty?: boolean;
   shouldValidate?: boolean;
   shouldTouch?: boolean;
 };
+
+type SanitizedField = 'title' | 'description' | 'location' | 'keywords';
 
 interface EditFormData {
   title: string;
@@ -153,12 +155,12 @@ export default function EditImagePage() {
   } = useForm<EditFormData>();
   const sanitizeInputValue = useCallback(
     (value: string | null | undefined) =>
-      DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG),
+      DOMPurify ? DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG) : value ?? '',
     []
   );
 
   const registerSanitizedField = useCallback(
-    <TFieldName extends keyof EditFormData>(
+    <TFieldName extends SanitizedField>(
       name: TFieldName,
       options?: RegisterOptions<EditFormData, TFieldName>
     ) =>
@@ -170,7 +172,7 @@ export default function EditImagePage() {
           if (sanitizedValue !== inputValue) {
             event.target.value = sanitizedValue;
           }
-          setValue(name, sanitizedValue as EditFormData[TFieldName], {
+          setValue(name as any, sanitizedValue as any, {
             shouldDirty: true,
             shouldValidate: true,
           });
@@ -183,12 +185,12 @@ export default function EditImagePage() {
   );
 
   const setSanitizedFieldValue = useCallback(
-    <TFieldName extends keyof EditFormData>(
+    <TFieldName extends SanitizedField>(
       name: TFieldName,
       value: string | null | undefined,
       options?: SanitizeSetValueOptions
     ) => {
-      setValue(name, sanitizeInputValue(value) as EditFormData[TFieldName], options);
+      setValue(name as any, sanitizeInputValue(value) as any, options);
     },
     [sanitizeInputValue, setValue]
   );

@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import type { Map as LeafletMap } from 'leaflet';
 import {
   Area,
   AreaChart,
@@ -24,6 +25,53 @@ import { Download, Gauge, MapPin, TrendingUp, Loader2, AlertCircle } from 'lucid
 import clsx from 'clsx';
 import { format } from 'date-fns';
 import { imageApi } from '@/lib/api';
+import { getApiUrl } from '@/lib/config';
+import { z } from 'zod';
+import React from 'react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+
+// Zod validation schema for analytics data
+const AnalyticsDataSchema = z.object({
+  time_series: z.array(z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    uploads: z.number().int().nonnegative(),
+  })),
+  period_days: z.number().int().positive(),
+  total_uploads: z.number().int().nonnegative(),
+  hazard_distribution: z.record(z.string(), z.number().int().nonnegative()),
+  locations: z.array(z.object({
+    id: z.string(),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    hazard: z.string(),
+    country: z.string(),
+    uploads: z.number().int().nonnegative(),
+  })),
+  country_distribution: z.record(z.string(), z.number().int().nonnegative()),
+  views_metrics: z.object({
+    total: z.number().int().nonnegative(),
+    average_per_upload: z.number().nonnegative(),
+    max_views: z.number().int().nonnegative(),
+  }),
+  engagement_metrics: z.object({
+    impact_score: z.number().nonnegative(),
+    approval_rate: z.number().nonnegative(),
+    approved_count: z.number().int().nonnegative(),
+    pending_count: z.number().int().nonnegative(),
+  }),
+  comparative_benchmarks: z.object({
+    user_uploads: z.number().int().nonnegative(),
+    community_avg_uploads: z.number().nonnegative(),
+    user_avg_views: z.number().nonnegative(),
+    community_avg_views: z.number().nonnegative(),
+  }),
+  popular_images: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    views: z.number().int().nonnegative(),
+  })),
+  insights: z.array(z.string()),
+});
 
 interface AnalyticsData {
   time_series: Array<{ date: string; uploads: number }>;
@@ -96,6 +144,25 @@ function getColorForIntensity(count: number): string {
   return 'bg-emerald-400';
 }
 
+function formatPercent(value: number, total: number): string {
+  if (total === 0 || !isFinite(value) || !isFinite(total)) return '0';
+  const percent = (value / total) * 100;
+  return isFinite(percent) ? percent.toFixed(0) : '0';
+}
+
+function abbreviateHazard(name: string): string {
+  const abbreviations: Record<string, string> = {
+    'COASTAL_EROSION': 'COASTAL',
+    'COASTAL EROSION': 'COASTAL',
+    'VOLCANIC_ERUPTION': 'VOLCANIC',
+    'VOLCANIC ERUPTION': 'VOLCANIC',
+    'EARTHQUAKE': 'QUAKE',
+  };
+  
+  const key = name.toUpperCase().replace(/ /g, '_');
+  return abbreviations[key] || name;
+}
+
 function downloadFile(content: string, fileName: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
@@ -123,32 +190,67 @@ export default function UserAnalyticsReal() {
   const { data: analyticsData, isLoading, error } = useQuery<AnalyticsData>({
     queryKey: ['user-analytics', days],
     queryFn: async () => {
-      const response = await fetch(`http://localhost:8000/api/user/analytics?days=${days}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to fetch analytics');
-      return response.json();
+      try {
+        const apiUrl = getApiUrl(`api/user/analytics?days=${days}`);
+        const response = await fetch(apiUrl, {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Unauthorized');
+          }
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        
+        const json = await response.json();
+        
+        // Validate and sanitize response
+        const validated = AnalyticsDataSchema.parse(json);
+        return validated;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          console.error('Analytics data validation failed:', error.errors);
+          throw new Error('Invalid analytics data format');
+        }
+        throw error;
+      }
     },
-    staleTime: 60000, // 1 minute
+    staleTime: 60_000, // 1 minute
+    retry: 2,
+    refetchOnWindowFocus: false,
   });
 
   // Set initial selected hazard when data loads
   useEffect(() => {
+    let isCurrent = true;
+    
     if (analyticsData?.hazard_distribution && !selectedHazard) {
       const hazards = Object.keys(analyticsData.hazard_distribution);
-      if (hazards.length > 0) {
+      if (hazards.length > 0 && isCurrent) {
         setSelectedHazard(hazards[0]);
       }
     }
+    
+    return () => {
+      isCurrent = false;
+    };
   }, [analyticsData, selectedHazard]);
 
   const pieData = useMemo(() => {
     if (!analyticsData?.hazard_distribution) return [];
-    return Object.entries(analyticsData.hazard_distribution).map(([name, value]) => ({
-      name: name.replace(/_/g, ' ').toUpperCase(),
-      value,
-      rawName: name,
-    }));
+    return Object.entries(analyticsData.hazard_distribution).map(([name, value]) => {
+      const displayName = name.replace(/_/g, ' ').toUpperCase();
+      return {
+        name: displayName,
+        shortName: abbreviateHazard(displayName),
+        value,
+        rawName: name,
+      };
+    });
   }, [analyticsData]);
 
   const timelineWithRolling = useMemo(() => {
@@ -234,18 +336,22 @@ export default function UserAnalyticsReal() {
     );
   }
 
-  const benchmarkData = [
-    {
-      metric: 'Uploads',
-      user: analyticsData.comparative_benchmarks.user_uploads,
-      community: analyticsData.comparative_benchmarks.community_avg_uploads,
-    },
-    {
-      metric: 'Avg. views',
-      user: analyticsData.comparative_benchmarks.user_avg_views,
-      community: analyticsData.comparative_benchmarks.community_avg_views,
-    },
-  ];
+  const benchmarkData = useMemo(() => {
+    if (!analyticsData?.comparative_benchmarks) return [];
+    
+    return [
+      {
+        metric: 'Uploads',
+        user: analyticsData.comparative_benchmarks.user_uploads,
+        community: analyticsData.comparative_benchmarks.community_avg_uploads,
+      },
+      {
+        metric: 'Avg. views',
+        user: analyticsData.comparative_benchmarks.user_avg_views,
+        community: analyticsData.comparative_benchmarks.community_avg_views,
+      },
+    ];
+  }, [analyticsData?.comparative_benchmarks]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6">
@@ -262,6 +368,7 @@ export default function UserAnalyticsReal() {
           <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
+            aria-label="Select time range"
             className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white"
           >
             <option value={7}>Last 7 days</option>
@@ -272,6 +379,7 @@ export default function UserAnalyticsReal() {
           <button
             onClick={exportCsv}
             className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700"
+            aria-label="Export data as CSV"
             title="Export CSV"
           >
             <Download className="h-4 w-4" />
@@ -279,9 +387,10 @@ export default function UserAnalyticsReal() {
           <button
             onClick={exportJson}
             className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700"
+            aria-label="Export data as JSON"
             title="Export JSON"
           >
-            CSV
+            JSON
           </button>
         </div>
       </header>
@@ -340,11 +449,12 @@ export default function UserAnalyticsReal() {
       )}
 
       {/* Timeline Chart */}
-      <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 shadow-lg">
+      <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 shadow-lg" role="img" aria-label="Upload timeline with 7-day rolling average">
         <h2 className="text-xl font-semibold text-white mb-4">Upload Timeline</h2>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={timelineWithRolling} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+        <ErrorBoundary>
+          <div className="h-80 w-full" style={{ minHeight: '320px', minWidth: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={320}>
+              <AreaChart data={timelineWithRolling} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorUploads" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
@@ -374,9 +484,10 @@ export default function UserAnalyticsReal() {
                 dot={false}
                 name="7-day average"
               />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </ErrorBoundary>
       </div>
 
       {/* Map and Hazard Distribution */}
@@ -385,8 +496,9 @@ export default function UserAnalyticsReal() {
         {analyticsData.locations.length > 0 && (
           <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
             <h2 className="text-xl font-semibold text-white mb-4">Geographic Distribution</h2>
-            <div className="h-96 rounded-xl overflow-hidden">
-              <MapContainer
+            <ErrorBoundary>
+              <div className="h-96 rounded-xl overflow-hidden">
+                <MapContainer
                 center={[-18, 178]}
                 zoom={3}
                 style={{ height: '100%', width: '100%' }}
@@ -415,8 +527,9 @@ export default function UserAnalyticsReal() {
                     </LeafletTooltip>
                   </CircleMarker>
                 ))}
-              </MapContainer>
-            </div>
+                </MapContainer>
+              </div>
+            </ErrorBoundary>
           </div>
         )}
 
@@ -424,8 +537,9 @@ export default function UserAnalyticsReal() {
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
           <h2 className="text-xl font-semibold text-white mb-4">Hazard Distribution</h2>
           {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
+            <ErrorBoundary>
+              <ResponsiveContainer width="100%" height={300} minHeight={300}>
+                <PieChart>
                 <Pie
                   data={pieData}
                   cx="50%"
@@ -435,15 +549,21 @@ export default function UserAnalyticsReal() {
                   fill="#8884d8"
                   dataKey="value"
                   onClick={(data) => setSelectedHazard(data.rawName)}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                  label={(entry: any) => {
+                    const total = pieData.reduce((sum, item) => sum + item.value, 0);
+                    const dataEntry = pieData.find(item => item.value === entry.value);
+                    const shortName = dataEntry?.shortName || entry.name;
+                    return `${shortName} ${formatPercent(entry.value, total)}%`;
+                  }}
                 >
                   {pieData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={hazardPalette[index % hazardPalette.length]} />
                   ))}
                 </Pie>
                 <RechartsTooltip />
-              </PieChart>
-            </ResponsiveContainer>
+                </PieChart>
+              </ResponsiveContainer>
+            </ErrorBoundary>
           ) : (
             <p className="text-white/60 text-center py-10">No hazard data available</p>
           )}
@@ -482,9 +602,10 @@ export default function UserAnalyticsReal() {
         {/* Community Benchmark */}
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
           <h2 className="text-xl font-semibold text-white mb-4">Community Benchmark</h2>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={benchmarkData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+          <ErrorBoundary>
+            <div className="h-64 w-full" style={{ minHeight: '256px', minWidth: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={256}>
+                <BarChart data={benchmarkData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                 <XAxis dataKey="metric" stroke="rgba(255,255,255,0.6)" />
                 <YAxis stroke="rgba(255,255,255,0.6)" />
@@ -494,9 +615,10 @@ export default function UserAnalyticsReal() {
                 />
                 <Bar dataKey="user" name="You" fill="#22c55e" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="community" name="Community Avg" fill="#38bdf8" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ErrorBoundary>
         </div>
       </div>
 

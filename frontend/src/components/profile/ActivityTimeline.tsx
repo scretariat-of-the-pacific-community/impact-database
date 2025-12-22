@@ -87,9 +87,10 @@ const deriveStorageKey = () => {
   return STORAGE_KEY_PREFIX;
 };
 
-export async function fetchActivityTimeline(): Promise<ActivityItem[]> {
+export async function fetchActivityTimeline(identifier?: string): Promise<ActivityItem[]> {
   try {
-    const data = await imageApi.userActivity();
+    // Pass identifier when provided to fetch other user's activity (admin only)
+    const data = await imageApi.userActivity(identifier);
     if (!data || !Array.isArray(data.events)) {
       return [];
     }
@@ -169,7 +170,7 @@ export default function ActivityTimeline() {
 
   const { data: activities = [], isLoading, error } = useQuery({
     queryKey: ['profile-activity-timeline'],
-    queryFn: fetchActivityTimeline,
+    queryFn: () => fetchActivityTimeline(),
     refetchInterval: POLL_INTERVAL,
     staleTime: POLL_INTERVAL,
   });
@@ -323,7 +324,7 @@ export default function ActivityTimeline() {
             {filteredActivities.map((item) => {
               const isUnread = !readIds.has(item.id);
               return (
-                <li key={item.id} role="listitem">
+                <li key={item.id} role="article">
                   <article
                     className={clsx(
                       'relative overflow-hidden rounded-xl border p-4 transition hover:border-white/30',

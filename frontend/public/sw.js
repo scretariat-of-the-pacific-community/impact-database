@@ -1,5 +1,5 @@
-const SHELL_CACHE = 'ocean-shell-v2';
-const DATA_CACHE = 'ocean-data-v1';
+const SHELL_CACHE = 'ocean-shell-v3'; // Bumped to v3 to clear old cache
+const DATA_CACHE = 'ocean-data-v2'; // Bumped to v2 to clear old cache
 const OFFLINE_URL = '/offline';
 const SHELL_ASSETS = [
   '/',

@@ -14,12 +14,25 @@ import {
 } from './types';
 import { config, getApiUrl } from './config';
 
+type QueuedRequest = {
+  config: any;
+  resolve: (value: any) => void;
+  reject: (reason?: any) => void;
+};
+
 class APIClient {
   private client: AxiosInstance;
   private baseURL: string;
+  private refreshPromise: Promise<string | null> | null = null;
+  private requestQueue: QueuedRequest[] = [];
 
   constructor() {
     this.baseURL = config.API.BASE_URL;
+    
+    // Debug: Log the API base URL in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔧 API Client initialized with baseURL:', this.baseURL);
+    }
     
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -44,13 +57,29 @@ class APIClient {
       (error) => Promise.reject(error)
     );
 
-    // Response interceptor for error handling
+    // Response interceptor for error handling + auto-refresh on 401
     this.client.interceptors.response.use(
       (response) => response,
-      (error) => {
-        if (error.response?.status === 401) {
-          this.handleUnauthorized();
+      async (error) => {
+        const originalRequest = error?.config || {};
+        const status = error?.response?.status;
+
+        const isRefreshCall =
+          typeof originalRequest?.url === 'string' &&
+          originalRequest.url.includes('/api/auth/refresh');
+
+        if ((status === 401 || status === 403) && !originalRequest._retry && !isRefreshCall) {
+          originalRequest._retry = true;
+
+          return new Promise((resolve, reject) => {
+            this.enqueueRequest(originalRequest, resolve, reject);
+            this.refreshAccessToken();
+          });
         }
+
+        // Don't automatically redirect on 401 - let components handle it
+        // This prevents redirect loops when public endpoints return 401
+        // or when users are intentionally visiting public pages while not authenticated
         return Promise.reject(this.formatError(error));
       }
     );
@@ -67,14 +96,7 @@ class APIClient {
     if (cookieToken) {
       return decodeURIComponent(cookieToken);
     }
-    return localStorage.getItem('authToken');
-  }
-
-  private handleUnauthorized(): void {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken');
-      window.location.href = '/auth/login';
-    }
+    return null;
   }
 
   private formatError(error: any): APIError {
@@ -105,6 +127,61 @@ class APIClient {
       ...defaultError,
       message: error.message || defaultError.message,
     };
+  }
+
+  private enqueueRequest(config: any, resolve: (value: any) => void, reject: (reason?: any) => void) {
+    this.requestQueue.push({ config, resolve, reject });
+  }
+
+  private flushQueue(token: string | null, fallbackError?: APIError) {
+    const queued = [...this.requestQueue];
+    this.requestQueue = [];
+
+    queued.forEach(({ config, resolve, reject }) => {
+      if (token) {
+        config.headers = {
+          ...(config.headers || {}),
+          Authorization: `Bearer ${token}`,
+        };
+        this.client
+          .request(config)
+          .then(resolve)
+          .catch((err) => reject(this.formatError(err)));
+      } else {
+        reject(fallbackError || { error: 'Unauthorized', message: 'Authentication required', status: 401 });
+      }
+    });
+  }
+
+  private async refreshAccessToken(): Promise<string | null> {
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = (async () => {
+      try {
+        const response = await this.client.post(
+          '/api/auth/refresh',
+          {},
+          { _skipQueue: true } as any
+        );
+        const token = response.data?.access_token || null;
+        if (token) {
+          this.client.defaults.headers.common.Authorization = `Bearer ${token}`;
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('auth-restored'));
+        }
+        this.flushQueue(token);
+        return token;
+      } catch (err) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('auth-lost'));
+        }
+        this.flushQueue(null, this.formatError(err));
+        return null;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+    return this.refreshPromise;
   }
 
   // Search and Browse Images
@@ -229,9 +306,11 @@ class APIClient {
     }
   }
 
-  async getUserActivity(): Promise<PaginatedResponse<UserActivityEvent>> {
+  async getUserActivity(identifier?: string): Promise<PaginatedResponse<UserActivityEvent>> {
     try {
-      const response: AxiosResponse<PaginatedResponse<UserActivityEvent>> = await this.client.get('/api/user/activity');
+      const response: AxiosResponse<PaginatedResponse<UserActivityEvent>> = await this.client.get('/api/user/activity', {
+        params: identifier ? { identifier } : undefined,
+      });
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 403)) {
@@ -257,9 +336,11 @@ class APIClient {
   }
 
   // Settings API Methods
-  async getUserSettings(): Promise<any> {
+  async getUserSettings(identifier?: string): Promise<any> {
     try {
-      const response = await this.client.get('/api/user/settings');
+      const response = await this.client.get('/api/user/settings', {
+        params: identifier ? { identifier } : undefined,
+      });
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
@@ -541,8 +622,8 @@ export const imageApi = {
   userStats: () => oceanPortalApi.getUserStats(),
   userUploads: (params?: { page?: number; limit?: number }) =>
     oceanPortalApi.getUserUploads(params),
-  userActivity: () => oceanPortalApi.getUserActivity(),
-  userSettings: () => oceanPortalApi.getUserSettings(),
+  userActivity: (identifier?: string) => oceanPortalApi.getUserActivity(identifier),
+  userSettings: (identifier?: string) => oceanPortalApi.getUserSettings(identifier),
   updateSettings: (data: any) => oceanPortalApi.updateUserSettings(data),
   storageQuota: () => oceanPortalApi.getStorageQuota(),
   apiTokens: () => oceanPortalApi.getAPITokens(),
@@ -567,5 +648,30 @@ export const imageApi = {
       }
       throw error;
     }
-  },
-};
+  },  // Shared Folders API
+  sharedFolders: {
+    list: async () => {
+      const response = await apiClient.get('/api/shared-folders');
+      return response.data;
+    },
+    create: async (data: any) => {
+      const response = await apiClient.post('/api/shared-folders', data);
+      return response.data;
+    },
+    get: async (folderId: string) => {
+      const response = await apiClient.get(`/api/shared-folders/${folderId}`);
+      return response.data;
+    },
+    watch: async (folderId: string) => {
+      const response = await apiClient.post(`/api/shared-folders/${folderId}/watch`);
+      return response.data;
+    },
+    unwatch: async (folderId: string) => {
+      const response = await apiClient.delete(`/api/shared-folders/${folderId}/watch`);
+      return response.data;
+    },
+    delete: async (folderId: string) => {
+      const response = await apiClient.delete(`/api/shared-folders/${folderId}`);
+      return response.data;
+    },
+  },};

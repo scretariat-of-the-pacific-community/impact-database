@@ -4,13 +4,23 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { User, AuthSession } from '@/lib/types';
 import { sanitizeReturnUrl, readCookie } from '@/lib/security';
 import { oceanPortalApi } from '@/lib/api';
+import { getApiUrl } from '@/lib/config';
+import {
+  cacheSessionMetadata,
+  clearCachedSession as clearStoredSession,
+  getCachedSession,
+  isCachedSessionExpired,
+} from '@/lib/auth-session';
 
 interface AuthContextType {
   user: User | null;
   session: AuthSession | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  readOnlyMode: boolean;
   error: string | null;
+  sessionExpired: boolean;
+  sessionExpiring: boolean;
   signIn: (returnUrl?: string, provider?: 'google' | 'facebook' | 'github') => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (role: string) => boolean;
@@ -68,88 +78,93 @@ const authConfig = {
   prompt: 'select_account',
 };
 
-interface CachedSessionMetadata {
-  user: User;
-  expires_at: number;
+function setAuthCookie(token: string | null): void {
+  // SECURITY: Cookie is now set server-side with HttpOnly flag
+  // This function is kept for clearing cookies only
+  if (typeof document === 'undefined') return;
+  
+  if (!token) {
+    // Only clear cookie on logout
+    document.cookie = `ocean_portal_token=; Max-Age=0; path=/; SameSite=Strict`;
+  }
+  // Server sets the cookie on login with HttpOnly + Secure flags
 }
 
-const SESSION_STORAGE_KEY = 'ocean_portal_session';
+function clearCachedSession(): void {
+  clearStoredSession();
+  setAuthCookie(null);
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Session management functions (moved inside component to avoid hoisting issues with Turbopack)
-  const getCachedSession = (): CachedSessionMetadata | null => {
-    if (typeof window === 'undefined') return null;
-
-    try {
-      const stored = localStorage.getItem(SESSION_STORAGE_KEY);
-      if (!stored) return null;
-      const parsed = JSON.parse(stored) as CachedSessionMetadata;
-      return parsed?.user ? parsed : null;
-    } catch {
-      return null;
-    }
-  };
-
-  const cacheSessionMetadata = (session: AuthSession): void => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      const safePayload: CachedSessionMetadata = {
-        user: session.user,
-        expires_at: session.expires_at,
-      };
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(safePayload));
-      // Server sets HttpOnly cookie, no need to set it here
-    } catch (error) {
-      console.error('Failed to cache session metadata:', error);
-    }
-  };
-
-  const setAuthCookie = (token: string | null): void => {
-    // SECURITY: Cookie is now set server-side with HttpOnly flag
-    // This function is kept for clearing cookies only
-    if (typeof document === 'undefined') return;
-    
-    if (!token) {
-      // Only clear cookie on logout
-      document.cookie = `ocean_portal_token=; Max-Age=0; path=/; SameSite=Strict`;
-    }
-    // Server sets the cookie on login with HttpOnly + Secure flags
-  };
-
-  const clearCachedSession = (): void => {
-    if (typeof window === 'undefined') return;
-
-    try {
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-      setAuthCookie(null);
-    } catch (error) {
-      console.error('Failed to clear session:', error);
-    }
-  };
-
-  const isCachedSessionExpired = (session: CachedSessionMetadata): boolean => {
-    return Date.now() >= session.expires_at;
-  };
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [sessionExpiring, setSessionExpiring] = useState(false);
+  const [readOnlyMode, setReadOnlyMode] = useState(false);
+
+  const SESSION_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+  const SESSION_WARNING_MS = 5 * 60 * 1000; // warn 5 minutes before expiry
+
+  const refreshSession = async () => {
+    try {
+      const response = await fetch(getApiUrl('/api/auth/refresh'), {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Refresh failed');
+      const data = await response.json();
+      const nextExpiry = Date.now() + SESSION_DURATION_MS;
+      setSession({
+        user: data,
+        access_token: data.access_token,
+        expires_at: nextExpiry,
+      });
+      setUser((prev) => prev || data);
+      setSessionExpired(false);
+      setSessionExpiring(false);
+      setReadOnlyMode(false);
+      cacheSessionMetadata<User>({
+        user: data,
+        expires_at: nextExpiry,
+      });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth-restored'));
+      }
+      return true;
+    } catch (err) {
+      setSessionExpired(true);
+      if (user) {
+        setReadOnlyMode(true);
+      }
+      return false;
+    }
+  };
 
   const isAuthenticated = Boolean(user);
 
   const initializeAuth = async () => {
     try {
       setIsLoading(true);
-      const cachedSession = getCachedSession();
+      
+      // CRITICAL: Check for cookie FIRST before reading cache
+      // If no cookie exists, user is NOT authenticated regardless of cache
       const cookieToken = readCookie('ocean_portal_token');
 
       if (!cookieToken) {
+        // No cookie = not authenticated
+        // Clear everything immediately to prevent any momentary authenticated state
         clearCachedSession();
         setSession(null);
         setUser(null);
+        setReadOnlyMode(false);
+        setIsLoading(false); // Important: set loading to false here
         return;
       }
+
+      // Only read cache if we have a valid cookie
+      const cachedSession = getCachedSession<User>();
 
       let resolvedUser = cachedSession?.user ?? null;
       let resolvedExpiry = cachedSession?.expires_at ?? 0;
@@ -159,20 +174,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!resolvedUser || cacheExpired) {
         try {
           resolvedUser = await oceanPortalApi.getCurrentUser();
-          resolvedExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days to match token expiration
+          resolvedExpiry = Date.now() + SESSION_DURATION_MS;
         } catch (error: any) {
           // Only clear session on actual auth errors, not network errors
           if (error?.response?.status === 401 || error?.response?.status === 403) {
             console.error('Session validation failed - authentication error:', error);
+            // Only set sessionExpired if there was a cached session (user was previously logged in)
+            if (cachedSession?.user) {
+              setAuthError('Session expired. Please sign in again.');
+              setSessionExpired(true);
+              setReadOnlyMode(true);
+              setUser(cachedSession.user);
+              setSession({
+                user: cachedSession.user,
+                access_token: '',
+                expires_at: cachedSession.expires_at || Date.now(),
+              });
+              cacheSessionMetadata<User>({
+                user: cachedSession.user,
+                expires_at: cachedSession.expires_at || Date.now(),
+              });
+              return;
+            }
             clearCachedSession();
             setSession(null);
             setUser(null);
+            setReadOnlyMode(false);
           } else {
             // Network error or other issue - keep cached session if available
             console.warn('Failed to validate session, keeping cached data:', error);
             if (cachedSession?.user) {
               resolvedUser = cachedSession.user;
               resolvedExpiry = cachedSession.expires_at;
+              setReadOnlyMode(true);
             }
           }
           return;
@@ -187,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!resolvedExpiry) {
-        resolvedExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000);  // 7 days
+        resolvedExpiry = Date.now() + SESSION_DURATION_MS;
       }
 
       const restoredSession: AuthSession = {
@@ -198,11 +232,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setSession(restoredSession);
       setUser(resolvedUser);
-      cacheSessionMetadata(restoredSession);
+      setSessionExpired(false);
+      setSessionExpiring(false);
+      setReadOnlyMode(false);
+      cacheSessionMetadata<User>({
+        user: restoredSession.user,
+        expires_at: restoredSession.expires_at,
+      });
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth-restored'));
+      }
     } catch (error) {
       console.error('Auth initialization failed:', error);
       // Don't set error here to avoid redirect loops
       clearCachedSession();
+      setReadOnlyMode(false);
     } finally {
       setIsLoading(false);
     }
@@ -213,6 +257,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initializeAuth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    let warnTimer: ReturnType<typeof setTimeout> | null = null;
+    let expireTimer: ReturnType<typeof setTimeout> | null = null;
+
+    if (!session?.expires_at) {
+      setSessionExpiring(false);
+      setSessionExpired(false);
+      return () => {};
+    }
+
+    const now = Date.now();
+    const msToExpiry = Math.max(0, session.expires_at - now);
+    const msToWarning = Math.max(0, session.expires_at - SESSION_WARNING_MS - now);
+
+    warnTimer = setTimeout(() => setSessionExpiring(true), msToWarning);
+    expireTimer = setTimeout(() => setSessionExpired(true), msToExpiry);
+
+    return () => {
+      if (warnTimer) clearTimeout(warnTimer);
+      if (expireTimer) clearTimeout(expireTimer);
+    };
+  }, [session?.expires_at]);
 
   const signIn = async (returnUrl?: string, provider: AuthProvider = 'google') => {
     try {
@@ -275,6 +342,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setSession(null);
       setAuthError(null);
+      setSessionExpired(false);
+      setSessionExpiring(false);
+      setReadOnlyMode(false);
       clearCachedSession();
 
       // Build logout URL for SPC SSO
@@ -348,7 +418,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Store session
       setSession(newSession);
       setUser(userInfo);
-      cacheSessionMetadata(newSession);
+      setReadOnlyMode(false);
+      cacheSessionMetadata<User>({
+        user: newSession.user,
+        expires_at: newSession.expires_at,
+      });
 
       // Clean up OAuth session data
       sessionStorage.removeItem('oauth_code_verifier');
@@ -374,12 +448,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     isLoading,
     isAuthenticated,
+    readOnlyMode,
     signIn,
     signOut,
     hasRole,
     handleCallback, // Export for callback page
     error: authError,
-    clearError: () => setAuthError(null),
+    sessionExpired,
+    sessionExpiring,
+    clearError: () => {
+      setAuthError(null);
+      setSessionExpired(false);
+      setSessionExpiring(false);
+    },
   };
 
   return (

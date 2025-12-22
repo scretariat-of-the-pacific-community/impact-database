@@ -17,19 +17,19 @@ import {
   GlobeAltIcon
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
-import dompurify from 'dompurify';
+import dompurify, { type Config as DOMPurifyConfig } from 'dompurify';
 
 const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
-const INPUT_SANITIZE_CONFIG = {
+const INPUT_SANITIZE_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [],
   ALLOWED_ATTR: [],
   KEEP_CONTENT: true,
-} as const;
+};
 
 const sanitizeMetadataValue = (value: unknown): unknown => {
   if (typeof value === 'string') {
-    return DOMPurify.sanitize(value, INPUT_SANITIZE_CONFIG);
+    return DOMPurify ? DOMPurify.sanitize(value, INPUT_SANITIZE_CONFIG) : value;
   }
 
   if (Array.isArray(value)) {

@@ -31,7 +31,11 @@ export default function TutorialProvider({ children, autoStart = true }: Tutoria
     if (pathname === '/' && tutorial.isFirstVisit()) {
       // Delay to ensure page is fully loaded
       const timer = setTimeout(() => {
-        if (!tutorial.isTourCompleted('mainTour')) {
+        // Check if required elements exist before starting tour
+        const hasRequiredElements = document.querySelector('#search-box') || 
+                                    document.querySelector('#upload-button');
+        
+        if (hasRequiredElements && !tutorial.isTourCompleted('mainTour')) {
           tutorial.startTour('mainTour');
         }
       }, 1500);
@@ -42,7 +46,13 @@ export default function TutorialProvider({ children, autoStart = true }: Tutoria
     // Auto-start specific tours for first-time visitors to those pages
     if (pathname === '/upload' && !tutorial.isTourCompleted('uploadTour')) {
       const timer = setTimeout(() => {
-        tutorial.startTour('uploadTour');
+        // Check if upload form exists
+        const hasUploadForm = document.querySelector('#file-upload') ||
+                               document.querySelector('#hazard-type');
+        
+        if (hasUploadForm) {
+          tutorial.startTour('uploadTour');
+        }
       }, 1000);
 
       return () => clearTimeout(timer);

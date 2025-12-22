@@ -34,12 +34,21 @@ const normalizeError = (error: unknown): NormalizedError => {
   }
 
   if (error instanceof Error) {
+    const message = error.message;
+    let status: number | undefined;
+
+    const statusMatch = message.match(/(\d{3})/);
+    if (statusMatch) {
+      status = parseInt(statusMatch[0], 10);
+    }
+    
     return {
       message: error.message,
       details: {
         name: error.name,
         message: error.message,
         stack: trimStack(error.stack),
+        status,
       },
     };
   }
@@ -104,6 +113,23 @@ export function QueryProvider({ children }: QueryProviderProps) {
               return;
             }
 
+            // Suppress 401/403 errors to avoid console spam, as AuthProvider handles auth state.
+            const status = normalized.details.status as number | undefined;
+            const message = normalized.message.toLowerCase();
+            const isAuthError =
+              status === 401 ||
+              status === 403 ||
+              message.includes('unauthorized') ||
+              message.includes('forbidden') ||
+              message.includes('(401)') ||
+              message.includes('(403)') ||
+              // Exact match for plain "Unauthorized" message
+              normalized.message === 'Unauthorized';
+
+            if (isAuthError) {
+              return;
+            }
+
             // Throttle connection/network errors to avoid console spam
             const isConnectionError = 
               normalized.message.includes('Unable to connect') ||
@@ -132,6 +158,19 @@ export function QueryProvider({ children }: QueryProviderProps) {
               }
               
               connectionErrorTracker.lastError = now;
+              trackQueryError(query?.queryHash, normalized.message);
+              return;
+            }
+
+            // Downgrade noisy server errors to warn to reduce console spam
+            if (status && status >= 500) {
+              console.warn('Query server error:', normalized.message, {
+                status,
+                query: {
+                  queryHash: query?.queryHash,
+                  queryKey: query?.queryKey,
+                },
+              });
               trackQueryError(query?.queryHash, normalized.message);
               return;
             }

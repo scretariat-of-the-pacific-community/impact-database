@@ -49,7 +49,40 @@ PY
 )
     REDIS_HOST=${REDIS_TARGET%:*}
     REDIS_PORT=${REDIS_TARGET#*:}
-    wait_for_tcp "$REDIS_HOST" "$REDIS_PORT" "Redis"
+    
+    # Enhanced Redis wait with exponential backoff for Flower
+    MAX_RETRIES=60
+    RETRY_COUNT=0
+    SLEEP_TIME=2
+    
+    echo "Waiting for Redis at ${REDIS_HOST}:${REDIS_PORT}..."
+    while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+        if (echo > /dev/tcp/"$REDIS_HOST"/"$REDIS_PORT") >/dev/null 2>&1; then
+            echo "Redis is ready!"
+            # Additional verification: try a PING command
+            if command -v redis-cli >/dev/null 2>&1; then
+                if redis-cli -h "$REDIS_HOST" -p "$REDIS_PORT" ping >/dev/null 2>&1; then
+                    echo "Redis PING successful!"
+                    break
+                fi
+            else
+                # No redis-cli available, TCP check is enough
+                break
+            fi
+        fi
+        
+        if [ $(($RETRY_COUNT % 10)) -eq 0 ] && [ $RETRY_COUNT -gt 0 ]; then
+            echo "Still waiting for Redis... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+        fi
+        
+        sleep $SLEEP_TIME
+        RETRY_COUNT=$((RETRY_COUNT + 1))
+    done
+    
+    if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
+        echo "ERROR: Redis did not become ready after $MAX_RETRIES attempts"
+        exit 1
+    fi
 fi
 
 # Role-specific startup logic
