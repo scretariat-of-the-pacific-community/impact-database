@@ -6,8 +6,8 @@
 'use client';
 
 import { useState } from 'react';
-import { HelpCircle, Play, RotateCcw } from 'lucide-react';
-import { useTutorial, tutorialSteps } from '@/lib/tutorial';
+import { HelpCircle, Play, RotateCcw, TrendingUp, BarChart3, Award, CheckCircle2 } from 'lucide-react';
+import { useTutorial, tutorialSteps } from '@/lib/tutorial-enhanced';
 import { toast } from 'sonner';
 
 interface TutorialButtonProps {
@@ -25,6 +25,12 @@ export default function TutorialButton({
 }: TutorialButtonProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const tutorial = useTutorial();
+  const stats = tutorial.getStats() || { 
+    completed: 0, 
+    started: 0, 
+    interactions: 0, 
+    completedTours: [] as string[] 
+  };
 
   const handleStartTour = (tour?: keyof typeof tutorialSteps) => {
     const tourToStart = tour || tourName;
@@ -54,51 +60,88 @@ export default function TutorialButton({
         </button>
         
         {showMenu && menuOpen && (
-          <div className="absolute bottom-16 right-0 w-64 bg-deep-900/95 backdrop-blur border border-white/20 rounded-xl shadow-xl p-4 space-y-2">
-            <div className="text-white font-semibold mb-3 pb-2 border-b border-white/10">
-              Available Tutorials
+          <div className="absolute bottom-16 right-0 w-72 bg-deep-900/95 backdrop-blur border border-white/20 rounded-xl shadow-xl overflow-hidden">
+            {/* Stats Header */}
+            <div className="bg-gradient-to-r from-pacific-600 to-pacific-700 p-4 border-b border-white/10">
+              <div className="text-white font-semibold mb-2 flex items-center gap-2">
+                <Award className="w-5 h-5" />
+                Your Progress
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-2xl font-bold text-white">{stats.completed}</div>
+                  <div className="text-xs text-white/70">Completed</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-2xl font-bold text-white">{stats.started}</div>
+                  <div className="text-xs text-white/70">Started</div>
+                </div>
+                <div className="bg-white/10 rounded-lg p-2">
+                  <div className="text-2xl font-bold text-white">{stats.interactions}</div>
+                  <div className="text-xs text-white/70">Interactions</div>
+                </div>
+              </div>
             </div>
-            
-            <button
-              onClick={() => handleStartTour('mainTour')}
-              className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              Main Application Tour
-            </button>
-            
-            <button
-              onClick={() => handleStartTour('uploadTour')}
-              className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              Upload Guide
-            </button>
-            
-            <button
-              onClick={() => handleStartTour('analyticsTour')}
-              className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              Analytics Dashboard
-            </button>
-            
-            <button
-              onClick={() => handleStartTour('galleryTour')}
-              className="w-full text-left px-3 py-2 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              Search & Browse
-            </button>
-            
-            <div className="pt-2 mt-2 border-t border-white/10">
+
+            {/* Tutorial Menu */}
+            <div className="p-4 space-y-2">
+              <div className="text-white/60 text-xs font-semibold uppercase tracking-wide mb-3">
+                Available Tutorials
+              </div>
+              
               <button
-                onClick={handleResetTours}
-                className="w-full text-left px-3 py-2 text-sm text-white/60 hover:text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors"
+                onClick={() => handleStartTour('mainTour')}
+                className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
               >
-                <RotateCcw className="w-4 h-4" />
-                Reset All Tutorials
+                <Play className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="flex-1">Main Application Tour</span>
+                {stats.completedTours.includes('mainTour') && (
+                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                )}
               </button>
+              
+              <button
+                onClick={() => handleStartTour('uploadTour')}
+                className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
+              >
+                <Play className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="flex-1">Upload Guide</span>
+                {stats.completedTours.includes('uploadTour') && (
+                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                )}
+              </button>
+              
+              <button
+                onClick={() => handleStartTour('analyticsTour')}
+                className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
+              >
+                <BarChart3 className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="flex-1">Analytics Dashboard</span>
+                {stats.completedTours.includes('analyticsTour') && (
+                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                )}
+              </button>
+              
+              <button
+                onClick={() => handleStartTour('galleryTour')}
+                className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
+              >
+                <TrendingUp className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                <span className="flex-1">Search & Browse</span>
+                {stats.completedTours.includes('galleryTour') && (
+                  <CheckCircle2 className="w-4 h-4 text-green-400" />
+                )}
+              </button>
+              
+              <div className="pt-2 mt-2 border-t border-white/10">
+                <button
+                  onClick={handleResetTours}
+                  className="w-full text-left px-3 py-2 text-sm text-white/60 hover:text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                  Reset All Tutorials
+                </button>
+              </div>
             </div>
           </div>
         )}

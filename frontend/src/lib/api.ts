@@ -17,6 +17,7 @@ import { config, getApiUrl } from './config';
 class APIClient {
   private client: AxiosInstance;
   private baseURL: string;
+  private isHandlingUnauthorized: boolean = false;
 
   constructor() {
     this.baseURL = config.API.BASE_URL;
@@ -39,6 +40,10 @@ class APIClient {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+        const csrfToken = this.getCsrfToken();
+        if (csrfToken) {
+          config.headers['X-CSRF-Token'] = csrfToken;
+        }
         return config;
       },
       (error) => Promise.reject(error)
@@ -56,6 +61,15 @@ class APIClient {
     );
   }
 
+  private getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    const cookie = document.cookie
+      ?.split('; ')
+      .find((row) => row.startsWith('csrf_token='))
+      ?.split('=')[1];
+    return cookie ? decodeURIComponent(cookie) : null;
+  }
+
   private getAuthToken(): string | null {
     if (typeof window === 'undefined') {
       return null;
@@ -71,9 +85,34 @@ class APIClient {
   }
 
   private handleUnauthorized(): void {
+    // Prevent multiple rapid calls from causing re-render loops
+    if (this.isHandlingUnauthorized) {
+      return;
+    }
+    
     if (typeof window !== 'undefined') {
+      this.isHandlingUnauthorized = true;
+      
+      // Clear auth tokens
       localStorage.removeItem('authToken');
-      window.location.href = '/auth/login';
+      localStorage.removeItem('ocean_portal_session');
+      document.cookie = 'ocean_portal_token=; Max-Age=0; path=/; SameSite=Strict';
+      
+      // Dispatch custom event so auth provider can react and update React state
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      
+      // Only redirect to login if not already there or on public pages
+      const publicPaths = ['/', '/auth/login', '/auth/callback', '/search', '/map'];
+      const currentPath = window.location.pathname;
+      
+      if (!publicPaths.includes(currentPath)) {
+        window.location.href = '/auth/login';
+      }
+      
+      // Reset the flag after a short delay to allow legitimate re-auth attempts
+      setTimeout(() => {
+        this.isHandlingUnauthorized = false;
+      }, 2000);
     }
   }
 

@@ -39,6 +39,8 @@ export interface Achievement {
   milestoneLabel: string;
   /** Indicates whether the badge has been unlocked. */
   unlocked: boolean;
+  /** ISO timestamp for when the badge was unlocked (if unlocked). */
+  unlockedAt?: string;
   /** Guidance shown below the progress bar to help users reach the next level. */
   nextMilestone: string;
 }
@@ -94,6 +96,7 @@ export const achievements: Achievement[] = [
     target: 5,
     milestoneLabel: 'Countries mapped',
     unlocked: true,
+    unlockedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
     nextMilestone: 'Continental Voyager at 10 countries',
   },
   {
@@ -142,6 +145,7 @@ export const achievements: Achievement[] = [
     target: 30,
     milestoneLabel: 'Flood uploads',
     unlocked: true,
+    unlockedAt: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(),
     nextMilestone: 'Eligible for community spotlight',
   },
   {
@@ -205,4 +209,3 @@ export const categoryLegend = [
 ];
 
 export const textSeparator = '•';
-

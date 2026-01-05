@@ -1,23 +1,89 @@
 # Compose overrides for production mode.
-# Currently mirrors the base services but maps canonical public ports.
-# Future steps can swap in optimized images/commands.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.production up -d
+# Generated: January 4, 2026
+#
+# NOTE: This file adds production settings without changing ports from base compose.
+# Ports from docker-compose.yml: API=8000, Frontend=3000, PostgreSQL=5434, Redis=6380, MinIO=9020/9021
 
 services:
   postgis_db:
-    ports:
-      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
 
   redis:
-    ports:
-      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  minio:
+    environment:
+      MINIO_ROOT_USER: "${MINIO_ROOT_USER}"
+      MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
 
   api:
-    ports:
-      - "8000:8000"
     environment:
-      APP_ENV: prod
+      ENVIRONMENT: production
+      DEBUG: "false"
+      SECRET_KEY: "${SECRET_KEY}"
+      DATABASE_URL: "${DATABASE_URL}"
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY}"
       MINIO_BUCKET_NAME: "${MINIO_BUCKET_NAME:-impact-images}"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "${ACCESS_TOKEN_EXPIRE_MINUTES:-30}"
+      SESSION_SECURE: "true"
+      SESSION_SAMESITE: "strict"
+      SESSION_HTTPONLY: "true"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  celery_worker:
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  celery_beat:
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+    restart: unless-stopped
+
+  flower:
+    restart: unless-stopped
 
   frontend:
-    ports:
-      - "3000:3000"
+    environment:
+      # Keep NODE_ENV=development for dev server compatibility
+      # Next.js dev server requires NODE_ENV=development
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G

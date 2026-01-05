@@ -221,5 +221,140 @@ DEFAULT_ACHIEVEMENTS = [
         'criteria_threshold': 20,
         'tier': 'silver',
         'points': 50
+    },
+    # Hazard-specific Expert Achievements
+    {
+        'id': 'flood_expert',
+        'name': 'Flood Expert',
+        'description': 'Have 25+ approved flood images',
+        'icon': '🌊',
+        'category': 'hazard',
+        'criteria_type': 'count',
+        'criteria_metric': 'approved_flood_count',
+        'criteria_threshold': 25,
+        'tier': 'gold',
+        'points': 75
+    },
+    {
+        'id': 'earthquake_expert',
+        'name': 'Earthquake Expert',
+        'description': 'Have 25+ approved earthquake images',
+        'icon': '🏚️',
+        'category': 'hazard',
+        'criteria_type': 'count',
+        'criteria_metric': 'approved_earthquake_count',
+        'criteria_threshold': 25,
+        'tier': 'gold',
+        'points': 75
+    },
+    {
+        'id': 'cyclone_expert',
+        'name': 'Cyclone Expert',
+        'description': 'Have 25+ approved cyclone images',
+        'icon': '🌀',
+        'category': 'hazard',
+        'criteria_type': 'count',
+        'criteria_metric': 'approved_cyclone_count',
+        'criteria_threshold': 25,
+        'tier': 'gold',
+        'points': 75
+    },
+    {
+        'id': 'tsunami_expert',
+        'name': 'Tsunami Expert',
+        'description': 'Have 25+ approved tsunami images',
+        'icon': '🌊',
+        'category': 'hazard',
+        'criteria_type': 'count',
+        'criteria_metric': 'approved_tsunami_count',
+        'criteria_threshold': 25,
+        'tier': 'gold',
+        'points': 75
+    },
+    {
+        'id': 'wildfire_expert',
+        'name': 'Wildfire Expert',
+        'description': 'Have 25+ approved wildfire images',
+        'icon': '🔥',
+        'category': 'hazard',
+        'criteria_type': 'count',
+        'criteria_metric': 'approved_wildfire_count',
+        'criteria_threshold': 25,
+        'tier': 'gold',
+        'points': 75
+    },
+    {
+        'id': 'volcanic_expert',
+        'name': 'Volcanic Expert',
+        'description': 'Have 25+ approved volcanic images',
+        'icon': '🌋',
+        'category': 'hazard',
+        'criteria_type': 'count',
+        'criteria_metric': 'approved_volcanic_count',
+        'criteria_threshold': 25,
+        'tier': 'gold',
+        'points': 75
+    },
+    # Geographic Achievements
+    {
+        'id': 'country_champion',
+        'name': 'Country Champion',
+        'description': 'Have 20+ approved uploads from a single country',
+        'icon': '🏅',
+        'category': 'geographic',
+        'criteria_type': 'count',
+        'criteria_metric': 'top_country_count',
+        'criteria_threshold': 20,
+        'tier': 'gold',
+        'points': 80
+    },
+    {
+        'id': 'regional_expert',
+        'name': 'Regional Expert',
+        'description': 'Have 50+ approved uploads from a single country',
+        'icon': '🌏',
+        'category': 'geographic',
+        'criteria_type': 'count',
+        'criteria_metric': 'top_country_count',
+        'criteria_threshold': 50,
+        'tier': 'platinum',
+        'points': 150
+    },
+    # Quality Streak Achievements
+    {
+        'id': 'five_star_streak',
+        'name': '5-Star Streak',
+        'description': 'Have 5 consecutive approved uploads',
+        'icon': '⭐',
+        'category': 'quality',
+        'criteria_type': 'streak',
+        'criteria_metric': 'consecutive_approvals',
+        'criteria_threshold': 5,
+        'tier': 'bronze',
+        'points': 30
+    },
+    {
+        'id': 'ten_star_streak',
+        'name': '10-Star Streak',
+        'description': 'Have 10 consecutive approved uploads',
+        'icon': '🌟',
+        'category': 'quality',
+        'criteria_type': 'streak',
+        'criteria_metric': 'consecutive_approvals',
+        'criteria_threshold': 10,
+        'tier': 'silver',
+        'points': 60
+    },
+    {
+        'id': 'perfect_streak',
+        'name': 'Perfect Streak',
+        'description': 'Have 20 consecutive approved uploads',
+        'icon': '💫',
+        'category': 'quality',
+        'criteria_type': 'streak',
+        'criteria_metric': 'consecutive_approvals',
+        'criteria_threshold': 20,
+        'tier': 'gold',
+        'points': 100
     }
 ]

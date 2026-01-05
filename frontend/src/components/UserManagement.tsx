@@ -18,9 +18,14 @@ import {
   FunnelIcon,
   EyeIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  EnvelopeIcon,
+  ArrowPathIcon,
+  UsersIcon,
+  CheckIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Select } from '@/components/design-system';
 
 interface User {
   id: string;
@@ -49,8 +54,12 @@ interface CreateUserData {
 
 const UserManagement: React.FC = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showQuickInvite, setShowQuickInvite] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [quickInviteEmail, setQuickInviteEmail] = useState('');
+  const [quickInviteRole, setQuickInviteRole] = useState('contributor');
   const [filters, setFilters] = useState({
     search: '',
     role: '',
@@ -134,6 +143,62 @@ const UserManagement: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
     }
   });
+
+  // Quick invite mutation
+  const quickInviteMutation = useMutation({
+    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+      const response = await authFetch('/api/admin/users/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email, role, sendInvite: true })
+      });
+      if (!response.ok) throw new Error('Failed to send invite');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setShowQuickInvite(false);
+      setQuickInviteEmail('');
+      setQuickInviteRole('contributor');
+    }
+  });
+
+  // Bulk lock mutation
+  const bulkLockMutation = useMutation({
+    mutationFn: async ({ userIds, lock }: { userIds: string[]; lock: boolean }) => {
+      const response = await authFetch('/api/admin/users/bulk-action', {
+        method: 'POST',
+        body: JSON.stringify({ user_ids: userIds, action: lock ? 'lock' : 'unlock' })
+      });
+      if (!response.ok) throw new Error('Failed to perform bulk action');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      setSelectedUsers(new Set());
+    }
+  });
+
+  // Toggle user selection
+  const toggleUserSelection = (userId: string) => {
+    const newSelected = new Set(selectedUsers);
+    if (newSelected.has(userId)) {
+      newSelected.delete(userId);
+    } else {
+      newSelected.add(userId);
+    }
+    setSelectedUsers(newSelected);
+  };
+
+  // Select all users on current page
+  const toggleSelectAll = () => {
+    if (!usersData?.users) return;
+    const allSelected = usersData.users.every((u: User) => selectedUsers.has(u.id));
+    if (allSelected) {
+      setSelectedUsers(new Set());
+    } else {
+      setSelectedUsers(new Set(usersData.users.map((u: User) => u.id)));
+    }
+  };
 
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
@@ -224,14 +289,15 @@ const UserManagement: React.FC = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Role *
-              </label>
-              <select
+              <Select
+                id="create-user-role"
+                label="Role *"
                 required
                 value={formData.role}
                 onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                variant="light"
+                size="md"
+                error={!formData.role ? undefined : undefined}
               >
                 <option value="">Select Role</option>
                 {roles?.map((role: any) => (
@@ -239,7 +305,7 @@ const UserManagement: React.FC = () => {
                     {role.displayName || role.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             
             <div>
@@ -448,17 +514,165 @@ const UserManagement: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-        >
-          <UserPlusIcon className="h-4 w-4 mr-2" />
-          Add User
-        </button>
+      {/* Stats Dashboard */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-blue-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Total Users</p>
+              <p className="text-2xl font-bold text-gray-900">{usersData?.total || 0}</p>
+            </div>
+            <UsersIcon className="h-8 w-8 text-blue-500" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Active Users</p>
+              <p className="text-2xl font-bold text-gray-900">{usersData?.active_count || usersData?.total || 0}</p>
+            </div>
+            <CheckIcon className="h-8 w-8 text-green-500" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-red-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Locked</p>
+              <p className="text-2xl font-bold text-gray-900">{usersData?.locked_count || 0}</p>
+            </div>
+            <LockClosedIcon className="h-8 w-8 text-red-500" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-500">Pending Invites</p>
+              <p className="text-2xl font-bold text-gray-900">{usersData?.pending_count || 0}</p>
+            </div>
+            <EnvelopeIcon className="h-8 w-8 text-purple-500" />
+          </div>
+        </div>
       </div>
+
+      {/* Header with Actions */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+        <div className="flex flex-wrap gap-2">
+          {/* Quick Invite */}
+          <button
+            onClick={() => setShowQuickInvite(!showQuickInvite)}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <EnvelopeIcon className="h-4 w-4 mr-2" />
+            Quick Invite
+          </button>
+          {/* Add User */}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+          >
+            <UserPlusIcon className="h-4 w-4 mr-2" />
+            Add User
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Invite Panel */}
+      <AnimatePresence>
+        {showQuickInvite && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 border border-blue-200"
+          >
+            <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <EnvelopeIcon className="h-5 w-5 mr-2 text-blue-600" />
+              Send Quick Invitation
+            </h3>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <input
+                  type="email"
+                  placeholder="email@example.com"
+                  value={quickInviteEmail}
+                  onChange={(e) => setQuickInviteEmail(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              <div className="w-full sm:w-48">
+                <Select
+                  aria-label="Select role for invite"
+                  value={quickInviteRole}
+                  onChange={(e) => setQuickInviteRole(e.target.value)}
+                  variant="light"
+                  size="md"
+                >
+                  <option value="viewer">Viewer</option>
+                  <option value="contributor">Contributor</option>
+                  <option value="curator">Curator</option>
+                  <option value="admin">Admin</option>
+                </Select>
+              </div>
+              <button
+                onClick={() => quickInviteMutation.mutate({ email: quickInviteEmail, role: quickInviteRole })}
+                disabled={!quickInviteEmail || quickInviteMutation.isPending}
+                className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              >
+                {quickInviteMutation.isPending ? (
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <EnvelopeIcon className="h-4 w-4 mr-2" />
+                )}
+                Send Invite
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mt-2">
+              An email invitation will be sent with a link to set up their account.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bulk Actions Bar */}
+      <AnimatePresence>
+        {selectedUsers.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between"
+          >
+            <span className="text-sm font-medium text-blue-800">
+              {selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => bulkLockMutation.mutate({ userIds: Array.from(selectedUsers), lock: true })}
+                disabled={bulkLockMutation.isPending}
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200"
+              >
+                <LockClosedIcon className="h-4 w-4 mr-1" />
+                Lock Selected
+              </button>
+              <button
+                onClick={() => bulkLockMutation.mutate({ userIds: Array.from(selectedUsers), lock: false })}
+                disabled={bulkLockMutation.isPending}
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200"
+              >
+                <LockOpenIcon className="h-4 w-4 mr-1" />
+                Unlock Selected
+              </button>
+              <button
+                onClick={() => setSelectedUsers(new Set())}
+                className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Clear Selection
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Filters */}
       <div className="bg-white rounded-lg shadow-md p-6">
@@ -474,10 +688,13 @@ const UserManagement: React.FC = () => {
             />
           </div>
           
-          <select
+          <Select
+            aria-label="Filter by role"
             value={filters.role}
             onChange={(e) => setFilters({ ...filters, role: e.target.value })}
-            className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+            variant="light"
+            size="md"
+            fullWidth={false}
           >
             <option value="">All Roles</option>
             {roles?.map((role: any) => (
@@ -485,18 +702,21 @@ const UserManagement: React.FC = () => {
                 {role.displayName || role.name}
               </option>
             ))}
-          </select>
+          </Select>
           
-          <select
+          <Select
+            aria-label="Filter by status"
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-            className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+            variant="light"
+            size="md"
+            fullWidth={false}
           >
             <option value="">All Statuses</option>
             <option value="active">Active</option>
             <option value="locked">Locked</option>
             <option value="inactive">Inactive</option>
-          </select>
+          </Select>
           
           <input
             type="text"
@@ -514,6 +734,14 @@ const UserManagement: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={usersData?.users?.length > 0 && selectedUsers.size === usersData.users.length}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   User
                 </th>
@@ -539,8 +767,16 @@ const UserManagement: React.FC = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="hover:bg-gray-50"
+                    className={`hover:bg-gray-50 ${selectedUsers.has(user.id) ? 'bg-blue-50' : ''}`}
                   >
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.has(user.id)}
+                        onChange={() => toggleUserSelection(user.id)}
+                        className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center overflow-hidden">

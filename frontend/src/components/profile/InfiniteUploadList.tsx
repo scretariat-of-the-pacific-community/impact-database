@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, ComponentType } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { FixedSizeList as List } from 'react-window';
+import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { MapPin, Loader2 } from 'lucide-react';
+import { MapPin, Loader2, CheckCircle, XCircle, Clock3 } from 'lucide-react';
 import { Card, Button } from '@/components/design-system';
 import { imageApi } from '@/lib/api';
 import { HAZARD_TYPE_LABELS } from '@/lib/types';
@@ -27,10 +27,15 @@ interface Upload {
 
 interface InfiniteUploadListProps {
   enabled: boolean;
+  /** When false, the component is hidden and should pause any polling/fetching */
+  isActive?: boolean;
 }
 
-export default function InfiniteUploadList({ enabled }: InfiniteUploadListProps) {
+export default function InfiniteUploadList({ enabled, isActive = true }: InfiniteUploadListProps) {
   const observerTarget = useRef<HTMLDivElement>(null);
+  
+  // Only fetch when enabled AND tab is active
+  const shouldFetch = enabled && isActive;
 
   const {
     data,
@@ -49,7 +54,7 @@ export default function InfiniteUploadList({ enabled }: InfiniteUploadListProps)
       }
       return allPages.length + 1;
     },
-    enabled,
+    enabled: shouldFetch,
     initialPageParam: 1,
   });
 
@@ -105,6 +110,24 @@ export default function InfiniteUploadList({ enabled }: InfiniteUploadListProps)
 
   const UploadRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
     const upload = uploads[index];
+    const statusConfig: Record<string, { label: string; className: string; Icon: ComponentType<{ className?: string }> }> = {
+      approved: {
+        label: 'Approved',
+        className: 'bg-emerald-400/20 text-emerald-200',
+        Icon: CheckCircle,
+      },
+      rejected: {
+        label: 'Rejected',
+        className: 'bg-coral-500/20 text-coral-200',
+        Icon: XCircle,
+      },
+      pending: {
+        label: 'Pending',
+        className: 'bg-amber-400/20 text-amber-100',
+        Icon: Clock3,
+      },
+    };
+    const status = statusConfig[upload.approval_status] || statusConfig.pending;
     
     return (
       <div style={style} className="px-2">
@@ -125,15 +148,12 @@ export default function InfiniteUploadList({ enabled }: InfiniteUploadListProps)
               </p>
             </div>
             <span
-              className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${
-                upload.approval_status === 'approved'
-                  ? 'bg-emerald-400/20 text-emerald-200'
-                  : upload.approval_status === 'rejected'
-                  ? 'bg-coral-500/20 text-coral-200'
-                  : 'bg-amber-400/20 text-amber-100'
-              }`}
+              className={`flex-shrink-0 rounded-full px-3 py-1 text-xs font-semibold inline-flex items-center gap-1 ${status.className}`}
+              role="status"
+              aria-label={`Status: ${status.label}`}
             >
-              {upload.approval_status.replace('_', ' ')}
+              <status.Icon className="h-4 w-4" aria-hidden />
+              <span>{status.label}</span>
             </span>
           </div>
           <div className="mt-4 flex items-center justify-between text-sm text-white/60">
@@ -180,16 +200,29 @@ export default function InfiniteUploadList({ enabled }: InfiniteUploadListProps)
       {/* Desktop: Virtualized grid */}
       <div className="hidden md:block h-[600px]">
         <AutoSizer>
-          {({ height, width }) => (
-            <List
-              height={height}
-              itemCount={uploads.length}
-              itemSize={180}
-              width={width}
-            >
-              {UploadRow}
-            </List>
-          )}
+          {({ height, width }) => {
+            const itemSize = (index: number) => {
+              const upload = uploads[index];
+              const titleLength = (upload.title || upload.filename || '').length;
+              const locationLength = (upload.location || '').length;
+              const base = 140;
+              const titleRows = Math.max(1, Math.ceil(titleLength / 32));
+              const locationRows = Math.max(1, Math.ceil(locationLength / 40));
+              return Math.min(320, base + titleRows * 18 + locationRows * 16);
+            };
+
+            return (
+              <List
+                height={height}
+                itemCount={uploads.length}
+                itemSize={itemSize}
+                width={width}
+                overscanCount={5}
+              >
+                {UploadRow}
+              </List>
+            );
+          }}
         </AutoSizer>
       </div>
     </div>

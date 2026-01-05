@@ -274,13 +274,18 @@ def create_audit_log(
     return audit_entry
 
 @router.get("/images/{filename}")
-async def serve_image(filename: str):
-    """Serve uploaded image files from MinIO or local storage"""
+async def serve_image(filename: str, download: bool = False):
+    """Serve uploaded image files from MinIO or local storage
+    
+    Args:
+        filename: The image filename
+        download: If True, forces download with Content-Disposition: attachment
+    """
     from fastapi.responses import StreamingResponse
     from io import BytesIO
     
     # SECURITY: Validate and sanitize filename
-    if not filename or '..' in filename or '/' in filename or '\\' in filename:
+    if not filename or '..' in filename or '/' in filename or '\\\\' in filename:
         raise HTTPException(status_code=400, detail="Invalid filename")
     
     # Validate file extension
@@ -299,6 +304,9 @@ async def serve_image(filename: str):
     }
     media_type = media_type_map.get(ext, 'image/jpeg')
     
+    # Determine Content-Disposition based on download parameter
+    disposition = "attachment" if download else "inline"
+    
     # Try MinIO first
     try:
         minio_storage = get_minio_storage()
@@ -313,7 +321,7 @@ async def serve_image(filename: str):
         
         # SECURITY: Add security headers to prevent content-type attacks
         streaming_response = StreamingResponse(BytesIO(data), media_type=media_type)
-        streaming_response.headers["Content-Disposition"] = f"inline; filename={safe_filename}"
+        streaming_response.headers["Content-Disposition"] = f"{disposition}; filename={safe_filename}"
         streaming_response.headers["X-Content-Type-Options"] = "nosniff"
         streaming_response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return streaming_response
@@ -332,7 +340,11 @@ async def serve_image(filename: str):
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail=f"Image not found: {safe_filename}")
         
-        return FileResponse(path=file_path, media_type=media_type, filename=safe_filename)
+        # For FileResponse, we need to set headers manually for download
+        response = FileResponse(path=file_path, media_type=media_type, filename=safe_filename)
+        if download:
+            response.headers["Content-Disposition"] = f"attachment; filename={safe_filename}"
+        return response
 
 @router.get("/images/{filename}/thumbnail")
 async def serve_image_thumbnail(filename: str):

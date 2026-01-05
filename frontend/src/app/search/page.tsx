@@ -22,6 +22,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 import { imageApi } from '@/lib/api';
+import { Select } from '@/components/design-system';
 import { SearchFilters, ImageMetadata, HazardType, SourceAgency, HAZARD_TYPE_LABELS, SOURCE_AGENCY_LABELS } from '@/lib/types';
 import ErrorBanner from '@/components/ErrorBanner';
 import { sanitizeText } from '@/lib/sanitize';
@@ -452,7 +453,8 @@ function SearchPageContent() {
                   {/* Sort Options */}
                   <div>
                     <h3 className="text-sm font-medium text-white mb-3">Sort By</h3>
-                    <select
+                    <Select
+                      aria-label="Sort by"
                       value={`${state.sortBy}-${state.sortOrder}`}
                       onChange={(e) => {
                         const [sortBy, sortOrder] = e.target.value.split('-');
@@ -469,7 +471,8 @@ function SearchPageContent() {
                         params.set('page', '1');
                         router.push(`/search?${params.toString()}`);
                       }}
-                      className="w-full rounded-lg border border-white/15 bg-deep-900/60 px-3 py-2 text-sm text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
+                      variant="dark"
+                      size="md"
                     >
                       <option value="relevance-desc">Relevance</option>
                       <option value="date-desc">Date (Newest)</option>
@@ -478,7 +481,7 @@ function SearchPageContent() {
                       <option value="upload_date-asc">Upload Date (Oldest)</option>
                       <option value="title-asc">Title (A-Z)</option>
                       <option value="title-desc">Title (Z-A)</option>
-                    </select>
+                    </Select>
 
                     <button
                       onClick={clearFilters}

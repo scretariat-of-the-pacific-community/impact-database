@@ -48,6 +48,8 @@ export default function ImageDetailPage() {
   const params = useParams();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'metadata' | 'map'>('overview');
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   
   const imageId = params.id as string;
   
@@ -76,6 +78,31 @@ export default function ImageDetailPage() {
   // Construct the image URL
   const imageUrl = image ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}` : '';
   const fileSizeLabel = formatFileSize(image?.file_size);
+
+  const handleDownload = async () => {
+    if (!image || !imageUrl) return;
+    try {
+      setDownloadError(null);
+      setIsDownloading(true);
+      
+      // Use the download=true query parameter to force download
+      const downloadUrl = `${imageUrl}?download=true`;
+      
+      // Use a direct anchor element with the download attribute
+      // This allows the browser to handle the download natively
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = image.filename || `${image.id || 'image'}.jpg`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to download file';
+      setDownloadError(message);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -132,12 +159,21 @@ export default function ImageDetailPage() {
                 <Share2 className="w-4 h-4 mr-2" />
                 Share
               </button>
-              <button className="flex items-center px-4 py-2 bg-pacific-600 text-white rounded-lg hover:bg-pacific-500 transition-colors">
+              <button
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="flex items-center px-4 py-2 bg-pacific-600 text-white rounded-lg hover:bg-pacific-500 transition-colors disabled:opacity-60"
+              >
                 <Download className="w-4 h-4 mr-2" />
-                Download
+                {isDownloading ? 'Downloading…' : 'Download'}
               </button>
             </div>
           </div>
+          {downloadError && (
+            <div className="mt-2 rounded-md border border-rose-500/40 bg-rose-900/30 px-3 py-2 text-sm text-rose-100">
+              {downloadError}
+            </div>
+          )}
         </div>
       </header>
 
@@ -161,9 +197,13 @@ export default function ImageDetailPage() {
                   />
                 )}
                 <div className="absolute bottom-4 right-4 flex space-x-2">
-                  <button className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-white/20">
+                  <button
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="bg-white/10 hover:bg-white/20 text-white backdrop-blur-sm px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-white/20 disabled:opacity-60"
+                  >
                     <Download className="w-4 h-4 mr-1 inline" />
-                    Download
+                    {isDownloading ? 'Downloading…' : 'Download'}
                   </button>
                 </div>
                 <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs border border-white/10">

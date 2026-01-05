@@ -107,6 +107,10 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     hashed_password = Column(String(255), nullable=True)  # Nullable for SSO users
     
+    # SSO fields
+    sso_provider = Column(String(50), nullable=True, index=True)  # e.g., 'google', 'github', 'azure'
+    sso_provider_id = Column(String(255), nullable=True, index=True)  # Provider's user ID
+    
     # Role assignment
     role_id = Column(Integer, ForeignKey('roles.id'), nullable=True, index=True)
     

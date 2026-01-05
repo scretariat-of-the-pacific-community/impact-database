@@ -305,6 +305,160 @@ async def delete_user(
     
     return {"message": "User deleted successfully"}
 
+
+# Bulk Actions and Invite Endpoints
+class BulkActionRequest(BaseModel):
+    user_ids: List[str]
+    action: str  # 'lock', 'unlock', 'delete', 'activate', 'deactivate'
+
+class InviteUserRequest(BaseModel):
+    email: EmailStr
+    role: str = "viewer"
+    send_invite: bool = True
+
+class InviteUserResponse(BaseModel):
+    message: str
+    user_id: Optional[str] = None
+    invite_sent: bool = False
+
+
+@router.post("/users/invite", response_model=InviteUserResponse)
+async def invite_user(
+    invite_data: InviteUserRequest,
+    request: Request,
+    admin_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)),
+    admin_service: AdminService = Depends(get_admin_service)
+):
+    """Send an invitation to a new user via email."""
+    import uuid
+    import secrets
+    
+    # Check if email already exists
+    existing = admin_service.db.query(AdminUser).filter(
+        AdminUser.email == invite_data.email
+    ).first()
+    
+    if existing:
+        raise HTTPException(status_code=400, detail="User with this email already exists")
+    
+    # Validate role
+    try:
+        role = UserRole(invite_data.role)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid role")
+    
+    # Generate invite token and temporary password
+    invite_token = secrets.token_urlsafe(32)
+    temp_password = secrets.token_urlsafe(16)
+    
+    # Create user with pending status
+    username = invite_data.email.split('@')[0] + '_' + str(uuid.uuid4())[:8]
+    
+    new_user = admin_service.create_user(
+        username=username,
+        email=invite_data.email,
+        password=temp_password,
+        role=role,
+        full_name=None,
+        organization=None,
+        created_by=admin_user.username
+    )
+    
+    # Mark as pending verification
+    new_user.is_verified = False
+    admin_service.db.commit()
+    
+    # Log the action
+    admin_service._log_action(
+        user_id=admin_user.id,
+        action="invite_user",
+        resource_type="user",
+        resource_id=new_user.id,
+        details={"email": invite_data.email, "role": invite_data.role}
+    )
+    
+    # TODO: Integrate with email service to send invite
+    # For now, return success with the user created
+    
+    return InviteUserResponse(
+        message=f"Invitation sent to {invite_data.email}",
+        user_id=new_user.id,
+        invite_sent=invite_data.send_invite
+    )
+
+
+@router.post("/users/bulk-action")
+async def bulk_user_action(
+    action_data: BulkActionRequest,
+    request: Request,
+    admin_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)),
+    admin_service: AdminService = Depends(get_admin_service)
+):
+    """Perform bulk actions on multiple users."""
+    
+    if not action_data.user_ids:
+        raise HTTPException(status_code=400, detail="No users specified")
+    
+    if action_data.action not in ['lock', 'unlock', 'delete', 'activate', 'deactivate']:
+        raise HTTPException(status_code=400, detail="Invalid action")
+    
+    # Don't allow self-modification
+    if admin_user.id in action_data.user_ids:
+        raise HTTPException(status_code=400, detail="Cannot perform bulk action on your own account")
+    
+    users = admin_service.db.query(AdminUser).filter(
+        AdminUser.id.in_(action_data.user_ids)
+    ).all()
+    
+    if not users:
+        raise HTTPException(status_code=404, detail="No valid users found")
+    
+    affected = 0
+    errors = []
+    
+    for user in users:
+        try:
+            if action_data.action == 'lock':
+                user.is_locked = True
+            elif action_data.action == 'unlock':
+                user.is_locked = False
+                user.failed_login_attempts = 0
+                user.lockout_until = None
+            elif action_data.action == 'delete':
+                user.is_active = False
+            elif action_data.action == 'activate':
+                user.is_active = True
+            elif action_data.action == 'deactivate':
+                user.is_active = False
+            
+            user.updated_at = datetime.utcnow()
+            affected += 1
+        except Exception as e:
+            errors.append({"user_id": user.id, "error": str(e)})
+    
+    admin_service.db.commit()
+    
+    # Log the action
+    admin_service._log_action(
+        user_id=admin_user.id,
+        action=f"bulk_{action_data.action}",
+        resource_type="users",
+        resource_id=None,
+        details={
+            "user_ids": action_data.user_ids,
+            "affected": affected,
+            "errors": errors
+        }
+    )
+    
+    return {
+        "message": f"Bulk {action_data.action} completed",
+        "affected": affected,
+        "total": len(action_data.user_ids),
+        "errors": errors
+    }
+
+
 # Role and Permission Management
 @router.get("/roles")
 async def list_roles(

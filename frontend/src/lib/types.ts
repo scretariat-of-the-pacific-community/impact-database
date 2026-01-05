@@ -339,6 +339,8 @@ export interface UserStats {
     uploads_this_month: number;
     average_review_time: number;
     top_hazard: string;
+    hazard_distribution?: Record<string, number>;
+    contribution_heatmap?: Record<string, number>;
   };
 }
 

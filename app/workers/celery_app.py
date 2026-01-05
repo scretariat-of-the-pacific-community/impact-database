@@ -1,5 +1,6 @@
 import os
 from celery import Celery
+from celery.schedules import crontab
 from core.config import settings
 
 def create_celery_app():
@@ -9,7 +10,7 @@ def create_celery_app():
         'impact_database_workers',
         broker=settings.CELERY_BROKER_URL,
         backend=settings.CELERY_RESULT_BACKEND,
-        include=['workers.tasks']
+        include=['workers.tasks', 'workers.email_tasks']
     )
     
     # Configure Celery
@@ -27,6 +28,8 @@ def create_celery_app():
         result_expires=3600,  # 1 hour
         task_compression='gzip',
         result_compression='gzip',
+        worker_send_task_events=True,
+        task_send_sent_event=True,
         
         # Redis specific settings
         broker_connection_retry_on_startup=True,
@@ -38,6 +41,7 @@ def create_celery_app():
             'workers.tasks.process_upload': {'queue': 'upload_processing'},
             'workers.tasks.generate_thumbnail': {'queue': 'image_processing'},
             'workers.tasks.cleanup_failed_uploads': {'queue': 'cleanup'},
+            # Email tasks use default queue for simplicity
         },
         
         # Default queue
@@ -48,6 +52,14 @@ def create_celery_app():
         # Worker configuration
         worker_disable_rate_limits=True,
         worker_max_memory_per_child=200000,  # 200MB
+        
+        # Beat schedule for periodic tasks
+        beat_schedule={
+            'weekly-digest-every-monday': {
+                'task': 'workers.email_tasks.send_weekly_digest_all_users',
+                'schedule': crontab(hour=9, minute=0, day_of_week=1),  # Every Monday at 9 AM UTC
+            },
+        },
     )
     
     return celery_app

@@ -2,9 +2,10 @@
 
 import { useState, useMemo, memo } from 'react';
 import { CalendarDays, MapPin, Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
-import { Card, Tag } from '@/components/design-system';
+import { Card, Tag, Select } from '@/components/design-system';
 import { trackFilterApplied } from '@/lib/analytics';
 import { sanitizeText } from '@/lib/sanitize';
+import { getCountryName } from '@/lib/countries';
 
 export interface FilterState {
   searchTerm: string;
@@ -189,7 +190,7 @@ export default function ImageFilters({
                         onChange={() => toggleCountry(country)}
                         className="w-4 h-4 text-pacific-600 border-white/20 rounded focus:ring-pacific-500 bg-white/5"
                       />
-                      <span className="ml-3 text-sm text-white">{sanitizeText(country)}</span>
+                      <span className="ml-3 text-sm text-white">{getCountryName(country)}</span>
                     </label>
                   ))}
                 </div>
@@ -253,30 +254,32 @@ export default function ImageFilters({
 
             {/* Sort By */}
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Sort By</label>
-              <select
+              <Select
+                label="Sort By"
                 value={filters.sortBy}
                 onChange={(e) => updateFilters({ sortBy: e.target.value as FilterState['sortBy'] })}
-                className="w-full px-3 py-2 bg-white/5 border border-white/20 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pacific-500 text-sm"
+                variant="dark"
+                size="sm"
               >
-                <option value="date" className="bg-deep-900">Date</option>
-                <option value="location" className="bg-deep-900">Location</option>
-                <option value="hazard_type" className="bg-deep-900">Hazard Type</option>
-                <option value="filename" className="bg-deep-900">Filename</option>
-              </select>
+                <option value="date">Date</option>
+                <option value="location">Location</option>
+                <option value="hazard_type">Hazard Type</option>
+                <option value="filename">Filename</option>
+              </Select>
             </div>
 
             {/* Sort Order */}
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Sort Order</label>
-              <select
+              <Select
+                label="Sort Order"
                 value={filters.sortOrder}
                 onChange={(e) => updateFilters({ sortOrder: e.target.value as FilterState['sortOrder'] })}
-                className="w-full px-3 py-2 bg-white/5 border border-white/20 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-pacific-500 text-sm"
+                variant="dark"
+                size="sm"
               >
-                <option value="desc" className="bg-deep-900">Newest First</option>
-                <option value="asc" className="bg-deep-900">Oldest First</option>
-              </select>
+                <option value="desc">Newest First</option>
+                <option value="asc">Oldest First</option>
+              </Select>
             </div>
           </div>
         </div>
@@ -305,9 +308,9 @@ export default function ImageFilters({
                 tone="success"
                 icon={<MapPin className="w-3 h-3" />}
                 onRemove={() => toggleCountry(country)}
-                removableLabel={`Remove ${country} filter`}
+                removableLabel={`Remove ${getCountryName(country)} filter`}
               >
-                {country}
+                {getCountryName(country)}
               </Tag>
             ))}
 

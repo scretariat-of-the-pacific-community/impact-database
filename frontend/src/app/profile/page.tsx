@@ -1,31 +1,43 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import type React from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/providers/auth-provider';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, UploadCloud, Award, Activity, Settings, MapPin, ShieldCheck, Users } from 'lucide-react';
+import { Loader2, UploadCloud, Award, Activity, Settings, ShieldCheck, Users } from 'lucide-react';
 import { imageApi } from '@/lib/api';
-import { getApiUrl } from '@/lib/config';
-import { HAZARD_TYPE_LABELS, UserStats, UserUpload } from '@/lib/types';
+import { UserStats, UserUpload, HAZARD_TYPE_LABELS, HazardType } from '@/lib/types';
 import { Card, Button } from '@/components/design-system';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import ActivityTimeline from '@/components/profile/ActivityTimeline';
 import Collaboration from '@/components/profile/Collaboration';
 import MobileBottomNav, { PROFILE_NAV_ITEMS } from '@/components/profile/MobileBottomNav';
 import SwipeableTabs from '@/components/profile/SwipeableTabs';
 import InfiniteUploadList from '@/components/profile/InfiniteUploadList';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import ErrorBanner from '@/components/ErrorBanner';
 import dynamic from 'next/dynamic';
 
 // Dynamically import UserAnalyticsReal to prevent SSR (Leaflet requires window object)
-const UserAnalyticsReal = dynamic(() => import('@/components/profile/UserAnalyticsReal'), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center py-12">
-      <Loader2 className="w-8 h-8 text-pacific-400 animate-spin" />
-    </div>
-  ),
-});
+const UserAnalyticsReal = dynamic(
+  () => import('@/components/profile/UserAnalyticsReal').then((mod) => mod.default),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-6">
+        <div className="h-32 w-full animate-pulse rounded-2xl bg-white/5" />
+        <div className="grid grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-28 rounded-2xl bg-white/5 animate-pulse" />
+          ))}
+        </div>
+        <div className="h-80 w-full animate-pulse rounded-2xl bg-white/5" />
+      </div>
+    ),
+  }
+);
 
 const TABS = [
   { id: 'uploads', label: 'Uploads', icon: UploadCloud },
@@ -44,7 +56,18 @@ export default function ProfilePage() {
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('uploads');
+  // Track which tabs have been visited to enable lazy-mount on first visit
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(new Set(['uploads']));
   const queriesEnabled = !authLoading && isAuthenticated;
+
+  // Mark tab as visited when selected (enables lazy-mount)
+  const handleTabChange = (tabId: string) => {
+    setActiveTab(tabId);
+    setVisitedTabs((prev) => {
+      if (prev.has(tabId)) return prev;
+      return new Set([...prev, tabId]);
+    });
+  };
 
   // Auth guard - redirect to login if not authenticated
   useEffect(() => {
@@ -57,7 +80,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam && TABS.some((tab) => tab.id === tabParam) && tabParam !== activeTab) {
-      setActiveTab(tabParam);
+      handleTabChange(tabParam);
     }
   }, [searchParams, activeTab]);
 
@@ -70,18 +93,19 @@ export default function ProfilePage() {
   } = useQuery<UserStats, Error>({
     queryKey: ['user-profile-stats'],
     queryFn: () => imageApi.userStats(),
+    // Polling pauses automatically when browser tab is hidden (react-query default)
     refetchInterval: 30000,
     refetchOnWindowFocus: true,
     enabled: queriesEnabled,
     retry: 1,
+    // Pause refetching when page becomes hidden
+    refetchIntervalInBackground: false,
   });
 
   const {
     data: uploads,
-    isLoading: uploadsLoading,
     isFetching: uploadsFetching,
     refetch: refetchUploads,
-    error: uploadsError,
   } = useQuery<UserUpload[], Error>({
     queryKey: ['user-profile-uploads'],
     queryFn: () => imageApi.userUploads(),
@@ -89,65 +113,89 @@ export default function ProfilePage() {
     refetchOnWindowFocus: true,
     enabled: queriesEnabled,
     retry: 1,
+    refetchIntervalInBackground: false,
+    retry: 1,
   });
+
   const isRefreshing = statsFetching || uploadsFetching;
   const shouldShowStatsError = !!statsError && !statsLoading && queriesEnabled;
 
-  // Profile data loaded and ready
+  const achievements = stats?.achievements ?? [];
 
   // Compute stat summary (must be before early returns due to Rules of Hooks)
-  const statSummary = useMemo(() => {
-    if (!stats) {
-      return [];
-    }
-    const totalUploads = typeof stats.total_uploads === 'number' ? stats.total_uploads : 0;
-    const approvalRate = typeof stats.approval_rate === 'number' ? stats.approval_rate : 0;
-    const impactScore =
-      typeof stats.impact_score === 'number' && Number.isFinite(stats.impact_score) ? stats.impact_score : null;
-    const uploadsThisMonth = stats.analytics?.uploads_this_month ?? 0;
+  const totalUploads = typeof stats?.total_uploads === 'number' ? stats.total_uploads : 0;
+  const approvalRate = typeof stats?.approval_rate === 'number' ? stats.approval_rate : 0;
+  const impactScore =
+    typeof stats?.impact_score === 'number' && Number.isFinite(stats.impact_score) ? stats.impact_score : null;
+  const uploadsThisMonth = stats?.analytics?.uploads_this_month ?? 0;
+  const statSummary = stats
+    ? [
+        {
+          label: 'Lifetime Uploads',
+          value: totalUploads.toLocaleString(),
+          change: `${uploadsThisMonth.toLocaleString()} in the last 30 days`,
+        },
+        {
+          label: 'Lifetime Approval Rate',
+          value: `${Math.round(approvalRate * 100)}%`,
+          change: approvalRate > 0.8 ? 'Consistent quality' : 'Aim for 80%',
+        },
+        {
+          label: 'Lifetime Impact Score',
+          value: impactScore !== null ? impactScore.toFixed(1) : '—',
+          change: 'Based on all-time approvals',
+        },
+      ]
+    : [];
 
-    return [
-      {
-        label: 'Total Uploads',
-        value: totalUploads.toLocaleString(),
-        change: `${uploadsThisMonth.toLocaleString()} in the last 30 days`,
-      },
-      {
-        label: 'Approval Rate',
-        value: `${Math.round(approvalRate * 100)}%`,
-        change: approvalRate > 0.8 ? 'Consistent quality' : 'Aim for 80%',
-      },
-      {
-        label: 'Impact Score',
-        value: impactScore !== null ? impactScore.toFixed(1) : '—',
-        change: 'Based on approvals and recency',
-      },
-    ];
-  }, [stats]);
-
-  // Show loading while checking authentication
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-deep-900 via-deep-800 to-deep-900 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-pacific-400 animate-spin mx-auto mb-2" />
-          <p className="text-sm text-surface-soft/70">Verifying authentication...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Don't render profile if not authenticated (will redirect)
-  if (!isAuthenticated) {
-    return null;
-  }
-
-  const renderUploads = () => {
-    return <InfiniteUploadList enabled={activeTab === 'uploads'} />;
+  // Colorblind-friendly hazard color palette
+  const hazardColorMap: Record<string, string> = {
+    earthquake: '#E69F00',
+    flood: '#0072B2',
+    tsunami: '#56B4E9',
+    cyclone: '#CC79A7',
+    drought: '#F0E442',
+    landslide: '#009E73',
+    wildfire: '#D55E00',
+    volcanic: '#332288',
+    coastal_erosion: '#999999',
+    other: '#666666',
   };
 
-  const renderAchievements = () => {
-    if (!stats?.achievements?.length) {
+  // Prepare pie chart data from hazard distribution
+  const pieData = useMemo(() => {
+    const distribution = stats?.analytics?.hazard_distribution;
+    if (!distribution) return [];
+    return Object.entries(distribution).map(([hazard, count]) => ({
+      name: HAZARD_TYPE_LABELS[hazard as HazardType] || hazard.replace(/_/g, ' '),
+      value: count,
+      color: hazardColorMap[hazard] || '#3b82f6',
+    }));
+  }, [stats?.analytics?.hazard_distribution]);
+
+  // Prepare 30-day heatmap data
+  const heatmapDays = useMemo(() => {
+    const heatmap = stats?.analytics?.contribution_heatmap || {};
+    const days: Array<{ date: string; count: number; label: string }> = [];
+    const today = new Date();
+    
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      days.push({
+        date: dateStr,
+        count: heatmap[dateStr] || 0,
+        label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      });
+    }
+    return days;
+  }, [stats?.analytics?.contribution_heatmap]);
+
+  // Render all tab panels but hide inactive ones to maintain consistent hook order
+  // This prevents React hook order violations when switching tabs
+  const renderAchievementsContent = () => {
+    if (achievements.length === 0) {
       return (
         <div className="rounded-2xl border border-dashed border-white/20 bg-white/5 p-8 text-center text-white/70">
           {statsLoading ? 'Loading achievements...' : 'Achievements will appear as you contribute more assessments.'}
@@ -157,10 +205,11 @@ export default function ProfilePage() {
 
     return (
       <div className="grid gap-4 sm:grid-cols-2">
-        {stats.achievements.map((achievement, index) => {
+        {achievements.map((achievement) => {
           const total = achievement.total ?? 0;
           const progressValue = achievement.progress ?? 0;
-          const progressPct = total > 0 ? Math.min(100, Math.round((progressValue / total) * 100)) : achievement.unlocked ? 100 : 0;
+          const progressPct =
+            total > 0 ? Math.min(100, Math.round((progressValue / total) * 100)) : achievement.unlocked ? 100 : 0;
           const unlocked = Boolean(achievement.unlocked);
 
           return (
@@ -204,35 +253,7 @@ export default function ProfilePage() {
     );
   };
 
-  const {
-    data: analyticsData,
-    isLoading: analyticsLoading,
-  } = useQuery({
-    queryKey: ['user-analytics', 30],
-    queryFn: async () => {
-      const response = await fetch(getApiUrl('/api/user/analytics?days=30'), {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to fetch analytics');
-      return response.json();
-    },
-    enabled: queriesEnabled && activeTab === 'analytics',
-    staleTime: 60000,
-  });
-
-  const renderAnalytics = () => {
-    return <UserAnalyticsReal />;
-  };
-
-  const handleManagePreferences = () => {
-    router.push('/profile/settings');
-  };
-
-  const handleGenerateToken = () => {
-    router.push('/profile/settings?section=api');
-  };
-
-  const renderSettings = () => (
+  const renderSettingsContent = () => (
     <div className="space-y-4">
       <Card className={`${glassCard} border-white/5`}>
         <h4 className="text-lg font-semibold text-white">Notification Preferences</h4>
@@ -241,21 +262,19 @@ export default function ProfilePage() {
           variant="secondary"
           size="sm"
           className="mt-4 bg-white/10 text-white hover:bg-white/20"
-          onClick={handleManagePreferences}
+          onClick={() => router.push('/profile/settings')}
         >
           Manage Preferences
         </Button>
       </Card>
       <Card className={`${glassCard} border-white/5`}>
         <h4 className="text-lg font-semibold text-white">API Access</h4>
-        <p className="mt-1 text-sm text-white/60">
-          Generate scoped tokens for integrating automation or bulk upload tooling.
-        </p>
-        <Button 
-          variant='secondary' 
-          size='sm' 
+        <p className="mt-1 text-sm text-white/60">Generate tokens for programmatic access to your data.</p>
+        <Button
+          variant="secondary"
+          size="sm"
           className="mt-4 bg-white/10 text-white hover:bg-white/20"
-          onClick={handleGenerateToken}
+          onClick={() => router.push('/profile/settings?section=api')}
         >
           Generate Token
         </Button>
@@ -263,32 +282,71 @@ export default function ProfilePage() {
     </div>
   );
 
-  // Render all tabs but only show active one to prevent unmounting/remounting
-  const tabsContent = useMemo(() => ({
-    uploads: renderUploads(),
-    activity: <ActivityTimeline />,
-    achievements: renderAchievements(),
-    analytics: renderAnalytics(),
-    collaboration: <Collaboration uploads={uploads || []} stats={stats} />,
-    settings: renderSettings(),
-  }), [uploads, stats, statsLoading, activeTab]);
-
-  const renderTabContent = () => {
-    return Object.entries(tabsContent).map(([tabId, content]) => (
-      <div
-        key={tabId}
-        className={`transition-opacity duration-200 ${activeTab === tabId ? 'block opacity-100' : 'hidden opacity-0'}`}
-      >
-        {content}
+  // All tab panels rendered together to maintain consistent hook order across renders
+  // Using lazy-mount pattern: components only mount on first visit, then stay mounted
+  // Components receive isActive prop to pause polling when not visible
+  const tabPanels = (
+    <>
+      <div className={activeTab === 'uploads' ? 'block' : 'hidden'}>
+        {visitedTabs.has('uploads') && (
+          <InfiniteUploadList enabled={queriesEnabled} isActive={activeTab === 'uploads'} />
+        )}
       </div>
-    ));
-  };
+      <div className={activeTab === 'activity' ? 'block' : 'hidden'}>
+        {visitedTabs.has('activity') && (
+          <ActivityTimeline isActive={activeTab === 'activity'} />
+        )}
+      </div>
+      <div className={activeTab === 'achievements' ? 'block' : 'hidden'}>
+        {visitedTabs.has('achievements') && renderAchievementsContent()}
+      </div>
+      <div className={activeTab === 'analytics' ? 'block' : 'hidden'}>
+        {visitedTabs.has('analytics') && (
+          <UserAnalyticsReal isActive={activeTab === 'analytics'} />
+        )}
+      </div>
+      <div className={activeTab === 'collaboration' ? 'block' : 'hidden'}>
+        {visitedTabs.has('collaboration') && (
+          <Collaboration uploads={uploads || []} stats={stats} isActive={activeTab === 'collaboration'} />
+        )}
+      </div>
+      <div className={activeTab === 'settings' ? 'block' : 'hidden'}>
+        {visitedTabs.has('settings') && renderSettingsContent()}
+      </div>
+    </>
+  );
+
+  // Show loading while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-deep-900 via-deep-800 to-deep-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 text-pacific-400 animate-spin mx-auto mb-2" />
+          <p className="text-sm text-surface-soft/70">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render profile if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleTabSelect = (tabId: string) => {
-    setActiveTab(tabId);
+    handleTabChange(tabId);
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tabId);
     router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
+
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+    event.preventDefault();
+    const nextIndex =
+      event.key === 'ArrowRight' ? (index + 1) % TABS.length : (index - 1 + TABS.length) % TABS.length;
+    const nextTab = TABS[nextIndex];
+    handleTabSelect(nextTab.id);
   };
 
   const handleUploadClick = () => {
@@ -301,8 +359,10 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 px-4 py-10 text-white sm:px-6 lg:px-10">
-      <div className="mx-auto max-w-6xl space-y-8">
+    <ErrorBoundary boundaryName="profile page">
+      <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 px-4 py-10 text-white sm:px-6 lg:px-10">
+        <style>{`@supports (padding-bottom: env(safe-area-inset-bottom)) { .pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 24px); } }`}</style>
+        <div className="mx-auto max-w-6xl space-y-8">
         <Card className={`${glassCard} border-white/5 bg-gradient-to-br from-pacific-900/30 to-deep-900/40`}>
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
@@ -369,15 +429,101 @@ export default function ProfilePage() {
           ))}
         </div>
 
+        {/* Mini Visualizations - Hazard Pie Chart & Contribution Heatmap */}
+        {stats && (stats.analytics?.hazard_distribution || stats.analytics?.contribution_heatmap) && (
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Hazard Distribution Pie Chart */}
+            {pieData.length > 0 && (
+              <Card className={`${glassCard} border-white/5`}>
+                <h3 className="text-sm font-semibold text-white/80 mb-3">Hazard Types</h3>
+                <div className="flex items-center gap-4">
+                  <div className="w-24 h-24">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={20}
+                          outerRadius={40}
+                          dataKey="value"
+                          stroke="none"
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                          labelStyle={{ color: '#fff' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="flex-1 space-y-1">
+                    {pieData.slice(0, 4).map((item) => (
+                      <div key={item.name} className="flex items-center gap-2 text-xs">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                        <span className="text-white/70 truncate">{item.name}</span>
+                        <span className="text-white/50 ml-auto">{item.value}</span>
+                      </div>
+                    ))}
+                    {pieData.length > 4 && (
+                      <p className="text-xs text-white/40">+{pieData.length - 4} more</p>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* 30-Day Contribution Heatmap */}
+            {heatmapDays.length > 0 && (
+              <Card className={`${glassCard} border-white/5`}>
+                <h3 className="text-sm font-semibold text-white/80 mb-3">Last 30 Days</h3>
+                <div className="flex flex-wrap gap-1">
+                  {heatmapDays.map((day) => (
+                    <div
+                      key={day.date}
+                      className={`w-3 h-3 rounded-sm transition ${
+                        day.count === 0 ? 'bg-white/5' :
+                        day.count === 1 ? 'bg-emerald-900/60' :
+                        day.count <= 3 ? 'bg-emerald-700/70' :
+                        day.count <= 5 ? 'bg-emerald-500/80' :
+                        'bg-emerald-400'
+                      }`}
+                      title={`${day.label}: ${day.count} upload${day.count !== 1 ? 's' : ''}`}
+                    />
+                  ))}
+                </div>
+                <div className="mt-2 flex items-center gap-2 text-xs text-white/50">
+                  <span>Less</span>
+                  <div className="w-2 h-2 rounded-sm bg-white/5" />
+                  <div className="w-2 h-2 rounded-sm bg-emerald-900/60" />
+                  <div className="w-2 h-2 rounded-sm bg-emerald-700/70" />
+                  <div className="w-2 h-2 rounded-sm bg-emerald-500/80" />
+                  <div className="w-2 h-2 rounded-sm bg-emerald-400" />
+                  <span>More</span>
+                </div>
+              </Card>
+            )}
+          </div>
+        )}
+
         {/* Desktop tabs */}
         <div className={`hidden md:block ${glassCard} border-white/5`}>
-          <div className="flex flex-wrap border-b border-white/10">
-            {TABS.map((tab) => {
+          <div className="flex flex-wrap border-b border-white/10" role="tablist" aria-label="Profile sections">
+            {TABS.map((tab, index) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
                 <button
                   key={tab.id}
+                  role="tab"
+                  id={`tab-${tab.id}`}
+                  aria-selected={isActive}
+                  aria-controls={`panel-${tab.id}`}
+                  tabIndex={isActive ? 0 : -1}
+                  onKeyDown={(event) => handleTabKeyDown(event, index)}
                   onClick={() => handleTabSelect(tab.id)}
                   className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
                     isActive ? 'bg-white/10 text-white' : 'text-white/60 hover:text-white'
@@ -389,22 +535,40 @@ export default function ProfilePage() {
               );
             })}
           </div>
-          <div className="p-6">{renderTabContent()}</div>
+          <div className="p-6">
+            <div
+              role="tabpanel"
+              id={`panel-${activeTab}`}
+              aria-labelledby={`tab-${activeTab}`}
+              tabIndex={0}
+            >
+              {tabPanels}
+            </div>
+          </div>
         </div>
 
         {/* Mobile swipeable tabs */}
         <div className="block md:hidden">
-          <SwipeableTabs 
-            activeTab={activeTab} 
-            onTabChange={handleTabSelect} 
+          <SwipeableTabs
+            activeTab={activeTab}
+            onTabChange={handleTabSelect}
             tabs={TABS}
           >
-            <div className="p-4 pb-24">{renderTabContent()}</div>
+            <div className="p-4 pb-24 pb-safe">
+              <div
+                role="tabpanel"
+                id={`panel-${activeTab}-mobile`}
+                aria-labelledby={`tab-${activeTab}-mobile`}
+                tabIndex={0}
+              >
+                {tabPanels}
+              </div>
+            </div>
           </SwipeableTabs>
         </div>
 
         {/* Mobile bottom navigation */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
+        <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden pb-safe">
           <MobileBottomNav 
             activeTab={activeTab} 
             onTabChange={handleTabSelect} 
@@ -441,5 +605,6 @@ export default function ProfilePage() {
         )}
       </div>
     </div>
+  </ErrorBoundary>
   );
 }

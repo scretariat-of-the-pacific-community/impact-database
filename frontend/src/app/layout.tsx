@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import "../styles/tutorial.css";
+import "../styles/tutorial-enhanced.css";
 import { QueryProvider } from "@/providers/query-provider";
 import { AuthProvider } from "@/providers/auth-provider";
 import ServiceWorkerRegistration from "@/components/service-worker-registration";

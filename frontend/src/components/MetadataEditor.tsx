@@ -17,6 +17,7 @@ import {
   GlobeAltIcon
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
+import { Select } from '@/components/design-system';
 import dompurify from 'dompurify';
 
 const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
@@ -263,12 +264,14 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
 
       case 'select':
         return (
-          <select
+          <Select
             id={fieldId}
             value={value}
             onChange={(e) => handleFieldChange(field.key, e.target.value)}
             disabled={readOnly}
-            className={baseInputClasses}
+            variant="light"
+            size="md"
+            aria-label={field.label}
           >
             <option value="">Select {field.label}</option>
             {field.options?.map(option => (
@@ -276,7 +279,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
                 {option.charAt(0).toUpperCase() + option.slice(1)}
               </option>
             ))}
-          </select>
+          </Select>
         );
 
       case 'date':

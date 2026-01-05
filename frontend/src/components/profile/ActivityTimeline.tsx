@@ -24,79 +24,25 @@ export type ActivityItem = UserActivityEvent;
 const POLL_INTERVAL = 30_000;
 const STORAGE_KEY_PREFIX = 'activity-timeline-read-ids';
 
-const mockActivities: ActivityItem[] = [
-  {
-    id: 'upload-1',
-    type: 'upload',
-    title: 'Uploaded “Mangrove Restoration Survey.jpg”',
-    description: 'High-resolution imagery for coastal resilience program',
-    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-  },
-  {
-    id: 'edit-1',
-    type: 'edit',
-    title: 'Edited project metadata',
-    description: 'Updated hazard classification and geolocation accuracy',
-    timestamp: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-  },
-  {
-    id: 'review-1',
-    type: 'review',
-    title: 'Review received for “Floodplain Assessment.pdf”',
-    description: 'Peer review complete — see recommendations below',
-    reviewer: 'Dr. Amina Clarke',
-    reviewComments: 'Great documentation of field notes. Consider clarifying sensor calibration steps.',
-    suggestedImprovements: [
-      { id: 'review-1-tip-1', text: 'Add calibration photos for sensors used on March 3rd.' },
-      { id: 'review-1-tip-2', text: 'Include a short summary of QA/QC checks in the metadata.' },
-    ],
-    timestamp: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
-  },
-  {
-    id: 'achievement-1',
-    type: 'achievement',
-    title: 'Unlocked “Consistency Champion” badge',
-    description: '10 consecutive weeks of verified submissions',
-    achievementBadge: 'Consistency Champion',
-    timestamp: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-  },
-  {
-    id: 'system-1',
-    type: 'system',
-    title: 'Scheduled maintenance',
-    description: 'Brief downtime on Saturday for database upgrades',
-    systemMessage: 'We will be offline for approximately 20 minutes at 02:00 UTC. Uploads will resume automatically.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 300).toISOString(),
-  },
-];
+// NOTE: Mock activities removed for production - all data is now fetched from the API
 
-const deriveStorageKey = () => {
-  if (typeof window === 'undefined') return STORAGE_KEY_PREFIX;
-  try {
-    const sessionRaw = window.localStorage.getItem('ocean_portal_session');
-    if (sessionRaw) {
-      const session = JSON.parse(sessionRaw);
-      const identifier = session?.user?.id || session?.user?.email || session?.user?.username;
-      if (identifier) {
-        return `${STORAGE_KEY_PREFIX}:${identifier}`;
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to read auth session for activity timeline', error);
-  }
-  return STORAGE_KEY_PREFIX;
-};
+const deriveStorageKey = () => STORAGE_KEY_PREFIX;
 
-export async function fetchActivityTimeline(): Promise<ActivityItem[]> {
+// Shared query key for user activity - used by both ActivityTimeline and Collaboration
+export const USER_ACTIVITY_QUERY_KEY = ['user-activity'] as const;
+
+export async function fetchUserActivity(): Promise<{ events: ActivityItem[] }> {
   try {
     const data = await imageApi.userActivity();
     if (!data || !Array.isArray(data.events)) {
-      return [];
+      return { events: [] };
     }
-    return data.events.map((item) => ({
-      ...item,
-      timestamp: item.timestamp ?? new Date().toISOString(),
-    }));
+    return {
+      events: data.events.map((item) => ({
+        ...item,
+        timestamp: item.timestamp ?? new Date().toISOString(),
+      })),
+    };
   } catch (error) {
     console.warn('Failed to fetch activity timeline', error);
     throw error;
@@ -144,7 +90,12 @@ const typeStyles: Record<ActivityType, string> = {
   system: 'border-white/20 bg-white/5',
 };
 
-export default function ActivityTimeline() {
+interface ActivityTimelineProps {
+  /** When false, the component is hidden and should pause polling */
+  isActive?: boolean;
+}
+
+export default function ActivityTimeline({ isActive = true }: ActivityTimelineProps) {
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const storageKey = useMemo(() => deriveStorageKey(), []);
@@ -167,12 +118,17 @@ export default function ActivityTimeline() {
     window.localStorage.setItem(storageKey, JSON.stringify([...readIds]));
   }, [readIds, storageKey]);
 
-  const { data: activities = [], isLoading, error } = useQuery({
-    queryKey: ['profile-activity-timeline'],
-    queryFn: fetchActivityTimeline,
-    refetchInterval: POLL_INTERVAL,
+  const { data: activityData, isLoading, error } = useQuery({
+    // Shared query key - same data used by Collaboration.tsx
+    queryKey: USER_ACTIVITY_QUERY_KEY,
+    queryFn: fetchUserActivity,
+    // Only poll when tab is active - saves battery and network on mobile
+    refetchInterval: isActive ? POLL_INTERVAL : false,
     staleTime: POLL_INTERVAL,
   });
+
+  // Extract events array from shared query data
+  const activities = activityData?.events ?? [];
 
   const sortedActivities = useMemo(
     () =>

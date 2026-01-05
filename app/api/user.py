@@ -15,6 +15,7 @@ from models.database import get_db, ImageMetadata
 from models.rbac import User as DBUser
 from models.audit_log import AuditLog
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced
+from api.dependencies import UserDetails, get_user_details, build_user_upload_filter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -184,6 +185,39 @@ async def get_user_stats(
         # Get user details
         user = db.query(DBUser).filter(DBUser.username == current_user.username).first()
 
+        # Get hazard distribution for profile visualization
+        hazard_counts = db.query(
+            ImageMetadata.hazard_type,
+            func.count(ImageMetadata.id).label('count')
+        ).filter(
+            ImageMetadata.uploader_id.in_(user_identifiers)
+        ).group_by(
+            ImageMetadata.hazard_type
+        ).all()
+        
+        hazard_distribution = {
+            row[0]: row[1] for row in hazard_counts if row[0]
+        }
+
+        # Get recent upload dates for contribution heatmap (last 30 days)
+        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+        daily_uploads = db.query(
+            func.date(ImageMetadata.datetime).label('date'),
+            func.count(ImageMetadata.id).label('count')
+        ).filter(
+            and_(
+                ImageMetadata.uploader_id.in_(user_identifiers),
+                ImageMetadata.datetime >= thirty_days_ago
+            )
+        ).group_by(
+            func.date(ImageMetadata.datetime)
+        ).all()
+        
+        contribution_heatmap = {
+            row[0].isoformat() if row[0] else None: row[1] 
+            for row in daily_uploads if row[0]
+        }
+
         # Get achievements with progress for profile display
         achievements_with_progress = []
         try:
@@ -223,7 +257,9 @@ async def get_user_stats(
             "analytics": {
                 "uploads_this_month": uploads_this_month,
                 "average_review_time": average_review_time,
-                "top_hazard": top_hazard
+                "top_hazard": top_hazard,
+                "hazard_distribution": hazard_distribution,
+                "contribution_heatmap": contribution_heatmap
             }
         }
         
@@ -1078,3 +1114,69 @@ async def get_unlocked_achievements(
     except Exception as e:
         logger.error(f"Error fetching unlocked achievements: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch unlocked achievements: {str(e)}")
+
+
+# =============================================================================
+# Collaboration Features (Stub Endpoints - Ready for future implementation)
+# =============================================================================
+
+@router.get("/follows")
+async def get_follows(
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Get users/entities the current user follows. Stub for future implementation."""
+    return []
+
+
+@router.post("/follows")
+async def create_follow(
+    request: Request,
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Follow a user or entity. Stub for future implementation."""
+    body = await request.json()
+    return {"success": True, "followed": body.get("target_id")}
+
+
+@router.delete("/follows/{follow_id}")
+async def delete_follow(
+    follow_id: str,
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Unfollow a user or entity. Stub for future implementation."""
+    return {"success": True, "unfollowed": follow_id}
+
+
+@router.get("/workspaces")
+async def get_workspaces(
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Get user's workspaces. Stub for future implementation."""
+    return []
+
+
+@router.post("/workspaces")
+async def create_workspace(
+    request: Request,
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Create a new workspace. Stub for future implementation."""
+    body = await request.json()
+    return {"success": True, "name": body.get("name"), "id": "placeholder"}
+
+
+@router.get("/notifications")
+async def get_notifications(
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Get user's notifications. Stub for future implementation."""
+    return []
+
+
+@router.put("/notifications/{notification_id}/read")
+async def mark_notification_read(
+    notification_id: str,
+    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+):
+    """Mark a notification as read. Stub for future implementation."""
+    return {"success": True, "id": notification_id, "read": True}

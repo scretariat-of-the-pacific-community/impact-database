@@ -5,6 +5,7 @@ import { Award, Star, Upload, CheckCircle, TrendingUp, Zap, Target, Shield } fro
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { imageApi } from '@/lib/api';
+import { useAuth } from '@/providers/auth-provider';
 
 interface Badge {
   id: string;
@@ -25,14 +26,18 @@ interface ContributorStats {
   streak: number;
 }
 
+const defaultStats: ContributorStats = {
+  totalUploads: 0,
+  reviewedImages: 0,
+  qualityScore: 0,
+  streak: 0,
+};
+
 export default function GamificationBadges() {
-  // Fetch real user stats from API
-  const { data: stats = {
-    totalUploads: 0,
-    reviewedImages: 0,
-    qualityScore: 0,
-    streak: 0,
-  }, isLoading } = useQuery<ContributorStats>({
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  
+  // Fetch real user stats from API - only when authenticated
+  const { data: stats = defaultStats, isLoading } = useQuery<ContributorStats>({
     queryKey: ['contributor-stats'],
     queryFn: async () => {
       try {
@@ -44,15 +49,11 @@ export default function GamificationBadges() {
           streak: 0,
         };
       } catch (error) {
-        // Silently return default stats if not authenticated or fetch fails
-        return {
-          totalUploads: 0,
-          reviewedImages: 0,
-          qualityScore: 0,
-          streak: 0,
-        };
+        // Silently return default stats if fetch fails
+        return defaultStats;
       }
     },
+    enabled: isAuthenticated && !authLoading, // Only fetch when authenticated
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: false, // Don't retry if not authenticated
     meta: {

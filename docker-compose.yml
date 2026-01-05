@@ -79,6 +79,8 @@ services:
       - redis_data:/data
     networks:
       - impact-network
+    sysctls:
+      - net.core.somaxconn=511
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -170,6 +172,14 @@ services:
       - DEBUG=${DEBUG}
       - SECRET_KEY=${SECRET_KEY}
       - PYTHONPATH=${PYTHONPATH}
+      - EMAIL_BACKEND=${EMAIL_BACKEND}
+      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_USE_TLS=${SMTP_USE_TLS}
     depends_on:
       postgis_db:
         condition: service_healthy

@@ -31,17 +31,12 @@ const getTrustedShareUrl = () => {
 
   try {
     const parsed = new URL(envUrl);
-    const validSubdomain = /^[a-z0-9]+(-[a-z0-9]+)*\.impactdatabase\.org$/i;
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    const allowedProtocol = isDevelopment
-      ? parsed.protocol === 'https:' || parsed.protocol === 'http:'
-      : parsed.protocol === 'https:';
-    if (
-      allowedProtocol &&
-      (parsed.hostname === 'impactdatabase.org' || validSubdomain.test(parsed.hostname))
-    ) {
-      return parsed.toString();
-    }
+    const allowedHosts = ['impactdatabase.org'];
+    const isDev = process.env.NODE_ENV === 'development';
+    const hostname = parsed.hostname.toLowerCase();
+    const protocolAllowed = isDev ? parsed.protocol === 'https:' || parsed.protocol === 'http:' : parsed.protocol === 'https:';
+    const hostAllowed = allowedHosts.includes(hostname) || hostname.endsWith('.impactdatabase.org');
+    if (protocolAllowed && hostAllowed) return parsed.toString();
   } catch (error) {
     console.warn('Invalid share URL provided, reverting to default.', error);
   }
@@ -407,4 +402,3 @@ export default function AchievementsHub({
     </section>
   );
 }
-

@@ -22,7 +22,7 @@ import {
   HardDrive,
   LogOut,
 } from 'lucide-react';
-import { Card, Button } from '@/components/design-system';
+import { Card, Button, Select } from '@/components/design-system';
 import ErrorBanner from '@/components/ErrorBanner';
 import { imageApi } from '@/lib/api';
 
@@ -94,8 +94,22 @@ export default function SettingsPage() {
   const { user, isAuthenticated, isLoading: authLoading, signOut } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
+  const deleteConfirmInputRef = useRef<HTMLInputElement>(null);
+  const tokenRef = useRef<HTMLElement>(null);
 
   const [activeSection, setActiveSection] = useState<string>('profile');
+  const reauthRequested = searchParams.get('reauth') === '1';
+  const [reauthConfirmed, setReauthConfirmed] = useState(reauthRequested);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showTokenGenerate, setShowTokenGenerate] = useState(false);
+  const [newTokenName, setNewTokenName] = useState('');
+  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
+  const [tokenRevealed, setTokenRevealed] = useState(false);
+  const [tokenCopyPending, setTokenCopyPending] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   // Set active section from URL parameter
   useEffect(() => {
@@ -104,11 +118,43 @@ export default function SettingsPage() {
       setActiveSection(section);
     }
   }, [searchParams]);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showTokenGenerate, setShowTokenGenerate] = useState(false);
-  const [newTokenName, setNewTokenName] = useState('');
-  const [generatedToken, setGeneratedToken] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Auth guard - redirect to login if not authenticated
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      router.push('/auth/login?returnUrl=/profile/settings');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // Keep focus within delete confirmation dialog when open
+  useEffect(() => {
+    if (!showDeleteConfirm) return;
+    const dialogEl = deleteDialogRef.current;
+    const inputEl = deleteConfirmInputRef.current;
+    inputEl?.focus();
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !dialogEl) return;
+      const focusable = dialogEl.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey) {
+        if (document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        }
+      } else if (document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    dialogEl?.addEventListener('keydown', handleKeyDown);
+    return () => dialogEl?.removeEventListener('keydown', handleKeyDown);
+  }, [showDeleteConfirm]);
 
   // Fetch user settings
   const { data: settings, isLoading: settingsLoading } = useQuery<UserSettings>({
@@ -130,6 +176,7 @@ export default function SettingsPage() {
     queryFn: () => imageApi.apiTokens(),
     enabled: !authLoading && isAuthenticated,
   });
+  const hasHydratedSettings = useRef(false);
 
   const [formData, setFormData] = useState<UserSettings>(
     settings || {
@@ -144,10 +191,13 @@ export default function SettingsPage() {
     }
   );
 
-  // Update form data when settings load
-  if (settings && !formData.profile.avatar_url && settings.profile.avatar_url) {
-    setFormData(settings);
-  }
+  // Update form data once when settings load
+  useEffect(() => {
+    if (settings && !hasHydratedSettings.current) {
+      setFormData(settings);
+      hasHydratedSettings.current = true;
+    }
+  }, [settings]);
 
   const updateSettingsMutation = useMutation({
     mutationFn: (data: Partial<UserSettings>) => imageApi.updateSettings(data),
@@ -163,6 +213,7 @@ export default function SettingsPage() {
     mutationFn: (name: string) => imageApi.generateToken(name),
     onSuccess: (data) => {
       setGeneratedToken(data.token);
+      setTokenRevealed(false);
       refetchTokens();
       setNewTokenName('');
     },
@@ -217,6 +268,11 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast.error('Please type DELETE to confirm account deletion.', { description: 'Confirmation text did not match.' });
+      deleteConfirmInputRef.current?.focus();
+      return;
+    }
     try {
       await imageApi.deleteAccount();
       // Clear local storage and redirect to home
@@ -229,12 +285,38 @@ export default function SettingsPage() {
         description: 'Please try again or contact support.',
       });
       setShowDeleteConfirm(false);
+      setDeleteConfirmText('');
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard!');
+  const copyToClipboard = async (text: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success('Copied to clipboard!');
+    } catch (error) {
+      console.error('Clipboard copy failed', error);
+      toast.error('Unable to copy right now. Please try again.');
+    }
+  };
+
+  const handleCopyToken = async () => {
+    if (!generatedToken) return;
+    setTokenCopyPending(true);
+    await copyToClipboard(generatedToken);
+    setTokenCopyPending(false);
+    setGeneratedToken(null);
+    setTokenRevealed(false);
   };
 
   const formatBytes = (bytes: number) => {
@@ -245,7 +327,25 @@ export default function SettingsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  if (authLoading || settingsLoading) {
+  // Show loading while checking authentication first
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950">
+        <div className="text-center text-white">
+          <RefreshCw className="mx-auto mb-4 h-12 w-12 animate-spin text-pacific-300" />
+          <p className="text-lg">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Redirect to login if not authenticated (redirect handled in useEffect)
+  if (!isAuthenticated) {
+    return null;
+  }
+
+  // Show loading while fetching settings (only after auth is confirmed)
+  if (settingsLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950">
         <div className="text-center text-white">
@@ -254,11 +354,6 @@ export default function SettingsPage() {
         </div>
       </div>
     );
-  }
-
-  if (!isAuthenticated) {
-    router.push('/auth/login?returnUrl=/profile/settings');
-    return null;
   }
 
   const sections = [
@@ -358,6 +453,9 @@ export default function SettingsPage() {
             type="checkbox"
             className="h-5 w-5 rounded border-white/20 bg-white/5 text-pacific-500 focus:ring-2 focus:ring-pacific-400/20"
             checked={formData.privacy.public_profile}
+            role="switch"
+            aria-checked={formData.privacy.public_profile}
+            aria-label="Public profile visibility"
             onChange={(e) =>
               setFormData({
                 ...formData,
@@ -375,6 +473,9 @@ export default function SettingsPage() {
             type="checkbox"
             className="h-5 w-5 rounded border-white/20 bg-white/5 text-pacific-500 focus:ring-2 focus:ring-pacific-400/20"
             checked={formData.privacy.hide_stats}
+            role="switch"
+            aria-checked={formData.privacy.hide_stats}
+            aria-label="Hide statistics"
             onChange={(e) =>
               setFormData({ ...formData, privacy: { ...formData.privacy, hide_stats: e.target.checked } })
             }
@@ -389,6 +490,9 @@ export default function SettingsPage() {
             type="checkbox"
             className="h-5 w-5 rounded border-white/20 bg-white/5 text-pacific-500 focus:ring-2 focus:ring-pacific-400/20"
             checked={formData.privacy.anonymous_contributions}
+            role="switch"
+            aria-checked={formData.privacy.anonymous_contributions}
+            aria-label="Enable anonymous contributions"
             onChange={(e) =>
               setFormData({
                 ...formData,
@@ -446,9 +550,10 @@ export default function SettingsPage() {
       </p>
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">Default Hazard Type</label>
-          <select
-            className={glassInput}
+          <Select
+            label="Default Hazard Type"
+            variant="dark"
+            size="md"
             value={formData.default_metadata.hazard_type || ''}
             onChange={(e) =>
               setFormData({
@@ -464,7 +569,7 @@ export default function SettingsPage() {
             <option value="flooding">Flooding</option>
             <option value="drought">Drought</option>
             <option value="volcanic_eruption">Volcanic Eruption</option>
-          </select>
+          </Select>
         </div>
         <div>
           <label className="block text-sm font-medium text-white/80 mb-2">Default Location</label>
@@ -558,20 +663,42 @@ export default function SettingsPage() {
         <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
           <div className="flex items-start gap-3">
             <CheckCircle className="h-5 w-5 text-emerald-400 mt-0.5" />
-            <div className="flex-1">
-              <p className="font-medium text-emerald-200 mb-2">Token Generated Successfully</p>
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-black/20 font-mono text-sm text-emerald-100">
-                <code className="flex-1 break-all">{generatedToken}</code>
-                <button
-                  onClick={() => copyToClipboard(generatedToken)}
-                  className="p-1.5 rounded hover:bg-white/10 transition"
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
-              </div>
-              <p className="text-xs text-emerald-200/70 mt-2">
-                ⚠️ Save this token now. You won't be able to see it again.
-              </p>
+            <div className="flex-1 space-y-3">
+              <p className="font-medium text-emerald-200">Token Generated Successfully</p>
+              {!tokenRevealed ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-emerald-100/80">
+                    This token will be shown only once. Reveal it to copy, then it will be cleared from memory.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    className="bg-white/10 text-white hover:bg-white/20"
+                    onClick={() => setTokenRevealed(true)}
+                  >
+                    Reveal Token
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-black/20 font-mono text-sm text-emerald-100">
+                    <code ref={tokenRef} className="flex-1 break-all blur-sm hover:blur-none focus:blur-none">
+                      {generatedToken}
+                    </code>
+                    <Button
+                      variant="secondary"
+                      className="bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30"
+                      onClick={handleCopyToken}
+                      disabled={tokenCopyPending}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      {tokenCopyPending ? 'Copying…' : 'Copy & Hide'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-emerald-200/70">
+                    ⚠️ Do not share this token. It will disappear after you copy it.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -699,7 +826,7 @@ export default function SettingsPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-coral-400 mt-0.5" />
             <div className="flex-1">
-              <h4 className="font-medium text-coral-200 mb-1">Delete Account</h4>
+              <h4 id="delete-account-title" className="font-medium text-coral-200 mb-1">Delete Account</h4>
               <p className="text-sm text-coral-200/70 mb-3">
                 Permanently delete your account and all associated data. This action cannot be undone.
               </p>
@@ -713,20 +840,35 @@ export default function SettingsPage() {
                   Delete Account
                 </Button>
               ) : (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-coral-100">
+                <div
+                  className="space-y-3"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="delete-account-title"
+                  aria-describedby="delete-account-description"
+                  ref={deleteDialogRef}
+                >
+                  <p id="delete-account-description" className="text-sm font-medium text-coral-100">
                     Are you absolutely sure? Type "DELETE" to confirm:
                   </p>
                   <div className="flex gap-2">
+                    <label className="sr-only" htmlFor="delete-confirm-input">
+                      Confirm account deletion by typing DELETE
+                    </label>
                     <input
                       type="text"
+                      id="delete-confirm-input"
                       className={`${glassInput} flex-1`}
                       placeholder="Type DELETE"
+                      ref={deleteConfirmInputRef}
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
                     />
                     <Button
                       variant="secondary"
                       className="bg-coral-500 text-white hover:bg-coral-400"
                       onClick={handleDeleteAccount}
+                      disabled={deleteConfirmText !== 'DELETE'}
                     >
                       Confirm Delete
                     </Button>

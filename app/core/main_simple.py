@@ -304,6 +304,14 @@ try:
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
 
+# Admin router in separate try block to ensure it loads independently
+try:
+    from api.admin import router as admin_router
+    app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
+    logger.info("Admin API router included")
+except ImportError as e:
+    logger.warning(f"Could not import admin router: {e}")
+
 # Add essential endpoints directly to main app
 @app.get("/api/vocabularies")
 async def get_vocabularies():

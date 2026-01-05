@@ -119,7 +119,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
     >
-      <ResponsiveContainer width="100%" height={300} minHeight={300}>
+      <ResponsiveContainer width="100%" height={300} minWidth={100} minHeight={300}>
         <AreaChart
           data={enrichedData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}

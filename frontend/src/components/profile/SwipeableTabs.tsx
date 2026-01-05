@@ -13,9 +13,16 @@ interface SwipeableTabsProps {
 export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }: SwipeableTabsProps) {
   const controls = useAnimation();
   const [isDragging, setIsDragging] = useState(false);
+  const [dragEnabled, setDragEnabled] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const currentIndex = tabs.findIndex((tab) => tab.id === activeTab);
+
+  const triggerHaptic = () => {
+    if (typeof window !== 'undefined' && 'vibrate' in navigator) {
+      navigator.vibrate?.(10);
+    }
+  };
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     setIsDragging(false);
@@ -29,6 +36,7 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
       // Swiped right - go to previous tab
       if (currentIndex > 0) {
         onTabChange(tabs[currentIndex - 1].id);
+        triggerHaptic();
       }
     } else if (
       info.offset.x < -swipeThreshold ||
@@ -37,7 +45,16 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
       // Swiped left - go to next tab
       if (currentIndex < tabs.length - 1) {
         onTabChange(tabs[currentIndex + 1].id);
+        triggerHaptic();
       }
+    }
+    setDragEnabled(true);
+  };
+
+  const handleDirectionLock = (axis: 'x' | 'y') => {
+    if (axis === 'y') {
+      // Release to allow vertical scroll
+      setDragEnabled(false);
     }
   };
 
@@ -48,11 +65,14 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
   return (
     <div className="relative overflow-hidden touch-pan-y" ref={containerRef}>
       <motion.div
-        drag="x"
+        drag={dragEnabled ? 'x' : false}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.2}
+        dragDirectionLock
         onDragStart={() => setIsDragging(true)}
         onDragEnd={handleDragEnd}
+        onPanEnd={() => setDragEnabled(true)}
+        onDirectionLock={handleDirectionLock}
         animate={controls}
         transition={{
           type: 'spring',
@@ -70,10 +90,8 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`min-w-[44px] min-h-[8px] rounded-full transition-all ${
-              index === currentIndex
-                ? 'w-8 bg-pacific-400'
-                : 'w-2 bg-white/20 hover:bg-white/40'
+            className={`min-w-[44px] min-h-[44px] rounded-full transition-all flex items-center justify-center ${
+              index === currentIndex ? 'bg-white/10' : 'bg-white/5 hover:bg-white/10'
             }`}
             aria-label={`Go to ${tab.label} tab`}
           />

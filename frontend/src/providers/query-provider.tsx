@@ -1,7 +1,7 @@
 'use client';
 
 import { QueryCache, QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { isAxiosError } from 'axios';
 import { trackQueryError } from '@/lib/analytics';
 
@@ -108,7 +108,10 @@ export function QueryProvider({ children }: QueryProviderProps) {
             const isConnectionError = 
               normalized.message.includes('Unable to connect') ||
               normalized.message.includes('Network Error') ||
+              normalized.message.includes('Failed to fetch') ||
               normalized.message.includes('ECONNREFUSED') ||
+              normalized.message.includes('aborted') ||
+              normalized.message.includes('cancelled') ||
               (normalized.details.status === undefined && isAxiosError(error));
 
             if (isConnectionError) {
@@ -168,10 +171,52 @@ export function QueryProvider({ children }: QueryProviderProps) {
           queries: {
             staleTime: 60 * 1000,
             refetchOnWindowFocus: false,
+            // Don't retry on authentication errors
+            retry: (failureCount, error) => {
+              if (isAxiosError(error) && error.response?.status === 401) {
+                return false;
+              }
+              return failureCount < 3;
+            },
           },
         },
       })
   );
+
+  // Cancel all user-related queries when unauthorized
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      // Cancel all queries that require authentication
+      queryClient.cancelQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && (
+            key.includes('user') ||
+            key.includes('profile') ||
+            key.includes('contributor') ||
+            key.includes('activity')
+          );
+        },
+      });
+      // Invalidate to clear stale authenticated data
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === 'string' && (
+            key.includes('user') ||
+            key.includes('profile') ||
+            key.includes('contributor') ||
+            key.includes('activity')
+          );
+        },
+      });
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => {
+      window.removeEventListener('auth:unauthorized', handleUnauthorized);
+    };
+  }, [queryClient]);
 
   return (
     <QueryClientProvider client={queryClient}>

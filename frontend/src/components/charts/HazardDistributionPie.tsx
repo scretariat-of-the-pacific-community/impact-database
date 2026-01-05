@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { motion } from 'framer-motion';
 
@@ -41,6 +41,12 @@ const toTitleCase = (value: string) =>
     .join(' ');
 
 export default function HazardDistributionPie({ data, className = '' }: Props) {
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const { chartData, total, topHazard, insightHazard } = useMemo(() => {
     if (!data || data.length === 0) {
       return { chartData: [], total: 0, topHazard: null, insightHazard: null };
@@ -96,6 +102,15 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
       <div className={`flex h-80 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-deep-900/40 ${className}`}>
         <p className="text-base font-semibold text-white">No hazard-tagged reports in the selected period.</p>
         <p className="text-sm text-white/70">Upload new imagery or adjust filters to see hazard trends.</p>
+      </div>
+    );
+  }
+
+  // Don't render chart until mounted (avoid SSR issues)
+  if (!isMounted) {
+    return (
+      <div className={`flex h-80 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-deep-900/40 ${className}`}>
+        <div className="animate-pulse text-white/50">Loading chart...</div>
       </div>
     );
   }
@@ -157,8 +172,8 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
           <p className="text-lg font-semibold text-white">What hazards are being reported?</p>
         </div>
       </div>
-      <div className="relative h-80" style={{ minHeight: '320px' }}>
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="relative" style={{ width: '100%', height: '320px' }}>
+        <ResponsiveContainer width="100%" height={320} minWidth={100} minHeight={320}>
           <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
             <Pie
               data={chartData as any}

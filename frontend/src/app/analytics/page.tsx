@@ -23,6 +23,8 @@ import dynamic from 'next/dynamic';
 import { generateInsights } from '@/lib/insights-engine';
 import { exportCSV, exportJSON } from '@/lib/export-utils';
 import InsightsPanel from '@/components/InsightsPanel';
+import { Select } from '@/components/design-system';
+import { getCountryName } from '@/lib/countries';
 
 // Dynamic import for map to avoid SSR issues
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
@@ -294,44 +296,47 @@ export default function EnhancedAnalytics() {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Hazard Type</label>
-                <select
+                <Select
+                  label="Hazard Type"
                   value={filters.hazardType}
                   onChange={(e) => setFilters({...filters, hazardType: e.target.value})}
-                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
+                  variant="dark"
+                  size="md"
                 >
                   <option value="">All Hazards</option>
                   {Object.keys(analyticsData.hazardDistribution).map(hazard => (
                     <option key={hazard} value={hazard}>{hazard}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Country</label>
-                <select
+                <Select
+                  label="Country"
                   value={filters.country}
                   onChange={(e) => setFilters({...filters, country: e.target.value})}
-                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
+                  variant="dark"
+                  size="md"
                 >
                   <option value="">All Countries</option>
                   {Object.keys(analyticsData.countryDistribution).map(country => (
-                    <option key={country} value={country}>{country}</option>
+                    <option key={country} value={country}>{getCountryName(country)}</option>
                   ))}
-                </select>
+                </Select>
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-white/80 mb-2">Time Range</label>
-                <select
+                <Select
+                  label="Time Range"
                   value={filters.timeRange}
                   onChange={(e) => setFilters({...filters, timeRange: e.target.value as Filters['timeRange']})}
-                  className="w-full rounded-lg border border-white/20 bg-deep-900/60 px-3 py-2 text-white focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
+                  variant="dark"
+                  size="md"
                 >
                   <option value="daily">Daily</option>
                   <option value="monthly">Monthly</option>
                   <option value="yearly">Yearly</option>
-                </select>
+                </Select>
               </div>
             </div>
           </div>
@@ -504,7 +509,7 @@ export default function EnhancedAnalytics() {
                       </div>
                       <div className="flex-1">
                         <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm font-medium text-white">{country}</span>
+                          <span className="text-sm font-medium text-white">{getCountryName(country)}</span>
                           <span className="text-sm font-bold text-white/80">{count}</span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
@@ -540,7 +545,7 @@ export default function EnhancedAnalytics() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-white truncate">{activity.type}</p>
-                        <p className="text-xs text-white/70 truncate">{activity.country}</p>
+                        <p className="text-xs text-white/70 truncate">{getCountryName(activity.country)}</p>
                         <p className="text-xs text-white/60 mt-1">
                           {new Date(activity.timestamp).toLocaleDateString()}
                         </p>

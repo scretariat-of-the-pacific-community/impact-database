@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import React from 'react';
 
-import UserAnalytics, { formatCsv, generateTimelineSeries } from '@/components/profile/UserAnalytics';
+import UserAnalytics, { formatCsv, generateTimelineSeries } from '@/components/profile/UserAnalyticsMock';
 
 const rechartsSpies: { areaData?: any[] } = {};
 

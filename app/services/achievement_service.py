@@ -106,6 +106,46 @@ class AchievementService:
             else:
                 break  # Streak broken
         
+        # Hazard-specific approved counts for expert achievements
+        hazard_types = ['flood', 'earthquake', 'cyclone', 'tsunami', 'wildfire', 'volcanic', 'drought', 'landslide']
+        hazard_counts = {}
+        for hazard in hazard_types:
+            count = db.query(func.count(ImageMetadata.id)).filter(
+                and_(
+                    ImageMetadata.uploader_id == user_id_str,
+                    ImageMetadata.status == "approved",
+                    ImageMetadata.hazard_type == hazard
+                )
+            ).scalar() or 0
+            hazard_counts[f'approved_{hazard}_count'] = count
+        
+        # Top country (for geographic achievements)
+        top_country_query = db.query(
+            ImageMetadata.country,
+            func.count(ImageMetadata.id).label('count')
+        ).filter(
+            and_(
+                ImageMetadata.uploader_id == user_id_str,
+                ImageMetadata.status == "approved",
+                ImageMetadata.country.isnot(None)
+            )
+        ).group_by(ImageMetadata.country).order_by(func.count(ImageMetadata.id).desc()).first()
+        
+        top_country_count = top_country_query[1] if top_country_query else 0
+        
+        # Consecutive approved uploads streak (quality streak)
+        # Get recent uploads ordered by datetime descending
+        recent_uploads = db.query(ImageMetadata.status).filter(
+            ImageMetadata.uploader_id == user_id_str
+        ).order_by(ImageMetadata.datetime.desc()).limit(20).all()
+        
+        consecutive_approvals = 0
+        for upload in recent_uploads:
+            if upload.status == 'approved':
+                consecutive_approvals += 1
+            else:
+                break  # Streak broken by non-approved upload
+        
         return {
             'uploads': total_uploads,
             'approved_uploads': approved_uploads,
@@ -113,6 +153,9 @@ class AchievementService:
             'unique_hazards': unique_hazards,
             'unique_countries': unique_countries,
             'complete_metadata': complete_metadata,
+            'top_country_count': top_country_count,
+            'consecutive_approvals': consecutive_approvals,
+            **hazard_counts,
             'weekly_streak': weekly_streak
         }
     

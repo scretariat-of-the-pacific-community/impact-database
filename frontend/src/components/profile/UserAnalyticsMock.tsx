@@ -339,7 +339,7 @@ export default function UserAnalytics() {
               <div className="rounded-full bg-white/5 px-3 py-1 text-xs text-white">Click a slice to drill down</div>
             </div>
             <div className="h-72" style={{ minHeight: '288px' }}>
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={200}>
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -432,7 +432,7 @@ export default function UserAnalytics() {
             </div>
           </div>
           <div className="h-80" style={{ minHeight: '320px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={200}>
               <AreaChart data={timelineWithRolling} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorUploads" x1="0" y1="0" x2="0" y2="1">
@@ -481,7 +481,7 @@ export default function UserAnalytics() {
           <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Benchmarking</p>
           <h2 className="text-xl font-semibold text-white">You vs. community average</h2>
           <div className="h-64" style={{ minHeight: '256px' }}>
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={150}>
               <BarChart data={communityBenchmark} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                 <XAxis dataKey="metric" stroke="rgba(255,255,255,0.6)" />

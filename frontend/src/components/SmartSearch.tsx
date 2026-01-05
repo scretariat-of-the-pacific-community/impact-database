@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { imageApi } from '@/lib/api';
 import { getApiUrl } from '@/lib/config';
 import { sanitizeText } from '@/lib/sanitize';
+import { getCountryName } from '@/lib/countries';
 
 interface SearchResult {
   id: string;
@@ -206,7 +207,7 @@ export default function SmartSearch() {
                             </span>
                           )}
                           {result.country && (
-                            <span>{result.country}</span>
+                            <span>{getCountryName(result.country)}</span>
                           )}
                         </div>
                       </div>

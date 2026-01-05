@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { useTutorial } from '@/lib/tutorial';
+import { useTutorial } from '@/lib/tutorial-enhanced';
 import 'driver.js/dist/driver.css';
 
 interface TutorialProviderProps {

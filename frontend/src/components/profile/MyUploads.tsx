@@ -5,7 +5,7 @@ import clsx from 'clsx';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { HAZARD_TYPE_LABELS, UserUpload } from '@/lib/types';
-import { Button, Card } from '@/components/design-system';
+import { Button, Card, Select } from '@/components/design-system';
 import { Loader2, Grid, List, Filter, RefreshCcw, Search, AlertTriangle, Trash2, MapPin, PenLine } from 'lucide-react';
 
 type ViewMode = 'grid' | 'list';
@@ -192,11 +192,15 @@ export default function MyUploads({
         </label>
 
         <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70">
-          <Filter className="h-4 w-4" />
-          <select
+          <Filter className="h-4 w-4" aria-hidden="true" />
+          <Select
             value={filters.hazard}
             onChange={(event) => setFilters((prev) => ({ ...prev, hazard: event.target.value }))}
-            className="bg-transparent text-white focus:outline-none"
+            variant="dark"
+            size="sm"
+            fullWidth={false}
+            aria-label="Filter by hazard type"
+            className="bg-transparent border-0 h-auto px-0 py-0 focus-visible:ring-0 focus-visible:ring-offset-0"
           >
             <option value="all">All hazards</option>
             {hazardOptions?.map((option) => (
@@ -204,31 +208,37 @@ export default function MyUploads({
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
 
-        <select
+        <Select
           value={filters.status}
           onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
-          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 focus:outline-none"
+          variant="dark"
+          size="sm"
+          fullWidth={false}
+          aria-label="Filter by approval status"
         >
           <option value="all">All statuses</option>
           <option value="approved">Approved</option>
           <option value="pending_review">Pending review</option>
           <option value="rejected">Rejected</option>
           <option value="flagged">Flagged</option>
-        </select>
+        </Select>
 
-        <select
+        <Select
           value={sortBy}
           onChange={(event) => setSortBy(event.target.value as SortOption)}
-          className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70 focus:outline-none"
+          variant="dark"
+          size="sm"
+          fullWidth={false}
+          aria-label="Sort uploads by"
         >
           <option value="newest">Newest first</option>
           <option value="oldest">Oldest first</option>
           <option value="status">Status</option>
           <option value="hazard">Hazard type</option>
-        </select>
+        </Select>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

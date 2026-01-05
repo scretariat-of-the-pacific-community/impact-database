@@ -135,7 +135,7 @@ except Exception as e:
 
   worker)
     echo "Starting Celery worker..."
-    exec celery -A workers.celery_app worker --loglevel=info --concurrency=2
+    exec celery -A workers.celery_app worker --loglevel=info --concurrency=2 -E
     ;;
 
   beat)

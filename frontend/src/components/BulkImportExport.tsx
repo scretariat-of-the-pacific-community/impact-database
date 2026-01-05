@@ -19,6 +19,7 @@ import {
   TableCellsIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Select } from '@/components/design-system';
 
 interface ImportJob {
   id: string;
@@ -322,17 +323,16 @@ const BulkImportExport: React.FC = () => {
               {/* Import Options */}
               <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Import Type
-                  </label>
-                  <select
+                  <Select
+                    label="Import Type"
                     value={importType}
                     onChange={(e) => setImportType(e.target.value as 'zip' | 'csv')}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    variant="light"
+                    size="md"
                   >
                     <option value="zip">ZIP Archive (Images + Metadata)</option>
                     <option value="csv">CSV File (Metadata Only)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="flex items-center justify-center">
@@ -517,30 +517,28 @@ const BulkImportExport: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Format Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Export Format
-                  </label>
-                  <select
+                  <Select
+                    label="Export Format"
                     value={exportFormat}
                     onChange={(e) => setExportFormat(e.target.value as any)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    variant="light"
+                    size="md"
                   >
                     <option value="csv">CSV (Spreadsheet)</option>
                     <option value="geojson">GeoJSON (Spatial)</option>
                     <option value="iso_xml">ISO 19139 XML (Metadata)</option>
-                  </select>
+                  </Select>
                 </div>
                 
                 {/* Filters */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Hazard Type
-                    </label>
-                    <select
+                    <Select
+                      label="Hazard Type"
                       value={exportFilters.hazardType}
                       onChange={(e) => setExportFilters({ ...exportFilters, hazardType: e.target.value })}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      variant="light"
+                      size="md"
                     >
                       <option value="">All Types</option>
                       <option value="flood">Flood</option>
@@ -550,7 +548,7 @@ const BulkImportExport: React.FC = () => {
                       <option value="cyclone">Cyclone</option>
                       <option value="drought">Drought</option>
                       <option value="wildfire">Wildfire</option>
-                    </select>
+                    </Select>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -579,19 +577,18 @@ const BulkImportExport: React.FC = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status
-                    </label>
-                    <select
+                    <Select
+                      label="Status"
                       value={exportFilters.status}
                       onChange={(e) => setExportFilters({ ...exportFilters, status: e.target.value })}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      variant="light"
+                      size="md"
                     >
                       <option value="">All Statuses</option>
                       <option value="approved">Approved Only</option>
                       <option value="pending">Pending Review</option>
                       <option value="under_review">Under Review</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
               </div>

@@ -27,6 +27,7 @@ import {
 import { imageApi } from '@/lib/api';
 import { getApiUrl } from '@/lib/config';
 import { sanitizeText } from '@/lib/sanitize';
+import { getCountryName } from '@/lib/countries';
 import { Card, Tag } from '@/components/design-system';
 
 // Define WaveLoader before dynamic imports that reference it
@@ -42,11 +43,6 @@ const WaveLoader = () => (
 const InteractiveHeroMap = nextDynamic(() => import('@/components/InteractiveHeroMap'), {
   ssr: false,
   loading: () => <div className="h-full w-full rounded-3xl bg-gradient-to-r from-deep-900/40 to-pacific-900/30" />,
-});
-
-const ActivityFeed = nextDynamic(() => import('@/components/ActivityFeed'), {
-  ssr: false,
-  loading: () => null,
 });
 
 const SmartSearch = nextDynamic(() => import('@/components/SmartSearch'), {
@@ -422,7 +418,10 @@ const resolveImagePath = (image: ImageRecord) => {
   return image.thumbnail_url || directUrl;
 };
 
-const resolveCountry = (image: ImageRecord) => (image as { country?: string }).country;
+const resolveCountry = (image: ImageRecord) => {
+  const code = (image as { country?: string }).country;
+  return code ? getCountryName(code) : undefined;
+};
 const resolveDescription = (image: ImageRecord) =>
   (image as { description?: string }).description ?? (image as { abstract?: string }).abstract;
 
@@ -546,7 +545,6 @@ export default function PacificImpactAtlasDashboard() {
 
   const heroStats = [
     { label: 'Pacific Hazards Curated', value: stats.total, suffix: '+' },
-    { label: 'Live Contributors', value: stats.organizations, suffix: '' },
     { label: 'Reviewed in 30 days', value: stats.recentUploads, suffix: '' },
   ];
 
@@ -584,9 +582,6 @@ export default function PacificImpactAtlasDashboard() {
   return (
     <PullToRefresh onRefresh={handleRefresh}>
       <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 pb-24 text-white">
-        {/* Activity Feed - Fixed Position */}
-        <ActivityFeed />
-
       {/* Header with Interactive Map Hero */}
       <header className="relative isolate overflow-hidden">
         <InteractiveHeroMap images={images} />

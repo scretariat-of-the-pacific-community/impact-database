@@ -14,6 +14,7 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from models.database import get_db
+from workers.email_tasks import send_welcome_email
 
 logger = logging.getLogger(__name__)
 
@@ -360,6 +361,17 @@ async def register(
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    
+    # Send welcome email asynchronously
+    try:
+        send_welcome_email.delay(
+            user_id=str(new_user.id),
+            username=new_user.username,
+            email=new_user.email
+        )
+        logger.info(f"Queued welcome email for new user: {new_user.username}")
+    except Exception as e:
+        logger.warning(f"Failed to queue welcome email: {e}")
     
     # Generate access token for immediate login
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
