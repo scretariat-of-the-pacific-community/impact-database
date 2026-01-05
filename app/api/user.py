@@ -223,8 +223,8 @@ async def get_user_stats(
         try:
             from services.achievement_service import achievement_service
             # Check and award any new achievements
-            achievement_service.check_and_award_achievements(db, current_user.username)
-            all_achievements = achievement_service.get_user_achievements(db, current_user.username)
+            achievement_service.check_and_award_achievements(db, target_username)
+            all_achievements = achievement_service.get_user_achievements(db, target_username)
             achievements_with_progress = [
                 {
                     "id": a["id"],
@@ -305,9 +305,15 @@ async def get_user_uploads(
             )
             if target:
                 target_username = target.username
+                target_id = str(target.id)
+
+        # Build user identifiers list (username + UUID if available)
+        user_identifiers = {target_username}
+        if 'target_id' in locals() and target_id:
+            user_identifiers.add(target_id)
 
         query = db.query(ImageMetadata).filter(
-            ImageMetadata.uploader_id == target_username
+            ImageMetadata.uploader_id.in_(user_identifiers)
         )
 
         # Filter by status if provided

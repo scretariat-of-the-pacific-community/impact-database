@@ -327,7 +327,7 @@ def send_weekly_digest_all_users(self):
         
         # Get all users with email notifications enabled
         # For now, get all users and check preferences individually
-        users = db_session.query(User).filter(User.is_active == True).all()
+        users = db_session.query(User).filter(User.is_active).all()
         
         for user in users:
             try:
