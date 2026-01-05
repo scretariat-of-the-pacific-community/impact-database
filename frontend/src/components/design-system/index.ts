@@ -1,3 +1,5 @@
+'use client';
+
 export { default as Button } from './Button';
 export type { ButtonProps } from './Button';
 export { default as Card } from './Card';
@@ -7,3 +9,5 @@ export type { TagProps } from './Tag';
 export { default as FormField } from './FormField';
 export type { FormFieldProps } from './FormField';
 export { default as Skeleton } from './Skeleton';
+export { default as Select } from './Select';
+export type { SelectProps } from './Select';

@@ -9,6 +9,7 @@ import pytest
 from datetime import datetime, timezone
 from pydantic import ValidationError
 from enum import Enum
+from unittest.mock import MagicMock
 
 # Test the StatusEnum
 from api.schemas.image_schemas import StatusEnum
@@ -133,13 +134,19 @@ def test_is_admin_function():
     from api.upload import is_admin
     from api.auth import User
     
-    # Admin user
     admin_user = User(username="admin", email="admin@test.com")
-    assert is_admin(admin_user) == True
-    
-    # Regular user
     regular_user = User(username="regular", email="user@test.com")
-    assert is_admin(regular_user) == False
+    
+    # Configure fake DB responses
+    db = MagicMock()
+    admin_db_user = MagicMock()
+    admin_db_user.has_role.side_effect = lambda role: role == "admin"
+    admin_query = MagicMock()
+    admin_query.filter.return_value.first.side_effect = [admin_db_user, None]
+    db.query.return_value = admin_query
+    
+    assert is_admin(admin_user, db) is True
+    assert is_admin(regular_user, db) is False
 
 
 def test_create_audit_log_function():

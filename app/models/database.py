@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, Text, JSON, Boolean, func
+from sqlalchemy import create_engine, Column, String, Float, DateTime, Text, JSON, Boolean, SmallInteger, func
 from sqlalchemy.orm import declarative_base, sessionmaker, object_session
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -46,7 +46,7 @@ class ImageMetadata(Base):
     # Core metadata fields
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     datetime = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    geometry = Column(Geometry(geometry_type='POINT', srid=4326), nullable=False)
+    geometry = Column(Geometry(geometry_type='POINTZ', srid=4326), nullable=True)
     hazard_type = Column(String, nullable=False) # Or Enum
     event_id = Column(String, nullable=True)
     status = Column(String, default="pending_review", nullable=False) # Enum: pending_review, approved, rejected
@@ -55,6 +55,16 @@ class ImageMetadata(Base):
     uploader_id = Column(String, nullable=False)
     positional_accuracy = Column(Float, nullable=True) # In meters
     thumbnail_url = Column(String, nullable=True)
+    thumbnail_key = Column(String, nullable=True)  # MinIO object key for thumbnail
+    
+    # EXIF-derived metadata
+    altitude = Column(Float, nullable=True)  # Altitude in meters from GPS EXIF
+    altitude_ref = Column(SmallInteger, default=0, nullable=True)  # 0=above sea level, 1=below
+    orientation = Column(SmallInteger, nullable=True)  # EXIF orientation value (1-8)
+    camera_make = Column(String(100), nullable=True)  # Camera manufacturer
+    camera_model = Column(String(100), nullable=True)  # Camera model
+    camera_bearing = Column(Float, nullable=True)  # GPS image direction in degrees
+    exif_metadata = Column(JSON, nullable=True)  # Full EXIF data as JSON
 
     # Original filename, kept for reference
     filename = Column(String, nullable=True)
@@ -117,6 +127,33 @@ class ImageMetadata(Base):
     @longitude.expression
     def longitude(cls):
         return func.ST_X(cls.geometry)
+
+    @hybrid_property
+    def z_coordinate(self):
+        """Get Z coordinate (altitude) from geometry if available."""
+        if self.geometry is None:
+            return None
+        session = object_session(self)
+        if session is None:
+            return None
+        return session.scalar(func.ST_Z(self.geometry))
+
+    @z_coordinate.expression
+    def z_coordinate(cls):
+        return func.ST_Z(cls.geometry)
+
+    @property
+    def rotation_degrees(self) -> int:
+        """Get rotation in degrees from EXIF orientation value."""
+        if not self.orientation:
+            return 0
+        orientation_map = {
+            1: 0, 2: 0,    # Normal
+            3: 180, 4: 180,  # Upside down
+            5: 90, 6: 90,    # Rotated 90° CW
+            7: 270, 8: 270   # Rotated 90° CCW
+        }
+        return orientation_map.get(self.orientation, 0)
     
     def to_dict(self):
         """Convert model to dictionary for JSON serialization"""

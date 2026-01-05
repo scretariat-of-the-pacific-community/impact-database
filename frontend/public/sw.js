@@ -1,5 +1,5 @@
-const SHELL_CACHE = 'ocean-shell-v2';
-const DATA_CACHE = 'ocean-data-v1';
+const SHELL_CACHE = 'ocean-shell-v3'; // Bumped to v3 to clear old cache
+const DATA_CACHE = 'ocean-data-v2'; // Bumped to v2 to clear old cache
 const OFFLINE_URL = '/offline';
 const SHELL_ASSETS = [
   '/',
@@ -133,3 +133,188 @@ self.addEventListener('message', (event) => {
     self.skipWaiting();
   }
 });
+
+// Background sync - upload queued images
+self.addEventListener('sync', (event) => {
+  console.log('[ServiceWorker] Background sync:', event.tag);
+
+  if (event.tag === 'sync-uploads') {
+    event.waitUntil(syncPendingUploads());
+  }
+});
+
+// Push notification received
+self.addEventListener('push', (event) => {
+  console.log('[ServiceWorker] Push notification received');
+
+  let notification = {
+    title: 'Impact Database',
+    body: 'You have a new notification',
+    icon: '/icons/icon-192.svg',
+    badge: '/icons/icon-badge.svg',
+    tag: 'impact-notification',
+    requireInteraction: false,
+  };
+
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      notification = {
+        ...notification,
+        title: data.title || notification.title,
+        body: data.body || notification.body,
+        tag: data.tag || notification.tag,
+        data: data.data || {},
+      };
+    } catch (error) {
+      console.error('[ServiceWorker] Failed to parse push data:', error);
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(notification.title, {
+      body: notification.body,
+      icon: notification.icon,
+      badge: notification.badge,
+      tag: notification.tag,
+      requireInteraction: notification.requireInteraction,
+      data: notification.data,
+      vibrate: [200, 100, 200],
+      actions: [
+        { action: 'view', title: 'View' },
+        { action: 'close', title: 'Close' },
+      ],
+    })
+  );
+});
+
+// Notification clicked
+self.addEventListener('notificationclick', (event) => {
+  console.log('[ServiceWorker] Notification clicked:', event.action);
+
+  event.notification.close();
+
+  if (event.action === 'view') {
+    const urlToOpen = event.notification.data?.url || '/profile';
+    
+    event.waitUntil(
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        // Focus existing window if available
+        for (const client of clientList) {
+          if (client.url === urlToOpen && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        // Open new window
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
+    );
+  }
+});
+
+// Helper function to sync pending uploads
+async function syncPendingUploads() {
+  try {
+    // Open IndexedDB
+    const db = await openIndexedDB();
+    const transaction = db.transaction(['pending-uploads'], 'readwrite');
+    const store = transaction.objectStore('pending-uploads');
+    const uploads = await getAllFromStore(store);
+
+    console.log('[ServiceWorker] Syncing', uploads.length, 'pending uploads');
+
+    for (const upload of uploads) {
+      try {
+        const formData = new FormData();
+        formData.append('file', upload.file);
+        
+        // Add metadata
+        for (const [key, value] of Object.entries(upload.metadata)) {
+          formData.append(key, String(value));
+        }
+
+        const response = await fetch('/api/images/upload', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          // Remove from pending queue
+          await deleteFromStore(store, upload.id);
+          console.log('[ServiceWorker] Successfully synced upload:', upload.id);
+
+          // Show success notification
+          await self.registration.showNotification('Upload Successful', {
+            body: 'Your image has been uploaded and is being reviewed.',
+            icon: '/icons/icon-192.svg',
+            tag: 'upload-success',
+          });
+        } else {
+          // Increment retry count
+          upload.retryCount = (upload.retryCount || 0) + 1;
+          if (upload.retryCount < 3) {
+            await putToStore(store, upload);
+          } else {
+            // Give up after 3 retries
+            await deleteFromStore(store, upload.id);
+            console.error('[ServiceWorker] Failed to sync upload after 3 retries:', upload.id);
+          }
+        }
+      } catch (error) {
+        console.error('[ServiceWorker] Error syncing upload:', error);
+      }
+    }
+
+    await completeTransaction(transaction);
+  } catch (error) {
+    console.error('[ServiceWorker] Background sync failed:', error);
+    throw error;
+  }
+}
+
+// Helper function to open IndexedDB
+function openIndexedDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('impact-offline-db', 1);
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Helper function to get all items from store
+function getAllFromStore(store) {
+  return new Promise((resolve, reject) => {
+    const request = store.getAll();
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Helper function to delete from store
+function deleteFromStore(store, key) {
+  return new Promise((resolve, reject) => {
+    const request = store.delete(key);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Helper function to put to store
+function putToStore(store, value) {
+  return new Promise((resolve, reject) => {
+    const request = store.put(value);
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Helper function to complete transaction
+function completeTransaction(transaction) {
+  return new Promise((resolve, reject) => {
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}

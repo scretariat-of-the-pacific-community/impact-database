@@ -1,5 +1,23 @@
 /**
  * Configuration settings for the frontend application
+ * 
+ * API Architecture:
+ * ================
+ * 
+ * 1. Next.js API Routes (/api/*):
+ *    - Use relative paths: '/api/admin/users', '/api/analytics'
+ *    - Handled by Next.js server-side (app/api/ directory)
+ *    - Work in any deployment without configuration
+ *    - These routes proxy to backend using environment variables
+ * 
+ * 2. Direct Backend API Calls:
+ *    - Use imageApi from '@/lib/api'
+ *    - Configured with BASE_URL from environment variables
+ *    - Example: imageApi.searchImages(), imageApi.upload()
+ * 
+ * Environment Variables:
+ * - NEXT_PUBLIC_API_URL: External backend URL (browser access)
+ * - NEXT_PUBLIC_API_URL_INTERNAL: Internal backend URL (SSR in Docker)
  */
 
 // Helper to determine the correct API URL based on execution context
@@ -8,8 +26,19 @@ const getBaseApiUrl = (): string => {
   if (typeof window === 'undefined') {
     return process.env.NEXT_PUBLIC_API_URL_INTERNAL || process.env.NEXT_PUBLIC_API_URL || 'http://api:8000';
   }
-  // Client-side (browser): use external URL accessible from host
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+  // Client-side (browser): use external URL accessible from host and allowed by CSP
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  
+  // Debug log in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🌐 Client-side API URL:', apiUrl);
+    console.log('📦 Environment variables:', {
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+      NODE_ENV: process.env.NODE_ENV,
+    });
+  }
+  
+  return apiUrl;
 };
 
 const config = {

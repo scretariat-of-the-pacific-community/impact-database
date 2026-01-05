@@ -145,3 +145,6 @@ def get_minio_storage():
     if _minio_storage is None:
         _minio_storage = MinIOStorage()
     return _minio_storage
+
+# Alias for backward compatibility
+minio_service = get_minio_storage()

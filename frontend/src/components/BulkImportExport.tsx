@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import {
   CloudArrowUpIcon,
   CloudArrowDownIcon,
@@ -18,6 +19,7 @@ import {
   TableCellsIcon
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Select } from '@/components/design-system';
 
 interface ImportJob {
   id: string;
@@ -76,11 +78,7 @@ const BulkImportExport: React.FC = () => {
   const { data: importJobs, isLoading: importLoading } = useQuery({
     queryKey: ['import-jobs'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/imports', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch('/api/admin/imports');
       if (!response.ok) throw new Error('Failed to fetch import jobs');
       return response.json();
     },
@@ -91,11 +89,7 @@ const BulkImportExport: React.FC = () => {
   const { data: exportJobs, isLoading: exportLoading } = useQuery({
     queryKey: ['export-jobs'],
     queryFn: async () => {
-      const response = await fetch('/api/admin/exports', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch('/api/admin/exports');
       if (!response.ok) throw new Error('Failed to fetch export jobs');
       return response.json();
     },
@@ -110,11 +104,8 @@ const BulkImportExport: React.FC = () => {
       formData.append('type', type);
       formData.append('dry_run', dryRun.toString());
 
-      const response = await fetch('/api/admin/imports', {
+      const response = await authFetch('/api/admin/imports', {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: formData
       });
       if (!response.ok) throw new Error('Failed to start import');
@@ -129,12 +120,8 @@ const BulkImportExport: React.FC = () => {
   // Start export
   const exportMutation = useMutation({
     mutationFn: async ({ format, filters }: { format: string; filters: any }) => {
-      const response = await fetch('/api/admin/exports', {
+      const response = await authFetch('/api/admin/exports', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ format, filters })
       });
       if (!response.ok) throw new Error('Failed to start export');
@@ -336,17 +323,16 @@ const BulkImportExport: React.FC = () => {
               {/* Import Options */}
               <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Import Type
-                  </label>
-                  <select
+                  <Select
+                    label="Import Type"
                     value={importType}
                     onChange={(e) => setImportType(e.target.value as 'zip' | 'csv')}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    variant="light"
+                    size="md"
                   >
                     <option value="zip">ZIP Archive (Images + Metadata)</option>
                     <option value="csv">CSV File (Metadata Only)</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="flex items-center justify-center">
@@ -471,9 +457,9 @@ const BulkImportExport: React.FC = () => {
                             <div className="mt-2">
                               <h6 className="text-xs font-medium text-yellow-900">Warnings:</h6>
                               <ul className="text-xs text-yellow-800 mt-1 space-y-1">
-                                {job.validationReport.warnings.map((warning, idx) => (
-                                  <li key={idx}>• {warning}</li>
-                                ))}
+                              {job.validationReport.warnings.map((warning, idx) => (
+                                <li key={`${job.id}-warning-${idx}-${warning}`}>• {warning}</li>
+                              ))}
                               </ul>
                             </div>
                           )}
@@ -489,7 +475,10 @@ const BulkImportExport: React.FC = () => {
                             </summary>
                             <div className="mt-2 p-3 bg-red-50 rounded-lg max-h-32 overflow-y-auto">
                               {job.errors.map((error, idx) => (
-                                <div key={idx} className="text-xs text-red-800 mb-1">
+                                <div
+                                  key={`${job.id}-error-${error.item}-${error.line ?? idx}`}
+                                  className="text-xs text-red-800 mb-1"
+                                >
                                   <span className="font-medium">{error.item}</span>
                                   {error.line && <span className="text-red-600"> (line {error.line})</span>}
                                   : {error.error}
@@ -528,30 +517,28 @@ const BulkImportExport: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Format Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Export Format
-                  </label>
-                  <select
+                  <Select
+                    label="Export Format"
                     value={exportFormat}
                     onChange={(e) => setExportFormat(e.target.value as any)}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                    variant="light"
+                    size="md"
                   >
                     <option value="csv">CSV (Spreadsheet)</option>
                     <option value="geojson">GeoJSON (Spatial)</option>
                     <option value="iso_xml">ISO 19139 XML (Metadata)</option>
-                  </select>
+                  </Select>
                 </div>
                 
                 {/* Filters */}
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Hazard Type
-                    </label>
-                    <select
+                    <Select
+                      label="Hazard Type"
                       value={exportFilters.hazardType}
                       onChange={(e) => setExportFilters({ ...exportFilters, hazardType: e.target.value })}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      variant="light"
+                      size="md"
                     >
                       <option value="">All Types</option>
                       <option value="flood">Flood</option>
@@ -561,7 +548,7 @@ const BulkImportExport: React.FC = () => {
                       <option value="cyclone">Cyclone</option>
                       <option value="drought">Drought</option>
                       <option value="wildfire">Wildfire</option>
-                    </select>
+                    </Select>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2">
@@ -590,19 +577,18 @@ const BulkImportExport: React.FC = () => {
                   </div>
                   
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status
-                    </label>
-                    <select
+                    <Select
+                      label="Status"
                       value={exportFilters.status}
                       onChange={(e) => setExportFilters({ ...exportFilters, status: e.target.value })}
-                      className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+                      variant="light"
+                      size="md"
                     >
                       <option value="">All Statuses</option>
                       <option value="approved">Approved Only</option>
                       <option value="pending">Pending Review</option>
                       <option value="under_review">Under Review</option>
-                    </select>
+                    </Select>
                   </div>
                 </div>
               </div>

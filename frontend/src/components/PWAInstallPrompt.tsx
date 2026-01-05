@@ -111,7 +111,7 @@ export default function PWAInstallPrompt() {
             <h3 className="font-semibold text-gray-900">Install App</h3>
           </div>
           <p className="text-sm text-gray-600">
-            Install Ocean Portal for quick access and offline support. Perfect for field work.
+            Install Pacific Impact Atlas for quick access and offline support. Perfect for field work.
           </p>
         </div>
 

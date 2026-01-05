@@ -1,0 +1,9 @@
+
+> ocean-portal-frontend@0.1.0 dev
+> next dev
+
+ ⚠ Warning: Found multiple lockfiles. Selecting /home/kishank/impact-database/package-lock.json.
+   Consider removing the lockfiles at:
+   * /home/kishank/impact-database/frontend/package-lock.json
+
+[?25h

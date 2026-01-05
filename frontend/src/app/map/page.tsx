@@ -13,6 +13,7 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import ErrorBanner from '@/components/ErrorBanner';
 import Skeleton from '@/components/design-system/Skeleton';
 import { trackMapInteraction } from '@/lib/analytics';
+import type { HazardType } from '@/lib/types';
 
 const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
 const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
@@ -72,14 +73,26 @@ export default function MapPage() {
   const hazardTypeCount = new Set(
     imagesWithCoordinates
       .map((img) => img.hazard_type)
-      .filter((type): type is string => Boolean(type))
+      .filter((type): type is HazardType => Boolean(type))
   ).size;
 
   return (
     <ErrorBoundary boundaryName="map view">
-      <div className="min-h-screen bg-gray-50 p-4">
-        <div className="max-w-6xl mx-auto space-y-6">
-          <h1 className="text-3xl font-bold text-gray-800">Map View</h1>
+      <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 px-4 py-8 text-white">
+        <div className="mx-auto max-w-6xl space-y-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-white/60">Interactive Exploration</p>
+              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Map View</h1>
+              <p className="mt-2 text-sm text-white/70">Locate geotagged hazards with the same glassmorphism styling as the home dashboard.</p>
+            </div>
+            <Link
+              href="/"
+              className="hidden rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/80 transition hover:-translate-y-0.5 hover:border-white/40 hover:text-white lg:inline-flex"
+            >
+              Back to home
+            </Link>
+          </div>
 
           {isLoading ? (
             <MapInsightsSkeleton />
@@ -91,7 +104,7 @@ export default function MapPage() {
             />
           )}
 
-          <div className="h-[600px] bg-white rounded-lg shadow-md overflow-hidden flex items-center justify-center">
+          <div className="flex h-[600px] items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-white/5 shadow-card backdrop-blur">
             {isLoading ? (
               <MapLoadingState />
             ) : error ? (
@@ -201,16 +214,16 @@ function MapInsights({ geocodedCount, missingCoordinates, hazardTypeCount }: Map
         <motion.div
           key={card.label}
           variants={insightVariants}
-          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-card backdrop-blur"
         >
           <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-blue-50 p-2 text-blue-600">
+            <div className="rounded-lg bg-pacific-500/15 p-2 text-pacific-200">
               <card.icon className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-sm text-slate-500">{card.label}</p>
-              <p className="text-2xl font-semibold text-slate-900">{card.value}</p>
-              <p className="text-xs text-slate-500 mt-1">{card.sublabel}</p>
+              <p className="text-sm text-white/70">{card.label}</p>
+              <p className="text-2xl font-semibold text-white">{card.value}</p>
+              <p className="mt-1 text-xs text-white/60">{card.sublabel}</p>
             </div>
           </div>
         </motion.div>
@@ -231,12 +244,12 @@ function MapInsightsSkeleton() {
 
 function MapLoadingState() {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-gray-600" role="status">
-      <Skeleton className="h-8 w-48" />
-      <Skeleton className="h-4 w-64" />
+    <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-white/70" role="status">
+      <Skeleton className="h-8 w-48 bg-white/10" />
+      <Skeleton className="h-4 w-64 bg-white/10" />
       <div className="flex gap-3">
         {[1, 2, 3].map((key) => (
-          <Skeleton key={key} className="h-12 w-12 rounded-full" />
+          <Skeleton key={key} className="h-12 w-12 rounded-full bg-white/10" />
         ))}
       </div>
       <p className="text-sm">Fetching the latest impact reports…</p>
@@ -247,22 +260,21 @@ function MapLoadingState() {
 function MapEmptyState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
-      <h2 className="text-xl font-semibold text-slate-900">No geocoded submissions yet</h2>
-      <p className="text-sm text-slate-600">
-        We have not received any reports with coordinates. Invite field teams to capture latitude/longitude or retry the
-        sync once new data lands.
+      <h2 className="text-xl font-semibold text-white">No geocoded submissions yet</h2>
+      <p className="text-sm text-white/70">
+        We have not received any reports with coordinates. Invite field teams to capture latitude/longitude or retry the sync once new data lands.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Link
           href="/upload"
-          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className="rounded-full bg-gradient-to-r from-pacific-500 to-coral-500 px-5 py-2 text-sm font-semibold text-white shadow-card transition hover:-translate-y-0.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
         >
           Upload a new report
         </Link>
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400"
+          className="rounded-full border border-white/20 px-4 py-2 text-sm font-semibold text-white/80 transition hover:-translate-y-0.5 hover:border-white/40 hover:text-white"
         >
           Refresh data
         </button>

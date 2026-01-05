@@ -107,6 +107,10 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     hashed_password = Column(String(255), nullable=True)  # Nullable for SSO users
     
+    # SSO fields
+    sso_provider = Column(String(50), nullable=True, index=True)  # e.g., 'google', 'github', 'azure'
+    sso_provider_id = Column(String(255), nullable=True, index=True)  # Provider's user ID
+    
     # Role assignment
     role_id = Column(Integer, ForeignKey('roles.id'), nullable=True, index=True)
     
@@ -141,6 +145,10 @@ class User(Base):
 
     # Relationships
     role = relationship("Role", back_populates="users")
+    # Extended user data relationships (commented out to avoid forward ref issues)
+    # profile = relationship("UserProfile", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # settings = relationship("UserSettings", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # api_tokens = relationship("APIToken", back_populates="user", cascade="all, delete-orphan")
 
     def to_dict(self):
         """Convert user to dictionary (safe for API responses - no password)"""

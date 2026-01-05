@@ -2,6 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import Image from 'next/image';
 import {
   FunnelIcon,
@@ -86,11 +87,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
         if (value) params.append(key, value.toString());
       });
 
-      const response = await fetch(`/api/admin/curation/queue?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch(`/api/admin/curation/queue?${params}`);
       if (!response.ok) throw new Error('Failed to fetch curation queue');
       return response.json();
     }
@@ -98,12 +95,8 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ itemId, status, notes }: { itemId: string; status: string; notes?: string }) => {
-      const response = await fetch(`/api/admin/curation/queue/${itemId}`, {
+      const response = await authFetch(`/api/admin/curation/queue/${itemId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ status, reviewer_notes: notes })
       });
       if (!response.ok) throw new Error('Failed to update status');
@@ -116,12 +109,8 @@ const CurationQueue: React.FC<CurationQueueProps> = ({ onItemSelect, selectedIte
 
   const flagMutation = useMutation({
     mutationFn: async ({ itemId, reason }: { itemId: string; reason: string }) => {
-      const response = await fetch(`/api/admin/curation/queue/${itemId}/flag`, {
+      const response = await authFetch(`/api/admin/curation/queue/${itemId}/flag`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ reason })
       });
       if (!response.ok) throw new Error('Failed to flag item');

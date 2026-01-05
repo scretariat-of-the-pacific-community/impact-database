@@ -17,7 +17,12 @@ class HazardType(str, Enum):
     flood = "flood"
     cyclone = "cyclone"
     tsunami = "tsunami"
+    drought = "drought"
     landslide = "landslide"
+    earthquake = "earthquake"
+    wildfire = "wildfire"
+    volcanic = "volcanic"
+    coastal_erosion = "coastal_erosion"
     other = "other"
 
 class SourceType(str, Enum):
@@ -49,6 +54,11 @@ class ImageUploadRequest(BaseModel):
     data_license: str = "https://creativecommons.org/licenses/by/4.0/"
     source_type: SourceType
     positional_accuracy: Optional[float] = None
+    title: Optional[str] = None
+    abstract: Optional[str] = None
+    location: Optional[str] = None
+    country: Optional[str] = None
+    keywords: Optional[list[str]] = None
 
     @validator('datetime', pre=True)
     def ensure_utc(cls, v):
@@ -65,6 +75,17 @@ class ImageUploadRequest(BaseModel):
                 return v.replace(tzinfo=timezone.utc)
             return v.astimezone(timezone.utc)
         return v
+
+    @validator('keywords', pre=True)
+    def normalize_keywords(cls, value):
+        if value is None or value == "":
+            return None
+        if isinstance(value, str):
+            value = [value]
+        if isinstance(value, list):
+            cleaned = [str(item).strip() for item in value if str(item).strip()]
+            return cleaned or None
+        raise ValueError("Invalid keywords format")
 
     @root_validator(pre=True)
     def check_geometry(cls, values):
@@ -124,7 +145,7 @@ def test_invalid_hazard_type():
     data = {
         "filename": "test.jpg",
         "datetime": "2025-11-07T12:00:00Z",
-        "hazard_type": "earthquake",  # Not in enum
+        "hazard_type": "alien_invasion",  # Not in enum
         "source_type": "citizen",
         "geometry": {"type": "Point", "coordinates": [174.7762, -41.2865]}
     }
@@ -133,6 +154,38 @@ def test_invalid_hazard_type():
         ImageUploadRequest(**data)
     
     assert "hazard_type" in str(exc_info.value)
+
+
+def test_keywords_are_normalized():
+    """Test that keyword lists are trimmed and empty entries removed"""
+    data = {
+        "filename": "test.jpg",
+        "datetime": "2025-11-07T12:00:00Z",
+        "hazard_type": "flood",
+        "source_type": "citizen",
+        "geometry": {"type": "Point", "coordinates": [174.7762, -41.2865]},
+        "keywords": [" flooding ", "", "damage"]
+    }
+
+    request = ImageUploadRequest(**data)
+    assert request.keywords == ["flooding", "damage"]
+
+
+def test_invalid_keywords_type():
+    """Test that non-list/string keywords are rejected"""
+    data = {
+        "filename": "test.jpg",
+        "datetime": "2025-11-07T12:00:00Z",
+        "hazard_type": "flood",
+        "source_type": "citizen",
+        "geometry": {"type": "Point", "coordinates": [174.7762, -41.2865]},
+        "keywords": 12345
+    }
+
+    with pytest.raises(ValidationError) as exc_info:
+        ImageUploadRequest(**data)
+
+    assert "Invalid keywords format" in str(exc_info.value)
 
 
 def test_invalid_datetime_format():
@@ -416,4 +469,3 @@ def test_webhook_system():
 
         # Assert that the task was called
         mock_task.assert_called_once()
-

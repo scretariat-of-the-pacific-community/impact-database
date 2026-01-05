@@ -2,7 +2,7 @@ import Link from "next/link";
 import { WifiOff, RefreshCcw, UploadCloud } from "lucide-react";
 
 export const metadata = {
-  title: "Offline | Ocean Portal",
+  title: "Offline | Pacific Impact Atlas",
 };
 
 export const dynamic = "force-static";

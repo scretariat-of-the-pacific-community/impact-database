@@ -1,15 +1,15 @@
-// API Response Types for Ocean Portal
+// API Response Types for Pacific Impact Atlas
 
 // Vocabulary Types
 export interface VocabularyItem {
   id: string;
   label: string;
+  description?: string;
 }
 
 export interface VocabulariesResponse {
   hazard_types: VocabularyItem[];
-  source_agencies: VocabularyItem[];
-  topic_categories: VocabularyItem[];
+  countries: VocabularyItem[];
 }
 
 export interface ImageMetadata {
@@ -21,7 +21,7 @@ export interface ImageMetadata {
   bucket_name: string;
   resource_locator: string;
   upload_date: string;
-  file_size: number;
+  file_size?: number;
   thumbnail_url?: string;
   
   // Geographic information
@@ -97,17 +97,12 @@ export type HazardType =
   | 'earthquake'
   | 'flood' 
   | 'tsunami'
-  | 'hurricane'
   | 'cyclone'
-  | 'tornado'
-  | 'wildfire'
   | 'drought'
   | 'landslide'
-  | 'volcanicEruption'
-  | 'avalanche'
-  | 'hailstorm'
-  | 'stormSurge'
-  | 'extremeTemperature'
+  | 'wildfire'
+  | 'volcanic'
+  | 'coastal_erosion'
   | 'other';
 
 export type SourceAgency = 
@@ -256,19 +251,27 @@ export const HAZARD_TYPE_LABELS: Record<HazardType, string> = {
   earthquake: 'Earthquake',
   flood: 'Flood',
   tsunami: 'Tsunami',
-  hurricane: 'Hurricane',
   cyclone: 'Cyclone',
-  tornado: 'Tornado',
-  wildfire: 'Wildfire',
   drought: 'Drought',
   landslide: 'Landslide',
-  volcanicEruption: 'Volcanic Eruption',
-  avalanche: 'Avalanche',
-  hailstorm: 'Hailstorm',
-  stormSurge: 'Storm Surge',
-  extremeTemperature: 'Extreme Temperature',
+  wildfire: 'Wildfire',
+  volcanic: 'Volcanic Activity',
+  coastal_erosion: 'Coastal Erosion',
   other: 'Other'
 };
+
+export const HAZARD_TYPES = [
+  { value: 'earthquake', label: 'Earthquake' },
+  { value: 'flood', label: 'Flood' },
+  { value: 'tsunami', label: 'Tsunami' },
+  { value: 'cyclone', label: 'Cyclone' },
+  { value: 'drought', label: 'Drought' },
+  { value: 'landslide', label: 'Landslide' },
+  { value: 'wildfire', label: 'Wildfire' },
+  { value: 'volcanic', label: 'Volcanic Activity' },
+  { value: 'coastal_erosion', label: 'Coastal Erosion' },
+  { value: 'other', label: 'Other' },
+] as const;
 
 export const SOURCE_AGENCY_LABELS: Record<SourceAgency, string> = {
   usgs: 'USGS',
@@ -308,3 +311,175 @@ export const TOPIC_CATEGORY_LABELS: Record<TopicCategory, string> = {
   transportation: 'Transportation',
   utilitiesCommunication: 'Utilities/Communication'
 };
+
+// User Profile Types
+export interface UserStats {
+  name: string;
+  email: string;
+  organization?: string;
+  avatar_url?: string;
+  total_uploads: number;
+  approval_rate: number;
+  impact_score: number;
+  last_active: string;
+  achievements: Array<{
+    id: string;
+    title: string;
+    description: string;
+    icon: string;
+    unlocked?: boolean;
+    unlocked_at?: string;
+    tier?: string;
+    points?: number;
+    progress?: number;
+    total?: number;
+    category?: string;
+  }>;
+  analytics: {
+    uploads_this_month: number;
+    average_review_time: number;
+    top_hazard: string;
+    hazard_distribution?: Record<string, number>;
+    contribution_heatmap?: Record<string, number>;
+  };
+}
+
+export type UserActivityType = 'upload' | 'edit' | 'review' | 'achievement' | 'system';
+
+export interface PaginationMetadata {
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  events: T[];
+  pagination: PaginationMetadata;
+}
+
+export interface UserActivityEvent {
+  id: string;
+  type: UserActivityType;
+  title: string;
+  description: string;
+  timestamp: string;
+  reviewer?: string;
+  reviewComments?: string;
+  suggestedImprovements?: { id: string; text: string }[];
+  achievementBadge?: string;
+  systemMessage?: string;
+}
+
+export interface UserUpload {
+  id: string;
+  filename: string;
+  title?: string;
+  hazard_type: HazardType;
+  status: string;
+  uploaded_at: string;
+  approval_status: 'approved' | 'pending_review' | 'rejected' | 'flagged';
+  thumbnail_url?: string;
+  location?: string;
+  country?: string;
+  abstract?: string;
+  keywords?: string[];
+  latitude?: number;
+  longitude?: number;
+}
+
+// Collaboration Types
+export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
+export type VisibilityType = 'owner' | 'workspace' | 'public';
+
+export interface SharedFolder {
+  id: string;
+  name: string;
+  description?: string;
+  owner_username?: string; // For compatibility
+  owner_id: string; // Backend uses owner_id
+  workspace_id?: string;
+  hazard_filter?: string;
+  region_filter?: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
+  watch_count: number;
+  watcher_count?: number; // Alias for watch_count
+  is_watching?: boolean;
+}
+
+export interface CreateSharedFolderRequest {
+  name: string;
+  description?: string;
+  workspace_id?: string;
+  hazard_filter?: string;
+  region_filter?: string;
+  is_public?: boolean;
+}
+
+export interface SharedFolderDetail extends SharedFolder {
+  items: FolderItem[];
+  watchers: FolderWatcher[];
+}
+
+export interface FolderItem {
+  id: string;
+  folder_id: string;
+  image_id: string;
+  added_by: string;
+  added_at: string;
+  notes?: string;
+  image?: ImageMetadata;
+}
+
+export interface FolderWatcher {
+  id: string;
+  folder_id: string;
+  user_username: string;
+  watched_at: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  description?: string;
+  owner_username: string;
+  settings: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  member_count?: number;
+  channel_count?: number;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  workspace_id: string;
+  user_username: string;
+  role: WorkspaceRole;
+  joined_at: string;
+}
+
+export interface FollowedArea {
+  id: string;
+  user_username: string;
+  entity_type: 'hazard' | 'region';
+  entity_id: string;
+  entity_name: string;
+  followed_at: string;
+  notification_enabled: boolean;
+}
+
+export interface ActivityPost {
+  id: string;
+  workspace_id?: string;
+  author_username: string;
+  content: string;
+  mentions: string[];
+  attachments?: string[];
+  created_at: string;
+  updated_at?: string;
+}

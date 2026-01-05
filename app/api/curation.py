@@ -23,10 +23,12 @@ from models.curation import (
     CurationQueue, CurationComment, CurationAction, BulkImport, ExportRequest,
     CurationStatus, Priority, ActionType
 )
+from models.rbac import User as DBUser
 from api.auth import get_current_user, User
 from services.metadata_validation import MetadataValidator
 from services.minio_client import get_minio_storage
 from workers.tasks import trigger_webhooks_on_approval
+from workers.email_tasks import send_upload_approved_email, send_upload_rejected_email
 
 router = APIRouter()
 
@@ -312,6 +314,36 @@ async def update_curation_item(
                 if old_image_status != "approved" and image_metadata.status == "approved":
                     trigger_webhooks_on_approval.delay(str(image_metadata.id))
                     logger.info(f"Queued webhook trigger for approved image: {image_metadata.id}")
+                
+                # Send email notification to uploader
+                try:
+                    uploader = db.query(DBUser).filter(
+                        (DBUser.id == image_metadata.uploader_id) | 
+                        (DBUser.username == image_metadata.uploader_id)
+                    ).first()
+                    
+                    if uploader and uploader.email:
+                        image_title = image_metadata.title or image_metadata.filename or "Untitled"
+                        
+                        if update_data.status == "approved":
+                            send_upload_approved_email.delay(
+                                user_email=uploader.email,
+                                username=uploader.username,
+                                image_title=image_title,
+                                image_id=str(image_metadata.id)
+                            )
+                            logger.info(f"Queued approval email for {uploader.email}")
+                        elif update_data.status == "rejected":
+                            reason = update_data.review_notes or item.review_notes or "Does not meet quality guidelines"
+                            send_upload_rejected_email.delay(
+                                user_email=uploader.email,
+                                username=uploader.username,
+                                image_title=image_title,
+                                reason=reason
+                            )
+                            logger.info(f"Queued rejection email for {uploader.email}")
+                except Exception as e:
+                    logger.warning(f"Failed to queue notification email: {e}")
 
     
     if update_data.priority and update_data.priority != item.priority.value:

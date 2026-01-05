@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import {
   PencilIcon,
   CheckIcon,
@@ -16,6 +17,34 @@ import {
   GlobeAltIcon
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
+import dompurify, { type Config as DOMPurifyConfig } from 'dompurify';
+
+const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
+
+const INPUT_SANITIZE_CONFIG: DOMPurifyConfig = {
+  ALLOWED_TAGS: [],
+  ALLOWED_ATTR: [],
+  KEEP_CONTENT: true,
+};
+
+const sanitizeMetadataValue = (value: unknown): unknown => {
+  if (typeof value === 'string') {
+    return DOMPurify ? DOMPurify.sanitize(value, INPUT_SANITIZE_CONFIG) : value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeMetadataValue(item));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.entries(value).reduce<Record<string, unknown>>((acc, [key, val]) => {
+      acc[key] = sanitizeMetadataValue(val);
+      return acc;
+    }, {});
+  }
+
+  return value;
+};
 
 interface MetadataField {
   key: string;
@@ -54,7 +83,7 @@ const METADATA_FIELDS: MetadataField[] = [
     label: 'Hazard Type',
     type: 'select',
     required: true,
-    options: ['flood', 'earthquake', 'tsunami', 'landslide', 'cyclone', 'drought', 'wildfire', 'volcanic'],
+    options: ['flood', 'earthquake', 'tsunami', 'landslide', 'cyclone', 'drought', 'wildfire', 'volcanic', 'coastal_erosion'],
     description: 'Primary type of natural hazard depicted'
   },
   {
@@ -115,11 +144,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
   const { data: imageData, isLoading } = useQuery({
     queryKey: ['image-metadata', imageId],
     queryFn: async () => {
-      const response = await fetch(`/api/images/${imageId}/metadata`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch(`/api/images/${imageId}/metadata`);
       if (!response.ok) throw new Error('Failed to fetch metadata');
       return response.json();
     },
@@ -128,12 +153,8 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
 
   const saveMutation = useMutation({
     mutationFn: async (updatedMetadata: any) => {
-      const response = await fetch(`/api/admin/curation/metadata/${imageId}`, {
+      const response = await authFetch(`/api/admin/curation/metadata/${imageId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({
           metadata: updatedMetadata,
           change_notes: 'Metadata updated via admin interface'
@@ -193,7 +214,8 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
   };
 
   const handleFieldChange = (key: string, value: any) => {
-    const newMetadata = { ...metadata, [key]: value };
+    const sanitizedValue = sanitizeMetadataValue(value);
+    const newMetadata = { ...metadata, [key]: sanitizedValue };
     setMetadata(newMetadata);
 
     // Clear validation error for this field
@@ -486,7 +508,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
             </div>
             <ul className="mt-2 text-xs text-red-800 list-disc list-inside">
               {Object.values(validationErrors).filter(Boolean).map((error, idx) => (
-                <li key={idx}>{error}</li>
+                <li key={`${error}-${idx}`}>{error}</li>
               ))}
             </ul>
           </div>

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { authFetch } from '@/lib/auth-utils';
 import {
   ChatBubbleLeftIcon,
   PaperAirplaneIcon,
@@ -72,11 +73,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
         include_deleted: showDeletedComments.toString()
       });
 
-      const response = await fetch(`/api/admin/curation/comments/${itemId}?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
-      });
+      const response = await authFetch(`/api/admin/curation/comments/${itemId}?${params}`);
       if (!response.ok) throw new Error('Failed to fetch comments');
       return response.json();
     }
@@ -85,12 +82,8 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
   // Create comment mutation
   const createCommentMutation = useMutation({
     mutationFn: async ({ content, type, parentId }: { content: string; type: string; parentId?: string }) => {
-      const response = await fetch('/api/admin/curation/comments', {
+      const response = await authFetch('/api/admin/curation/comments', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({
           item_id: itemId,
           item_type: itemType,
@@ -112,12 +105,8 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
   // Update comment mutation
   const updateCommentMutation = useMutation({
     mutationFn: async ({ commentId, content }: { commentId: string; content: string }) => {
-      const response = await fetch(`/api/admin/curation/comments/${commentId}`, {
+      const response = await authFetch(`/api/admin/curation/comments/${commentId}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ content })
       });
       if (!response.ok) throw new Error('Failed to update comment');
@@ -133,11 +122,8 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
   // Delete comment mutation
   const deleteCommentMutation = useMutation({
     mutationFn: async (commentId: string) => {
-      const response = await fetch(`/api/admin/curation/comments/${commentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+      const response = await authFetch(`/api/admin/curation/comments/${commentId}`, {
+        method: 'DELETE'
       });
       if (!response.ok) throw new Error('Failed to delete comment');
       return response.json();
@@ -150,12 +136,8 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
   // Flag comment mutation
   const flagCommentMutation = useMutation({
     mutationFn: async ({ commentId, reason }: { commentId: string; reason: string }) => {
-      const response = await fetch(`/api/admin/curation/comments/${commentId}/flag`, {
+      const response = await authFetch(`/api/admin/curation/comments/${commentId}/flag`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ reason })
       });
       if (!response.ok) throw new Error('Failed to flag comment');

@@ -15,7 +15,7 @@ import redis
 
 from core.config import settings
 # Use simplified APIs for development
-from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds
+from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds, featured, workspaces, shared_folders
 from api import images_simple as images  # Use simple version
 from api import rbac  # Phase 0: RBAC foundation
 # Temporarily disable complex features for basic startup
@@ -51,8 +51,29 @@ if settings.REDIS_URL:
         logger.warning(f"Failed to connect to Redis: {e}. Using in-memory fallbacks.")
 
 # Add security middleware (order matters - add from outermost to innermost)
-# app.add_middleware(SecurityHeadersMiddleware)  # Commented out - not imported
-# app.add_middleware(RateLimitMiddleware, redis_client=redis_client)  # Commented out - not imported
+# Import rate limiting middleware
+from middleware.rate_limit import RateLimitMiddleware, RedisRateLimitMiddleware
+
+# Add rate limiting (10 requests per minute per user)
+if redis_client:
+    logger.info("Using Redis-based rate limiting")
+    app.add_middleware(
+        RedisRateLimitMiddleware,
+        redis_client=redis_client,
+        requests_per_minute=10,
+        exclude_paths=['/api/health', '/api/docs', '/docs', '/openapi.json', '/redoc']
+    )
+else:
+    logger.info("Using in-memory rate limiting")
+    app.add_middleware(
+        RateLimitMiddleware,
+        requests_per_minute=10,
+        burst_size=15,
+        exclude_paths=['/api/health', '/api/docs', '/docs', '/openapi.json', '/redoc']
+    )
+
+# Import user API
+from api import user as user_api
 
 # Configure CORS - more restrictive in production
 if settings.ENVIRONMENT.lower() == "production":
@@ -68,23 +89,50 @@ else:
         "http://127.0.0.1:3001"
     ]
 
+# Add CSRF protection (before CORS)
+from middleware.csrf import CSRFMiddleware
+
+app.add_middleware(
+    CSRFMiddleware,
+    cookie_secure=settings.ENVIRONMENT.lower() == "production",
+    cookie_samesite="lax",
+    exempt_paths=[
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+        "/api/auth/login",
+        "/api/auth/register",
+        "/api/auth/token",
+        "/api/auth/refresh",
+        "/api/health",
+        "/favicon.ico"
+    ]
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
-        "Authorization", 
-        "Content-Type", 
+        "Authorization",
+        "Content-Type",
         "Accept",
-        "X-Requested-With",
-        "X-CSRF-Token"
+        "X-CSRF-Token",  # Allow CSRF token header
+        "X-Requested-With"
     ],
-    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-Process-Time"]
+    expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-Process-Time"],
+    max_age=86400,  # Cache preflight responses for 24 hours (reduces 300ms overhead)
 )
 
 # Include routers with enhanced security
-# app.include_router(auth_enhanced_router, prefix="/api/auth", tags=["auth"])  # Commented out - not imported
+# SECURITY FIX: Mount auth router to enable token-based authentication
+from api import auth
+app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+
+# RBAC routers
+from api import rbac
+app.include_router(rbac.router, prefix="/api/rbac", tags=["rbac"])
 
 # Secure upload endpoint (replaces upload.py, upload_backup.py, upload_fixed.py)
 # from api import upload_secure  # Commented out - optional module
@@ -103,6 +151,11 @@ app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
 # API endpoints - now require authentication
 app.include_router(images.router, prefix="/api", tags=["api", "images"])
 app.include_router(metadata.router, prefix="/api", tags=["metadata"])
+app.include_router(workspaces.router, prefix="/api", tags=["workspaces"])
+app.include_router(shared_folders.router, prefix="/api", tags=["shared-folders"])
+
+# User endpoints - profile, stats, settings
+app.include_router(user_api.router, prefix="/api", tags=["user"])
 
 # RBAC endpoints - Phase 0: Foundation
 app.include_router(rbac.router, tags=["rbac", "roles", "permissions", "users"])
@@ -118,6 +171,9 @@ app.include_router(webhooks.router, prefix="/api/webhooks", tags=["webhooks"])
 
 # Lightweight feeds for external integration
 app.include_router(feeds.router, prefix="/feeds", tags=["feeds"])
+
+# Featured stories endpoint for homepage
+app.include_router(featured.router, prefix="/api", tags=["featured"])
 
 # Setup monitoring - temporarily disabled
 # setup_monitoring(app)

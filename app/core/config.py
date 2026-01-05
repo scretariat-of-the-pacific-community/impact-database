@@ -1,11 +1,12 @@
 import os
-import sys
-import secrets
+import json
 import logging
+import secrets
+import sys
 from typing import Optional, List, Dict, Any, Union
+
 from pydantic import BaseModel, Field, field_validator, model_validator, validator
 from pydantic_settings import BaseSettings
-import json
 
 
 # Configure logging for config validation
@@ -48,6 +49,26 @@ def get_env(name: str, default: Optional[str] = None, required_in_production: bo
 
 class SecuritySettings(BaseModel):
     """Security-specific settings with strict validation"""
+    
+    # EXIF/Metadata Settings
+    EXIF_LIBRARY: str = Field(
+        default="PIL",
+        description="EXIF extraction library: 'PIL' (default) or 'exifread' (more comprehensive)"
+    )
+    ENABLE_XMP_EXTRACTION: bool = Field(
+        default=False,
+        description="Enable XMP metadata extraction (requires python-xmp-toolkit)"
+    )
+    AUTO_CONVERT_HEIF: bool = Field(
+        default=True,
+        description="Automatically convert HEIF/HEIC to JPEG"
+    )
+    HEIF_JPEG_QUALITY: int = Field(
+        default=95,
+        ge=1,
+        le=100,
+        description="JPEG quality for HEIF conversion (1-100)"
+    )
     
     # JWT Configuration
     SECRET_KEY: str = Field(
@@ -167,16 +188,16 @@ class RedisSettings(BaseModel):
         description="Use SSL for Redis connections"
     )
     REDIS_PASSWORD: Optional[str] = Field(
-        default=get_env("REDIS_PASSWORD", required_in_production=True),
-        description="Redis password (required in production)"
+        default=get_env("REDIS_PASSWORD", required_in_production=False),
+        description="Redis password (recommended in production)"
     )
     
     @field_validator('REDIS_URL')
     @classmethod
     def validate_redis_url(cls, v):
         environment = os.getenv("ENVIRONMENT", "development").lower()
-        if environment == "production" and not ("password" in v.lower() or cls.REDIS_PASSWORD):
-            logger.warning("Redis URL should include authentication in production")
+        if environment == "production" and not ("password" in v.lower()):
+            logger.warning("Redis URL should include authentication in production for security")
         return v
 
 
@@ -222,6 +243,63 @@ class MinIOSettings(BaseModel):
         return v
 
 
+class EmailSettings(BaseModel):
+    """Email service configuration"""
+    
+    EMAIL_BACKEND: str = Field(
+        default=get_env("EMAIL_BACKEND", "console"),
+        pattern=r"^(smtp|sendgrid|console)$",
+        description="Email backend: 'smtp', 'sendgrid', or 'console' (development)"
+    )
+    EMAIL_FROM_ADDRESS: str = Field(
+        default=get_env("EMAIL_FROM_ADDRESS", "noreply@oceanportal.io"),
+        description="Default from email address"
+    )
+    EMAIL_FROM_NAME: str = Field(
+        default=get_env("EMAIL_FROM_NAME", "Ocean Portal"),
+        description="Default from name"
+    )
+    
+    # SMTP Settings
+    SMTP_HOST: Optional[str] = Field(
+        default=get_env("SMTP_HOST"),
+        description="SMTP server host"
+    )
+    SMTP_PORT: int = Field(
+        default=int(get_env("SMTP_PORT", "587")),
+        ge=1, le=65535,
+        description="SMTP server port"
+    )
+    SMTP_USER: Optional[str] = Field(
+        default=get_env("SMTP_USER"),
+        description="SMTP username"
+    )
+    SMTP_PASSWORD: Optional[str] = Field(
+        default=get_env("SMTP_PASSWORD"),
+        description="SMTP password"
+    )
+    SMTP_USE_TLS: bool = Field(
+        default=get_env("SMTP_USE_TLS", "true").lower() == "true",
+        description="Use TLS for SMTP connections"
+    )
+    
+    # SendGrid Settings
+    SENDGRID_API_KEY: Optional[str] = Field(
+        default=get_env("SENDGRID_API_KEY"),
+        description="SendGrid API key"
+    )
+    
+    @model_validator(mode='after')
+    def validate_email_backend(self):
+        """Validate email backend configuration"""
+        if self.EMAIL_BACKEND == "smtp":
+            if not self.SMTP_HOST:
+                raise ValueError("SMTP_HOST is required when using smtp backend")
+        elif self.EMAIL_BACKEND == "sendgrid":
+            if not self.SENDGRID_API_KEY:
+                raise ValueError("SENDGRID_API_KEY is required when using sendgrid backend")
+        return self
+
 
 class Settings(BaseSettings):
     """
@@ -251,6 +329,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = DatabaseSettings()
     redis: RedisSettings = RedisSettings()
     minio: MinIOSettings = MinIOSettings()
+    email: EmailSettings = EmailSettings()
     
     # File Upload Security
     MAX_FILE_SIZE: int = Field(
@@ -265,6 +344,12 @@ class Settings(BaseSettings):
     SCAN_UPLOADS: bool = Field(
         default=get_env("SCAN_UPLOADS", "false").lower() == "true",
         description="Enable virus/malware scanning for uploads"
+    )
+
+    UPLOAD_DUPLICATE_POLICY: str = Field(
+        default=get_env("UPLOAD_DUPLICATE_POLICY", "allow"),
+        pattern=r"^(allow|reject|review)$",
+        description="Policy for handling duplicate image uploads"
     )
     
     # CORS Configuration

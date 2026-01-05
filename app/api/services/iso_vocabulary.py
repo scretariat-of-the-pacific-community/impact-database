@@ -168,7 +168,7 @@ HAZARD_TYPES = {
         },
         "topic_categories": ["geoscientificInformation", "environment"],
     },
-    "volcano": {
+    "volcanic": {
         "name": {
             "eng": "Volcano",
             "fra": "Volcan",
@@ -209,6 +209,27 @@ HAZARD_TYPES = {
             ],
         },
         "topic_categories": ["biota", "environment"],
+    },
+    "coastal_erosion": {
+        "name": {
+            "eng": "Coastal Erosion",
+            "fra": "Érosion côtière",
+        },
+        "keywords": {
+            "eng": [
+                "coastal erosion",
+                "shoreline retreat",
+                "beach erosion",
+                "storm surge impact",
+            ],
+            "fra": [
+                "érosion côtière",
+                "recul du rivage",
+                "érosion des plages",
+                "impact des ondes de tempête",
+            ],
+        },
+        "topic_categories": ["oceans", "environment"],
     },
 }
 
