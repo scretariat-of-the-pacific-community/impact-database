@@ -245,9 +245,14 @@ services:
       - REDIS_URL=${REDIS_URL}
       - ENVIRONMENT=${ENVIRONMENT}
       - PYTHONPATH=${PYTHONPATH}
+      - FLOWER_BROKER=${REDIS_URL}
+      - FLOWER_PORT=5555
+      - FLOWER_MAX_TASKS=10000
     depends_on:
       redis:
         condition: service_healthy
+      celery_worker:
+        condition: service_started
     networks:
       - impact-network
     volumes:

@@ -300,17 +300,17 @@ try:
         init_cache(None)
         logger.warning(f"Failed to initialize Redis cache: {e}")
     
-    logger.info("Auth API, Images API, Upload API, RBAC API, Review Workflow API, Featured Stories API, User API, Avatar API, and Push Notifications API routers included")
+    logger.info("Auth API, Images API, Upload API, RBAC API, Review Workflow API, Featured Stories API, User API, Avatar API, Push Notifications API, and Shared Folders API routers included")
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
 
-# Admin router in separate try block to ensure it loads independently
+# Import Shared Folders API separately (collaboration feature)
 try:
-    from api.admin import router as admin_router
-    app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
-    logger.info("Admin API router included")
+    from api.shared_folders import router as shared_folders_router
+    app.include_router(shared_folders_router, prefix="/api", tags=["shared-folders"])
+    logger.info("Shared Folders API router included successfully")
 except ImportError as e:
-    logger.warning(f"Could not import admin router: {e}")
+    logger.warning(f"Could not import Shared Folders API: {e}")
 
 # Add essential endpoints directly to main app
 @app.get("/api/vocabularies")

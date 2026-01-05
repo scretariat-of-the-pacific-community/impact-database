@@ -17,20 +17,19 @@ import {
   GlobeAltIcon
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
-import { Select } from '@/components/design-system';
-import dompurify from 'dompurify';
+import dompurify, { type Config as DOMPurifyConfig } from 'dompurify';
 
 const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
-const INPUT_SANITIZE_CONFIG = {
+const INPUT_SANITIZE_CONFIG: DOMPurifyConfig = {
   ALLOWED_TAGS: [],
   ALLOWED_ATTR: [],
   KEEP_CONTENT: true,
-} as const;
+};
 
 const sanitizeMetadataValue = (value: unknown): unknown => {
   if (typeof value === 'string') {
-    return DOMPurify.sanitize(value, INPUT_SANITIZE_CONFIG);
+    return DOMPurify ? DOMPurify.sanitize(value, INPUT_SANITIZE_CONFIG) : value;
   }
 
   if (Array.isArray(value)) {
@@ -264,14 +263,12 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
 
       case 'select':
         return (
-          <Select
+          <select
             id={fieldId}
             value={value}
             onChange={(e) => handleFieldChange(field.key, e.target.value)}
             disabled={readOnly}
-            variant="light"
-            size="md"
-            aria-label={field.label}
+            className={baseInputClasses}
           >
             <option value="">Select {field.label}</option>
             {field.options?.map(option => (
@@ -279,7 +276,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
                 {option.charAt(0).toUpperCase() + option.slice(1)}
               </option>
             ))}
-          </Select>
+          </select>
         );
 
       case 'date':

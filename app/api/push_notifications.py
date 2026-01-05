@@ -29,8 +29,8 @@ class PushSubscription(Base):
     endpoint = Column(String(500), nullable=False, unique=True)
     p256dh = Column(String(200), nullable=False)
     auth = Column(String(50), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    last_used = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.utcnow())
+    last_used = Column(DateTime, default=lambda: datetime.utcnow())
 
 
 # Request/Response models

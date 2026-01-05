@@ -1,4 +1,3 @@
-"""Admin UI for reviewing upload failures - React component."""
 'use client';
 
 import React, { useState, useEffect } from 'react';

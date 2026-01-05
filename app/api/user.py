@@ -15,7 +15,7 @@ from models.database import get_db, ImageMetadata
 from models.rbac import User as DBUser
 from models.audit_log import AuditLog
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced
-from api.dependencies import UserDetails, get_user_details, build_user_upload_filter
+from api.auth_rbac import require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -119,6 +119,7 @@ class ActivityEvent(BaseModel):
 @router.get("/user/stats", response_model=UserStats)
 async def get_user_stats(
     request: Request,
+    identifier: Optional[str] = Query(None, description="Username, UUID, or email to fetch stats for"),
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
@@ -126,7 +127,39 @@ async def get_user_stats(
     # Check cache first
     from middleware.cache import get_cache
     cache = get_cache()
-    cache_key = f"cache:user_stats:{current_user.username}"
+    # Resolve target user identifiers (username/UUID/email)
+    target_username = current_user.username
+    target_id: Optional[str] = getattr(current_user, "id", None)
+    target_email: Optional[str] = getattr(current_user, "email", None)
+
+    if identifier:
+        # Normalize identifier and enforce access control
+        # Allow self-access; otherwise require admin role
+        normalized = identifier.strip().lower()
+        is_self = normalized in {
+            current_user.username.lower(),
+            (str(target_id).lower() if target_id else ""),
+            (str(target_email).lower() if target_email else ""),
+        }
+        if not is_self and current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="Insufficient permissions to view other users' stats")
+
+        # Look up user by UUID, email, or username
+        target = (
+            db.query(DBUser)
+            .filter(
+                (DBUser.id == normalized) |
+                (func.lower(DBUser.email) == normalized) |
+                (func.lower(DBUser.username) == normalized)
+            )
+            .first()
+        )
+        if target:
+            target_username = target.username
+            target_id = str(target.id)
+            target_email = target.email
+
+    cache_key = f"cache:user_stats:{target_username}"
     
     cached_data = cache.get(cache_key)
     if cached_data:
@@ -135,9 +168,9 @@ async def get_user_stats(
     
     try:
         # Query user's uploads
-        user_identifiers = {current_user.username}
-        if hasattr(current_user, "id") and current_user.id:
-            user_identifiers.add(str(current_user.id))
+        user_identifiers = {target_username}
+        if target_id:
+            user_identifiers.add(str(target_id))
 
         total_uploads = db.query(func.count(ImageMetadata.id)).filter(
             ImageMetadata.uploader_id.in_(user_identifiers)
@@ -183,40 +216,7 @@ async def get_user_stats(
         impact_score = approved_count * 10
 
         # Get user details
-        user = db.query(DBUser).filter(DBUser.username == current_user.username).first()
-
-        # Get hazard distribution for profile visualization
-        hazard_counts = db.query(
-            ImageMetadata.hazard_type,
-            func.count(ImageMetadata.id).label('count')
-        ).filter(
-            ImageMetadata.uploader_id.in_(user_identifiers)
-        ).group_by(
-            ImageMetadata.hazard_type
-        ).all()
-        
-        hazard_distribution = {
-            row[0]: row[1] for row in hazard_counts if row[0]
-        }
-
-        # Get recent upload dates for contribution heatmap (last 30 days)
-        thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
-        daily_uploads = db.query(
-            func.date(ImageMetadata.datetime).label('date'),
-            func.count(ImageMetadata.id).label('count')
-        ).filter(
-            and_(
-                ImageMetadata.uploader_id.in_(user_identifiers),
-                ImageMetadata.datetime >= thirty_days_ago
-            )
-        ).group_by(
-            func.date(ImageMetadata.datetime)
-        ).all()
-        
-        contribution_heatmap = {
-            row[0].isoformat() if row[0] else None: row[1] 
-            for row in daily_uploads if row[0]
-        }
+        user = db.query(DBUser).filter(DBUser.username == target_username).first()
 
         # Get achievements with progress for profile display
         achievements_with_progress = []
@@ -257,15 +257,13 @@ async def get_user_stats(
             "analytics": {
                 "uploads_this_month": uploads_this_month,
                 "average_review_time": average_review_time,
-                "top_hazard": top_hazard,
-                "hazard_distribution": hazard_distribution,
-                "contribution_heatmap": contribution_heatmap
+                "top_hazard": top_hazard
             }
         }
         
         # Cache for 5 minutes (300 seconds)
         cache.set(cache_key, stats_data, ttl=300)
-        logger.debug(f"Cached stats for {current_user.username}")
+        logger.debug(f"Cached stats for {target_username}")
         
         return JSONResponse(content=stats_data, headers={"X-Cache": "MISS"})
     except Exception as e:
@@ -276,6 +274,7 @@ async def get_user_stats(
 @router.get("/images/user/uploads")
 async def get_user_uploads(
     request: Request,
+    identifier: Optional[str] = Query(None, description="Username, UUID, or email to fetch uploads for"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
     status: Optional[str] = Query(None, description="Filter by approval status"),
@@ -284,8 +283,31 @@ async def get_user_uploads(
 ):
     """Get paginated list of user's uploads."""
     try:
+        # Determine target user (self by default; otherwise admin can view others)
+        target_username = current_user.username
+        if identifier:
+            normalized = identifier.strip().lower()
+            is_self = normalized in {
+                current_user.username.lower(),
+                (str(getattr(current_user, 'id', '')).lower()),
+                (str(getattr(current_user, 'email', '')).lower()),
+            }
+            if not is_self and current_user.role != 'admin':
+                raise HTTPException(status_code=403, detail="Insufficient permissions to view other users' uploads")
+            target = (
+                db.query(DBUser)
+                .filter(
+                    (DBUser.id == normalized) |
+                    (func.lower(DBUser.email) == normalized) |
+                    (func.lower(DBUser.username) == normalized)
+                )
+                .first()
+            )
+            if target:
+                target_username = target.username
+
         query = db.query(ImageMetadata).filter(
-            ImageMetadata.uploader_id == current_user.username
+            ImageMetadata.uploader_id == target_username
         )
 
         # Filter by status if provided
@@ -326,6 +348,7 @@ async def get_user_uploads(
 @router.get("/user/activity")
 async def get_user_activity(
     request: Request,
+    identifier: Optional[str] = Query(None, description="Username, UUID, or email to fetch activity for"),
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(50, ge=1, le=100, description="Number of events per page"),
     db: Session = Depends(get_db),
@@ -335,12 +358,38 @@ async def get_user_activity(
     try:
         from utils.pagination import paginate_query, PaginationMetadata
         from sqlalchemy import or_
+        from models.database import User as DBUser
+        
+        # Resolve target user by identifier (self by default)
+        target_id = str(getattr(current_user, 'id', '')) if getattr(current_user, 'id', None) else None
+        target_username = current_user.username
+        if identifier:
+            normalized = identifier.strip().lower()
+            is_self = normalized in {
+                current_user.username.lower(),
+                (target_id.lower() if target_id else ""),
+                (getattr(current_user, 'email', '').lower()),
+            }
+            if not is_self and current_user.role != 'admin':
+                raise HTTPException(status_code=403, detail="Insufficient permissions to view other users' activity")
+            target = (
+                db.query(DBUser)
+                .filter(
+                    (DBUser.id == normalized) |
+                    (func.lower(DBUser.email) == normalized) |
+                    (func.lower(DBUser.username) == normalized)
+                )
+                .first()
+            )
+            if target:
+                target_id = str(target.id)
+                target_username = target.username
         
         # Build query - match by either user_id (UUID) or username (string)
         query = db.query(AuditLog).filter(
             or_(
-                AuditLog.user_id == str(current_user.id),
-                AuditLog.username == current_user.username
+                AuditLog.user_id == (target_id or ''),
+                AuditLog.username == target_username
             )
         ).order_by(
             desc(AuditLog.timestamp)
@@ -437,21 +486,45 @@ async def get_user_activity(
 @router.get("/user/settings", response_model=UserSettingsResponse)
 async def get_user_settings(
     request: Request,
+    identifier: Optional[str] = Query(None, description="Username, UUID, or email to fetch settings for"),
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Get user settings and preferences."""
     try:
+        # Determine target user (self by default; admin can view others)
+        target_username = current_user.username
+        if identifier:
+            normalized = identifier.strip().lower()
+            is_self = normalized in {
+                current_user.username.lower(),
+                (str(getattr(current_user, 'id', '')).lower()),
+                (str(getattr(current_user, 'email', '')).lower()),
+            }
+            if not is_self and current_user.role != 'admin':
+                raise HTTPException(status_code=403, detail="Insufficient permissions to view other users' settings")
+            target = (
+                db.query(DBUser)
+                .filter(
+                    (DBUser.id == normalized) |
+                    (func.lower(DBUser.email) == normalized) |
+                    (func.lower(DBUser.username) == normalized)
+                )
+                .first()
+            )
+            if target:
+                target_username = target.username
+        
         # Get or create settings for user
         settings = db.query(DBUserSettings).filter(
-            DBUserSettings.user_id == current_user.username
+            DBUserSettings.user_id == target_username
         ).first()
         
         if not settings:
             # Create default settings
             default_settings = DBUserSettings.get_default_settings()
             settings = DBUserSettings(
-                user_id=current_user.username,
+                user_id=target_username,
                 profile_settings=default_settings['profile'],
                 privacy_settings=default_settings['privacy'],
                 notification_settings=default_settings['notifications'],
@@ -473,7 +546,7 @@ async def get_user_settings(
         raise HTTPException(status_code=500, detail=f"Failed to fetch settings: {str(e)}")
 
 
-@router.put("/user/settings")
+@router.put("/user/settings", dependencies=[Depends(require_permission("profile:settings:update"))])
 async def update_user_settings(
     request: Request,
     settings_update: UserSettingsUpdate,
@@ -861,7 +934,7 @@ async def get_user_analytics(
     try:
         start_date = datetime.now(timezone.utc) - timedelta(days=days)
         
-        # Get user's UUID
+        # Get user's UUID and build identifiers (username + uuid) so legacy uploads are counted
         user = db.query(DBUser).filter(DBUser.username == current_user.username).first()
         if not user:
             return {
@@ -875,12 +948,14 @@ async def get_user_analytics(
                 "comparative_benchmarks": {}
             }
         
-        user_id_str = str(user.id)
+        user_identifiers = {current_user.username}
+        if getattr(user, "id", None):
+            user_identifiers.add(str(user.id))
         
         # Get all user's images for the period
         user_images = db.query(ImageMetadata).filter(
             and_(
-                ImageMetadata.uploader_id == user_id_str,
+                ImageMetadata.uploader_id.in_(user_identifiers),
                 ImageMetadata.datetime >= start_date
             )
         ).all()
@@ -893,7 +968,7 @@ async def get_user_analytics(
             func.count(ImageMetadata.id).label('count')
         ).filter(
             and_(
-                ImageMetadata.uploader_id == user_id_str,
+                ImageMetadata.uploader_id.in_(user_identifiers),
                 ImageMetadata.datetime >= start_date
             )
         ).group_by(
@@ -928,6 +1003,7 @@ async def get_user_analytics(
                 })
         
         # Views metrics - use placeholder since views tracking not yet implemented
+        # TODO: Replace placeholder view multipliers with real view tracking data (tracking issue #1234)
         total_views = total_uploads * 10  # Placeholder: estimate 10 views per upload
         avg_views = round(total_views / total_uploads, 1) if total_uploads > 0 else 0
         max_views = max(10, total_uploads * 5)  # Placeholder max
@@ -1114,69 +1190,3 @@ async def get_unlocked_achievements(
     except Exception as e:
         logger.error(f"Error fetching unlocked achievements: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch unlocked achievements: {str(e)}")
-
-
-# =============================================================================
-# Collaboration Features (Stub Endpoints - Ready for future implementation)
-# =============================================================================
-
-@router.get("/follows")
-async def get_follows(
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
-):
-    """Get users/entities the current user follows. Stub for future implementation."""
-    return []
-
-
-@router.post("/follows")
-async def create_follow(
-    request: Request,
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
-):
-    """Follow a user or entity. Stub for future implementation."""
-    body = await request.json()
-    return {"success": True, "followed": body.get("target_id")}
-
-
-@router.delete("/follows/{follow_id}")
-async def delete_follow(
-    follow_id: str,
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
-):
-    """Unfollow a user or entity. Stub for future implementation."""
-    return {"success": True, "unfollowed": follow_id}
-
-
-@router.get("/workspaces")
-async def get_workspaces(
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
-):
-    """Get user's workspaces. Stub for future implementation."""
-    return []
-
-
-@router.post("/workspaces")
-async def create_workspace(
-    request: Request,
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
-):
-    """Create a new workspace. Stub for future implementation."""
-    body = await request.json()
-    return {"success": True, "name": body.get("name"), "id": "placeholder"}
-
-
-@router.get("/notifications")
-async def get_notifications(
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
-):
-    """Get user's notifications. Stub for future implementation."""
-    return []
-
-
-@router.put("/notifications/{notification_id}/read")
-async def mark_notification_read(
-    notification_id: str,
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
-):
-    """Mark a notification as read. Stub for future implementation."""
-    return {"success": True, "id": notification_id, "read": True}

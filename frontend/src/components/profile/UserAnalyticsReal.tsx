@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+import type { Map as LeafletMap } from 'leaflet';
 import {
   Area,
   AreaChart,
@@ -23,11 +24,54 @@ import {
 import { Download, Gauge, MapPin, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
 import clsx from 'clsx';
 import { format } from 'date-fns';
-import { HAZARD_TYPE_LABELS, HazardType } from '@/lib/types';
-import { Select } from '@/components/design-system';
-import { getCountryName } from '@/lib/countries';
+import { imageApi } from '@/lib/api';
+import { getApiUrl } from '@/lib/config';
+import { z } from 'zod';
+import React from 'react';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
-const RADIAN = Math.PI / 180;
+// Zod validation schema for analytics data
+const AnalyticsDataSchema = z.object({
+  time_series: z.array(z.object({
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    uploads: z.number().int().nonnegative(),
+  })),
+  period_days: z.number().int().positive(),
+  total_uploads: z.number().int().nonnegative(),
+  hazard_distribution: z.record(z.string(), z.number().int().nonnegative()),
+  locations: z.array(z.object({
+    id: z.string(),
+    latitude: z.number().min(-90).max(90),
+    longitude: z.number().min(-180).max(180),
+    hazard: z.string(),
+    country: z.string(),
+    uploads: z.number().int().nonnegative(),
+  })),
+  country_distribution: z.record(z.string(), z.number().int().nonnegative()),
+  views_metrics: z.object({
+    total: z.number().int().nonnegative(),
+    average_per_upload: z.number().nonnegative(),
+    max_views: z.number().int().nonnegative(),
+  }),
+  engagement_metrics: z.object({
+    impact_score: z.number().nonnegative(),
+    approval_rate: z.number().nonnegative(),
+    approved_count: z.number().int().nonnegative(),
+    pending_count: z.number().int().nonnegative(),
+  }),
+  comparative_benchmarks: z.object({
+    user_uploads: z.number().int().nonnegative(),
+    community_avg_uploads: z.number().nonnegative(),
+    user_avg_views: z.number().nonnegative(),
+    community_avg_views: z.number().nonnegative(),
+  }),
+  popular_images: z.array(z.object({
+    id: z.string(),
+    title: z.string(),
+    views: z.number().int().nonnegative(),
+  })),
+  insights: z.array(z.string()),
+});
 
 interface AnalyticsData {
   time_series: Array<{ date: string; uploads: number }>;
@@ -68,32 +112,18 @@ interface AnalyticsData {
   insights: string[];
 }
 
-// Colorblind-friendly palette (Okabe-Ito + neutrals)
-const hazardPalette = ['#0072B2', '#D55E00', '#009E73', '#CC79A7', '#F0E442', '#56B4E9', '#E69F00', '#999999'];
+const hazardPalette = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
-// Color map aligned with HazardType enum from lib/types.ts
-const hazardColorMap: Record<HazardType | string, string> = {
-  earthquake: '#E69F00',      // Orange
-  flood: '#0072B2',           // Blue
-  tsunami: '#56B4E9',         // Light blue
-  cyclone: '#CC79A7',         // Pink
-  drought: '#F0E442',         // Yellow
-  landslide: '#009E73',       // Green
-  wildfire: '#D55E00',        // Red-orange
-  volcanic: '#332288',        // Deep purple
-  coastal_erosion: '#999999', // Gray
-  other: '#666666',           // Dark gray
-};
-
-// Helper to get display label for hazard type
-const getHazardLabel = (hazard: string): string => {
-  return HAZARD_TYPE_LABELS[hazard as HazardType] || 
-    hazard.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-};
-
-// Helper to get color for hazard type
-const getHazardColor = (hazard: string): string => {
-  return hazardColorMap[hazard as HazardType] || hazardColorMap.other || '#3b82f6';
+const hazardColorMap: Record<string, string> = {
+  flood: '#3b82f6',
+  cyclone: '#8b5cf6',
+  wildfire: '#ef4444',
+  earthquake: '#f59e0b',
+  tsunami: '#14b8a6',
+  landslide: '#f97316',
+  drought: '#eab308',
+  coastal_erosion: '#06b6d4',
+  volcanic_eruption: '#dc2626',
 };
 
 function rollingAverage(data: Array<{ date: string; uploads: number }>, window: number) {
@@ -112,6 +142,25 @@ function getColorForIntensity(count: number): string {
   if (count < 4) return 'bg-emerald-700/60';
   if (count < 6) return 'bg-emerald-500/80';
   return 'bg-emerald-400';
+}
+
+function formatPercent(value: number, total: number): string {
+  if (total === 0 || !isFinite(value) || !isFinite(total)) return '0';
+  const percent = (value / total) * 100;
+  return isFinite(percent) ? percent.toFixed(0) : '0';
+}
+
+function abbreviateHazard(name: string): string {
+  const abbreviations: Record<string, string> = {
+    'COASTAL_EROSION': 'COASTAL',
+    'COASTAL EROSION': 'COASTAL',
+    'VOLCANIC_ERUPTION': 'VOLCANIC',
+    'VOLCANIC ERUPTION': 'VOLCANIC',
+    'EARTHQUAKE': 'QUAKE',
+  };
+  
+  const key = name.toUpperCase().replace(/ /g, '_');
+  return abbreviations[key] || name;
 }
 
 function downloadFile(content: string, fileName: string, mimeType: string) {
@@ -134,46 +183,74 @@ function formatCsv(rows: Array<Record<string, any>>): string {
   return csvRows.join('\n');
 }
 
-interface UserAnalyticsRealProps {
-  /** When false, the component is hidden and should pause polling/heavy operations */
-  isActive?: boolean;
-}
-
-export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsRealProps) {
+export default function UserAnalyticsReal() {
   const [selectedHazard, setSelectedHazard] = useState<string>('');
   const [days, setDays] = useState(30);
 
   const { data: analyticsData, isLoading, error } = useQuery<AnalyticsData>({
     queryKey: ['user-analytics', days],
     queryFn: async () => {
-      // Use relative URL to go through Next.js API proxy
-      const response = await fetch(`/api/user/analytics?days=${days}`, {
-        credentials: 'include',
-      });
-      if (!response.ok) throw new Error('Failed to fetch analytics');
-      return response.json();
+      try {
+        const apiUrl = getApiUrl(`api/user/analytics?days=${days}`);
+        const response = await fetch(apiUrl, {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error('Unauthorized');
+          }
+          throw new Error(`Request failed with status ${response.status}`);
+        }
+        
+        const json = await response.json();
+        
+        // Validate and sanitize response
+        const validated = AnalyticsDataSchema.parse(json);
+        return validated;
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          console.error('Analytics data validation failed:', error.errors);
+          throw new Error('Invalid analytics data format');
+        }
+        throw error;
+      }
     },
-    staleTime: 60000, // 1 minute
+    staleTime: 60_000, // 1 minute
+    retry: 2,
+    refetchOnWindowFocus: false,
   });
 
   // Set initial selected hazard when data loads
   useEffect(() => {
+    let isCurrent = true;
+    
     if (analyticsData?.hazard_distribution && !selectedHazard) {
       const hazards = Object.keys(analyticsData.hazard_distribution);
-      if (hazards.length > 0) {
+      if (hazards.length > 0 && isCurrent) {
         setSelectedHazard(hazards[0]);
       }
     }
+    
+    return () => {
+      isCurrent = false;
+    };
   }, [analyticsData, selectedHazard]);
 
   const pieData = useMemo(() => {
     if (!analyticsData?.hazard_distribution) return [];
-    return Object.entries(analyticsData.hazard_distribution).map(([name, value]) => ({
-      name: getHazardLabel(name),
-      value,
-      rawName: name,
-      color: getHazardColor(name),
-    }));
+    return Object.entries(analyticsData.hazard_distribution).map(([name, value]) => {
+      const displayName = name.replace(/_/g, ' ').toUpperCase();
+      return {
+        name: displayName,
+        shortName: abbreviateHazard(displayName),
+        value,
+        rawName: name,
+      };
+    });
   }, [analyticsData]);
 
   const timelineWithRolling = useMemo(() => {
@@ -208,30 +285,6 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
     if (currentWeek.length) weeks.push(currentWeek);
     return weeks;
   }, [calendarData]);
-
-  const mapBounds = useMemo(() => {
-    if (!analyticsData?.locations?.length) {
-      return [
-        [-18, 178],
-      ];
-    }
-    const lats = analyticsData.locations.map((l) => l.latitude);
-    const lons = analyticsData.locations.map((l) => l.longitude);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const spanLon = Math.max(...lons) - Math.min(...lons);
-    // Handle anti-meridian by normalizing longitudes for smallest span
-    const normalizedLons =
-      spanLon > 180
-        ? lons.map((lon) => (lon < 0 ? lon + 360 : lon))
-        : lons;
-    const minLon = Math.min(...normalizedLons);
-    const maxLon = Math.max(...normalizedLons);
-    return [
-      [minLat, minLon > 180 ? minLon - 360 : minLon],
-      [maxLat, maxLon > 180 ? maxLon - 360 : maxLon],
-    ];
-  }, [analyticsData?.locations]);
 
   const exportJson = () => {
     const payload = {
@@ -283,71 +336,73 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
     );
   }
 
-  const benchmarkData = [
-    {
-      metric: 'Uploads',
-      user: analyticsData.comparative_benchmarks.user_uploads,
-      community: analyticsData.comparative_benchmarks.community_avg_uploads,
-    },
-    {
-      metric: 'Avg. views',
-      user: analyticsData.comparative_benchmarks.user_avg_views,
-      community: analyticsData.comparative_benchmarks.community_avg_views,
-    },
-  ];
+  const benchmarkData = useMemo(() => {
+    if (!analyticsData?.comparative_benchmarks) return [];
+    
+    return [
+      {
+        metric: 'Uploads',
+        user: analyticsData.comparative_benchmarks.user_uploads,
+        community: analyticsData.comparative_benchmarks.community_avg_uploads,
+      },
+      {
+        metric: 'Avg. views',
+        user: analyticsData.comparative_benchmarks.user_avg_views,
+        community: analyticsData.comparative_benchmarks.community_avg_views,
+      },
+    ];
+  }, [analyticsData?.comparative_benchmarks]);
 
   return (
     <div className="mx-auto max-w-7xl space-y-8 p-6">
       {/* Header */}
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 p-6 shadow-lg">
         <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Period Analytics</p>
-          <h1 className="mt-1 text-3xl font-bold text-white">Time-Range Dashboard</h1>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">User Analytics</p>
+          <h1 className="mt-1 text-3xl font-bold text-white">Your Impact Dashboard</h1>
           <p className="mt-2 text-sm text-white/70">
-            Showing {analyticsData.total_uploads} uploads from the last {days} days
+            Analyzing {analyticsData.total_uploads} uploads over the last {days} days
           </p>
         </div>
         <div className="flex gap-2">
-          <Select
+          <select
             value={days}
             onChange={(e) => setDays(Number(e.target.value))}
-            variant="dark"
-            size="sm"
-            fullWidth={false}
-            aria-label="Select time period"
+            aria-label="Select time range"
+            className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white"
           >
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
             <option value={365}>Last year</option>
-          </Select>
+          </select>
           <button
             onClick={exportCsv}
-            className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pacific-400 focus-visible:ring-offset-2 focus-visible:ring-offset-deep-950"
-            title="Export CSV"
+            className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700"
             aria-label="Export data as CSV"
+            title="Export CSV"
           >
-            <Download className="h-4 w-4" aria-hidden="true" />
+            <Download className="h-4 w-4" />
           </button>
           <button
             onClick={exportJson}
-            className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pacific-400 focus-visible:ring-offset-2 focus-visible:ring-offset-deep-950"
-            title="Export JSON"
+            className="rounded-xl border border-white/20 bg-slate-800 px-4 py-2 text-sm text-white hover:bg-slate-700"
             aria-label="Export data as JSON"
+            title="Export JSON"
           >
             JSON
           </button>
         </div>
       </header>
 
-      {/* Key Metrics - Period Specific */}
+      {/* Key Metrics */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-pacific-500/20 to-pacific-500/5 p-6">
           <div className="flex items-center justify-between">
             <TrendingUp className="h-8 w-8 text-pacific-300" />
             <p className="text-3xl font-bold text-white">{analyticsData.total_uploads}</p>
           </div>
-          <p className="mt-2 text-sm font-semibold text-white">Period Uploads</p>
+          <p className="mt-2 text-sm font-semibold text-white">Total Uploads</p>
           <p className="text-xs text-white/60">Last {days} days</p>
         </div>
 
@@ -356,7 +411,7 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
             <Gauge className="h-8 w-8 text-emerald-300" />
             <p className="text-3xl font-bold text-white">{analyticsData.views_metrics.total}</p>
           </div>
-          <p className="mt-2 text-sm font-semibold text-white">Period Views</p>
+          <p className="mt-2 text-sm font-semibold text-white">Total Views</p>
           <p className="text-xs text-white/60">Avg: {analyticsData.views_metrics.average_per_upload}/upload</p>
         </div>
 
@@ -365,8 +420,8 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
             <span className="text-2xl">✨</span>
             <p className="text-3xl font-bold text-white">{analyticsData.engagement_metrics.impact_score}</p>
           </div>
-          <p className="mt-2 text-sm font-semibold text-white">Period Impact</p>
-          <p className="text-xs text-white/60">{analyticsData.engagement_metrics.approval_rate}% approved in period</p>
+          <p className="mt-2 text-sm font-semibold text-white">Impact Score</p>
+          <p className="text-xs text-white/60">{analyticsData.engagement_metrics.approval_rate}% approved</p>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-gradient-to-br from-purple-500/20 to-purple-500/5 p-6">
@@ -374,7 +429,7 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
             <MapPin className="h-8 w-8 text-purple-300" />
             <p className="text-3xl font-bold text-white">{analyticsData.locations.length}</p>
           </div>
-          <p className="mt-2 text-sm font-semibold text-white">Period Locations</p>
+          <p className="mt-2 text-sm font-semibold text-white">Locations</p>
           <p className="text-xs text-white/60">{Object.keys(analyticsData.country_distribution).length} countries</p>
         </div>
       </div>
@@ -394,11 +449,12 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
       )}
 
       {/* Timeline Chart */}
-      <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 shadow-lg">
+      <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-6 shadow-lg" role="img" aria-label="Upload timeline with 7-day rolling average">
         <h2 className="text-xl font-semibold text-white mb-4">Upload Timeline</h2>
-        <div className="h-80 min-w-0" style={{ minHeight: '320px' }}>
-          <ResponsiveContainer width="100%" height={320} minWidth={120} minHeight={200}>
-            <AreaChart data={timelineWithRolling} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+        <ErrorBoundary>
+          <div className="h-80 w-full" style={{ minHeight: '320px', minWidth: '300px' }}>
+            <ResponsiveContainer width="100%" height="100%" minHeight={320}>
+              <AreaChart data={timelineWithRolling} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorUploads" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8} />
@@ -407,10 +463,7 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
               <XAxis dataKey="date" stroke="rgba(255,255,255,0.6)" />
-              <YAxis
-                stroke="rgba(255,255,255,0.6)"
-                label={{ value: 'Uploads', angle: -90, position: 'insideLeft', fill: '#cbd5e1' }}
-              />
+              <YAxis stroke="rgba(255,255,255,0.6)" />
               <RechartsTooltip
                 contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)' }}
                 labelStyle={{ color: '#fff' }}
@@ -431,35 +484,36 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
                 dot={false}
                 name="7-day average"
               />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </ErrorBoundary>
       </div>
 
       {/* Map and Hazard Distribution */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-            {/* Map */}
-            {analyticsData.locations.length > 0 && (
-              <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
-                <h2 className="text-xl font-semibold text-white mb-4">Geographic Distribution</h2>
-                <div className="h-96 rounded-xl overflow-hidden">
-                  <MapContainer
-                    bounds={mapBounds as any}
-                    boundsOptions={{ padding: [20, 20] }}
-                    style={{ height: '100%', width: '100%' }}
-                    scrollWheelZoom={false}
-                    worldCopyJump
-                  >
-                    <TileLayer
-                      attribution='&copy; OpenStreetMap'
-                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                    />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Map */}
+        {analyticsData.locations.length > 0 && (
+          <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
+            <h2 className="text-xl font-semibold text-white mb-4">Geographic Distribution</h2>
+            <ErrorBoundary>
+              <div className="h-96 rounded-xl overflow-hidden">
+                <MapContainer
+                center={[-18, 178]}
+                zoom={3}
+                style={{ height: '100%', width: '100%' }}
+                scrollWheelZoom={false}
+              >
+                <TileLayer
+                  attribution='&copy; OpenStreetMap'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
                 {analyticsData.locations.map((location) => (
                   <CircleMarker
                     key={location.id}
                     center={[location.latitude, location.longitude]}
                     radius={8}
-                    fillColor={getHazardColor(location.hazard)}
+                    fillColor={hazardColorMap[location.hazard] || '#3b82f6'}
                     color="#fff"
                     weight={2}
                     opacity={0.8}
@@ -467,14 +521,15 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
                   >
                     <LeafletTooltip>
                       <div className="text-xs">
-                        <p className="font-semibold">{getCountryName(location.country)}</p>
-                        <p>Hazard: {getHazardLabel(location.hazard)}</p>
+                        <p className="font-semibold">{location.country}</p>
+                        <p>Hazard: {location.hazard.replace(/_/g, ' ')}</p>
                       </div>
                     </LeafletTooltip>
                   </CircleMarker>
                 ))}
-              </MapContainer>
-            </div>
+                </MapContainer>
+              </div>
+            </ErrorBoundary>
           </div>
         )}
 
@@ -482,89 +537,37 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
           <h2 className="text-xl font-semibold text-white mb-4">Hazard Distribution</h2>
           {pieData.length > 0 ? (
-            <div className="min-w-0" style={{ minHeight: '300px' }}>
-              <ResponsiveContainer width="100%" height={300} minWidth={120} minHeight={200}>
-                <PieChart margin={{ top: 8, right: 16, left: 16, bottom: 8 }}>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius={100}
-                    paddingAngle={2}
-                    fill="#8884d8"
-                    dataKey="value"
-                    onClick={(data) => setSelectedHazard(data.rawName)}
-                    label={({ cx = 0, cy = 0, midAngle = 0, innerRadius = 0, outerRadius: r = 0, name, percent }) => {
-                      const radius = innerRadius + (r - innerRadius) * 0.65;
-                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                      return (
-                        <text
-                          x={x}
-                          y={y}
-                          fill="white"
-                          textAnchor="middle"
-                          dominantBaseline="middle"
-                          className="text-sm"
-                        >
-                          {`${name} ${(percent * 100).toFixed(0)}%`}
-                        </text>
-                      );
-                    }}
-                  >
-                    {pieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <RechartsTooltip />
+            <ErrorBoundary>
+              <ResponsiveContainer width="100%" height={300} minHeight={300}>
+                <PieChart>
+                <Pie
+                  data={pieData}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  outerRadius={100}
+                  fill="#8884d8"
+                  dataKey="value"
+                  onClick={(data) => setSelectedHazard(data.rawName)}
+                  label={(entry: any) => {
+                    const total = pieData.reduce((sum, item) => sum + item.value, 0);
+                    const dataEntry = pieData.find(item => item.value === entry.value);
+                    const shortName = dataEntry?.shortName || entry.name;
+                    return `${shortName} ${formatPercent(entry.value, total)}%`;
+                  }}
+                >
+                  {pieData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={hazardPalette[index % hazardPalette.length]} />
+                  ))}
+                </Pie>
+                <RechartsTooltip />
                 </PieChart>
               </ResponsiveContainer>
-            </div>
+            </ErrorBoundary>
           ) : (
             <p className="text-white/60 text-center py-10">No hazard data available</p>
           )}
         </div>
-      </div>
-
-      {/* Accessible data tables for screen readers */}
-      <div className="sr-only" aria-live="polite">
-        <h2>Upload timeline data</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Uploads</th>
-              <th>7-day average</th>
-            </tr>
-          </thead>
-          <tbody>
-            {timelineWithRolling.slice(-14).map((row) => (
-              <tr key={row.date}>
-                <td>{row.date}</td>
-                <td>{row.uploads}</td>
-                <td>{row.smoothed ?? '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <h2>Hazard distribution</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Hazard</th>
-              <th>Uploads</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pieData.map((item) => (
-              <tr key={item.rawName}>
-                <td>{item.name}</td>
-                <td>{item.value}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
 
       {/* Popular Images and Benchmarks */}
@@ -599,24 +602,23 @@ export default function UserAnalyticsReal({ isActive = true }: UserAnalyticsReal
         {/* Community Benchmark */}
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
           <h2 className="text-xl font-semibold text-white mb-4">Community Benchmark</h2>
-          <div className="h-64 min-w-0" style={{ minHeight: '256px' }}>
-            <ResponsiveContainer width="100%" height={256} minWidth={120} minHeight={150}>
-              <BarChart data={benchmarkData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+          <ErrorBoundary>
+            <div className="h-64 w-full" style={{ minHeight: '256px', minWidth: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%" minHeight={256}>
+                <BarChart data={benchmarkData} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                 <XAxis dataKey="metric" stroke="rgba(255,255,255,0.6)" />
-                <YAxis
-                  stroke="rgba(255,255,255,0.6)"
-                  label={{ value: 'Views', angle: -90, position: 'insideLeft', fill: '#cbd5e1' }}
-                />
+                <YAxis stroke="rgba(255,255,255,0.6)" />
                 <Legend />
                 <RechartsTooltip
                   contentStyle={{ backgroundColor: '#1e293b', border: '1px solid rgba(255,255,255,0.1)' }}
                 />
                 <Bar dataKey="user" name="You" fill="#22c55e" radius={[6, 6, 0, 0]} />
                 <Bar dataKey="community" name="Community Avg" fill="#38bdf8" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </ErrorBoundary>
         </div>
       </div>
 

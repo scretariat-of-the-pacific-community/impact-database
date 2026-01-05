@@ -389,3 +389,97 @@ export interface UserUpload {
   latitude?: number;
   longitude?: number;
 }
+
+// Collaboration Types
+export type WorkspaceRole = 'owner' | 'admin' | 'editor' | 'viewer';
+export type VisibilityType = 'owner' | 'workspace' | 'public';
+
+export interface SharedFolder {
+  id: string;
+  name: string;
+  description?: string;
+  owner_username?: string; // For compatibility
+  owner_id: string; // Backend uses owner_id
+  workspace_id?: string;
+  hazard_filter?: string;
+  region_filter?: string;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
+  watch_count: number;
+  watcher_count?: number; // Alias for watch_count
+  is_watching?: boolean;
+}
+
+export interface CreateSharedFolderRequest {
+  name: string;
+  description?: string;
+  workspace_id?: string;
+  hazard_filter?: string;
+  region_filter?: string;
+  is_public?: boolean;
+}
+
+export interface SharedFolderDetail extends SharedFolder {
+  items: FolderItem[];
+  watchers: FolderWatcher[];
+}
+
+export interface FolderItem {
+  id: string;
+  folder_id: string;
+  image_id: string;
+  added_by: string;
+  added_at: string;
+  notes?: string;
+  image?: ImageMetadata;
+}
+
+export interface FolderWatcher {
+  id: string;
+  folder_id: string;
+  user_username: string;
+  watched_at: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  description?: string;
+  owner_username: string;
+  settings: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+  member_count?: number;
+  channel_count?: number;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  workspace_id: string;
+  user_username: string;
+  role: WorkspaceRole;
+  joined_at: string;
+}
+
+export interface FollowedArea {
+  id: string;
+  user_username: string;
+  entity_type: 'hazard' | 'region';
+  entity_id: string;
+  entity_name: string;
+  followed_at: string;
+  notification_enabled: boolean;
+}
+
+export interface ActivityPost {
+  id: string;
+  workspace_id?: string;
+  author_username: string;
+  content: string;
+  mentions: string[];
+  attachments?: string[];
+  created_at: string;
+  updated_at?: string;
+}

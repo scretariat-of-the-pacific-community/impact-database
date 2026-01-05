@@ -42,8 +42,12 @@ export default function GamificationBadges() {
     queryFn: async () => {
       try {
         const stats = await imageApi.userStats();
+        const totalUploads =
+          (stats as any)?.uploads ??
+          (stats as any)?.total_uploads ??
+          (stats as any)?.totalUploads ?? 0;
         return {
-          totalUploads: stats.uploads || 0,
+          totalUploads: typeof totalUploads === 'number' ? totalUploads : Number(totalUploads) || 0,
           reviewedImages: 0,
           qualityScore: 0,
           streak: 0,

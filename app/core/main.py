@@ -15,7 +15,7 @@ import redis
 
 from core.config import settings
 # Use simplified APIs for development
-from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds, featured
+from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds, featured, workspaces, shared_folders
 from api import images_simple as images  # Use simple version
 from api import rbac  # Phase 0: RBAC foundation
 # Temporarily disable complex features for basic startup
@@ -102,6 +102,7 @@ app.add_middleware(
         "/redoc",
         "/api/auth/login",
         "/api/auth/register",
+        "/api/auth/token",
         "/api/auth/refresh",
         "/api/health",
         "/favicon.ico"
@@ -114,12 +115,11 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
-        "Authorization", 
-        "Content-Type", 
+        "Authorization",
+        "Content-Type",
         "Accept",
         "X-CSRF-Token",  # Allow CSRF token header
-        "X-Requested-With",
-        "X-CSRF-Token"
+        "X-Requested-With"
     ],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-Process-Time"],
     max_age=86400,  # Cache preflight responses for 24 hours (reduces 300ms overhead)
@@ -151,6 +151,8 @@ app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
 # API endpoints - now require authentication
 app.include_router(images.router, prefix="/api", tags=["api", "images"])
 app.include_router(metadata.router, prefix="/api", tags=["metadata"])
+app.include_router(workspaces.router, prefix="/api", tags=["workspaces"])
+app.include_router(shared_folders.router, prefix="/api", tags=["shared-folders"])
 
 # User endpoints - profile, stats, settings
 app.include_router(user_api.router, prefix="/api", tags=["user"])

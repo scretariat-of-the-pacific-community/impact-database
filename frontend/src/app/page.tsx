@@ -612,6 +612,7 @@ export default function PacificImpactAtlasDashboard() {
             </Link>
             {isAuthenticated ? (
               <Link
+                id="upload-button"
                 href="/upload"
                 className="inline-flex items-center gap-2 rounded-full bg-palm-600 px-6 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40"
               >
@@ -620,6 +621,7 @@ export default function PacificImpactAtlasDashboard() {
               </Link>
             ) : (
               <Link
+                id="upload-button"
                 href="/auth/login?returnUrl=%2Fupload"
                 className="inline-flex items-center gap-2 rounded-full bg-palm-600 px-6 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40 relative"
                 title="Login required to upload"
@@ -631,6 +633,7 @@ export default function PacificImpactAtlasDashboard() {
             )}
             {isAuthenticated ? (
               <Link
+                id="analytics-link"
                 href="/profile"
                 className="inline-flex items-center gap-2 rounded-full bg-pacific-600 px-6 py-3 font-semibold text-white shadow-lg shadow-pacific-600/30 transition hover:bg-pacific-500 hover:shadow-xl hover:shadow-pacific-500/40"
               >

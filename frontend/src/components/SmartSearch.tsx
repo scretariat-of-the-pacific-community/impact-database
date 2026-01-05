@@ -118,6 +118,7 @@ export default function SmartSearch() {
     <>
       {/* Search Trigger Button */}
       <button
+        id="search-box"
         onClick={() => setOpen(true)}
         className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm text-white/80 backdrop-blur transition hover:bg-white/20"
       >

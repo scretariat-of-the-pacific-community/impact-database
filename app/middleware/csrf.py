@@ -38,17 +38,24 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         exempt_paths: list = None
     ):
         super().__init__(app)
+        environment = os.getenv("ENVIRONMENT", "development").lower()
+
         # Prefer an explicitly provided secret key, then a configured environment or settings value.
         self.secret_key = secret_key or os.getenv("SECRET_KEY")
         if not self.secret_key:
             try:
                 from core.config import settings
                 self.secret_key = getattr(settings, "SECRET_KEY", None)
+                environment = getattr(settings, "ENVIRONMENT", environment).lower()
             except Exception:
                 self.secret_key = None
 
-        # Fall back to an ephemeral key in development so startup does not fail without SECRET_KEY.
+        # Fall back to an ephemeral key only in non-production environments.
         if not self.secret_key:
+            if environment == "production":
+                raise RuntimeError(
+                    "CSRFMiddleware requires SECRET_KEY in production. Set SECRET_KEY to a stable value."
+                )
             logger.warning(
                 "CSRFMiddleware initialized without SECRET_KEY or explicit secret_key; "
                 "using a randomly generated ephemeral key. "
@@ -68,6 +75,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             "/redoc",
             "/api/auth/login",
             "/api/auth/register",
+            "/api/auth/token",
             "/api/auth/refresh",
             "/health",
             "/favicon.ico"

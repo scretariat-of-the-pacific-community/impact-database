@@ -1,51 +1,24 @@
 /**
- * World-Class Interactive Tutorial System
- * 
- * Features:
- * - Progressive disclosure with context-aware tooltips
- * - Interactive checkpoints requiring user actions
- * - Personalized learning paths based on user role
- * - Analytics tracking for completion and engagement
- * - Smart triggers detecting user confusion/inactivity
- * - Multi-language support (i18n ready)
- * - Accessibility-first with ARIA labels and keyboard navigation
- * - Video walkthroughs and interactive demos
- * - Achievement system with confetti celebrations
- * - Adaptive content based on user progress
+ * Application Tutorial System using Driver.js
+ * Provides guided tours for Pacific Impact Atlas features
  */
 
 import { driver, DriveStep, Config } from 'driver.js';
 
-// Tutorial metrics for analytics
-interface TutorialMetrics {
-  tourName: string;
-  stepIndex: number;
-  timestamp: number;
-  action: 'started' | 'completed' | 'skipped' | 'dropped' | 'interaction';
-  duration?: number;
-  metadata?: Record<string, any>;
-}
+const COMPLETED_KEY = 'impact_tutorial_completed';
+const VISITED_KEY = 'impact_app_visited';
 
-// User role types for personalization
-export type UserRole = 'contributor' | 'curator' | 'admin' | 'viewer' | 'new_user';
+const safeParse = (value: string | null) => {
+  if (!value) return {};
+  try {
+    return JSON.parse(value) as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+};
 
-// Enhanced step with validation and interactivity
-interface InteractiveStep extends DriveStep {
-  // Require user to complete action before proceeding
-  requiresInteraction?: boolean;
-  validationSelector?: string;
-  validationFn?: () => boolean;
-  // Video walkthrough URL
-  videoUrl?: string;
-  // Code snippet or example
-  codeExample?: string;
-  // Personalization
-  roles?: UserRole[];
-  // Analytics tags
-  analyticsTag?: string;
-  // Accessibility
-  ariaLabel?: string;
-}
+const elementExists = (selector?: string) =>
+  selector ? typeof document !== 'undefined' && !!document.querySelector(selector) : true;
 
 // Tutorial step definitions for different sections
 export const tutorialSteps = {
@@ -54,8 +27,8 @@ export const tutorialSteps = {
     {
       element: '#search-box',
       popover: {
-        title: 'Find The Signal Fast',
-        description: 'Type a hazard, place, or date. Press Enter to jump straight to the most relevant evidence.',
+        title: 'Search Disaster Imagery',
+        description: 'Search through Pacific Impact Atlas to find specific hazard events, locations, or time periods.',
         side: 'bottom',
         align: 'start',
       },
@@ -63,8 +36,8 @@ export const tutorialSteps = {
     {
       element: '#upload-button',
       popover: {
-        title: 'Add Your Proof',
-        description: 'Drop a photo or video, we auto-extract EXIF and geo metadata. Better data means faster response.',
+        title: 'Contribute Imagery',
+        description: 'Upload disaster impact photos to help document hazards across the Pacific region. Your contributions support disaster preparedness.',
         side: 'bottom',
         align: 'start',
       },
@@ -72,36 +45,9 @@ export const tutorialSteps = {
     {
       element: '#analytics-link',
       popover: {
-        title: 'See Patterns, Not Noise',
-        description: 'Open analytics to spot hotspots, trends, and gaps so you know where to focus next.',
+        title: 'Analytics Dashboard',
+        description: 'View insights and trends about disaster patterns, geographic distribution, and hazard frequencies.',
         side: 'right',
-        align: 'start',
-      },
-    },
-    {
-      element: '#map-view',
-      popover: {
-        title: 'Map Every Impact',
-        description: 'Pan/zoom to explore incidents. Click any marker to open the full record, metadata, and downloads.',
-        side: 'top',
-        align: 'center',
-      },
-    },
-    {
-      element: '#filter-panel',
-      popover: {
-        title: 'Refine With Precision',
-        description: 'Layer filters (hazard, country, date) to narrow results. Saved views keep your context for later.',
-        side: 'left',
-        align: 'start',
-      },
-    },
-    {
-      element: '#collaboration-link',
-      popover: {
-        title: 'Collaborate Live',
-        description: 'Invite teammates, follow hazards/regions, and get notified when you’re @mentioned.',
-        side: 'bottom',
         align: 'start',
       },
     },
@@ -111,55 +57,55 @@ export const tutorialSteps = {
   uploadTour: [
     {
       popover: {
-        title: 'Upload Like A Pro',
-        description: 'Follow these steps for fast, metadata-rich submissions reviewers can approve quickly.',
+        title: 'Welcome to Upload',
+        description: 'Follow these steps to contribute disaster impact imagery to Pacific Impact Atlas.',
       },
     },
     {
       element: '#file-upload',
       popover: {
-        title: 'Drop Your File',
-        description: 'Choose an image/video. We’ll pull EXIF (location, time) automatically when present.',
+        title: 'Select Image File',
+        description: 'Choose a disaster impact photo (JPG, PNG). The system will extract metadata automatically if available.',
         side: 'bottom',
       },
     },
     {
       element: '#hazard-type',
       popover: {
-        title: 'Label The Hazard',
-        description: 'Pick the right hazard to drive accurate analytics and reviewer routing.',
+        title: 'Specify Hazard Type',
+        description: 'Select the type of disaster: flood, cyclone, earthquake, tsunami, drought, etc.',
         side: 'right',
       },
     },
     {
-      element: '#location-fields',
+      element: '#upload-country',
       popover: {
-        title: 'Confirm Location',
-        description: 'Confirm country/location. If EXIF was stripped, add coordinates manually for map accuracy.',
+        title: 'Country Selection',
+        description: 'Select the country where the disaster occurred. This is required for geographic analysis.',
         side: 'top',
       },
     },
     {
-      element: '#datetime-picker',
+      element: '#upload-location',
       popover: {
-        title: 'Date & Time',
-        description: 'When was this captured? Accurate timestamps keep timelines and alerts trustworthy.',
+        title: 'Location Details',
+        description: 'Provide the specific location name. Coordinates will be extracted from EXIF data when available.',
+        side: 'top',
+      },
+    },
+    {
+      element: '#upload-latitude',
+      popover: {
+        title: 'GPS Coordinates',
+        description: 'Add precise coordinates if available. Use "Use My Location" button for automatic detection.',
         side: 'left',
       },
     },
     {
-      element: '#metadata-section',
+      element: '#upload-abstract',
       popover: {
-        title: 'Context & License',
-        description: 'Add source agency, license, and tags so others can reuse confidently.',
-        side: 'top',
-      },
-    },
-    {
-      element: '#submit-button',
-      popover: {
-        title: 'Submit For Review',
-        description: 'We queue a review and notify you. High-quality, complete metadata speeds approval.',
+        title: 'Description',
+        description: 'Add a brief description of what the image shows. This helps others find and understand your contribution.',
         side: 'top',
       },
     },
@@ -170,7 +116,7 @@ export const tutorialSteps = {
     {
       popover: {
         title: 'Analytics Dashboard',
-        description: 'Explore hotspots, gaps, and trends so you can act where it matters.',
+        description: 'Explore disaster patterns and trends across the Pacific region.',
       },
     },
     {
@@ -228,32 +174,32 @@ export const tutorialSteps = {
     {
       element: '#search-filters',
       popover: {
-        title: 'Filters That Matter',
-        description: 'Stack filters to find the exact imagery you need—hazard, country, date, tags.',
+        title: 'Search Filters',
+        description: 'Filter by hazard type, country, date range, or keywords to find specific disaster images.',
         side: 'bottom',
       },
     },
     {
       element: '#results-grid',
       popover: {
-        title: 'Results You Can Trust',
-        description: 'Browse curated results. Open any item for full metadata, location, and provenance.',
+        title: 'Search Results',
+        description: 'Browse disaster impact imagery. Click any image to view full details and metadata.',
         side: 'top',
       },
     },
     {
       element: '#image-preview',
       popover: {
-        title: 'Verify The Details',
-        description: 'Inspect the record: location, date, hazard, coordinates, and reviewer status.',
+        title: 'Image Details',
+        description: 'View full metadata: location, date, hazard type, coordinates, and download options.',
         side: 'left',
       },
     },
     {
       element: '#download-button',
       popover: {
-        title: 'Download & Cite',
-        description: 'Grab the asset with ISO 19115 metadata so you can cite and reuse responsibly.',
+        title: 'Download',
+        description: 'Download high-resolution images and their ISO 19115 compliant metadata.',
         side: 'top',
       },
     },
@@ -273,8 +219,6 @@ const defaultConfig: Partial<Config> = {
   popoverClass: 'tutorial-popover',
   animate: true,
   smoothScroll: true,
-  allowKeyboardControl: true,
-  overlayOpacity: 0.55,
 };
 
 /**
