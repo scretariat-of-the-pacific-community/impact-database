@@ -27,41 +27,42 @@ RATE_LIMIT_MAX_ATTEMPTS = 5  # Max attempts for auth endpoints
 UPLOAD_RATE_LIMIT_WINDOW = 3600  # 1 hour
 UPLOAD_RATE_LIMIT_MAX_ATTEMPTS = 10  # 10 uploads per hour
 
+
 def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int = None) -> None:
     """Check if identifier has exceeded rate limit.
-    
+
     Args:
         identifier: IP address or username to check
         custom_window: Optional custom time window in seconds
         custom_max: Optional custom maximum attempts
-        
+
     Raises:
         HTTPException: If rate limit exceeded
     """
     # Use upload limits if identifier starts with 'upload:'
-    if identifier.startswith('upload:'):
+    if identifier.startswith("upload:"):
         window = custom_window or UPLOAD_RATE_LIMIT_WINDOW
         max_attempts = custom_max or UPLOAD_RATE_LIMIT_MAX_ATTEMPTS
     else:
         window = custom_window or RATE_LIMIT_WINDOW
         max_attempts = custom_max or RATE_LIMIT_MAX_ATTEMPTS
-    
+
     now = time.time()
     # Clean old attempts
     rate_limit_storage[identifier] = [
-        timestamp for timestamp in rate_limit_storage[identifier]
-        if now - timestamp < window
+        timestamp for timestamp in rate_limit_storage[identifier] if now - timestamp < window
     ]
-    
+
     # Check limit
     if len(rate_limit_storage[identifier]) >= max_attempts:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=f"Too many attempts. Please try again in {window // 60} minutes."
+            detail=f"Too many attempts. Please try again in {window // 60} minutes.",
         )
-    
+
     # Record attempt
     rate_limit_storage[identifier].append(now)
+
 
 # Configuration via environment variables
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -69,7 +70,7 @@ if not SECRET_KEY:
     environment = os.getenv("ENVIRONMENT", "development").lower()
     if environment == "production":
         raise ValueError("SECRET_KEY must be set in production")
-    
+
     # Development: Persist SECRET_KEY to .env.local if it doesn't exist
     secret_key_file = os.path.join(os.path.dirname(__file__), "..", "..", ".env.local")
     try:
@@ -81,7 +82,7 @@ if not SECRET_KEY:
                         SECRET_KEY = line.split("=", 1)[1].strip()
                         logger.info("Loaded SECRET_KEY from .env.local")
                         break
-        
+
         if not SECRET_KEY:
             # Generate and save new key
             SECRET_KEY = secrets.token_urlsafe(32)
@@ -94,7 +95,9 @@ if not SECRET_KEY:
         logger.warning(f"Failed to persist SECRET_KEY ({e}), using ephemeral key for this session")
 
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))  # 7 days default
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080")
+)  # 7 days default
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token", auto_error=False)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -126,22 +129,24 @@ class UserInDB(User):
 # Database integration
 def get_user_from_db(username: str, db: Session):
     """Get user from database using injected session.
-    
+
     Args:
         username: Username or email to look up
         db: Database session (dependency injected)
-    
+
     Returns:
         UserInDB if found and active, None otherwise
     """
     from models.rbac import User as DBUser
     from sqlalchemy import or_
-    
+
     try:
         # Look up user by username OR email
-        db_user = db.query(DBUser).filter(
-            or_(DBUser.username == username, DBUser.email == username)
-        ).first()
+        db_user = (
+            db.query(DBUser)
+            .filter(or_(DBUser.username == username, DBUser.email == username))
+            .first()
+        )
         if db_user and db_user.is_active:
             return UserInDB(
                 username=db_user.username,
@@ -149,7 +154,7 @@ def get_user_from_db(username: str, db: Session):
                 full_name=db_user.full_name,
                 id=str(db_user.id),
                 disabled=not db_user.is_active,
-                hashed_password=db_user.hashed_password or ""
+                hashed_password=db_user.hashed_password or "",
             )
     except Exception as e:
         logger.error(f"Database user lookup failed: {e}")
@@ -162,12 +167,12 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def authenticate_user(username: str, password: str, db: Session) -> Optional[UserInDB]:
     """Authenticate user with username/email and password.
-    
+
     Args:
         username: Username or email to authenticate
         password: Plain text password
         db: Database session (dependency injected)
-    
+
     Returns:
         UserInDB if authentication successful, None otherwise
     """
@@ -191,7 +196,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 async def login_for_access_token(
     request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Login endpoint - returns JWT token for authentication"""
     # Rate limiting by username and IP
@@ -220,10 +225,7 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 async def login(
-    request: Request,
-    response: Response,
-    login_data: LoginRequest,
-    db: Session = Depends(get_db)
+    request: Request, response: Response, login_data: LoginRequest, db: Session = Depends(get_db)
 ):
     """Login endpoint that accepts JSON credentials and sets HttpOnly cookie"""
     # Rate limiting by username and IP
@@ -242,13 +244,13 @@ async def login(
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
-    
+
     # SECURITY: Set HttpOnly cookie server-side to prevent XSS attacks
     is_secure = request.url.scheme == "https"
     environment = os.getenv("ENVIRONMENT", "development").lower()
     # Prefer strict SameSite in production; allow lax in development for local cross-origin flows
     samesite_policy = "strict" if environment == "production" else "lax"
-    
+
     response.set_cookie(
         key="ocean_portal_token",
         value=access_token,
@@ -256,16 +258,16 @@ async def login(
         path="/",
         httponly=True,  # Prevent JavaScript access
         secure=is_secure,  # HTTPS only in production
-        samesite=samesite_policy  # CSRF protection with dev-friendly policy
+        samesite=samesite_policy,  # CSRF protection with dev-friendly policy
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "id": getattr(user, "id", user.username),
         "username": user.username,
         "email": user.email,
-        "full_name": user.full_name
+        "full_name": user.full_name,
     }
 
 
@@ -277,11 +279,7 @@ class RegisterRequest(BaseModel):
 
 
 @router.post("/register")
-async def register(
-    request: Request,
-    register_data: RegisterRequest,
-    db: Session = Depends(get_db)
-):
+async def register(request: Request, register_data: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user account"""
     # Rate limiting by email and IP
     client_ip = request.client.host if request.client else "unknown"
@@ -289,50 +287,47 @@ async def register(
     check_rate_limit(f"register_ip:{client_ip}")
     from models.rbac import User as DBUser, Role
     import re
-    
+
     # Validate password strength
     if len(register_data.password) < 12:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 12 characters long"
+            detail="Password must be at least 12 characters long",
         )
-    if not re.search(r'[a-z]', register_data.password):
+    if not re.search(r"[a-z]", register_data.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must contain lowercase letters"
+            detail="Password must contain lowercase letters",
         )
-    if not re.search(r'[A-Z]', register_data.password):
+    if not re.search(r"[A-Z]", register_data.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must contain uppercase letters"
+            detail="Password must contain uppercase letters",
         )
-    if not re.search(r'\d', register_data.password):
+    if not re.search(r"\d", register_data.password):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must contain numbers"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Password must contain numbers"
         )
     if not re.search(r'[!@#$%^&*(),.?":{}|<>]', register_data.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must contain special characters"
+            detail="Password must contain special characters",
         )
-    
+
     # Check if username already exists
     existing_user = db.query(DBUser).filter(DBUser.username == register_data.username).first()
     if existing_user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username or email already registered"
         )
-    
+
     # Check if email already exists
     existing_email = db.query(DBUser).filter(DBUser.email == register_data.email).first()
     if existing_email:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username or email already registered"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Username or email already registered"
         )
-    
+
     # Get default role (contributor)
     default_role = db.query(Role).filter(Role.name == "contributor").first()
     if not default_role:
@@ -342,11 +337,11 @@ async def register(
             display_name="Contributor",
             description="Can upload and manage own content",
             level=1,
-            is_system_role=False
+            is_system_role=False,
         )
         db.add(default_role)
         db.flush()
-    
+
     # Create new user
     hashed_password = pwd_context.hash(register_data.password)
     new_user = DBUser(
@@ -355,30 +350,28 @@ async def register(
         full_name=register_data.full_name or register_data.username,
         hashed_password=hashed_password,
         is_active=True,
-        role_id=default_role.id
+        role_id=default_role.id,
     )
-    
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    
+
     # Send welcome email asynchronously
     try:
         send_welcome_email.delay(
-            user_id=str(new_user.id),
-            username=new_user.username,
-            email=new_user.email
+            user_id=str(new_user.id), username=new_user.username, email=new_user.email
         )
         logger.info(f"Queued welcome email for new user: {new_user.username}")
     except Exception as e:
         logger.warning(f"Failed to queue welcome email: {e}")
-    
+
     # Generate access token for immediate login
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": new_user.username}, expires_delta=access_token_expires
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -386,34 +379,32 @@ async def register(
         "username": new_user.username,
         "email": new_user.email,
         "full_name": new_user.full_name,
-        "message": "Account created successfully"
+        "message": "Account created successfully",
     }
 
 
 async def get_current_user(
-    request: Request,
-    token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    request: Request, token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> User:
     """Get current authenticated user from JWT token.
-    
+
     SECURITY: No authentication bypass - all requests require valid tokens
     Token can be provided via Authorization header OR HttpOnly cookie
     """
     # REMOVED: Development bypass to prevent accidental production exposure
     # If you need testing, create a test user account instead
-    
+
     # Check for token in Authorization header first, then cookie
     if not token:
         token = request.cookies.get("ocean_portal_token")
-    
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -435,21 +426,19 @@ async def get_current_user(
 
 @router.post("/refresh")
 async def refresh_token(
-    request: Request,
-    response: Response,
-    current_user: User = Depends(get_current_user)
+    request: Request, response: Response, current_user: User = Depends(get_current_user)
 ):
     """Refresh authentication token to extend session."""
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": current_user.username}, expires_delta=access_token_expires
     )
-    
+
     # Update cookie with new token
     is_secure = request.url.scheme == "https"
     environment = os.getenv("ENVIRONMENT", "development").lower()
     samesite_policy = "strict" if environment == "production" else "lax"
-    
+
     response.set_cookie(
         key="ocean_portal_token",
         value=access_token,
@@ -457,16 +446,16 @@ async def refresh_token(
         path="/",
         httponly=True,
         secure=is_secure,
-        samesite=samesite_policy
+        samesite=samesite_policy,
     )
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
         "id": getattr(current_user, "id", current_user.username),
         "username": current_user.username,
         "email": current_user.email,
-        "full_name": current_user.full_name
+        "full_name": current_user.full_name,
     }
 
 

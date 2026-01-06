@@ -1,4 +1,3 @@
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -15,6 +14,7 @@ TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engin
 # Create the tables in the test database
 Base.metadata.create_all(bind=engine)
 
+
 def override_get_db():
     try:
         db = TestingSessionLocal()
@@ -22,9 +22,11 @@ def override_get_db():
     finally:
         db.close()
 
+
 app.dependency_overrides[get_db] = override_get_db
 
 client = TestClient(app)
+
 
 def test_upload_image():
     """
@@ -32,36 +34,38 @@ def test_upload_image():
     """
     # Mock authentication
     headers = {"Authorization": "Bearer test-token"}
-    
+
     # Test data
     data = {
         "datetime": "2025-11-07T12:00:00Z",
         "hazard_type": "flood",
         "source_type": "citizen",
         "lat": -41.2865,
-        "lon": 174.7762
+        "lon": 174.7762,
     }
-    
+
     # The file to upload
-    file_path = os.path.join(os.path.dirname(__file__), '..', 'hazard_test_images', 'flood_1.jpg')
-    
+    file_path = os.path.join(os.path.dirname(__file__), "..", "hazard_test_images", "flood_1.jpg")
+
     with open(file_path, "rb") as f:
         files = {"file": ("flood_1.jpg", f, "image/jpeg")}
         response = client.post("/upload/", data=data, files=files, headers=headers)
-    
+
     assert response.status_code == 201
-    
+
     response_json = response.json()
     assert response_json["filename"] == "flood_1.jpg"
     assert response_json["status"] == "pending_review"
-    
+
     # Verify the data in the database
     db = next(override_get_db())
     from models.database import ImageMetadata
+
     db_image = db.query(ImageMetadata).filter(ImageMetadata.filename == "flood_1.jpg").first()
     assert db_image is not None
     assert db_image.status == "pending_review"
     assert db_image.hazard_type == "flood"
+
 
 def test_admin_approve_image():
     """
@@ -73,6 +77,7 @@ def test_admin_approve_image():
     # Get the image from the database
     db = next(override_get_db())
     from models.database import ImageMetadata
+
     db_image = db.query(ImageMetadata).filter(ImageMetadata.filename == "flood_1.jpg").first()
     assert db_image is not None
 
@@ -80,7 +85,9 @@ def test_admin_approve_image():
     admin_headers = {"Authorization": "Bearer admin-test-token"}
 
     # Approve the image
-    response = client.put(f"/admin/images/{db_image.id}/status", json={"status": "approved"}, headers=admin_headers)
+    response = client.put(
+        f"/admin/images/{db_image.id}/status", json={"status": "approved"}, headers=admin_headers
+    )
     assert response.status_code == 200
 
     # Verify the status is updated
@@ -89,10 +96,12 @@ def test_admin_approve_image():
 
     # Verify an audit log entry is created
     from models.audit_log import AuditLog
+
     audit_log = db.query(AuditLog).filter(AuditLog.image_id == db_image.id).first()
     assert audit_log is not None
     assert audit_log.action == "status_change"
     assert audit_log.details["new_status"] == "approved"
+
 
 def test_stac_item_endpoint():
     """
@@ -104,6 +113,7 @@ def test_stac_item_endpoint():
     # Get the image from the database
     db = next(override_get_db())
     from models.database import ImageMetadata
+
     db_image = db.query(ImageMetadata).filter(ImageMetadata.filename == "flood_1.jpg").first()
     assert db_image is not None
     assert db_image.status == "approved"
@@ -121,7 +131,9 @@ def test_stac_item_endpoint():
     assert "datetime" in stac_item["properties"]
     assert "assets" in stac_item
 
+
 from unittest.mock import patch
+
 
 def test_webhook_system():
     """
@@ -133,6 +145,7 @@ def test_webhook_system():
     # Get the image from the database
     db = next(override_get_db())
     from models.database import ImageMetadata
+
     db_image = db.query(ImageMetadata).filter(ImageMetadata.filename == "flood_1.jpg").first()
     assert db_image is not None
 
@@ -146,9 +159,12 @@ def test_webhook_system():
     with patch("workers.tasks.trigger_webhooks_on_approval.delay") as mock_task:
         # Approve the image, which should trigger the webhook
         admin_headers = {"Authorization": "Bearer admin-test-token"}
-        response = client.put(f"/admin/images/{db_image.id}/status", json={"status": "approved"}, headers=admin_headers)
+        response = client.put(
+            f"/admin/images/{db_image.id}/status",
+            json={"status": "approved"},
+            headers=admin_headers,
+        )
         assert response.status_code == 200
 
         # Assert that the task was called
         mock_task.assert_called_once()
-

@@ -1,4 +1,5 @@
 """Metadata validation utilities using JSON Schema."""
+
 import json
 import os
 from jsonschema import Draft202012Validator

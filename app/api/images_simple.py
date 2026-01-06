@@ -1,6 +1,7 @@
 """
 Simple Images API endpoint - Basic functionality for development
 """
+
 import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -24,11 +25,7 @@ def _escape_ilike(value: str) -> str:
     """Escape special characters for ILIKE patterns to prevent SQL injection."""
     if value is None:
         return value
-    return (
-        value.replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-    )
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _parse_date_param(value: Optional[str], clamp: str = "start") -> Optional[datetime]:
@@ -70,68 +67,95 @@ def _serialize_image(image: ImageMetadata) -> Dict[str, Any]:
     """Format ImageMetadata for API responses with full ISO 19115 metadata."""
     # Build contact information
     contact_info = None
-    if hasattr(image, 'point_of_contact') and image.point_of_contact:
+    if hasattr(image, "point_of_contact") and image.point_of_contact:
         contact_info = {
-            "organisation_name": getattr(image, 'contact_organisation_name', None),
-            "individual_name": getattr(image, 'contact_individual_name', None),
+            "organisation_name": getattr(image, "contact_organisation_name", None),
+            "individual_name": getattr(image, "contact_individual_name", None),
             "role": "pointOfContact",
-            "contact_info": {
-                "email": getattr(image, 'contact_email', None)
-            } if getattr(image, 'contact_email', None) else None
+            "contact_info": (
+                {"email": getattr(image, "contact_email", None)}
+                if getattr(image, "contact_email", None)
+                else None
+            ),
         }
-    
+
     # Build geographic bounding box if coordinates exist
     geographic_element = None
-    if hasattr(image, 'latitude') and image.latitude and hasattr(image, 'longitude') and image.longitude:
+    if (
+        hasattr(image, "latitude")
+        and image.latitude
+        and hasattr(image, "longitude")
+        and image.longitude
+    ):
         lat = float(image.latitude)
         lon = float(image.longitude)
         geographic_element = {
             "west_bound_longitude": lon,
             "east_bound_longitude": lon,
             "south_bound_latitude": lat,
-            "north_bound_latitude": lat
+            "north_bound_latitude": lat,
         }
-    elif hasattr(image, 'geographic_bounding_box') and image.geographic_bounding_box:
+    elif hasattr(image, "geographic_bounding_box") and image.geographic_bounding_box:
         geographic_element = image.geographic_bounding_box
-    
+
     return {
-        "id": str(image.id) if hasattr(image, 'id') and image.id else image.filename,
+        "id": str(image.id) if hasattr(image, "id") and image.id else image.filename,
         "filename": image.filename,
         "title": image.title or "Untitled",
-        "abstract": image.abstract if hasattr(image, 'abstract') else None,
-        "purpose": getattr(image, 'purpose', None),
+        "abstract": image.abstract if hasattr(image, "abstract") else None,
+        "purpose": getattr(image, "purpose", None),
         "hazard_type": image.hazard_type,
-        "source_agency": getattr(image, 'source', None) or getattr(image, 'source_type', None),
-        "topic_category": image.topic_category if hasattr(image, 'topic_category') and image.topic_category else ["environment"],
-        "keywords": image.keywords if hasattr(image, 'keywords') and image.keywords else [],
-        "latitude": float(image.latitude) if hasattr(image, 'latitude') and image.latitude is not None else None,
-        "longitude": float(image.longitude) if hasattr(image, 'longitude') and image.longitude is not None else None,
+        "source_agency": getattr(image, "source", None) or getattr(image, "source_type", None),
+        "topic_category": (
+            image.topic_category
+            if hasattr(image, "topic_category") and image.topic_category
+            else ["environment"]
+        ),
+        "keywords": image.keywords if hasattr(image, "keywords") and image.keywords else [],
+        "latitude": (
+            float(image.latitude)
+            if hasattr(image, "latitude") and image.latitude is not None
+            else None
+        ),
+        "longitude": (
+            float(image.longitude)
+            if hasattr(image, "longitude") and image.longitude is not None
+            else None
+        ),
         "geographic_element": geographic_element,
-        "upload_date": image.datetime.isoformat() if hasattr(image, 'datetime') and image.datetime else None,
-        "date_stamp": image.date_stamp.isoformat() if hasattr(image, 'date_stamp') and image.date_stamp else None,
+        "upload_date": (
+            image.datetime.isoformat() if hasattr(image, "datetime") and image.datetime else None
+        ),
+        "date_stamp": (
+            image.date_stamp.isoformat()
+            if hasattr(image, "date_stamp") and image.date_stamp
+            else None
+        ),
         "thumbnail_url": f"/upload/images/{image.filename}/thumbnail" if image.filename else None,
-        "resource_locator": getattr(image, 'resource_locator', None) or f"/upload/images/{image.filename}" if image.filename else None,
-        
+        "resource_locator": (
+            getattr(image, "resource_locator", None) or f"/upload/images/{image.filename}"
+            if image.filename
+            else None
+        ),
         # ISO 19115 metadata fields
-        "file_identifier": str(image.id) if hasattr(image, 'id') and image.id else None,
-        "language": getattr(image, 'metadata_language', 'eng'),
+        "file_identifier": str(image.id) if hasattr(image, "id") and image.id else None,
+        "language": getattr(image, "metadata_language", "eng"),
         "character_set": "UTF-8",
         "hierarchy_level": "dataset",
         "contact": contact_info,
-        "spatial_resolution": getattr(image, 'spatial_resolution', None),
+        "spatial_resolution": getattr(image, "spatial_resolution", None),
         "reference_system_info": "EPSG:4326",
-        "format_name": getattr(image, 'format_name', 'JPEG'),
-        "format_version": getattr(image, 'format_version', None),
-        "access_constraints": getattr(image, 'access_constraints', None),
-        "use_constraints": getattr(image, 'use_constraints', None),
-        "classification": getattr(image, 'security_classification', None),
+        "format_name": getattr(image, "format_name", "JPEG"),
+        "format_version": getattr(image, "format_version", None),
+        "access_constraints": getattr(image, "access_constraints", None),
+        "use_constraints": getattr(image, "use_constraints", None),
+        "classification": getattr(image, "security_classification", None),
         "processing_level": None,  # Not in current model
         "file_size": None,  # Not stored in current model
-        
         # Legacy fields for backward compatibility
         "country": image.country,
         "location": image.location,
-        "full_url": f"/upload/images/{image.filename}" if image.filename else None
+        "full_url": f"/upload/images/{image.filename}" if image.filename else None,
     }
 
 
@@ -162,31 +186,32 @@ class ImageUpdateRequest(BaseModel):
     longitude: Optional[float] = None
     is_draft: Optional[bool] = False
 
+
 @router.get("/", response_model=Dict[str, Any])
 async def get_images(
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
     hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
     country: Optional[str] = Query(None, description="Filter by country"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get paginated list of images with optional filtering."""
     try:
         # Build query
         query = db.query(ImageMetadata)
-        
+
         # Apply filters
         if hazard_type:
             query = query.filter(ImageMetadata.hazard_type == hazard_type)
         if country:
             query = query.filter(ImageMetadata.country == country)
-        
+
         # Get total count
         total = query.count()
-        
+
         # Apply pagination and ordering (using date_stamp instead of upload_timestamp)
         images = query.order_by(desc(ImageMetadata.date_stamp)).offset(skip).limit(limit).all()
-        
+
         # Convert to response format
         image_list = []
         for img in images:
@@ -201,27 +226,29 @@ async def get_images(
                 "file_size": None,  # Not available in current model
                 "mime_type": img.format_name,
                 "keywords": img.keywords if img.keywords else [],
-                "coordinates": {
-                    "latitude": img.latitude,
-                    "longitude": img.longitude
-                } if img.latitude and img.longitude else None,
+                "coordinates": (
+                    {"latitude": img.latitude, "longitude": img.longitude}
+                    if img.latitude and img.longitude
+                    else None
+                ),
                 "upload_timestamp": img.date_stamp.isoformat() if img.date_stamp else None,
-                "uploaded_by": img.point_of_contact
+                "uploaded_by": img.point_of_contact,
             }
             image_list.append(image_data)
-        
+
         return {
             "images": image_list,
             "total": total,
             "skip": skip,
             "limit": limit,
             "has_next": skip + limit < total,
-            "has_previous": skip > 0
+            "has_previous": skip > 0,
         }
-        
+
     except Exception as e:
         logger.error(f"Error fetching images: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch images: {str(e)}")
+
 
 @router.get("/list", response_model=List[SimpleImageResponse])
 async def get_images_list(
@@ -229,22 +256,22 @@ async def get_images_list(
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
     hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
     country: Optional[str] = Query(None, description="Filter by country"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get simple list of images (array format for legacy frontend compatibility)."""
     try:
         # Build query
         query = db.query(ImageMetadata)
-        
+
         # Apply filters
         if hazard_type:
             query = query.filter(ImageMetadata.hazard_type == hazard_type)
         if country:
             query = query.filter(ImageMetadata.country == country)
-        
+
         # Apply pagination and ordering (using date_stamp instead of upload_timestamp)
         images = query.order_by(desc(ImageMetadata.date_stamp)).offset(skip).limit(limit).all()
-        
+
         # Convert to simple array format for frontend compatibility
         image_list = []
         for img in images:
@@ -259,26 +286,25 @@ async def get_images_list(
                 "file_size": None,  # Not available in current model
                 "mime_type": img.format_name,
                 "keywords": img.keywords if img.keywords else [],
-                "coordinates": {
-                    "latitude": img.latitude,
-                    "longitude": img.longitude
-                } if img.latitude and img.longitude else None,
+                "coordinates": (
+                    {"latitude": img.latitude, "longitude": img.longitude}
+                    if img.latitude and img.longitude
+                    else None
+                ),
                 "upload_timestamp": img.date_stamp.isoformat() if img.date_stamp else None,
-                "uploaded_by": img.point_of_contact
+                "uploaded_by": img.point_of_contact,
             }
             image_list.append(image_data)
-        
+
         return image_list  # Return direct array
-        
+
     except Exception as e:
         logger.error(f"Error fetching images list: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch images: {str(e)}")
 
+
 @router.get("/{image_id}", response_model=Dict[str, Any])
-async def get_image_by_id(
-    image_id: str,
-    db: Session = Depends(get_db)
-):
+async def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
     """Get single image by ID or filename."""
     try:
         image = _find_image(db, image_id)
@@ -299,14 +325,13 @@ async def update_image_by_id(
     image_id: str,
     update_data: ImageUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced),
 ):
     """Update editable fields for an image record."""
     try:
         if "metadata:update" not in current_user.permissions:
             raise HTTPException(
-                status_code=403,
-                detail="Insufficient permissions to update image metadata"
+                status_code=403, detail="Insufficient permissions to update image metadata"
             )
 
         image = _find_image(db, image_id)
@@ -351,7 +376,7 @@ async def update_image_by_id(
             if lat is None or lng is None:
                 raise HTTPException(
                     status_code=400,
-                    detail="Both latitude and longitude are required to update coordinates"
+                    detail="Both latitude and longitude are required to update coordinates",
                 )
             image.geometry = WKTElement(f"POINT({lng} {lat})", srid=4326)
             updated_fields.append("geometry")
@@ -363,7 +388,7 @@ async def update_image_by_id(
             return {
                 "success": True,
                 "message": "No changes detected",
-                "image": _serialize_image(image)
+                "image": _serialize_image(image),
             }
 
         db.commit()
@@ -373,14 +398,14 @@ async def update_image_by_id(
             "User %s updated image %s fields: %s",
             getattr(current_user, "username", "unknown"),
             image_id,
-            ", ".join(updated_fields)
+            ", ".join(updated_fields),
         )
 
         return {
             "success": True,
             "message": f"Updated {len(updated_fields)} field(s)",
             "updated_fields": updated_fields,
-            "image": _serialize_image(image)
+            "image": _serialize_image(image),
         }
     except HTTPException:
         db.rollback()
@@ -389,6 +414,7 @@ async def update_image_by_id(
         db.rollback()
         logger.error(f"Error updating image {image_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update image: {str(e)}")
+
 
 @router.get("/search", response_model=Dict[str, Any])
 async def search_images(
@@ -402,18 +428,28 @@ async def search_images(
         None,
         description="Filter by source agency (pass multiple values to match any)",
     ),
-    date_from: Optional[str] = Query(None, description="Filter results captured on/after this date (YYYY-MM-DD)"),
-    date_to: Optional[str] = Query(None, description="Filter results captured on/before this date (YYYY-MM-DD)"),
+    date_from: Optional[str] = Query(
+        None, description="Filter results captured on/after this date (YYYY-MM-DD)"
+    ),
+    date_to: Optional[str] = Query(
+        None, description="Filter results captured on/before this date (YYYY-MM-DD)"
+    ),
     skip: int = Query(0, ge=0, le=10000, description="Number of records to skip"),
     limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
-    sort_by: Optional[str] = Query("relevance", description="Sort field: relevance, date, upload_date, title"),
+    sort_by: Optional[str] = Query(
+        "relevance", description="Sort field: relevance, date, upload_date, title"
+    ),
     sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Search images with text query, filters, and sorting."""
     try:
         query = db.query(ImageMetadata)
-        date_field = ImageMetadata.date_stamp if hasattr(ImageMetadata, "date_stamp") else ImageMetadata.datetime
+        date_field = (
+            ImageMetadata.date_stamp
+            if hasattr(ImageMetadata, "date_stamp")
+            else ImageMetadata.datetime
+        )
 
         # Hazard filters (support single, repeated, or comma-delimited values)
         hazard_filters: List[str] = []
@@ -427,12 +463,12 @@ async def search_images(
 
         if country:
             safe_country = _escape_ilike(country)
-            query = query.filter(
-                ImageMetadata.country.ilike(f"%{safe_country}%", escape='\\')
-            )
+            query = query.filter(ImageMetadata.country.ilike(f"%{safe_country}%", escape="\\"))
 
         if source_agency:
-            normalized_agencies = [agency.strip().lower() for agency in source_agency if agency and agency.strip()]
+            normalized_agencies = [
+                agency.strip().lower() for agency in source_agency if agency and agency.strip()
+            ]
             if normalized_agencies:
                 query = query.filter(
                     or_(
@@ -454,10 +490,10 @@ async def search_images(
             search_pattern = f"%{safe_q}%"
             query = query.filter(
                 or_(
-                    ImageMetadata.title.ilike(search_pattern, escape='\\'),
-                    ImageMetadata.abstract.ilike(search_pattern, escape='\\'),
-                    ImageMetadata.location.ilike(search_pattern, escape='\\'),
-                    ImageMetadata.hazard_type.ilike(search_pattern, escape='\\')
+                    ImageMetadata.title.ilike(search_pattern, escape="\\"),
+                    ImageMetadata.abstract.ilike(search_pattern, escape="\\"),
+                    ImageMetadata.location.ilike(search_pattern, escape="\\"),
+                    ImageMetadata.hazard_type.ilike(search_pattern, escape="\\"),
                 )
             )
 
@@ -475,10 +511,10 @@ async def search_images(
 
         if sort_field == "relevance" and search_pattern:
             relevance_case = case(
-                (ImageMetadata.title.ilike(search_pattern, escape='\\'), 3),
-                (ImageMetadata.abstract.ilike(search_pattern, escape='\\'), 2),
-                (ImageMetadata.location.ilike(search_pattern, escape='\\'), 1),
-                else_=0
+                (ImageMetadata.title.ilike(search_pattern, escape="\\"), 3),
+                (ImageMetadata.abstract.ilike(search_pattern, escape="\\"), 2),
+                (ImageMetadata.location.ilike(search_pattern, escape="\\"), 1),
+                else_=0,
             )
             query = query.order_by(desc(relevance_case), desc(date_field))
         else:
@@ -495,24 +531,38 @@ async def search_images(
         image_list = []
         for img in images:
             image_data = {
-                "id": str(img.id) if hasattr(img, 'id') else img.filename,
+                "id": str(img.id) if hasattr(img, "id") else img.filename,
                 "filename": img.filename,
                 "title": img.title,
-                "description": img.abstract if hasattr(img, 'abstract') else None,
+                "description": img.abstract if hasattr(img, "abstract") else None,
                 "hazard_type": img.hazard_type,
                 "country": img.country,
                 "location": img.location,
-                "keywords": img.keywords if hasattr(img, 'keywords') else [],
-                "latitude": float(img.latitude) if hasattr(img, 'latitude') and img.latitude else None,
-                "longitude": float(img.longitude) if hasattr(img, 'longitude') and img.longitude else None,
-                "upload_date": img.date_stamp.isoformat() if hasattr(img, 'date_stamp') and img.date_stamp else None,
-                "thumbnail_url": f"/upload/images/{img.filename}/thumbnail" if img.filename else None,
+                "keywords": img.keywords if hasattr(img, "keywords") else [],
+                "latitude": (
+                    float(img.latitude) if hasattr(img, "latitude") and img.latitude else None
+                ),
+                "longitude": (
+                    float(img.longitude) if hasattr(img, "longitude") and img.longitude else None
+                ),
+                "upload_date": (
+                    img.date_stamp.isoformat()
+                    if hasattr(img, "date_stamp") and img.date_stamp
+                    else None
+                ),
+                "thumbnail_url": (
+                    f"/upload/images/{img.filename}/thumbnail" if img.filename else None
+                ),
                 "full_url": f"/upload/images/{img.filename}" if img.filename else None,
-                "contact": {
-                    "organisation_name": getattr(img, 'contact_organisation_name', None),
-                    "individual_name": getattr(img, 'contact_individual_name', None),
-                    "email": getattr(img, 'contact_email', None)
-                } if hasattr(img, 'point_of_contact') else None
+                "contact": (
+                    {
+                        "organisation_name": getattr(img, "contact_organisation_name", None),
+                        "individual_name": getattr(img, "contact_individual_name", None),
+                        "email": getattr(img, "contact_email", None),
+                    }
+                    if hasattr(img, "point_of_contact")
+                    else None
+                ),
             }
             image_list.append(image_data)
 
@@ -522,81 +572,82 @@ async def search_images(
             "page": (skip // limit) + 1,
             "limit": limit,
             "total_pages": (total + limit - 1) // limit,
-            "has_more": skip + limit < total
+            "has_more": skip + limit < total,
         }
 
     except Exception as e:
         logger.error(f"Error searching images: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to search images: {str(e)}")
 
+
 @router.get("/hazards", response_model=Dict[str, Any])
 async def get_hazard_types(db: Session = Depends(get_db)):
     """Get available hazard types."""
     try:
-        hazards = db.query(ImageMetadata.hazard_type).distinct().filter(
-            ImageMetadata.hazard_type.isnot(None)
-        ).all()
-        
+        hazards = (
+            db.query(ImageMetadata.hazard_type)
+            .distinct()
+            .filter(ImageMetadata.hazard_type.isnot(None))
+            .all()
+        )
+
         hazard_list = [hazard[0] for hazard in hazards if hazard[0]]
-        
-        return {
-            "hazards": sorted(hazard_list),
-            "count": len(hazard_list)
-        }
-        
+
+        return {"hazards": sorted(hazard_list), "count": len(hazard_list)}
+
     except Exception as e:
         logger.error(f"Error fetching hazard types: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch hazard types: {str(e)}")
+
 
 @router.get("/countries", response_model=Dict[str, Any])
 async def get_countries(db: Session = Depends(get_db)):
     """Get available countries."""
     try:
-        countries = db.query(ImageMetadata.country).distinct().filter(
-            ImageMetadata.country.isnot(None)
-        ).all()
-        
+        countries = (
+            db.query(ImageMetadata.country)
+            .distinct()
+            .filter(ImageMetadata.country.isnot(None))
+            .all()
+        )
+
         country_list = [country[0] for country in countries if country[0]]
-        
-        return {
-            "countries": sorted(country_list),
-            "count": len(country_list)
-        }
-        
+
+        return {"countries": sorted(country_list), "count": len(country_list)}
+
     except Exception as e:
         logger.error(f"Error fetching countries: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch countries: {str(e)}")
+
 
 @router.get("/stats", response_model=Dict[str, Any])
 async def get_stats(db: Session = Depends(get_db)):
     """Get basic statistics about the image database."""
     try:
         total_images = db.query(ImageMetadata).count()
-        
+
         hazard_counts = {}
-        hazards = db.query(ImageMetadata.hazard_type).filter(
-            ImageMetadata.hazard_type.isnot(None)
-        ).all()
+        hazards = (
+            db.query(ImageMetadata.hazard_type).filter(ImageMetadata.hazard_type.isnot(None)).all()
+        )
         for hazard in hazards:
             if hazard[0]:
                 hazard_counts[hazard[0]] = hazard_counts.get(hazard[0], 0) + 1
-        
+
         country_counts = {}
-        countries = db.query(ImageMetadata.country).filter(
-            ImageMetadata.country.isnot(None)
-        ).all()
+        countries = db.query(ImageMetadata.country).filter(ImageMetadata.country.isnot(None)).all()
         for country in countries:
             if country[0]:
                 country_counts[country[0]] = country_counts.get(country[0], 0) + 1
-        
+
         return {
             "total_images": total_images,
             "hazard_types": hazard_counts,
             "countries": country_counts,
             "unique_hazards": len(hazard_counts),
-            "unique_countries": len(country_counts)
+            "unique_countries": len(country_counts),
         }
-        
+
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
@@ -607,7 +658,7 @@ async def get_image_history(
     image_id: str,
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced),
 ):
     """Return audit history entries for an image."""
     try:
@@ -616,18 +667,14 @@ async def get_image_history(
             and "audit:view" not in current_user.permissions
         ):
             raise HTTPException(
-                status_code=403,
-                detail="Insufficient permissions to view image history"
+                status_code=403, detail="Insufficient permissions to view image history"
             )
-        
+
         from models.audit_log import AuditLog
-        
+
         logs = (
             db.query(AuditLog)
-            .filter(
-                AuditLog.table_name == "image_metadata",
-                AuditLog.record_id == image_id
-            )
+            .filter(AuditLog.table_name == "image_metadata", AuditLog.record_id == image_id)
             .order_by(AuditLog.timestamp.desc())
             .limit(limit)
             .all()
@@ -656,8 +703,7 @@ async def get_image_history(
 
 @router.get("/user/uploads", response_model=List[Dict[str, Any]])
 async def get_user_uploads(
-    db: Session = Depends(get_db),
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+    db: Session = Depends(get_db), current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
     """Get all uploads for the current authenticated user."""
     try:
@@ -666,26 +712,31 @@ async def get_user_uploads(
         if hasattr(current_user, "id") and current_user.id:
             user_identifiers.add(str(current_user.id))
 
-        images = db.query(ImageMetadata).filter(
-            ImageMetadata.uploader_id.in_(user_identifiers)
-        ).order_by(desc(ImageMetadata.datetime)).all()
-        
+        images = (
+            db.query(ImageMetadata)
+            .filter(ImageMetadata.uploader_id.in_(user_identifiers))
+            .order_by(desc(ImageMetadata.datetime))
+            .all()
+        )
+
         # Serialize to match frontend UserUpload type
         uploads = []
         for img in images:
-            uploads.append({
-                "id": str(img.id),
-                "filename": img.filename,
-                "title": img.title or img.filename,
-                "hazard_type": img.hazard_type,
-                "location": img.location or img.country,
-                "uploaded_at": img.datetime.isoformat() if img.datetime else None,
-                "approval_status": getattr(img, 'status', 'pending_review'),
-                "views": getattr(img, 'views', 0),
-                "latitude": float(img.latitude) if img.latitude else None,
-                "longitude": float(img.longitude) if img.longitude else None
-            })
-        
+            uploads.append(
+                {
+                    "id": str(img.id),
+                    "filename": img.filename,
+                    "title": img.title or img.filename,
+                    "hazard_type": img.hazard_type,
+                    "location": img.location or img.country,
+                    "uploaded_at": img.datetime.isoformat() if img.datetime else None,
+                    "approval_status": getattr(img, "status", "pending_review"),
+                    "views": getattr(img, "views", 0),
+                    "latitude": float(img.latitude) if img.latitude else None,
+                    "longitude": float(img.longitude) if img.longitude else None,
+                }
+            )
+
         return uploads
     except Exception as e:
         logger.error(f"Error fetching user uploads: {e}")

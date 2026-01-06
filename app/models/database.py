@@ -1,4 +1,15 @@
-from sqlalchemy import create_engine, Column, String, Float, DateTime, Text, JSON, Boolean, SmallInteger, func
+from sqlalchemy import (
+    create_engine,
+    Column,
+    String,
+    Float,
+    DateTime,
+    Text,
+    JSON,
+    Boolean,
+    SmallInteger,
+    func,
+)
 from sqlalchemy.orm import declarative_base, sessionmaker, object_session
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -10,23 +21,29 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 # Get database URL from unified configuration
 def get_database_url():
     """Get database URL from environment with fallback"""
     try:
         from core.config import Settings
+
         settings = Settings()
         return settings.DATABASE_URL
     except Exception as e:
         logger.warning(f"Could not load settings: {e}, using fallback")
         return os.getenv("DATABASE_URL", "sqlite:///./app.db")
 
+
 DATABASE_URL = get_database_url()
-logger.info(f"Using database: {DATABASE_URL.split('@')[0] if '@' in DATABASE_URL else DATABASE_URL}")
+logger.info(
+    f"Using database: {DATABASE_URL.split('@')[0] if '@' in DATABASE_URL else DATABASE_URL}"
+)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
 
 def get_db():
     db = SessionLocal()
@@ -35,28 +52,36 @@ def get_db():
     finally:
         db.close()
 
+
 # Alembic migration hint:
 # alembic revision --autogenerate -m "Add core metadata fields to ImageMetadata"
 # You will likely need to manually adjust the migration file to handle the
 # transition from 'filename' to 'id' and to set default values.
+
 
 class ImageMetadata(Base):
     __tablename__ = "image_metadata"
 
     # Core metadata fields
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    datetime = Column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
-    geometry = Column(Geometry(geometry_type='POINTZ', srid=4326), nullable=True)
-    hazard_type = Column(String, nullable=False) # Or Enum
+    datetime = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
+    geometry = Column(Geometry(geometry_type="POINTZ", srid=4326), nullable=True)
+    hazard_type = Column(String, nullable=False)  # Or Enum
     event_id = Column(String, nullable=True)
-    status = Column(String, default="pending_review", nullable=False) # Enum: pending_review, approved, rejected
-    data_license = Column(String, default="https://creativecommons.org/licenses/by/4.0/", nullable=False)
-    source_type = Column(String, nullable=False) # Enum: citizen, official, remote_sensing, other
+    status = Column(
+        String, default="pending_review", nullable=False
+    )  # Enum: pending_review, approved, rejected
+    data_license = Column(
+        String, default="https://creativecommons.org/licenses/by/4.0/", nullable=False
+    )
+    source_type = Column(String, nullable=False)  # Enum: citizen, official, remote_sensing, other
     uploader_id = Column(String, nullable=False)
-    positional_accuracy = Column(Float, nullable=True) # In meters
+    positional_accuracy = Column(Float, nullable=True)  # In meters
     thumbnail_url = Column(String, nullable=True)
     thumbnail_key = Column(String, nullable=True)  # MinIO object key for thumbnail
-    
+
     # EXIF-derived metadata
     altitude = Column(Float, nullable=True)  # Altitude in meters from GPS EXIF
     altitude_ref = Column(SmallInteger, default=0, nullable=True)  # 0=above sea level, 1=below
@@ -68,7 +93,7 @@ class ImageMetadata(Base):
 
     # Original filename, kept for reference
     filename = Column(String, nullable=True)
-    
+
     # Deprecated/legacy fields (can be removed in a future migration)
     location = Column(String, nullable=True)
     country = Column(String, nullable=True)
@@ -148,57 +173,63 @@ class ImageMetadata(Base):
         if not self.orientation:
             return 0
         orientation_map = {
-            1: 0, 2: 0,    # Normal
-            3: 180, 4: 180,  # Upside down
-            5: 90, 6: 90,    # Rotated 90° CW
-            7: 270, 8: 270   # Rotated 90° CCW
+            1: 0,
+            2: 0,  # Normal
+            3: 180,
+            4: 180,  # Upside down
+            5: 90,
+            6: 90,  # Rotated 90° CW
+            7: 270,
+            8: 270,  # Rotated 90° CCW
         }
         return orientation_map.get(self.orientation, 0)
-    
+
     def to_dict(self):
         """Convert model to dictionary for JSON serialization"""
         return {
-            'id': str(self.id) if self.id else None,
-            'datetime': self.datetime.isoformat() if self.datetime else None,
-            'latitude': self.latitude,
-            'longitude': self.longitude,
-            'hazard_type': self.hazard_type,
-            'event_id': self.event_id,
-            'status': self.status,
-            'data_license': self.data_license,
-            'source_type': self.source_type,
-            'uploader_id': self.uploader_id,
-            'positional_accuracy': self.positional_accuracy,
-            'thumbnail_url': self.thumbnail_url,
-            
+            "id": str(self.id) if self.id else None,
+            "datetime": self.datetime.isoformat() if self.datetime else None,
+            "latitude": self.latitude,
+            "longitude": self.longitude,
+            "hazard_type": self.hazard_type,
+            "event_id": self.event_id,
+            "status": self.status,
+            "data_license": self.data_license,
+            "source_type": self.source_type,
+            "uploader_id": self.uploader_id,
+            "positional_accuracy": self.positional_accuracy,
+            "thumbnail_url": self.thumbnail_url,
             # Original filename, kept for reference
-            'filename': self.filename,
-
+            "filename": self.filename,
             # ISO 19115 fields (can be mapped from core fields or extended)
-            'title': self.title,
-            'abstract': self.abstract,
-            'purpose': self.purpose,
-            'point_of_contact': self.point_of_contact,
-            'date_stamp': self.date_stamp.isoformat() if self.date_stamp else None,
-            'maintenance_frequency': self.maintenance_frequency,
-            'geographic_bounding_box': self.geographic_bounding_box,
-            'geographic_identifier': self.geographic_identifier,
-            'temporal_extent_start': self.temporal_extent_start.isoformat() if self.temporal_extent_start else None,
-            'temporal_extent_end': self.temporal_extent_end.isoformat() if self.temporal_extent_end else None,
-            'vertical_extent': self.vertical_extent,
-            'topic_category': self.topic_category,
-            'keywords': self.keywords,
-            'keyword_thesaurus': self.keyword_thesaurus,
-            'resource_locator': self.resource_locator,
-            'format_name': self.format_name,
-            'format_version': self.format_version,
-            'lineage_statement': self.lineage_statement,
-            'source': self.source,
-            'use_constraints': self.use_constraints,
-            'access_constraints': self.access_constraints,
-            'security_classification': self.security_classification,
-            'metadata_language': self.metadata_language,
-            'metadata_standard_name': self.metadata_standard_name,
-            'metadata_standard_version': self.metadata_standard_version,
-            'metadata_date': self.metadata_date.isoformat() if self.metadata_date else None
+            "title": self.title,
+            "abstract": self.abstract,
+            "purpose": self.purpose,
+            "point_of_contact": self.point_of_contact,
+            "date_stamp": self.date_stamp.isoformat() if self.date_stamp else None,
+            "maintenance_frequency": self.maintenance_frequency,
+            "geographic_bounding_box": self.geographic_bounding_box,
+            "geographic_identifier": self.geographic_identifier,
+            "temporal_extent_start": (
+                self.temporal_extent_start.isoformat() if self.temporal_extent_start else None
+            ),
+            "temporal_extent_end": (
+                self.temporal_extent_end.isoformat() if self.temporal_extent_end else None
+            ),
+            "vertical_extent": self.vertical_extent,
+            "topic_category": self.topic_category,
+            "keywords": self.keywords,
+            "keyword_thesaurus": self.keyword_thesaurus,
+            "resource_locator": self.resource_locator,
+            "format_name": self.format_name,
+            "format_version": self.format_version,
+            "lineage_statement": self.lineage_statement,
+            "source": self.source,
+            "use_constraints": self.use_constraints,
+            "access_constraints": self.access_constraints,
+            "security_classification": self.security_classification,
+            "metadata_language": self.metadata_language,
+            "metadata_standard_name": self.metadata_standard_name,
+            "metadata_standard_version": self.metadata_standard_version,
+            "metadata_date": self.metadata_date.isoformat() if self.metadata_date else None,
         }

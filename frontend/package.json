@@ -15,7 +15,8 @@
     "build-storybook": "storybook build",
     "lighthouse": "lhci autorun --config=lighthouserc.json",
     "lighthouse:local": "echo 'Note: Lighthouse requires Chrome with display in WSL2. Consider running from Windows or CI/CD.' && npx lighthouse@11 http://localhost:3001 --chrome-flags=\"--headless --no-sandbox --disable-gpu\" --output html --output-path=./lighthouse-report.html",
-    "analyze": "ANALYZE=true npm run build"
+    "analyze": "ANALYZE=true npm run build",
+    "prepare": "cd .. && husky frontend/.husky"
   },
   "dependencies": {
     "@headlessui/react": "^2.0.0",
@@ -88,11 +89,22 @@
     "eslint-config-next": "^16.0.10",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-react-hooks": "^4.3.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
+    "lint-staged": "^15.2.11",
     "prettier": "^3.0.0",
     "storybook": "^8.4.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
   }
 }

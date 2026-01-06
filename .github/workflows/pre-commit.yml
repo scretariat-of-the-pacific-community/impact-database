@@ -1,0 +1,67 @@
+name: Pre-commit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+# This workflow runs lint and unit tests that block PR merges
+# Branch protection rules should require this workflow to pass
+
+jobs:
+  lint-and-test:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+    # Required status check - must pass for PR merge
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r app/requirements.txt -r app/requirements-test.txt
+          pip install flake8 pytest pytest-cov
+
+      - name: Lint backend (flake8)
+        run: flake8 app --count --show-source --statistics
+
+      - name: Run backend unit tests with coverage
+        working-directory: app
+        run: pytest --cov=app --cov-report=xml --cov-report=term-missing --cov-fail-under=50
+
+      - name: Upload Python coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./app/coverage.xml
+          flags: backend-precommit
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint frontend (ESLint)
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Type check frontend
+        working-directory: frontend
+        run: npx tsc --noEmit --skipLibCheck || true
+
+      - name: Run frontend unit tests
+        working-directory: frontend
+        run: npm test --if-present

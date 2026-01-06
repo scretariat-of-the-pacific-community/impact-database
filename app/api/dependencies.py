@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class UserDetails:
     """
     Consolidated user details for use across endpoints.
-    
+
     Attributes:
         db_user: The database User model instance (may be None if user not in DB yet)
         identifier: String identifier for uploader_id queries (UUID string or username)
@@ -30,17 +30,18 @@ class UserDetails:
         username: The username string
         display_name: Human-readable name for display purposes
     """
+
     db_user: Optional[DBUser]
     identifier: str
     user_uuid: Optional[uuid.UUID]
     username: str
     display_name: str
-    
+
     @property
     def id_str(self) -> str:
         """Alias for identifier - string form of user ID."""
         return self.identifier
-    
+
     @property
     def user_identifiers(self) -> set:
         """
@@ -54,38 +55,37 @@ class UserDetails:
 
 
 def get_user_details(
-    current_user: EnhancedUser = Depends(get_current_user_enhanced),
-    db: Session = Depends(get_db)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced), db: Session = Depends(get_db)
 ) -> UserDetails:
     """
     Reusable dependency that consolidates user lookup logic.
-    
+
     Resolves the current authenticated user to:
     - Database user record (if exists)
     - String identifier for uploader_id queries
     - UUID for foreign key references
     - Display name for UI
-    
+
     Usage:
         @router.get("/my-endpoint")
         async def my_endpoint(user: UserDetails = Depends(get_user_details)):
             # Use user.identifier for uploader_id queries
             # Use user.user_uuid for UUID foreign keys
             # Use user.display_name for UI display
-    
+
     Raises:
         HTTPException: If user identity cannot be determined
     """
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
-    
+
     username = getattr(current_user, "username", None)
     if not username:
         raise HTTPException(status_code=401, detail="Invalid user session - no username")
-    
+
     # Query database user
     db_user = db.query(DBUser).filter(DBUser.username == username).first()
-    
+
     # Resolve identifier (prefer UUID from DB, fallback to current_user.id or username)
     if db_user and getattr(db_user, "id", None):
         identifier = str(db_user.id)
@@ -96,25 +96,25 @@ def get_user_details(
     else:
         identifier = username
         user_uuid = None
-    
+
     # Resolve display name
     if db_user and getattr(db_user, "full_name", None):
         display_name = db_user.full_name
     else:
         display_name = username
-    
+
     return UserDetails(
         db_user=db_user,
         identifier=identifier,
         user_uuid=user_uuid,
         username=username,
-        display_name=display_name
+        display_name=display_name,
     )
 
 
 def get_optional_user_details(
     current_user: Optional[EnhancedUser] = Depends(get_current_user_enhanced),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> Optional[UserDetails]:
     """
     Optional version of get_user_details for endpoints that allow anonymous access.
@@ -122,7 +122,7 @@ def get_optional_user_details(
     """
     if not current_user or not getattr(current_user, "username", None):
         return None
-    
+
     try:
         return get_user_details(current_user, db)
     except HTTPException:
@@ -146,18 +146,18 @@ def build_user_upload_filter(user: UserDetails):
     """
     Build a SQLAlchemy filter for matching user's uploads.
     Handles backward compatibility where uploader_id might be username or UUID.
-    
+
     Usage:
         from sqlalchemy import or_
-        
+
         query = db.query(ImageMetadata).filter(
             or_(*[ImageMetadata.uploader_id == id for id in user.user_identifiers])
         )
     """
     from sqlalchemy import or_
     from models.database import ImageMetadata
-    
+
     if len(user.user_identifiers) == 1:
         return ImageMetadata.uploader_id == user.identifier
-    
+
     return or_(*[ImageMetadata.uploader_id == id for id in user.user_identifiers])

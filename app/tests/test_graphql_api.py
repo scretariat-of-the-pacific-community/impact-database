@@ -45,8 +45,9 @@ def test_images_query_matches_rest(client):
     }
     """
     gql = graphql(client, query, {"hazardType": "flood"}).json()
-    assert sorted(img["filename"] for img in gql["data"]["images"]) == \
-        sorted(img["filename"] for img in rest["images"])
+    assert sorted(img["filename"] for img in gql["data"]["images"]) == sorted(
+        img["filename"] for img in rest["images"]
+    )
 
 
 def test_hazards_query_matches_rest(client):
@@ -109,7 +110,7 @@ def test_upload_image_mutation(client):
             "title": "Test Title",
             "abstract": "Test Abstract",
             "purpose": "Testing",
-            "keywords": "[\"flood\"]",
+            "keywords": '["flood"]',
         },
     }
     file_map = {"0": ["variables.file"]}
@@ -140,6 +141,6 @@ def test_hazards_invalid_date(client):
 def test_images_invalid_has_coordinates(client):
     rest = client.get("/api/images", params={"has_coordinates": "notabool"})
     assert rest.status_code == 422
-    query = "query { images(hasCoordinates: \"notabool\"){ filename } }"
+    query = 'query { images(hasCoordinates: "notabool"){ filename } }'
     gql = client.post("/graphql", json={"query": query})
     assert "errors" in gql.json()

@@ -9,18 +9,19 @@ from core.config import settings
 
 client = TestClient(app)
 
+
 class TestPresignedURLs:
     """Test suite for presigned URL endpoints"""
-    
+
     @pytest.fixture
     def auth_headers(self):
         """Auth headers for testing"""
         return {"Authorization": "Bearer valid-token"}
-    
+
     @pytest.fixture
     def mock_minio_client(self):
         """Mock MinIO client"""
-        with patch('api.presign.get_minio_client') as mock_get_client:
+        with patch("api.presign.get_minio_client") as mock_get_client:
             mock_client = Mock()
             mock_get_client.return_value = mock_client
             yield mock_client
@@ -36,21 +37,17 @@ class TestPresignedURLs:
                 "x-amz-algorithm": "AWS4-HMAC-SHA256",
                 "x-amz-credential": "minioadmin/20230101/us-east-1/s3/aws4_request",
                 "x-amz-date": "20230101T000000Z",
-                "x-amz-signature": "signature"
-            }
+                "x-amz-signature": "signature",
+            },
         }
         mock_minio_client.presigned_post_policy.return_value = mock_presigned_data
-        
+
         response = client.get(
             "/presign/upload",
-            params={
-                "filename": "test_image.jpg",
-                "content_type": "image/jpeg",
-                "expires_in": 3600
-            },
-            headers=auth_headers
+            params={"filename": "test_image.jpg", "content_type": "image/jpeg", "expires_in": 3600},
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert "upload_url" in data
@@ -65,34 +62,24 @@ class TestPresignedURLs:
         """Test presigned upload URL with invalid file extension"""
         response = client.get(
             "/presign/upload",
-            params={
-                "filename": "test_file.txt",  # Invalid extension
-                "content_type": "text/plain"
-            },
-            headers=auth_headers
+            params={"filename": "test_file.txt", "content_type": "text/plain"},  # Invalid extension
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "not allowed" in response.json()["detail"]
 
     def test_generate_presigned_upload_url_empty_filename(self, auth_headers, mock_minio_client):
         """Test presigned upload URL with empty filename"""
-        response = client.get(
-            "/presign/upload",
-            params={"filename": ""},
-            headers=auth_headers
-        )
-        
+        response = client.get("/presign/upload", params={"filename": ""}, headers=auth_headers)
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "cannot be empty" in response.json()["detail"]
 
     def test_generate_presigned_upload_url_unauthorized(self, mock_minio_client):
         """Test presigned upload URL without authentication"""
-        response = client.get(
-            "/presign/upload",
-            params={"filename": "test_image.jpg"}
-        )
-        
+        response = client.get("/presign/upload", params={"filename": "test_image.jpg"})
+
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     def test_generate_presigned_download_url_success(self, auth_headers, mock_minio_client):
@@ -104,20 +91,17 @@ class TestPresignedURLs:
         mock_stat.last_modified = datetime.utcnow()
         mock_stat.etag = "abc123"
         mock_minio_client.stat_object.return_value = mock_stat
-        
+
         # Mock presigned URL
         mock_url = "http://localhost:9000/impact-images/test-object-key?signature=xyz"
         mock_minio_client.presigned_get_object.return_value = mock_url
-        
+
         response = client.get(
             "/presign/download",
-            params={
-                "object_key": "uploads/user123/test_image.jpg",
-                "expires_in": 1800
-            },
-            headers=auth_headers
+            params={"object_key": "uploads/user123/test_image.jpg", "expires_in": 1800},
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["download_url"] == mock_url
@@ -128,28 +112,26 @@ class TestPresignedURLs:
         assert "last_modified" in data
         assert data["etag"] == "abc123"
 
-    def test_generate_presigned_download_url_object_not_found(self, auth_headers, mock_minio_client):
+    def test_generate_presigned_download_url_object_not_found(
+        self, auth_headers, mock_minio_client
+    ):
         """Test presigned download URL for non-existent object"""
         # Mock object not found
         mock_minio_client.stat_object.side_effect = Exception("Object not found")
-        
+
         response = client.get(
-            "/presign/download",
-            params={"object_key": "nonexistent/file.jpg"},
-            headers=auth_headers
+            "/presign/download", params={"object_key": "nonexistent/file.jpg"}, headers=auth_headers
         )
-        
+
         assert response.status_code == status.HTTP_404_NOT_FOUND
         assert "not found" in response.json()["detail"]
 
-    def test_generate_presigned_download_url_empty_object_key(self, auth_headers, mock_minio_client):
+    def test_generate_presigned_download_url_empty_object_key(
+        self, auth_headers, mock_minio_client
+    ):
         """Test presigned download URL with empty object key"""
-        response = client.get(
-            "/presign/download",
-            params={"object_key": ""},
-            headers=auth_headers
-        )
-        
+        response = client.get("/presign/download", params={"object_key": ""}, headers=auth_headers)
+
         assert response.status_code == status.HTTP_400_BAD_REQUEST
         assert "cannot be empty" in response.json()["detail"]
 
@@ -158,16 +140,13 @@ class TestPresignedURLs:
         # Mock multipart upload initiation
         mock_upload_id = "test-upload-id-123"
         mock_minio_client._create_multipart_upload.return_value = mock_upload_id
-        
+
         response = client.get(
             "/presign/upload/multipart/initiate",
-            params={
-                "filename": "large_image.jpg",
-                "content_type": "image/jpeg"
-            },
-            headers=auth_headers
+            params={"filename": "large_image.jpg", "content_type": "image/jpeg"},
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["upload_id"] == mock_upload_id
@@ -180,18 +159,18 @@ class TestPresignedURLs:
         # Mock presigned URL for part
         mock_url = "http://localhost:9000/impact-images/test-object?uploadId=123&partNumber=1&signature=xyz"
         mock_minio_client.presigned_put_object.return_value = mock_url
-        
+
         response = client.get(
             "/presign/upload/multipart/part",
             params={
                 "object_key": "uploads/user123/large_image.jpg",
                 "upload_id": "test-upload-id-123",
                 "part_number": 1,
-                "expires_in": 3600
+                "expires_in": 3600,
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["upload_url"] == mock_url
@@ -207,11 +186,11 @@ class TestPresignedURLs:
             params={
                 "object_key": "test-object",
                 "upload_id": "test-upload-id",
-                "part_number": 0  # Invalid: must be >= 1
+                "part_number": 0,  # Invalid: must be >= 1
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_multipart_part_part_number_too_high(self, auth_headers, mock_minio_client):
@@ -219,22 +198,22 @@ class TestPresignedURLs:
         response = client.get(
             "/presign/upload/multipart/part",
             params={
-                "object_key": "test-object", 
+                "object_key": "test-object",
                 "upload_id": "test-upload-id",
-                "part_number": 10001  # Invalid: must be <= 10000
+                "part_number": 10001,  # Invalid: must be <= 10000
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
     def test_presign_health_check_success(self, mock_minio_client):
         """Test presign health check endpoint"""
         # Mock bucket exists check
         mock_minio_client.bucket_exists.return_value = True
-        
+
         response = client.get("/presign/health")
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "healthy"
@@ -248,9 +227,9 @@ class TestPresignedURLs:
         """Test presign health check when bucket doesn't exist"""
         # Mock bucket doesn't exist
         mock_minio_client.bucket_exists.return_value = False
-        
+
         response = client.get("/presign/health")
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         assert data["status"] == "healthy"
@@ -260,9 +239,9 @@ class TestPresignedURLs:
         """Test presign health check with MinIO error"""
         # Mock MinIO error
         mock_minio_client.bucket_exists.side_effect = Exception("MinIO connection failed")
-        
+
         response = client.get("/presign/health")
-        
+
         assert response.status_code == status.HTTP_503_SERVICE_UNAVAILABLE
         assert "unhealthy" in response.json()["detail"]
 
@@ -271,22 +250,16 @@ class TestPresignedURLs:
         # Too low
         response = client.get(
             "/presign/upload",
-            params={
-                "filename": "test.jpg",
-                "expires_in": 30  # Below minimum of 60
-            },
-            headers=auth_headers
+            params={"filename": "test.jpg", "expires_in": 30},  # Below minimum of 60
+            headers=auth_headers,
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
-        
+
         # Too high
         response = client.get(
             "/presign/upload",
-            params={
-                "filename": "test.jpg",
-                "expires_in": 700000  # Above maximum of 604800
-            },
-            headers=auth_headers
+            params={"filename": "test.jpg", "expires_in": 700000},  # Above maximum of 604800
+            headers=auth_headers,
         )
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
 
@@ -294,16 +267,16 @@ class TestPresignedURLs:
         """Test that filenames are properly sanitized"""
         mock_presigned_data = {
             "url": "http://localhost:9000/impact-images",
-            "fields": {"key": "uploads/user123/test_file_name.jpg"}
+            "fields": {"key": "uploads/user123/test_file_name.jpg"},
         }
         mock_minio_client.presigned_post_policy.return_value = mock_presigned_data
-        
+
         response = client.get(
             "/presign/upload",
             params={"filename": "test file name.jpg"},  # Contains spaces
-            headers=auth_headers
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
         # Spaces should be replaced with underscores
@@ -318,32 +291,37 @@ class TestPresignedURLs:
         mock_stat.last_modified = datetime.utcnow()
         mock_stat.etag = "abc123"
         mock_minio_client.stat_object.return_value = mock_stat
-        
+
         # Mock presigned URL
-        mock_url = "http://localhost:9000/impact-images/test.jpg?response-content-disposition=attachment"
+        mock_url = (
+            "http://localhost:9000/impact-images/test.jpg?response-content-disposition=attachment"
+        )
         mock_minio_client.presigned_get_object.return_value = mock_url
-        
+
         response = client.get(
             "/presign/download",
             params={
                 "object_key": "test.jpg",
-                "response_content_disposition": "attachment; filename=downloaded_image.jpg"
+                "response_content_disposition": "attachment; filename=downloaded_image.jpg",
             },
-            headers=auth_headers
+            headers=auth_headers,
         )
-        
+
         assert response.status_code == status.HTTP_200_OK
         # Verify that presigned_get_object was called with response_headers
         mock_minio_client.presigned_get_object.assert_called_once()
         call_args = mock_minio_client.presigned_get_object.call_args
         assert "response_headers" in call_args.kwargs
-        assert call_args.kwargs["response_headers"]["response-content-disposition"] == "attachment; filename=downloaded_image.jpg"
+        assert (
+            call_args.kwargs["response_headers"]["response-content-disposition"]
+            == "attachment; filename=downloaded_image.jpg"
+        )
 
 
 @pytest.mark.integration
 class TestPresignedURLsIntegration:
     """Integration tests for presigned URLs"""
-    
+
     def test_presigned_upload_flow(self):
         """Test complete presigned upload flow"""
         # This would test:
@@ -353,7 +331,7 @@ class TestPresignedURLsIntegration:
         # 4. Generate presigned download URL
         # 5. Download and verify file content
         pass
-    
+
     def test_multipart_upload_flow(self):
         """Test complete multipart upload flow"""
         # This would test:

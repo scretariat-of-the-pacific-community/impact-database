@@ -10,6 +10,7 @@ from dataclasses import dataclass
 @dataclass
 class EmailTemplate:
     """Email template with subject, text, and HTML versions."""
+
     subject: str
     body_text: str
     body_html: str
@@ -134,20 +135,18 @@ BASE_HTML_TEMPLATE = """
 def _render_html(subject: str, content: str, settings_url: str = "") -> str:
     """Render content into the base HTML template."""
     return BASE_HTML_TEMPLATE.format(
-        subject=subject,
-        content=content,
-        settings_url=settings_url or "#"
+        subject=subject, content=content, settings_url=settings_url or "#"
     )
 
 
 class EmailTemplates:
     """Collection of email templates."""
-    
+
     @staticmethod
     def welcome(username: str, login_url: str = "") -> EmailTemplate:
         """Welcome email for new users."""
         subject = "Welcome to Impact Database! 🌊"
-        
+
         text = f"""
 Welcome to Impact Database, {username}!
 
@@ -167,7 +166,7 @@ If you have any questions, feel free to reach out to our support team.
 Best regards,
 The Impact Database Team
         """
-        
+
         html_content = f"""
 <h2>Welcome, {username}! 👋</h2>
 <p>Thank you for joining the Pacific Environmental Monitoring community.</p>
@@ -189,25 +188,20 @@ The Impact Database Team
 
 <p>Best regards,<br>The Impact Database Team</p>
         """
-        
+
         return EmailTemplate(
-            subject=subject,
-            body_text=text.strip(),
-            body_html=_render_html(subject, html_content)
+            subject=subject, body_text=text.strip(), body_html=_render_html(subject, html_content)
         )
-    
+
     @staticmethod
     def upload_approved(
-        username: str,
-        image_title: str,
-        image_url: str = "",
-        reviewer_comment: Optional[str] = None
+        username: str, image_title: str, image_url: str = "", reviewer_comment: Optional[str] = None
     ) -> EmailTemplate:
         """Notification when an upload is approved."""
         subject = f"Your upload has been approved! ✅"
-        
+
         comment_text = f"\nReviewer comment: {reviewer_comment}" if reviewer_comment else ""
-        
+
         text = f"""
 Good news, {username}!
 
@@ -221,9 +215,13 @@ Thank you for contributing to environmental monitoring in the Pacific region!
 Best regards,
 The Impact Database Team
         """
-        
-        comment_html = f'<div class="success-box"><strong>Reviewer comment:</strong> {reviewer_comment}</div>' if reviewer_comment else ""
-        
+
+        comment_html = (
+            f'<div class="success-box"><strong>Reviewer comment:</strong> {reviewer_comment}</div>'
+            if reviewer_comment
+            else ""
+        )
+
         html_content = f"""
 <h2>Great news! ✅</h2>
 <p>Hi {username},</p>
@@ -238,23 +236,18 @@ The Impact Database Team
 
 <p>Best regards,<br>The Impact Database Team</p>
         """
-        
+
         return EmailTemplate(
-            subject=subject,
-            body_text=text.strip(),
-            body_html=_render_html(subject, html_content)
+            subject=subject, body_text=text.strip(), body_html=_render_html(subject, html_content)
         )
-    
+
     @staticmethod
     def upload_rejected(
-        username: str,
-        image_title: str,
-        rejection_reason: str,
-        resubmit_url: str = ""
+        username: str, image_title: str, rejection_reason: str, resubmit_url: str = ""
     ) -> EmailTemplate:
         """Notification when an upload is rejected."""
         subject = f"Upload requires changes"
-        
+
         text = f"""
 Hi {username},
 
@@ -269,7 +262,7 @@ If you have questions about the feedback, please contact our support team.
 Best regards,
 The Impact Database Team
         """
-        
+
         html_content = f"""
 <h2>Changes Requested</h2>
 <p>Hi {username},</p>
@@ -287,24 +280,22 @@ The Impact Database Team
 
 <p>Best regards,<br>The Impact Database Team</p>
         """
-        
+
         return EmailTemplate(
-            subject=subject,
-            body_text=text.strip(),
-            body_html=_render_html(subject, html_content)
+            subject=subject, body_text=text.strip(), body_html=_render_html(subject, html_content)
         )
-    
+
     @staticmethod
     def achievement_unlocked(
         username: str,
         achievement_name: str,
         achievement_description: str,
         points: int,
-        profile_url: str = ""
+        profile_url: str = "",
     ) -> EmailTemplate:
         """Notification when user unlocks an achievement."""
         subject = f"Achievement Unlocked: {achievement_name}! 🏆"
-        
+
         text = f"""
 Congratulations, {username}!
 
@@ -322,7 +313,7 @@ Keep up the great work!
 Best regards,
 The Impact Database Team
         """
-        
+
         html_content = f"""
 <h2>🏆 Achievement Unlocked!</h2>
 <p>Congratulations, {username}!</p>
@@ -339,23 +330,18 @@ The Impact Database Team
 
 <p>Best regards,<br>The Impact Database Team</p>
         """
-        
+
         return EmailTemplate(
-            subject=subject,
-            body_text=text.strip(),
-            body_html=_render_html(subject, html_content)
+            subject=subject, body_text=text.strip(), body_html=_render_html(subject, html_content)
         )
-    
+
     @staticmethod
     def review_assigned(
-        reviewer_name: str,
-        image_title: str,
-        uploader_name: str,
-        review_url: str = ""
+        reviewer_name: str, image_title: str, uploader_name: str, review_url: str = ""
     ) -> EmailTemplate:
         """Notification when a review is assigned to a curator."""
         subject = f"New image ready for review"
-        
+
         text = f"""
 Hi {reviewer_name},
 
@@ -371,7 +357,7 @@ Thank you for your contributions to content curation!
 Best regards,
 The Impact Database Team
         """
-        
+
         html_content = f"""
 <h2>New Review Assignment</h2>
 <p>Hi {reviewer_name},</p>
@@ -389,22 +375,16 @@ The Impact Database Team
 
 <p>Best regards,<br>The Impact Database Team</p>
         """
-        
+
         return EmailTemplate(
-            subject=subject,
-            body_text=text.strip(),
-            body_html=_render_html(subject, html_content)
+            subject=subject, body_text=text.strip(), body_html=_render_html(subject, html_content)
         )
-    
+
     @staticmethod
-    def password_reset(
-        username: str,
-        reset_url: str,
-        expires_in: str = "1 hour"
-    ) -> EmailTemplate:
+    def password_reset(username: str, reset_url: str, expires_in: str = "1 hour") -> EmailTemplate:
         """Password reset email."""
         subject = "Reset your password"
-        
+
         text = f"""
 Hi {username},
 
@@ -420,7 +400,7 @@ If you didn't request this, you can safely ignore this email. Your password will
 Best regards,
 The Impact Database Team
         """
-        
+
         html_content = f"""
 <h2>Password Reset Request</h2>
 <p>Hi {username},</p>
@@ -437,29 +417,27 @@ The Impact Database Team
 
 <p>Best regards,<br>The Impact Database Team</p>
         """
-        
+
         return EmailTemplate(
-            subject=subject,
-            body_text=text.strip(),
-            body_html=_render_html(subject, html_content)
+            subject=subject, body_text=text.strip(), body_html=_render_html(subject, html_content)
         )
-    
+
     @staticmethod
     def weekly_digest(
-        username: str,
-        stats: Dict[str, Any],
-        dashboard_url: str = ""
+        username: str, stats: Dict[str, Any], dashboard_url: str = ""
     ) -> EmailTemplate:
         """Weekly activity digest email."""
         subject = "Your Weekly Impact Summary 📊"
-        
+
         uploads = stats.get("uploads", 0)
         approved = stats.get("approved", 0)
         views = stats.get("views", 0)
         achievements = stats.get("new_achievements", [])
-        
-        achievements_text = "\n".join([f"  🏆 {a}" for a in achievements]) if achievements else "  None this week"
-        
+
+        achievements_text = (
+            "\n".join([f"  🏆 {a}" for a in achievements]) if achievements else "  None this week"
+        )
+
         text = f"""
 Hi {username},
 
@@ -479,9 +457,13 @@ Keep up the great work!
 Best regards,
 The Impact Database Team
         """
-        
-        achievements_html = "".join([f"<li>🏆 {a}</li>" for a in achievements]) if achievements else "<li>None this week</li>"
-        
+
+        achievements_html = (
+            "".join([f"<li>🏆 {a}</li>" for a in achievements])
+            if achievements
+            else "<li>None this week</li>"
+        )
+
         html_content = f"""
 <h2>Your Weekly Impact Summary 📊</h2>
 <p>Hi {username},</p>
@@ -520,9 +502,7 @@ The Impact Database Team
 
 <p>Best regards,<br>The Impact Database Team</p>
         """
-        
+
         return EmailTemplate(
-            subject=subject,
-            body_text=text.strip(),
-            body_html=_render_html(subject, html_content)
+            subject=subject, body_text=text.strip(), body_html=_render_html(subject, html_content)
         )

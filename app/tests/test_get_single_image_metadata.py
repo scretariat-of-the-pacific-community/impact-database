@@ -11,6 +11,7 @@ def client(tmp_path):
     os.environ["DATABASE_URL"] = f"sqlite:///{tmp_path}/test.db"
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
     from core.main import app
+
     os.makedirs("/app/uploads", exist_ok=True)
     return TestClient(app)
 

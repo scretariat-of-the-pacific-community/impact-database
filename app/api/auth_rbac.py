@@ -26,6 +26,7 @@ class EnhancedUser(AuthUser):
     Enhanced user model with RBAC attributes
     Extends the auth.User pydantic model
     """
+
     id: Optional[str] = None
     role: Optional[str] = None
     permissions: List[str] = []
@@ -34,19 +35,17 @@ class EnhancedUser(AuthUser):
 
 
 async def get_current_user_enhanced(
-    request: Request,
-    token: Optional[str] = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    request: Request, token: Optional[str] = Depends(oauth2_scheme), db: Session = Depends(get_db)
 ) -> EnhancedUser:
     """
     Get current authenticated user with RBAC information
     Falls back to development mode if needed
     """
-    
+
     # Check for token in Authorization header first, then cookie
     if not token:
         token = request.cookies.get("ocean_portal_token")
-    
+
     # Try to authenticate with token first (even in development)
     if token:
         credentials_exception = HTTPException(
@@ -54,7 +53,7 @@ async def get_current_user_enhanced(
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             username: str = payload.get("sub")
@@ -62,22 +61,21 @@ async def get_current_user_enhanced(
                 raise credentials_exception
         except JWTError:
             raise credentials_exception
-        
+
         # Load user from database
         user = db.query(DBUser).filter(DBUser.username == username).first()
         if user is None:
             raise credentials_exception
-        
+
         if not user.is_active:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account is disabled"
+                status_code=status.HTTP_403_FORBIDDEN, detail="User account is disabled"
             )
-        
+
         # Update last login
         user.last_login = datetime.now(timezone.utc)
         db.commit()
-        
+
         # Return enhanced user with permissions
         return EnhancedUser(
             id=str(user.id),
@@ -87,9 +85,9 @@ async def get_current_user_enhanced(
             role=user.role.name if user.role else None,
             permissions=[p.name for p in user.role.permissions] if user.role else [],
             is_active=user.is_active,
-            is_verified=user.is_verified
+            is_verified=user.is_verified,
         )
-    
+
     # Development mode fallback when no token provided
     if settings.ENVIRONMENT.lower() == "development":
         # Try to find development user in database
@@ -100,10 +98,10 @@ async def get_current_user_enhanced(
                 username=dev_user.username,
                 email=dev_user.email,
                 full_name=dev_user.full_name,
-                role=dev_user.role.name if dev_user.role else 'contributor',
+                role=dev_user.role.name if dev_user.role else "contributor",
                 permissions=[p.name for p in dev_user.role.permissions] if dev_user.role else [],
                 is_active=dev_user.is_active,
-                is_verified=dev_user.is_verified
+                is_verified=dev_user.is_verified,
             )
         else:
             # Return mock user if not in DB yet
@@ -115,9 +113,9 @@ async def get_current_user_enhanced(
                 role="contributor",
                 permissions=["review:read", "review:create", "metadata:read", "metadata:update"],
                 is_active=True,
-                is_verified=True
+                is_verified=True,
             )
-    
+
     # No token and not in development mode
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -132,6 +130,7 @@ def require_permission(permission: str):
     Usage:
         @router.post("/review/{id}/approve", dependencies=[Depends(require_permission("review:approve"))])
     """
+
     async def permission_checker(current_user: EnhancedUser = Depends(get_current_user_enhanced)):
         if permission not in current_user.permissions:
             logger.warning(
@@ -140,10 +139,10 @@ def require_permission(permission: str):
             )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Permission denied: {permission} required"
+                detail=f"Permission denied: {permission} required",
             )
         return current_user
-    
+
     return permission_checker
 
 
@@ -153,6 +152,7 @@ def require_role(role: str):
     Usage:
         @router.get("/admin/users", dependencies=[Depends(require_role("admin"))])
     """
+
     async def role_checker(current_user: EnhancedUser = Depends(get_current_user_enhanced)):
         if current_user.role != role:
             logger.warning(
@@ -160,11 +160,10 @@ def require_role(role: str):
                 f"but {role} required"
             )
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{role}' required"
+                status_code=status.HTTP_403_FORBIDDEN, detail=f"Role '{role}' required"
             )
         return current_user
-    
+
     return role_checker
 
 
@@ -184,10 +183,7 @@ def check_role(user: EnhancedUser, role: str) -> bool:
     return user.role == role
 
 
-async def get_user_permissions(
-    username: str,
-    db: Session = Depends(get_db)
-) -> List[str]:
+async def get_user_permissions(username: str, db: Session = Depends(get_db)) -> List[str]:
     """
     Get all permissions for a user
     Useful for token generation
@@ -195,7 +191,7 @@ async def get_user_permissions(
     user = db.query(DBUser).filter(DBUser.username == username).first()
     if not user or not user.role:
         return []
-    
+
     return [p.name for p in user.role.permissions]
 
 
@@ -203,12 +199,12 @@ async def get_user_permissions(
 get_current_user = get_current_user_enhanced
 
 __all__ = [
-    'EnhancedUser',
-    'get_current_user',
-    'get_current_user_enhanced',
-    'require_permission',
-    'require_role',
-    'check_permission',
-    'check_role',
-    'get_user_permissions'
+    "EnhancedUser",
+    "get_current_user",
+    "get_current_user_enhanced",
+    "require_permission",
+    "require_role",
+    "check_permission",
+    "check_role",
+    "get_user_permissions",
 ]

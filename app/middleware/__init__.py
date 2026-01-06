@@ -2,4 +2,4 @@
 
 from .rate_limit import RateLimitMiddleware, RedisRateLimitMiddleware
 
-__all__ = ['RateLimitMiddleware', 'RedisRateLimitMiddleware']
+__all__ = ["RateLimitMiddleware", "RedisRateLimitMiddleware"]

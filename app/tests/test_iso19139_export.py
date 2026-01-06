@@ -13,6 +13,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite://")
 from core.main import app
 from models.database import get_db
 
+
 class DummyImage:
     filename = "sample.jpg"
     hazard_type = "flood"
@@ -42,14 +43,19 @@ class DummySession:
         class Q:
             def filter(self_inner, *args, **kwargs):
                 return self_inner
+
             def first(self_inner):
                 return DummyImage()
+
         return Q()
+
     def close(self):
         pass
 
+
 def override_get_db():
     yield DummySession()
+
 
 app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)

@@ -5,7 +5,7 @@ ISO 19115-compliant controlled vocabularies for hazard image metadata
 # ISO 19115 Topic Categories
 ISO_TOPIC_CATEGORIES = [
     "farming",
-    "biota", 
+    "biota",
     "boundaries",
     "climatologyMeteorologyAtmosphere",
     "economy",
@@ -14,7 +14,7 @@ ISO_TOPIC_CATEGORIES = [
     "geoscientificInformation",
     "health",
     "imageryBaseMapsEarthCover",
-    "intelligenceMilitary", 
+    "intelligenceMilitary",
     "inlandWaters",
     "location",
     "oceans",
@@ -22,7 +22,7 @@ ISO_TOPIC_CATEGORIES = [
     "society",
     "structure",
     "transportation",
-    "utilitiesCommunication"
+    "utilitiesCommunication",
 ]
 
 # SPC Hazard Vocabulary - aligned with international standards
@@ -236,18 +236,18 @@ HAZARD_TYPES = {
 # ISO 19115 Status values
 STATUS_VALUES = [
     "Completed",
-    "HistoricalArchive", 
+    "HistoricalArchive",
     "Obsolete",
     "OnGoing",
     "Planned",
     "Required",
-    "UnderDevelopment"
+    "UnderDevelopment",
 ]
 
 # ISO 19115 Maintenance Frequency
 MAINTENANCE_FREQUENCY = [
     "Continual",
-    "Daily", 
+    "Daily",
     "Weekly",
     "Fortnightly",
     "Monthly",
@@ -257,7 +257,7 @@ MAINTENANCE_FREQUENCY = [
     "AsNeeded",
     "Irregular",
     "NotPlanned",
-    "Unknown"
+    "Unknown",
 ]
 
 # Capture methods for lineage
@@ -269,47 +269,35 @@ CAPTURE_METHODS = [
     "Aerial photography",
     "Ground-based sensor",
     "Webcam",
-    "Security camera"
+    "Security camera",
 ]
 
 # Access constraints
 ACCESS_CONSTRAINTS = [
     "Copyright",
-    "Patent", 
+    "Patent",
     "PatentPending",
     "Trademark",
     "License",
     "IntellectualPropertyRights",
     "Restricted",
     "OtherRestrictions",
-    "Public"
+    "Public",
 ]
 
 # Security classifications
-SECURITY_CLASSIFICATIONS = [
-    "Unclassified",
-    "Restricted", 
-    "Confidential",
-    "Secret",
-    "TopSecret"
-]
+SECURITY_CLASSIFICATIONS = ["Unclassified", "Restricted", "Confidential", "Secret", "TopSecret"]
+
 
 def get_hazard_name(hazard_type: str, language: str = "eng") -> str:
     """Get the localized hazard name"""
-    return (
-        HAZARD_TYPES.get(hazard_type, {})
-        .get("name", {})
-        .get(language, hazard_type)
-    )
+    return HAZARD_TYPES.get(hazard_type, {}).get("name", {}).get(language, hazard_type)
 
 
 def get_hazard_keywords(hazard_type: str, language: str = "eng") -> list:
     """Get ISO-compliant keywords for a hazard type"""
-    return (
-        HAZARD_TYPES.get(hazard_type, {})
-        .get("keywords", {})
-        .get(language, [])
-    )
+    return HAZARD_TYPES.get(hazard_type, {}).get("keywords", {}).get(language, [])
+
 
 def get_hazard_topic_categories(hazard_type: str) -> list:
     """Get ISO topic categories for a hazard type"""
@@ -317,28 +305,35 @@ def get_hazard_topic_categories(hazard_type: str) -> list:
     hazard_categories = HAZARD_TYPES.get(hazard_type, {}).get("topic_categories", [])
     return list(set(base_categories + hazard_categories))
 
-def create_geographic_bounding_box(latitude: float, longitude: float, buffer: float = 0.001) -> dict:
+
+def create_geographic_bounding_box(
+    latitude: float, longitude: float, buffer: float = 0.001
+) -> dict:
     """Create a geographic bounding box around a point"""
     if latitude is None or longitude is None:
         return None
-        
+
     return {
         "westBoundLongitude": longitude - buffer,
-        "eastBoundLongitude": longitude + buffer, 
+        "eastBoundLongitude": longitude + buffer,
         "southBoundLatitude": latitude - buffer,
-        "northBoundLatitude": latitude + buffer
+        "northBoundLatitude": latitude + buffer,
     }
+
 
 def generate_iso_title(hazard_type: str, location: str, timestamp) -> str:
     """Generate ISO-compliant title"""
     date_str = timestamp.strftime("%Y-%m-%d") if timestamp else "unknown date"
     return f"{hazard_type.title()} Hazard Image - {location} ({date_str})"
 
+
 def generate_iso_abstract(hazard_type: str, location: str, timestamp, purpose: str = None) -> str:
     """Generate ISO-compliant abstract"""
     date_str = timestamp.strftime("%Y-%m-%d %H:%M UTC") if timestamp else "unknown date"
-    base_abstract = f"Image documenting {hazard_type} hazard impacts at {location} captured on {date_str}."
-    
+    base_abstract = (
+        f"Image documenting {hazard_type} hazard impacts at {location} captured on {date_str}."
+    )
+
     if purpose:
         base_abstract += f" Purpose: {purpose}."
 

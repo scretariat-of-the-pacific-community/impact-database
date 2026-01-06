@@ -378,7 +378,9 @@ export default function UploadPage() {
           if (!currentLat && !currentLon) {
             setValue('latitude', latitude);
             setValue('longitude', longitude);
-            console.log(`✅ Auto-extracted GPS coordinates: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+            toast.success('GPS coordinates auto-extracted', {
+              description: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+            });
           }
           
           metadata.hasGPS = true;
@@ -395,7 +397,9 @@ export default function UploadPage() {
             setValue('altitude', finalAlt);
             setValue('altitude_ref', altitudeRef || 0);
             metadata.altitude = finalAlt;
-            console.log(`✅ Auto-extracted altitude: ${finalAlt}m`);
+            toast.success('Altitude auto-extracted', {
+              description: `${finalAlt.toFixed(0)}m ${altitudeRef === 1 ? 'below' : 'above'} sea level`
+            });
           }
         }
         
@@ -419,9 +423,8 @@ export default function UploadPage() {
           toast.success('EXIF metadata extracted', {
             description: details.join(' • ')
           });
-        } else {
-          console.log('ℹ️ No GPS data found in image EXIF');
         }
+        // No toast needed when no EXIF data - it's optional
       });
     } catch (error) {
       console.warn('Could not extract EXIF data:', error);

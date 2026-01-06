@@ -77,4 +77,3 @@ def extract_gps_from_exif(path: str) -> Dict[str, Optional[Any]]:
         print(f"EXIF extraction failed: {e}")
 
     return result
-

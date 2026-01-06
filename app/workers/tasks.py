@@ -25,7 +25,10 @@ logger = logging.getLogger(__name__)
 # Database setup for tasks
 engine = create_engine(settings.DATABASE_URL)
 
-@celery_app.task(bind=True, max_retries=5, default_retry_delay=300) # Retry up to 5 times, with 5 min delay
+
+@celery_app.task(
+    bind=True, max_retries=5, default_retry_delay=300
+)  # Retry up to 5 times, with 5 min delay
 def trigger_webhooks_on_approval(self, image_id: str):
     """
     Trigger webhooks for approved ImageMetadata records.
@@ -45,33 +48,41 @@ def trigger_webhooks_on_approval(self, image_id: str):
         class DummyRequest:
             @property
             def base_url(self):
-                return settings.API_BASE_URL # Assuming API_BASE_URL is configured
-        
-        dummy_request = DummyRequest()
-        stac_item_payload = image_to_stac_item(image, str(dummy_request.base_url).rstrip('/'), None)
+                return settings.API_BASE_URL  # Assuming API_BASE_URL is configured
 
-        active_subscriptions = db_session.query(WebhookSubscription).filter(
-            WebhookSubscription.is_active == True
-        ).all()
+        dummy_request = DummyRequest()
+        stac_item_payload = image_to_stac_item(image, str(dummy_request.base_url).rstrip("/"), None)
+
+        active_subscriptions = (
+            db_session.query(WebhookSubscription)
+            .filter(WebhookSubscription.is_active == True)
+            .all()
+        )
 
         for subscription in active_subscriptions:
             if self._matches_filters(image, subscription.filters):
-                logger.info(f"Triggering webhook {subscription.id} at {subscription.callback_url} for image {image_id}")
+                logger.info(
+                    f"Triggering webhook {subscription.id} at {subscription.callback_url} for image {image_id}"
+                )
                 try:
                     # TODO: Implement proper authentication/signing for webhooks
                     response = requests.post(
                         subscription.callback_url,
-                        json=stac_item_payload, # Send the full STAC item
-                        timeout=10 # 10 second timeout
+                        json=stac_item_payload,  # Send the full STAC item
+                        timeout=10,  # 10 second timeout
                     )
-                    response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
-                    logger.info(f"Webhook {subscription.id} successfully triggered. Status: {response.status_code}")
+                    response.raise_for_status()  # Raise HTTPError for bad responses (4xx or 5xx)
+                    logger.info(
+                        f"Webhook {subscription.id} successfully triggered. Status: {response.status_code}"
+                    )
                     # Reset failure count on success
                     subscription.failure_count = 0
                     subscription.last_failure_reason = None
                     subscription.last_triggered_at = datetime.now(timezone.utc)
                 except requests.exceptions.RequestException as e:
-                    logger.error(f"Webhook {subscription.id} failed to trigger for image {image_id}: {e}")
+                    logger.error(
+                        f"Webhook {subscription.id} failed to trigger for image {image_id}: {e}"
+                    )
                     subscription.failure_count += 1
                     subscription.last_failure_reason = str(e)
                     # TODO: Implement logic to deactivate webhook after N failures
@@ -81,19 +92,20 @@ def trigger_webhooks_on_approval(self, image_id: str):
 
     except Exception as exc:
         logger.error(f"Error in trigger_webhooks_on_approval for image {image_id}: {exc}")
-        if db_session: # Ensure session is rolled back on unexpected errors
+        if db_session:  # Ensure session is rolled back on unexpected errors
             db_session.rollback()
         raise self.retry(exc=exc)
     finally:
         if db_session:
             db_session.close()
 
+
 def _matches_filters(image: ImageMetadata, filters: Optional[Dict[str, Any]]) -> bool:
     """
     Helper to check if an image matches the subscription filters.
     """
     if not filters:
-        return True # No filters means match all
+        return True  # No filters means match all
 
     # Bbox filter (simple intersection check)
     if "bbox" in filters and image.geometry:
@@ -103,8 +115,8 @@ def _matches_filters(image: ImageMetadata, filters: Optional[Dict[str, Any]]) ->
         # For now, check if image point is within the bbox
         if image.longitude is not None and image.latitude is not None:
             if not (
-                sub_bbox[0] <= image.longitude <= sub_bbox[2] and
-                sub_bbox[1] <= image.latitude <= sub_bbox[3]
+                sub_bbox[0] <= image.longitude <= sub_bbox[2]
+                and sub_bbox[1] <= image.latitude <= sub_bbox[3]
             ):
                 return False
 
@@ -120,11 +132,12 @@ def _matches_filters(image: ImageMetadata, filters: Optional[Dict[str, Any]]) ->
 
     return True
 
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def process_upload(self, file_metadata: Dict[str, Any], bucket_name: str, object_key: str):
     """
     Process uploaded file: validate, generate metadata, and update database.
-    
+
     Args:
         file_metadata: Metadata about the uploaded file
         bucket_name: MinIO bucket name
@@ -132,10 +145,10 @@ def process_upload(self, file_metadata: Dict[str, Any], bucket_name: str, object
     """
     try:
         logger.info(f"Processing upload for object: {object_key}")
-        
+
         # Get MinIO client
         minio_client = get_minio_client()
-        
+
         # Verify file exists in MinIO
         try:
             stat = minio_client.stat_object(bucket_name, object_key)
@@ -143,38 +156,39 @@ def process_upload(self, file_metadata: Dict[str, Any], bucket_name: str, object
         except Exception as e:
             logger.error(f"File not found in MinIO: {e}")
             raise
-        
+
         # Generate thumbnail if it's an image
-        if file_metadata.get('content_type', '').startswith('image/'):
+        if file_metadata.get("content_type", "").startswith("image/"):
             # Use the filename/object_key for thumbnail generation
             thumbnail_task = generate_thumbnail.delay(object_key)
             logger.info(f"Thumbnail generation queued: {thumbnail_task.id}")
-        
+
         # Update database with processing status
         with Session(engine) as db_session:
             # Here you would update your database model
             # This is a placeholder - adjust based on your actual model
             logger.info(f"Updated database for file: {object_key}")
             db_session.commit()
-        
+
         logger.info(f"Successfully processed upload: {object_key}")
         return {"status": "success", "object_key": object_key}
-        
+
     except Exception as exc:
         logger.error(f"Error processing upload {object_key}: {exc}")
         # Retry the task
         raise self.retry(exc=exc)
 
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_size: tuple = None):
     """
     Generate thumbnail for uploaded image and update database record.
-    
+
     Args:
         filename: Filename/object key of the original image
         bucket_name: MinIO bucket name (optional, uses default from settings)
         thumbnail_size: Tuple of (width, height) for thumbnail (optional, uses default from settings)
-        
+
     Returns:
         Dict with status and thumbnail information
     """
@@ -182,12 +196,12 @@ def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_s
         bucket_name = settings.minio.MINIO_BUCKET_NAME
     if thumbnail_size is None:
         thumbnail_size = settings.THUMBNAIL_SIZE
-        
+
     try:
         logger.info(f"Generating thumbnail for: {filename}")
-        
+
         minio_client = get_minio_client()
-        
+
         # Download original image from MinIO
         try:
             response = minio_client.get_object(bucket_name, filename)
@@ -198,40 +212,45 @@ def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_s
         except Exception as e:
             logger.error(f"Failed to download original image {filename}: {e}")
             raise
-        
+
         # Generate thumbnail using Pillow
         try:
             with Image.open(io.BytesIO(image_data)) as img:
                 # Get original dimensions
                 original_width, original_height = img.size
                 logger.info(f"Original image dimensions: {original_width}x{original_height}")
-                
+
                 # Convert to RGB if necessary (handles RGBA, P, etc.)
-                if img.mode in ('RGBA', 'LA', 'P'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
-                    if img.mode == 'P':
-                        img = img.convert('RGBA')
-                    background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+                if img.mode in ("RGBA", "LA", "P"):
+                    background = Image.new("RGB", img.size, (255, 255, 255))
+                    if img.mode == "P":
+                        img = img.convert("RGBA")
+                    background.paste(img, mask=img.split()[-1] if img.mode == "RGBA" else None)
                     img = background
-                elif img.mode != 'RGB':
-                    img = img.convert('RGB')
-                
+                elif img.mode != "RGB":
+                    img = img.convert("RGB")
+
                 # Create thumbnail maintaining aspect ratio
                 img.thumbnail(thumbnail_size, Image.Resampling.LANCZOS)
                 thumbnail_width, thumbnail_height = img.size
                 logger.info(f"Thumbnail dimensions: {thumbnail_width}x{thumbnail_height}")
-                
+
                 # Save thumbnail to bytes buffer
                 thumbnail_buffer = io.BytesIO()
-                img.save(thumbnail_buffer, format='JPEG', quality=settings.THUMBNAIL_QUALITY, optimize=True)
+                img.save(
+                    thumbnail_buffer,
+                    format="JPEG",
+                    quality=settings.THUMBNAIL_QUALITY,
+                    optimize=True,
+                )
                 thumbnail_buffer.seek(0)
                 thumbnail_size_bytes = len(thumbnail_buffer.getvalue())
                 logger.info(f"Thumbnail size: {thumbnail_size_bytes} bytes")
-                
+
         except Exception as e:
             logger.error(f"Failed to process image {filename}: {e}")
             raise
-        
+
         # Upload thumbnail to MinIO with thumbnails/ prefix
         thumbnail_key = f"thumbnails/{filename}"
         try:
@@ -240,24 +259,26 @@ def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_s
                 thumbnail_key,
                 thumbnail_buffer,
                 length=thumbnail_size_bytes,
-                content_type='image/jpeg'
+                content_type="image/jpeg",
             )
-            
+
             # Generate thumbnail URL
             thumbnail_url = f"http://{settings.minio.MINIO_ENDPOINT}/{bucket_name}/{thumbnail_key}"
             logger.info(f"Thumbnail uploaded successfully: {thumbnail_key}")
-            
+
         except Exception as e:
             logger.error(f"Failed to upload thumbnail for {filename}: {e}")
             raise
-        
+
         # Update database record with thumbnail URL
         try:
             with Session(engine) as db_session:
-                image_record = db_session.query(ImageMetadata).filter(
-                    ImageMetadata.filename == filename
-                ).first()
-                
+                image_record = (
+                    db_session.query(ImageMetadata)
+                    .filter(ImageMetadata.filename == filename)
+                    .first()
+                )
+
                 if image_record:
                     image_record.thumbnail_url = thumbnail_url
                     image_record.thumbnail_key = thumbnail_key
@@ -265,11 +286,11 @@ def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_s
                     logger.info(f"Updated database record with thumbnail URL for: {filename}")
                 else:
                     logger.warning(f"No database record found for filename: {filename}")
-                    
+
         except Exception as e:
             logger.error(f"Failed to update database for {filename}: {e}")
             # Don't raise here - thumbnail was created successfully, DB update failure shouldn't fail the task
-        
+
         result = {
             "status": "success",
             "filename": filename,
@@ -277,37 +298,38 @@ def generate_thumbnail(self, filename: str, bucket_name: str = None, thumbnail_s
             "thumbnail_url": thumbnail_url,
             "original_size": (original_width, original_height),
             "thumbnail_size": (thumbnail_width, thumbnail_height),
-            "thumbnail_bytes": thumbnail_size_bytes
+            "thumbnail_bytes": thumbnail_size_bytes,
         }
-        
+
         logger.info(f"Successfully generated thumbnail for: {filename}")
         return result
-        
+
     except Exception as exc:
         logger.error(f"Error generating thumbnail for {filename}: {exc}")
         raise self.retry(exc=exc)
+
 
 @celery_app.task
 def cleanup_failed_uploads(bucket_name: str, object_keys: list):
     """
     Clean up failed uploads from MinIO.
-    
+
     Args:
         bucket_name: MinIO bucket name
         object_keys: List of object keys to clean up
     """
     try:
         minio_client = get_minio_client()
-        
+
         for object_key in object_keys:
             try:
                 minio_client.remove_object(bucket_name, object_key)
                 logger.info(f"Cleaned up failed upload: {object_key}")
             except Exception as e:
                 logger.error(f"Failed to clean up {object_key}: {e}")
-        
+
         return {"status": "success", "cleaned_objects": len(object_keys)}
-        
+
     except Exception as exc:
         logger.error(f"Error in cleanup task: {exc}")
         raise exc

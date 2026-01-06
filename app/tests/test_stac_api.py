@@ -73,7 +73,7 @@ class DummyQuery:
     def all(self):
         items = self._items
         if self._limit is not None:
-            items = items[self._skip:self._skip + self._limit]
+            items = items[self._skip : self._skip + self._limit]
         return items
 
     def first(self):

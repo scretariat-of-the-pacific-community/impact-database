@@ -22,6 +22,7 @@ router = APIRouter()
 # Database model for push subscriptions
 class PushSubscription(Base):
     """Push notification subscription model"""
+
     __tablename__ = "push_subscriptions"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -36,6 +37,7 @@ class PushSubscription(Base):
 # Request/Response models
 class PushSubscriptionCreate:
     """Push subscription creation model"""
+
     def __init__(self, endpoint: str, keys: Dict[str, str]):
         self.endpoint = endpoint
         self.keys = keys
@@ -45,11 +47,11 @@ class PushSubscriptionCreate:
 async def save_push_subscription(
     subscription_data: Dict[str, Any],
     current_user: EnhancedUser = Depends(get_current_user_enhanced),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Save or update push notification subscription for current user
-    
+
     Request body format:
     {
       "endpoint": "https://fcm.googleapis.com/...",
@@ -68,14 +70,12 @@ async def save_push_subscription(
         if not endpoint or not p256dh or not auth:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Missing required subscription data (endpoint, keys.p256dh, keys.auth)"
+                detail="Missing required subscription data (endpoint, keys.p256dh, keys.auth)",
             )
 
         # Check if subscription already exists for this endpoint
         existing_subscription = (
-            db.query(PushSubscription)
-            .filter(PushSubscription.endpoint == endpoint)
-            .first()
+            db.query(PushSubscription).filter(PushSubscription.endpoint == endpoint).first()
         )
 
         if existing_subscription:
@@ -89,19 +89,13 @@ async def save_push_subscription(
         else:
             # Create new subscription
             new_subscription = PushSubscription(
-                user_id=current_user.user_id,
-                endpoint=endpoint,
-                p256dh=p256dh,
-                auth=auth
+                user_id=current_user.user_id, endpoint=endpoint, p256dh=p256dh, auth=auth
             )
             db.add(new_subscription)
             db.commit()
             logger.info(f"Created push subscription for user {current_user.user_id}")
 
-        return {
-            "success": True,
-            "message": "Push subscription saved successfully"
-        }
+        return {"success": True, "message": "Push subscription saved successfully"}
 
     except HTTPException:
         raise
@@ -109,14 +103,13 @@ async def save_push_subscription(
         logger.error(f"Error saving push subscription: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to save push subscription"
+            detail="Failed to save push subscription",
         )
 
 
 @router.delete("/user/push-subscription", tags=["user"])
 async def delete_push_subscription(
-    current_user: EnhancedUser = Depends(get_current_user_enhanced),
-    db: Session = Depends(get_db)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced), db: Session = Depends(get_db)
 ):
     """
     Delete all push notification subscriptions for current user
@@ -134,21 +127,20 @@ async def delete_push_subscription(
         return {
             "success": True,
             "message": f"Deleted {deleted_count} push subscription(s)",
-            "deleted_count": deleted_count
+            "deleted_count": deleted_count,
         }
 
     except Exception as e:
         logger.error(f"Error deleting push subscription: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete push subscription"
+            detail="Failed to delete push subscription",
         )
 
 
 @router.get("/user/push-subscription", tags=["user"])
 async def get_push_subscription(
-    current_user: EnhancedUser = Depends(get_current_user_enhanced),
-    db: Session = Depends(get_db)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced), db: Session = Depends(get_db)
 ):
     """
     Get all push notification subscriptions for current user
@@ -166,7 +158,7 @@ async def get_push_subscription(
                     "id": sub.id,
                     "endpoint": sub.endpoint,
                     "created_at": sub.created_at.isoformat(),
-                    "last_used": sub.last_used.isoformat()
+                    "last_used": sub.last_used.isoformat(),
                 }
                 for sub in subscriptions
             ]
@@ -176,7 +168,7 @@ async def get_push_subscription(
         logger.error(f"Error retrieving push subscriptions: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve push subscriptions"
+            detail="Failed to retrieve push subscriptions",
         )
 
 
@@ -187,14 +179,14 @@ async def send_push_notification(
     body: str,
     data: Optional[Dict[str, Any]] = None,
     tag: Optional[str] = None,
-    db: Session = None
+    db: Session = None,
 ):
     """
     Send push notification to a specific user
-    
+
     This function requires the pywebpush library to be installed:
     pip install pywebpush
-    
+
     Args:
         user_id: User ID to send notification to
         title: Notification title
@@ -212,11 +204,7 @@ async def send_push_notification(
             return False
 
         # Get user's push subscriptions
-        subscriptions = (
-            db.query(PushSubscription)
-            .filter(PushSubscription.user_id == user_id)
-            .all()
-        )
+        subscriptions = db.query(PushSubscription).filter(PushSubscription.user_id == user_id).all()
 
         if not subscriptions:
             logger.info(f"No push subscriptions found for user {user_id}")
@@ -227,15 +215,14 @@ async def send_push_notification(
             "title": title,
             "body": body,
             "tag": tag or f"notification-{user_id}-{datetime.utcnow().timestamp()}",
-            "data": data or {}
+            "data": data or {},
         }
 
         # Get VAPID keys from environment
         import os
+
         vapid_private_key = os.getenv("VAPID_PRIVATE_KEY")
-        vapid_claims = {
-            "sub": "mailto:admin@impactdatabase.com"  # Change to your email
-        }
+        vapid_claims = {"sub": "mailto:admin@impactdatabase.com"}  # Change to your email
 
         if not vapid_private_key:
             logger.error("VAPID_PRIVATE_KEY not configured")
@@ -247,17 +234,14 @@ async def send_push_notification(
             try:
                 subscription_info = {
                     "endpoint": subscription.endpoint,
-                    "keys": {
-                        "p256dh": subscription.p256dh,
-                        "auth": subscription.auth
-                    }
+                    "keys": {"p256dh": subscription.p256dh, "auth": subscription.auth},
                 }
 
                 webpush(
                     subscription_info=subscription_info,
                     data=json.dumps(notification_data),
                     vapid_private_key=vapid_private_key,
-                    vapid_claims=vapid_claims
+                    vapid_claims=vapid_claims,
                 )
 
                 # Update last_used timestamp
@@ -266,7 +250,7 @@ async def send_push_notification(
 
             except WebPushException as e:
                 logger.error(f"Failed to send push to subscription {subscription.id}: {str(e)}")
-                
+
                 # If subscription is expired or invalid, delete it
                 if e.response and e.response.status_code in [404, 410]:
                     db.delete(subscription)
@@ -274,7 +258,9 @@ async def send_push_notification(
 
         db.commit()
 
-        logger.info(f"Sent push notification to {success_count}/{len(subscriptions)} subscriptions for user {user_id}")
+        logger.info(
+            f"Sent push notification to {success_count}/{len(subscriptions)} subscriptions for user {user_id}"
+        )
         return success_count > 0
 
     except Exception as e:
@@ -285,8 +271,7 @@ async def send_push_notification(
 # Example usage endpoints (for testing)
 @router.post("/user/push-notification/test", tags=["user"])
 async def send_test_notification(
-    current_user: EnhancedUser = Depends(get_current_user_enhanced),
-    db: Session = Depends(get_db)
+    current_user: EnhancedUser = Depends(get_current_user_enhanced), db: Session = Depends(get_db)
 ):
     """
     Send a test push notification to current user
@@ -297,7 +282,7 @@ async def send_test_notification(
         body="This is a test push notification from Impact Database",
         data={"url": "/profile"},
         tag="test-notification",
-        db=db
+        db=db,
     )
 
     if success:

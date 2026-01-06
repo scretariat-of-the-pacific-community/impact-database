@@ -4,8 +4,9 @@ from ..schemas.iso_metadata import ISO19115Metadata
 GMD = "http://www.isotc211.org/2005/gmd"
 GCO = "http://www.isotc211.org/2005/gco"
 
-register_namespace('gmd', GMD)
-register_namespace('gco', GCO)
+register_namespace("gmd", GMD)
+register_namespace("gco", GCO)
+
 
 def metadata_to_iso19139(metadata: ISO19115Metadata) -> str:
     """Convert ISO19115Metadata instance to ISO 19139 XML string."""
@@ -55,13 +56,21 @@ def metadata_to_iso19139(metadata: ISO19115Metadata) -> str:
     bbox = SubElement(geo_elem, f"{{{GMD}}}EX_GeographicBoundingBox")
 
     west = SubElement(bbox, f"{{{GMD}}}westBoundLongitude")
-    SubElement(west, f"{{{GCO}}}Decimal").text = str(metadata.geographic_element.west_bound_longitude)
+    SubElement(west, f"{{{GCO}}}Decimal").text = str(
+        metadata.geographic_element.west_bound_longitude
+    )
     east = SubElement(bbox, f"{{{GMD}}}eastBoundLongitude")
-    SubElement(east, f"{{{GCO}}}Decimal").text = str(metadata.geographic_element.east_bound_longitude)
+    SubElement(east, f"{{{GCO}}}Decimal").text = str(
+        metadata.geographic_element.east_bound_longitude
+    )
     south = SubElement(bbox, f"{{{GMD}}}southBoundLatitude")
-    SubElement(south, f"{{{GCO}}}Decimal").text = str(metadata.geographic_element.south_bound_latitude)
+    SubElement(south, f"{{{GCO}}}Decimal").text = str(
+        metadata.geographic_element.south_bound_latitude
+    )
     north = SubElement(bbox, f"{{{GMD}}}northBoundLatitude")
-    SubElement(north, f"{{{GCO}}}Decimal").text = str(metadata.geographic_element.north_bound_latitude)
+    SubElement(north, f"{{{GCO}}}Decimal").text = str(
+        metadata.geographic_element.north_bound_latitude
+    )
 
     # Distribution info
     dist_info = SubElement(root, f"{{{GMD}}}distributionInfo")

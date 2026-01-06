@@ -142,7 +142,9 @@ def test_get_all_images_enforces_permissions(client):
 
 
 def test_get_all_images_allows_metadata_read(client):
-    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["metadata:read"])
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(
+        ["metadata:read"]
+    )
 
     response = client.get("/images")
 
@@ -153,7 +155,9 @@ def test_get_all_images_allows_metadata_read(client):
 
 
 def test_get_all_images_allows_metadata_update(client):
-    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["metadata:update"])
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(
+        ["metadata:update"]
+    )
 
     response = client.get("/images")
 
@@ -161,7 +165,9 @@ def test_get_all_images_allows_metadata_update(client):
 
 
 def test_update_image_metadata_requires_update_permission(client):
-    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["metadata:read"])
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(
+        ["metadata:read"]
+    )
 
     response = client.put(
         "/images/test-id",
@@ -180,7 +186,9 @@ def test_get_image_history_requires_permissions(client):
 
 
 def test_get_image_history_allows_metadata_read(client):
-    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["metadata:read"])
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(
+        ["metadata:read"]
+    )
 
     response = client.get("/images/test-id/history")
 
@@ -189,10 +197,11 @@ def test_get_image_history_allows_metadata_read(client):
 
 
 def test_get_image_history_allows_audit_view(client):
-    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(["audit:view"])
+    client.app.dependency_overrides[get_current_user_enhanced] = override_user_with_permissions(
+        ["audit:view"]
+    )
 
     response = client.get("/images/test-id/history")
 
     assert response.status_code == 200
     assert "history" in response.json()
-

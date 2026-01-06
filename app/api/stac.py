@@ -26,36 +26,46 @@ from core.config import settings
 
 router = APIRouter()
 
+
 # STAC Models
 class STACLink(BaseModel):
     """STAC Link object"""
+
     href: str
     rel: str
     type: Optional[str] = None
     title: Optional[str] = None
 
+
 class STACAsset(BaseModel):
     """STAC Asset object"""
+
     href: str
     title: Optional[str] = None
     description: Optional[str] = None
     type: Optional[str] = None
     roles: Optional[List[str]] = None
 
+
 class STACExtent(BaseModel):
     """STAC Collection Extent"""
+
     spatial: Dict[str, List[List[float]]]
     temporal: Dict[str, List[Optional[str]]]
 
+
 class STACProvider(BaseModel):
     """STAC Provider information"""
+
     name: str
     description: Optional[str] = None
     roles: List[str]
     url: Optional[str] = None
 
+
 class STACCollection(BaseModel):
     """STAC Collection object"""
+
     type: str = "Collection"
     stac_version: str = "1.0.0"
     id: str
@@ -68,8 +78,10 @@ class STACCollection(BaseModel):
     links: List[STACLink]
     summaries: Optional[Dict[str, Any]] = None
 
+
 class STACItem(BaseModel):
     """STAC Item object"""
+
     type: str = "Feature"
     stac_version: str = "1.0.0"
     id: str
@@ -80,8 +92,10 @@ class STACItem(BaseModel):
     links: List[STACLink]
     assets: Dict[str, STACAsset]
 
+
 class STACCatalog(BaseModel):
     """STAC Catalog object"""
+
     type: str = "Catalog"
     stac_version: str = "1.0.0"
     id: str
@@ -89,47 +103,79 @@ class STACCatalog(BaseModel):
     description: str
     links: List[STACLink]
 
+
 class STACItemCollection(BaseModel):
     """STAC Item Collection (search results)"""
+
     type: str = "FeatureCollection"
     features: List[STACItem]
     links: List[STACLink]
     context: Optional[Dict[str, Any]] = None
 
+
 class STACConformance(BaseModel):
     """STAC API Conformance"""
+
     conformsTo: List[str]
 
+
 # Helper functions for ISO to STAC mapping
-def build_stac_links(request: Request, item_id: str = None, collection_id: str = None) -> List[STACLink]:
+def build_stac_links(
+    request: Request, item_id: str = None, collection_id: str = None
+) -> List[STACLink]:
     """Build STAC links based on request context"""
-    base_url = str(request.base_url).rstrip('/')
+    base_url = str(request.base_url).rstrip("/")
     links = []
-    
+
     if item_id and collection_id:
         # Item links
-        links.extend([
-            STACLink(href=f"{base_url}/stac", rel="root", type="application/json"),
-            STACLink(href=f"{base_url}/stac/collections/{collection_id}", rel="collection", type="application/json"),
-            STACLink(href=f"{base_url}/stac/collections/{collection_id}/items/{item_id}", rel="self", type="application/json"),
-        ])
+        links.extend(
+            [
+                STACLink(href=f"{base_url}/stac", rel="root", type="application/json"),
+                STACLink(
+                    href=f"{base_url}/stac/collections/{collection_id}",
+                    rel="collection",
+                    type="application/json",
+                ),
+                STACLink(
+                    href=f"{base_url}/stac/collections/{collection_id}/items/{item_id}",
+                    rel="self",
+                    type="application/json",
+                ),
+            ]
+        )
     elif collection_id:
         # Collection links
-        links.extend([
-            STACLink(href=f"{base_url}/stac", rel="root", type="application/json"),
-            STACLink(href=f"{base_url}/stac/collections/{collection_id}", rel="self", type="application/json"),
-            STACLink(href=f"{base_url}/stac/collections/{collection_id}/items", rel="items", type="application/geo+json"),
-        ])
+        links.extend(
+            [
+                STACLink(href=f"{base_url}/stac", rel="root", type="application/json"),
+                STACLink(
+                    href=f"{base_url}/stac/collections/{collection_id}",
+                    rel="self",
+                    type="application/json",
+                ),
+                STACLink(
+                    href=f"{base_url}/stac/collections/{collection_id}/items",
+                    rel="items",
+                    type="application/geo+json",
+                ),
+            ]
+        )
     else:
         # Root catalog links
-        links.extend([
-            STACLink(href=f"{base_url}/stac", rel="self", type="application/json"),
-            STACLink(href=f"{base_url}/stac/collections", rel="data", type="application/json"),
-            STACLink(href=f"{base_url}/stac/search", rel="search", type="application/geo+json"),
-            STACLink(href=f"{base_url}/stac/conformance", rel="conformance", type="application/json"),
-        ])
-    
+        links.extend(
+            [
+                STACLink(href=f"{base_url}/stac", rel="self", type="application/json"),
+                STACLink(href=f"{base_url}/stac/collections", rel="data", type="application/json"),
+                STACLink(href=f"{base_url}/stac/search", rel="search", type="application/geo+json"),
+                STACLink(
+                    href=f"{base_url}/stac/conformance", rel="conformance", type="application/json"
+                ),
+            ]
+        )
+
     return links
+
 
 # Use the shared STAC generator service for Item generation instead of
 # duplicating mapping logic here. The generator returns a dict compatible
@@ -137,7 +183,7 @@ def build_stac_links(request: Request, item_id: str = None, collection_id: str =
 def _image_to_stac_via_generator(image: ImageMetadata, request: Request) -> Dict:
     """Wrapper around services.stac_generator.image_to_stac_item to provide
     a base_url and optional collection id based on the image."""
-    base_url = str(request.base_url).rstrip('/')
+    base_url = str(request.base_url).rstrip("/")
     # Prefer generator's collection naming for consistency
     try:
         collection_id = get_collection_id_for_image(image)
@@ -147,19 +193,22 @@ def _image_to_stac_via_generator(image: ImageMetadata, request: Request) -> Dict
     # image_to_stac_item returns a dict
     return image_to_stac_item(image, base_url, collection_id)
 
-def build_stac_collection(hazard_type: str, images: List[ImageMetadata], request: Request) -> STACCollection:
+
+def build_stac_collection(
+    hazard_type: str, images: List[ImageMetadata], request: Request
+) -> STACCollection:
     """Build STAC Collection for a hazard type"""
     collection_id = f"hazard-{hazard_type.lower()}"
-    
+
     # Calculate spatial extent
     lats = [img.latitude for img in images if img.latitude is not None]
     lons = [img.longitude for img in images if img.longitude is not None]
-    
+
     if lats and lons:
         spatial_bbox = [min(lons), min(lats), max(lons), max(lats)]
     else:
         spatial_bbox = [-180, -90, 180, 90]  # Global extent as fallback
-    
+
     # Calculate temporal extent
     dates = [img.timestamp for img in images if img.timestamp is not None]
     if dates:
@@ -168,18 +217,17 @@ def build_stac_collection(hazard_type: str, images: List[ImageMetadata], request
     else:
         temporal_start = None
         temporal_end = None
-    
+
     # Build summaries
     summaries = {
         "datetime": [temporal_start, temporal_end] if temporal_start and temporal_end else [],
         "hazard:type": [hazard_type],
         "location:country": list(set(img.country for img in images if img.country)),
-        "iso:topic_category": list(set(
-            cat for img in images if img.topic_category 
-            for cat in img.topic_category
-        )),
+        "iso:topic_category": list(
+            set(cat for img in images if img.topic_category for cat in img.topic_category)
+        ),
     }
-    
+
     return STACCollection(
         id=collection_id,
         title=f"{hazard_type.title()} Hazard Images",
@@ -191,16 +239,21 @@ def build_stac_collection(hazard_type: str, images: List[ImageMetadata], request
                 name="Pacific Impact Database",
                 description="SPC Pacific Impact Database for hazard imagery",
                 roles=["host", "processor"],
-                url=str(request.base_url)
+                url=str(request.base_url),
             )
         ],
         extent=STACExtent(
             spatial={"bbox": [spatial_bbox]},
-            temporal={"interval": [temporal_start, temporal_end] if temporal_start and temporal_end else []}
+            temporal={
+                "interval": (
+                    [temporal_start, temporal_end] if temporal_start and temporal_end else []
+                )
+            },
         ),
         links=build_stac_links(request, collection_id=collection_id),
-        summaries=summaries
+        summaries=summaries,
     )
+
 
 # STAC API endpoints
 @router.get("/", response_model=STACCatalog)
@@ -210,8 +263,9 @@ async def get_stac_catalog(request: Request):
         id="pacific-impact-catalog",
         title="Pacific Impact Database STAC Catalog",
         description="SpatioTemporal Asset Catalog for Pacific Island hazard impact imagery with ISO 19115 compliant metadata",
-        links=build_stac_links(request)
+        links=build_stac_links(request),
     )
+
 
 @router.get("/conformance", response_model=STACConformance)
 async def get_stac_conformance():
@@ -222,62 +276,59 @@ async def get_stac_conformance():
             "https://api.stacspec.org/v1.0.0/collections",
             "https://api.stacspec.org/v1.0.0/item-search",
             "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/core",
-            "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson"
+            "http://www.opengis.net/spec/ogcapi-features-1/1.0/conf/geojson",
         ]
     )
+
 
 @router.get("/collections", response_model=List[STACCollection])
 async def get_stac_collections(
     request: Request,
     db: Session = Depends(get_db),
-    status: Optional[List[str]] = Query(default=["approved"], description="Filter by status. Default: approved only")
+    status: Optional[List[str]] = Query(
+        default=["approved"], description="Filter by status. Default: approved only"
+    ),
 ):
     """Get all STAC collections"""
     # Get unique hazard types
     hazard_types = db.query(ImageMetadata.hazard_type).distinct().all()
     collections = []
-    
+
     for (hazard_type,) in hazard_types:
         if hazard_type:
             # Get images for this hazard type
-            images_q = db.query(ImageMetadata).filter(
-                ImageMetadata.hazard_type == hazard_type
-            )
+            images_q = db.query(ImageMetadata).filter(ImageMetadata.hazard_type == hazard_type)
             # Apply status filter
             if status:
                 images_q = images_q.filter(ImageMetadata.status.in_(status))
             images = images_q.limit(100).all()  # Limit for performance
-            
+
             collection = build_stac_collection(hazard_type, images, request)
             collections.append(collection)
-    
+
     return collections
 
+
 @router.get("/collections/{collection_id}", response_model=STACCollection)
-async def get_stac_collection(
-    collection_id: str,
-    request: Request,
-    db: Session = Depends(get_db)
-):
+async def get_stac_collection(collection_id: str, request: Request, db: Session = Depends(get_db)):
     """Get specific STAC collection"""
     # Extract hazard type from collection ID
     if not collection_id.startswith("hazard-"):
         raise HTTPException(status_code=404, detail="Collection not found")
-    
+
     hazard_type = collection_id.replace("hazard-", "").replace("-", "_")
-    
+
     # Get images for this hazard type (default to approved only)
-    images_q = db.query(ImageMetadata).filter(
-        ImageMetadata.hazard_type == hazard_type
-    )
+    images_q = db.query(ImageMetadata).filter(ImageMetadata.hazard_type == hazard_type)
     # Default behaviour: only approved images are returned in collection view
     images_q = images_q.filter(ImageMetadata.status.in_(["approved"]))
     images = images_q.all()
-    
+
     if not images:
         raise HTTPException(status_code=404, detail="Collection not found")
-    
+
     return build_stac_collection(hazard_type, images, request)
+
 
 @router.get("/collections/{collection_id}/items", response_model=STACItemCollection)
 async def get_stac_collection_items(
@@ -288,54 +339,56 @@ async def get_stac_collection_items(
     bbox: Optional[str] = Query(None, description="Bounding box as 'minx,miny,maxx,maxy'"),
     datetime: Optional[str] = Query(None, description="Date/time filter"),
     offset: int = Query(0, ge=0),
-    status: Optional[List[str]] = Query(default=["approved"], description="Filter by status. Default: approved only")
+    status: Optional[List[str]] = Query(
+        default=["approved"], description="Filter by status. Default: approved only"
+    ),
 ):
     """Get items from a STAC collection"""
     # Extract hazard type from collection ID
     if not collection_id.startswith("hazard-"):
         raise HTTPException(status_code=404, detail="Collection not found")
-    
+
     hazard_type = collection_id.replace("hazard-", "").replace("-", "_")
-    
+
     # Build query
     query = db.query(ImageMetadata).filter(ImageMetadata.hazard_type == hazard_type)
 
     # Status filter (default to approved only)
     if status:
         query = query.filter(ImageMetadata.status.in_(status))
-    
+
     # Apply spatial filter
     if bbox:
         try:
-            minx, miny, maxx, maxy = map(float, bbox.split(','))
+            minx, miny, maxx, maxy = map(float, bbox.split(","))
             envelope = func.ST_MakeEnvelope(minx, miny, maxx, maxy, 4326)
             query = query.filter(func.ST_Intersects(ImageMetadata.geometry, envelope))
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid bbox format")
-    
+
     # Apply temporal filter
     if datetime:
         try:
             if "/" in datetime:
                 start, end = datetime.split("/")
                 if start != "..":
-                    start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
                     query = query.filter(ImageMetadata.timestamp >= start_dt)
                 if end != "..":
-                    end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                    end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
                     query = query.filter(ImageMetadata.timestamp <= end_dt)
             else:
-                dt = datetime.fromisoformat(datetime.replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(datetime.replace("Z", "+00:00"))
                 query = query.filter(ImageMetadata.timestamp == dt)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid datetime format")
-    
+
     # Get total count for context
     total = query.count()
-    
+
     # Apply pagination
     images = query.offset(offset).limit(limit).all()
-    
+
     # Convert to STAC items
     # Convert to STAC items using shared generator
     stac_items = []
@@ -345,20 +398,14 @@ async def get_stac_collection_items(
         except Exception:
             # Skip images that fail STAC generation to keep listing responsive
             continue
-    
+
     # Build context
-    context = {
-        "matched": total,
-        "returned": len(stac_items),
-        "limit": limit
-    }
-    
+    context = {"matched": total, "returned": len(stac_items), "limit": limit}
+
     # Build links for pagination
-    base_url = str(request.url).split('?')[0]
-    links = [
-        STACLink(href=str(request.url), rel="self", type="application/geo+json")
-    ]
-    
+    base_url = str(request.url).split("?")[0]
+    links = [STACLink(href=str(request.url), rel="self", type="application/geo+json")]
+
     if offset + limit < total:
         next_url = f"{base_url}?limit={limit}&offset={offset + limit}"
         if bbox:
@@ -366,7 +413,7 @@ async def get_stac_collection_items(
         if datetime:
             next_url += f"&datetime={datetime}"
         links.append(STACLink(href=next_url, rel="next", type="application/geo+json"))
-    
+
     if offset > 0:
         prev_offset = max(0, offset - limit)
         prev_url = f"{base_url}?limit={limit}&offset={prev_offset}"
@@ -375,36 +422,31 @@ async def get_stac_collection_items(
         if datetime:
             prev_url += f"&datetime={datetime}"
         links.append(STACLink(href=prev_url, rel="prev", type="application/geo+json"))
-    
-    return STACItemCollection(
-        features=stac_items,
-        links=links,
-        context=context
-    )
+
+    return STACItemCollection(features=stac_items, links=links, context=context)
+
 
 @router.get("/collections/{collection_id}/items/{item_id}", response_model=STACItem)
 async def get_stac_item(
-    collection_id: str,
-    item_id: str,
-    request: Request,
-    db: Session = Depends(get_db)
+    collection_id: str, item_id: str, request: Request, db: Session = Depends(get_db)
 ):
     """Get specific STAC item"""
     image = db.query(ImageMetadata).filter(ImageMetadata.filename == item_id).first()
-    
+
     if not image:
         raise HTTPException(status_code=404, detail="Item not found")
-    
+
     # Verify collection
     expected_collection = f"hazard-{image.hazard_type.lower()}" if image.hazard_type else "general"
     if collection_id != expected_collection:
         raise HTTPException(status_code=404, detail="Item not found in this collection")
-    
+
     # Use generator to produce canonical STAC Item dict
     try:
         return _image_to_stac_via_generator(image, request)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to generate STAC Item: {str(e)}")
+
 
 @router.post("/search", response_model=STACItemCollection)
 @router.get("/search", response_model=STACItemCollection)
@@ -416,7 +458,7 @@ async def search_stac_items(
     datetime: Optional[str] = Query(None, description="Date/time filter"),
     query: Optional[Dict[str, Any]] = None,
     limit: int = Query(10, ge=1, le=100),
-    offset: int = Query(0, ge=0)
+    offset: int = Query(0, ge=0),
 ):
     """STAC Item Search endpoint"""
     # Build base query
@@ -424,7 +466,7 @@ async def search_stac_items(
 
     # Default status filter to approved images for search/list operations
     db_query = db_query.filter(ImageMetadata.status.in_(["approved"]))
-    
+
     # Filter by collections
     if collections:
         hazard_types = []
@@ -432,36 +474,36 @@ async def search_stac_items(
             if coll_id.startswith("hazard-"):
                 hazard_type = coll_id.replace("hazard-", "").replace("-", "_")
                 hazard_types.append(hazard_type)
-        
+
         if hazard_types:
             db_query = db_query.filter(ImageMetadata.hazard_type.in_(hazard_types))
-    
+
     # Apply spatial filter
     if bbox:
         try:
-            minx, miny, maxx, maxy = map(float, bbox.split(','))
+            minx, miny, maxx, maxy = map(float, bbox.split(","))
             envelope = func.ST_MakeEnvelope(minx, miny, maxx, maxy, 4326)
             db_query = db_query.filter(func.ST_Intersects(ImageMetadata.geometry, envelope))
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid bbox format")
-    
+
     # Apply temporal filter
     if datetime:
         try:
             if "/" in datetime:
                 start, end = datetime.split("/")
                 if start != "..":
-                    start_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
+                    start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
                     db_query = db_query.filter(ImageMetadata.timestamp >= start_dt)
                 if end != "..":
-                    end_dt = datetime.fromisoformat(end.replace('Z', '+00:00'))
+                    end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
                     db_query = db_query.filter(ImageMetadata.timestamp <= end_dt)
             else:
-                dt = datetime.fromisoformat(datetime.replace('Z', '+00:00'))
+                dt = datetime.fromisoformat(datetime.replace("Z", "+00:00"))
                 db_query = db_query.filter(ImageMetadata.timestamp == dt)
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid datetime format")
-    
+
     # Apply property queries
     if query:
         for prop, value in query.items():
@@ -470,13 +512,13 @@ async def search_stac_items(
             elif prop == "location:country":
                 db_query = db_query.filter(ImageMetadata.country == value)
             # Add more property filters as needed
-    
+
     # Get total count
     total = db_query.count()
-    
+
     # Apply pagination
     images = db_query.offset(offset).limit(limit).all()
-    
+
     # Convert to STAC items using shared generator
     stac_items = []
     for img in images:
@@ -484,16 +526,12 @@ async def search_stac_items(
             stac_items.append(_image_to_stac_via_generator(img, request))
         except Exception:
             continue
-    
+
     # Build context
-    context = {
-        "matched": total,
-        "returned": len(stac_items),
-        "limit": limit
-    }
-    
+    context = {"matched": total, "returned": len(stac_items), "limit": limit}
+
     return STACItemCollection(
         features=stac_items,
         links=[STACLink(href=str(request.url), rel="self", type="application/geo+json")],
-        context=context
+        context=context,
     )

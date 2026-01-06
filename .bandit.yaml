@@ -1,0 +1,24 @@
+# Bandit security configuration for Python security checks
+# Ignore known false positives and adjust severity
+
+skips:
+  # Allow hardcoded passwords in test files
+  - B105
+  - B106
+
+exclude_dirs:
+  - /tests/
+  - /test_*
+  - /conftest.py
+  - /venv/
+  - /fresh_venv/
+  - /.venv/
+
+# Set severity level (LOW, MEDIUM, HIGH)
+severity: MEDIUM
+confidence: MEDIUM
+
+# Test IDs to skip
+tests:
+  - B201  # Allow pickle usage (required for Celery)
+  - B403  # Allow import of pickle

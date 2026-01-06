@@ -14,12 +14,16 @@ import json
 import redis
 
 from core.config import settings
+
 # Use simplified APIs for development
 from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds, featured
 from api import images_simple as images  # Use simple version
 from api import rbac  # Phase 0: RBAC foundation
+
+# Enable monitoring for production observability
+from services.monitoring import setup_monitoring, monitoring_background_tasks
+
 # Temporarily disable complex features for basic startup
-# from services.monitoring import setup_monitoring, monitoring_background_tasks
 # from services.performance import initialize_performance_optimizations
 # from services.minio_lifecycle import setup_minio_lifecycle_and_backup
 import asyncio
@@ -27,7 +31,7 @@ import asyncio
 # Configure logging
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -37,7 +41,7 @@ app = FastAPI(
     description="API for disaster impact image database with enhanced security",
     version="1.0.0",
     docs_url="/docs" if settings.DEBUG else None,  # Disable docs in production
-    redoc_url="/redoc" if settings.DEBUG else None
+    redoc_url="/redoc" if settings.DEBUG else None,
 )
 
 # Setup Redis connection for rate limiting
@@ -54,6 +58,15 @@ if settings.REDIS_URL:
 # Import rate limiting middleware
 from middleware.rate_limit import RateLimitMiddleware, RedisRateLimitMiddleware
 
+# Import structured logging middleware
+from middleware.logging import RequestLoggingMiddleware
+
+# Add structured logging with request IDs (outermost - logs everything)
+app.add_middleware(
+    RequestLoggingMiddleware,
+    exclude_paths=["/health", "/metrics", "/docs", "/openapi.json", "/redoc", "/favicon.ico"],
+)
+
 # Add rate limiting (10 requests per minute per user)
 if redis_client:
     logger.info("Using Redis-based rate limiting")
@@ -61,7 +74,7 @@ if redis_client:
         RedisRateLimitMiddleware,
         redis_client=redis_client,
         requests_per_minute=10,
-        exclude_paths=['/api/health', '/api/docs', '/docs', '/openapi.json', '/redoc']
+        exclude_paths=["/api/health", "/api/docs", "/docs", "/openapi.json", "/redoc"],
     )
 else:
     logger.info("Using in-memory rate limiting")
@@ -69,7 +82,7 @@ else:
         RateLimitMiddleware,
         requests_per_minute=10,
         burst_size=15,
-        exclude_paths=['/api/health', '/api/docs', '/docs', '/openapi.json', '/redoc']
+        exclude_paths=["/api/health", "/api/docs", "/docs", "/openapi.json", "/redoc"],
     )
 
 # Import user API
@@ -79,14 +92,14 @@ from api import user as user_api
 if settings.ENVIRONMENT.lower() == "production":
     allowed_origins = [
         "https://your-production-domain.com",  # Replace with actual production domain
-        "https://api.your-production-domain.com"
+        "https://api.your-production-domain.com",
     ]
 else:
     allowed_origins = [
         "http://localhost:3000",
-        "http://localhost:3001", 
+        "http://localhost:3001",
         "http://127.0.0.1:3000",
-        "http://127.0.0.1:3001"
+        "http://127.0.0.1:3001",
     ]
 
 # Add CSRF protection (before CORS)
@@ -104,8 +117,8 @@ app.add_middleware(
         "/api/auth/register",
         "/api/auth/refresh",
         "/api/health",
-        "/favicon.ico"
-    ]
+        "/favicon.ico",
+    ],
 )
 
 app.add_middleware(
@@ -114,12 +127,12 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[
-        "Authorization", 
-        "Content-Type", 
+        "Authorization",
+        "Content-Type",
         "Accept",
         "X-CSRF-Token",  # Allow CSRF token header
         "X-Requested-With",
-        "X-CSRF-Token"
+        "X-CSRF-Token",
     ],
     expose_headers=["X-RateLimit-Limit", "X-RateLimit-Window", "X-Process-Time"],
     max_age=86400,  # Cache preflight responses for 24 hours (reduces 300ms overhead)
@@ -128,10 +141,12 @@ app.add_middleware(
 # Include routers with enhanced security
 # SECURITY FIX: Mount auth router to enable token-based authentication
 from api import auth
+
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 
 # RBAC routers
 from api import rbac
+
 app.include_router(rbac.router, prefix="/api/rbac", tags=["rbac"])
 
 # Secure upload endpoint (replaces upload.py, upload_backup.py, upload_fixed.py)
@@ -160,6 +175,7 @@ app.include_router(rbac.router, tags=["rbac", "roles", "permissions", "users"])
 
 # Review Workflow endpoints - Phase 1: Assignment & Audit Trail
 from api import review_workflow
+
 app.include_router(review_workflow.router, tags=["review-workflow"])
 
 # STAC and OGC API - Records with authentication
@@ -173,30 +189,32 @@ app.include_router(feeds.router, prefix="/feeds", tags=["feeds"])
 # Featured stories endpoint for homepage
 app.include_router(featured.router, prefix="/api", tags=["featured"])
 
-# Setup monitoring - temporarily disabled
-# setup_monitoring(app)
+# Setup monitoring with Prometheus metrics
+setup_monitoring(app)
+
 
 # Application startup event
 @app.on_event("startup")
 async def startup_event():
     """Initialize application on startup"""
     try:
-        # Initialize database 
+        # Initialize database
         from models.database import get_db
+
         db = next(get_db())
         # await initialize_performance_optimizations(db)  # Temporarily disabled
-        
+
         # Setup MinIO lifecycle and backup policies
         # setup_minio_lifecycle_and_backup()  # Temporarily disabled
-        
-        # Start background monitoring tasks
-        # asyncio.create_task(monitoring_background_tasks())  # Temporarily disabled
-        
+
+        # Start background monitoring tasks for metrics collection
+        asyncio.create_task(monitoring_background_tasks())
+
         logger.info(f"{settings.PROJECT_NAME} started successfully")
         logger.info("STAC API available at /stac")
         logger.info("OGC API - Records available at /ogc")
-        # logger.info("Monitoring endpoints available at /health, /metrics")  # Temporarily disabled
-        
+        logger.info("Monitoring endpoints available at /health, /metrics")
+
     except Exception as e:
         logger.error(f"Startup error: {e}")
         # Don't raise exception to allow app to start even if some features fail
@@ -209,7 +227,7 @@ async def root():
         "message": f"Welcome to {settings.PROJECT_NAME}",
         "version": settings.VERSION,
         "environment": settings.ENVIRONMENT,
-        "docs_url": "/docs" if settings.DEBUG else None
+        "docs_url": "/docs" if settings.DEBUG else None,
     }
 
 
@@ -220,15 +238,9 @@ async def health_check():
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
         "redis_configured": bool(settings.REDIS_URL),
-        "database_configured": bool(settings.DATABASE_URL)
+        "database_configured": bool(settings.DATABASE_URL),
     }
 
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "core.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=settings.DEBUG,
-        log_level="info"
-    )
+    uvicorn.run("core.main:app", host="0.0.0.0", port=8000, reload=settings.DEBUG, log_level="info")
