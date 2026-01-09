@@ -29,7 +29,7 @@ Allows users to visually select image location coordinates on an interactive map
 ### 4. Smart Auto-Fill
 ```
 User clicks map at [-17.733, 168.322]
-  ↓ 
+  ↓
 Reverse geocode → "Port Vila, Vanuatu"
   ↓
 Auto-fill location field (if empty)

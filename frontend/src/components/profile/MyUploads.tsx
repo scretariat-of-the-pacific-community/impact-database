@@ -6,7 +6,18 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { HAZARD_TYPE_LABELS, UserUpload } from '@/lib/types';
 import { Button, Card, Select } from '@/components/design-system';
-import { Loader2, Grid, List, Filter, RefreshCcw, Search, AlertTriangle, Trash2, MapPin, PenLine } from 'lucide-react';
+import {
+  Loader2,
+  Grid,
+  List,
+  Filter,
+  RefreshCcw,
+  Search,
+  AlertTriangle,
+  Trash2,
+  MapPin,
+  PenLine,
+} from 'lucide-react';
 
 type ViewMode = 'grid' | 'list';
 type SortOption = 'newest' | 'oldest' | 'status' | 'hazard';
@@ -16,7 +27,10 @@ interface MyUploadsProps {
   isLoading?: boolean;
   hazardOptions?: { id: string; label: string }[];
   onRefresh?: () => void;
-  onUpdateMetadata: (id: string, updates: Partial<UserUpload>) => Promise<void> | void;
+  onUpdateMetadata: (
+    id: string,
+    updates: Partial<UserUpload>
+  ) => Promise<void> | void;
   onDelete: (ids: string[]) => Promise<void> | void;
   onExportMetadata?: (ids: string[]) => void;
   onUndoDelete?: (ids: string[]) => Promise<void> | void;
@@ -37,7 +51,8 @@ const statusClasses: Record<UserUpload['approval_status'], string> = {
   flagged: 'bg-rose-500/15 text-rose-200 border border-rose-400/20',
 };
 
-const glassCard = 'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
+const glassCard =
+  'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
 
 export default function MyUploads({
   uploads,
@@ -70,22 +85,30 @@ export default function MyUploads({
         upload.location?.toLowerCase().includes(query) ||
         upload.hazard_type.toLowerCase().includes(query);
 
-      const matchesHazard = filters.hazard === 'all' || upload.hazard_type === filters.hazard;
-      const matchesStatus = filters.status === 'all' || upload.approval_status === filters.status;
+      const matchesHazard =
+        filters.hazard === 'all' || upload.hazard_type === filters.hazard;
+      const matchesStatus =
+        filters.status === 'all' || upload.approval_status === filters.status;
       return matchesQuery && matchesHazard && matchesStatus;
     });
 
     data = data.sort((a, b) => {
       switch (sortBy) {
         case 'oldest':
-          return new Date(a.uploaded_at).getTime() - new Date(b.uploaded_at).getTime();
+          return (
+            new Date(a.uploaded_at).getTime() -
+            new Date(b.uploaded_at).getTime()
+          );
         case 'status':
           return a.approval_status.localeCompare(b.approval_status);
         case 'hazard':
           return a.hazard_type.localeCompare(b.hazard_type);
         case 'newest':
         default:
-          return new Date(b.uploaded_at).getTime() - new Date(a.uploaded_at).getTime();
+          return (
+            new Date(b.uploaded_at).getTime() -
+            new Date(a.uploaded_at).getTime()
+          );
       }
     });
 
@@ -131,10 +154,15 @@ export default function MyUploads({
       title: editForm.title?.trim(),
       abstract: editForm.abstract?.trim(),
       keywords: editForm.keywords
-        ? editForm.keywords.split(',').map((keyword) => keyword.trim()).filter(Boolean)
+        ? editForm.keywords
+            .split(',')
+            .map((keyword) => keyword.trim())
+            .filter(Boolean)
         : [],
       latitude: editForm.latitude ? parseFloat(editForm.latitude) : undefined,
-      longitude: editForm.longitude ? parseFloat(editForm.longitude) : undefined,
+      longitude: editForm.longitude
+        ? parseFloat(editForm.longitude)
+        : undefined,
     };
     await onUpdateMetadata(upload.id, payload);
     toast.success('Metadata updated');
@@ -164,7 +192,10 @@ export default function MyUploads({
             type="button"
             size="sm"
             variant="secondary"
-            className={clsx('text-white/70', viewMode === 'grid' && 'bg-white/15 text-white')}
+            className={clsx(
+              'text-white/70',
+              viewMode === 'grid' && 'bg-white/15 text-white'
+            )}
             onClick={() => setViewMode('grid')}
           >
             <Grid className="h-4 w-4" />
@@ -173,20 +204,31 @@ export default function MyUploads({
             type="button"
             size="sm"
             variant="secondary"
-            className={clsx('text-white/70', viewMode === 'list' && 'bg-white/15 text-white')}
+            className={clsx(
+              'text-white/70',
+              viewMode === 'list' && 'bg-white/15 text-white'
+            )}
             onClick={() => setViewMode('list')}
           >
             <List className="h-4 w-4" />
           </Button>
         </div>
 
-        <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70">
+        <label
+          htmlFor="uploads-search"
+          className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/70"
+        >
           <Search className="h-4 w-4" />
           <input
+            id="uploads-search"
+            name="uploads-search"
             type="text"
+            autoComplete="off"
             placeholder="Search uploads"
             value={filters.query}
-            onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, query: event.target.value }))
+            }
             className="bg-transparent text-white placeholder-white/40 focus:outline-none"
           />
         </label>
@@ -195,7 +237,9 @@ export default function MyUploads({
           <Filter className="h-4 w-4" aria-hidden="true" />
           <Select
             value={filters.hazard}
-            onChange={(event) => setFilters((prev) => ({ ...prev, hazard: event.target.value }))}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, hazard: event.target.value }))
+            }
             variant="dark"
             size="sm"
             fullWidth={false}
@@ -213,7 +257,9 @@ export default function MyUploads({
 
         <Select
           value={filters.status}
-          onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
+          onChange={(event) =>
+            setFilters((prev) => ({ ...prev, status: event.target.value }))
+          }
           variant="dark"
           size="sm"
           fullWidth={false}
@@ -299,13 +345,23 @@ export default function MyUploads({
         <div className="flex-1 space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs text-white/60">{format(new Date(upload.uploaded_at), 'PPpp')}</p>
-              <h3 className="text-lg font-semibold text-white">{upload.title || upload.filename}</h3>
+              <p className="text-xs text-white/60">
+                {format(new Date(upload.uploaded_at), 'PPpp')}
+              </p>
+              <h3 className="text-lg font-semibold text-white">
+                {upload.title || upload.filename}
+              </h3>
               <p className="text-sm text-white/60">
-                {HAZARD_TYPE_LABELS[upload.hazard_type] || upload.hazard_type} • {upload.location || 'Unknown location'}
+                {HAZARD_TYPE_LABELS[upload.hazard_type] || upload.hazard_type} •{' '}
+                {upload.location || 'Unknown location'}
               </p>
             </div>
-            <span className={clsx('rounded-full px-3 py-1 text-xs font-semibold', statusClasses[upload.approval_status])}>
+            <span
+              className={clsx(
+                'rounded-full px-3 py-1 text-xs font-semibold',
+                statusClasses[upload.approval_status]
+              )}
+            >
               {upload.approval_status.replace('_', ' ')}
             </span>
           </div>
@@ -313,21 +369,43 @@ export default function MyUploads({
           {editingId === upload.id ? (
             <div className="space-y-3 rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="grid gap-3 md:grid-cols-2">
-                <label className="text-xs uppercase tracking-wide text-white/50">
+                <label
+                  htmlFor={`edit-title-${upload.id}`}
+                  className="text-xs uppercase tracking-wide text-white/50"
+                >
                   Title
                   <input
+                    id={`edit-title-${upload.id}`}
+                    name="title"
                     type="text"
+                    autoComplete="off"
                     value={editForm.title}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, title: event.target.value }))}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        title: event.target.value,
+                      }))
+                    }
                     className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-pacific-400"
                   />
                 </label>
-                <label className="text-xs uppercase tracking-wide text-white/50">
+                <label
+                  htmlFor={`edit-keywords-${upload.id}`}
+                  className="text-xs uppercase tracking-wide text-white/50"
+                >
                   Keywords
                   <input
+                    id={`edit-keywords-${upload.id}`}
+                    name="keywords"
                     type="text"
+                    autoComplete="off"
                     value={editForm.keywords}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, keywords: event.target.value }))}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        keywords: event.target.value,
+                      }))
+                    }
                     className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-pacific-400"
                     placeholder="Comma separated"
                   />
@@ -337,7 +415,12 @@ export default function MyUploads({
                 Description
                 <textarea
                   value={editForm.abstract}
-                  onChange={(event) => setEditForm((prev) => ({ ...prev, abstract: event.target.value }))}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      abstract: event.target.value,
+                    }))
+                  }
                   rows={3}
                   className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-pacific-400"
                 />
@@ -348,7 +431,12 @@ export default function MyUploads({
                   <input
                     type="number"
                     value={editForm.latitude}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, latitude: event.target.value }))}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        latitude: event.target.value,
+                      }))
+                    }
                     className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-pacific-400"
                   />
                 </label>
@@ -357,26 +445,47 @@ export default function MyUploads({
                   <input
                     type="number"
                     value={editForm.longitude}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, longitude: event.target.value }))}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({
+                        ...prev,
+                        longitude: event.target.value,
+                      }))
+                    }
                     className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-pacific-400"
                   />
                 </label>
               </div>
               <div className="flex justify-end gap-2 text-sm">
-                <Button type="button" variant="secondary" size="sm" className="bg-white/10 text-white" onClick={cancelEdit}>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="bg-white/10 text-white"
+                  onClick={cancelEdit}
+                >
                   Cancel
                 </Button>
-                <Button type="button" size="sm" className="bg-pacific-500 text-white hover:bg-pacific-400" onClick={() => saveEdit(upload)}>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="bg-pacific-500 text-white hover:bg-pacific-400"
+                  onClick={() => saveEdit(upload)}
+                >
                   Save Changes
                 </Button>
               </div>
             </div>
           ) : (
             <>
-              <p className="text-sm text-white/70 line-clamp-3">{upload.abstract || 'No description provided.'}</p>
+              <p className="text-sm text-white/70 line-clamp-3">
+                {upload.abstract || 'No description provided.'}
+              </p>
               <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
                 {upload.keywords?.slice(0, 4).map((keyword) => (
-                  <span key={keyword} className="rounded-full bg-white/10 px-3 py-1">
+                  <span
+                    key={keyword}
+                    className="rounded-full bg-white/10 px-3 py-1"
+                  >
                     #{keyword}
                   </span>
                 ))}
@@ -419,24 +528,48 @@ export default function MyUploads({
       </td>
       <td className="px-4 py-3">
         <div>
-          <p className="font-medium text-white">{upload.title || upload.filename}</p>
-          <p className="text-xs text-white/60">{format(new Date(upload.uploaded_at), 'PPpp')}</p>
+          <p className="font-medium text-white">
+            {upload.title || upload.filename}
+          </p>
+          <p className="text-xs text-white/60">
+            {format(new Date(upload.uploaded_at), 'PPpp')}
+          </p>
         </div>
       </td>
-      <td className="px-4 py-3 text-sm text-white/70">{upload.location || '—'}</td>
-      <td className="px-4 py-3 text-sm text-white/70">{HAZARD_TYPE_LABELS[upload.hazard_type] || upload.hazard_type}</td>
+      <td className="px-4 py-3 text-sm text-white/70">
+        {upload.location || '—'}
+      </td>
+      <td className="px-4 py-3 text-sm text-white/70">
+        {HAZARD_TYPE_LABELS[upload.hazard_type] || upload.hazard_type}
+      </td>
       <td className="px-4 py-3">
-        <span className={clsx('rounded-full px-3 py-1 text-xs font-semibold', statusClasses[upload.approval_status])}>
+        <span
+          className={clsx(
+            'rounded-full px-3 py-1 text-xs font-semibold',
+            statusClasses[upload.approval_status]
+          )}
+        >
           {upload.approval_status.replace('_', ' ')}
         </span>
       </td>
       <td className="px-4 py-3 text-right text-sm">
         {editingId === upload.id ? (
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" size="sm" className="bg-white/10 text-white" onClick={cancelEdit}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="bg-white/10 text-white"
+              onClick={cancelEdit}
+            >
               Cancel
             </Button>
-            <Button type="button" size="sm" className="bg-pacific-500 text-white hover:bg-pacific-400" onClick={() => saveEdit(upload)}>
+            <Button
+              type="button"
+              size="sm"
+              className="bg-pacific-500 text-white hover:bg-pacific-400"
+              onClick={() => saveEdit(upload)}
+            >
               Save
             </Button>
           </div>
@@ -464,7 +597,10 @@ export default function MyUploads({
           <div>
             <strong>{selectedIds.size}</strong> uploads selected
           </div>
-          <button className="text-white/80 underline" onClick={() => setSelectedIds(new Set())}>
+          <button
+            className="text-white/80 underline"
+            onClick={() => setSelectedIds(new Set())}
+          >
             Clear selection
           </button>
         </div>
@@ -483,13 +619,17 @@ export default function MyUploads({
             type="button"
             variant="secondary"
             className="bg-white/10 text-white hover:bg-white/20"
-            onClick={() => setFilters({ query: '', hazard: 'all', status: 'all' })}
+            onClick={() =>
+              setFilters({ query: '', hazard: 'all', status: 'all' })
+            }
           >
             Reset Filters
           </Button>
         </div>
       ) : viewMode === 'grid' ? (
-        <div className="grid gap-4 md:grid-cols-2">{filteredUploads.map(renderGridCard)}</div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredUploads.map(renderGridCard)}
+        </div>
       ) : (
         <div className="overflow-hidden rounded-3xl border border-white/10 bg-white/5">
           <table className="w-full text-sm text-white/80">
@@ -519,10 +659,13 @@ export default function MyUploads({
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="max-w-md space-y-4 rounded-3xl border border-white/10 bg-deep-950 p-6 text-white shadow-2xl">
-            <h3 className="text-2xl font-semibold text-white">Confirm deletion</h3>
+            <h3 className="text-2xl font-semibold text-white">
+              Confirm deletion
+            </h3>
             <p className="text-sm text-white/70">
-              {selectedIds.size} upload{selectedIds.size > 1 ? 's' : ''} will be moved to the recycle bin for 7 days. You
-              can undo this action during that period.
+              {selectedIds.size} upload{selectedIds.size > 1 ? 's' : ''} will be
+              moved to the recycle bin for 7 days. You can undo this action
+              during that period.
             </p>
             <div className="flex justify-end gap-2">
               <Button

@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authFetch } from '@/lib/auth-utils';
+import { backendFetch, authFetch } from '@/lib/auth-utils';
 import Image from 'next/image';
 import { sanitizeText } from '@/lib/sanitize';
 import {
@@ -22,7 +22,7 @@ import {
   EnvelopeIcon,
   ArrowPathIcon,
   UsersIcon,
-  CheckIcon
+  CheckIcon,
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Select } from '@/components/design-system';
@@ -64,7 +64,7 @@ const UserManagement: React.FC = () => {
     search: '',
     role: '',
     status: '',
-    organization: ''
+    organization: '',
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(20);
@@ -72,7 +72,11 @@ const UserManagement: React.FC = () => {
   const queryClient = useQueryClient();
 
   // Fetch users
-  const { data: usersData, isLoading, error } = useQuery({
+  const {
+    data: usersData,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['admin-users', filters, currentPage, pageSize],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -87,7 +91,7 @@ const UserManagement: React.FC = () => {
       const response = await authFetch(`/api/admin/users?${params}`);
       if (!response.ok) throw new Error('Failed to fetch users');
       return response.json();
-    }
+    },
   });
 
   // Fetch roles
@@ -96,8 +100,14 @@ const UserManagement: React.FC = () => {
     queryFn: async () => {
       const response = await authFetch('/api/admin/roles');
       if (!response.ok) throw new Error('Failed to fetch roles');
-      return response.json();
-    }
+      const data = await response.json();
+      // Some backends return { roles: [...] }, others return an array directly
+      return Array.isArray(data?.roles)
+        ? data.roles
+        : Array.isArray(data)
+          ? data
+          : [];
+    },
   });
 
   // Create user mutation
@@ -105,7 +115,7 @@ const UserManagement: React.FC = () => {
     mutationFn: async (userData: CreateUserData) => {
       const response = await authFetch('/api/admin/users', {
         method: 'POST',
-        body: JSON.stringify(userData)
+        body: JSON.stringify(userData),
       });
       if (!response.ok) throw new Error('Failed to create user');
       return response.json();
@@ -113,35 +123,58 @@ const UserManagement: React.FC = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setShowCreateModal(false);
-    }
+    },
   });
 
   // Lock/unlock user mutation
   const lockUserMutation = useMutation({
     mutationFn: async ({ userId, lock }: { userId: string; lock: boolean }) => {
-      const response = await authFetch(`/api/admin/users/${userId}/${lock ? 'lock' : 'unlock'}`, {
-        method: 'POST'
-      });
-      if (!response.ok) throw new Error(`Failed to ${lock ? 'lock' : 'unlock'} user`);
+      const response = await backendFetch(
+        `/api/admin/users/${userId}/${lock ? 'lock' : 'unlock'}`,
+        {
+          method: 'POST',
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: 'Unknown error' }));
+        console.error('Lock/unlock failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        throw new Error(
+          errorData.detail ||
+            `Failed to ${lock ? 'lock' : 'unlock'} user (${response.status})`
+        );
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      console.log(
+        `User ${variables.lock ? 'locked' : 'unlocked'} successfully:`,
+        data
+      );
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-    }
+    },
+    onError: (error) => {
+      console.error('Lock/unlock error:', error);
+    },
   });
 
   // Delete user mutation
   const deleteUserMutation = useMutation({
     mutationFn: async (userId: string) => {
       const response = await authFetch(`/api/admin/users/${userId}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
       if (!response.ok) throw new Error('Failed to delete user');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-    }
+    },
   });
 
   // Quick invite mutation
@@ -149,7 +182,7 @@ const UserManagement: React.FC = () => {
     mutationFn: async ({ email, role }: { email: string; role: string }) => {
       const response = await authFetch('/api/admin/users/invite', {
         method: 'POST',
-        body: JSON.stringify({ email, role, sendInvite: true })
+        body: JSON.stringify({ email, role, sendInvite: true }),
       });
       if (!response.ok) throw new Error('Failed to send invite');
       return response.json();
@@ -159,23 +192,49 @@ const UserManagement: React.FC = () => {
       setShowQuickInvite(false);
       setQuickInviteEmail('');
       setQuickInviteRole('contributor');
-    }
+    },
   });
 
   // Bulk lock mutation
   const bulkLockMutation = useMutation({
-    mutationFn: async ({ userIds, lock }: { userIds: string[]; lock: boolean }) => {
+    mutationFn: async ({
+      userIds,
+      lock,
+    }: {
+      userIds: string[];
+      lock: boolean;
+    }) => {
       const response = await authFetch('/api/admin/users/bulk-action', {
         method: 'POST',
-        body: JSON.stringify({ user_ids: userIds, action: lock ? 'lock' : 'unlock' })
+        body: JSON.stringify({
+          user_ids: userIds,
+          action: lock ? 'lock' : 'unlock',
+        }),
       });
-      if (!response.ok) throw new Error('Failed to perform bulk action');
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: 'Unknown error' }));
+        console.error('Bulk action failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
+        throw new Error(
+          errorData.detail ||
+            `Failed to ${lock ? 'lock' : 'unlock'} users (${response.status})`
+        );
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('Bulk action successful:', data);
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setSelectedUsers(new Set());
-    }
+    },
+    onError: (error) => {
+      console.error('Bulk action error:', error);
+    },
   });
 
   // Toggle user selection
@@ -192,7 +251,9 @@ const UserManagement: React.FC = () => {
   // Select all users on current page
   const toggleSelectAll = () => {
     if (!usersData?.users) return;
-    const allSelected = usersData.users.every((u: User) => selectedUsers.has(u.id));
+    const allSelected = usersData.users.every((u: User) =>
+      selectedUsers.has(u.id)
+    );
     if (allSelected) {
       setSelectedUsers(new Set());
     } else {
@@ -202,12 +263,18 @@ const UserManagement: React.FC = () => {
 
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'super_admin': return 'bg-purple-100 text-purple-800';
-      case 'admin': return 'bg-red-100 text-red-800';
-      case 'curator': return 'bg-blue-100 text-blue-800';
-      case 'contributor': return 'bg-green-100 text-green-800';
-      case 'viewer': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'super_admin':
+        return 'bg-purple-100 text-purple-800';
+      case 'admin':
+        return 'bg-red-100 text-red-800';
+      case 'curator':
+        return 'bg-blue-100 text-blue-800';
+      case 'contributor':
+        return 'bg-green-100 text-green-800';
+      case 'viewer':
+        return 'bg-gray-100 text-gray-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -230,7 +297,7 @@ const UserManagement: React.FC = () => {
       lastName: '',
       role: '',
       organization: '',
-      sendInvite: true
+      sendInvite: true,
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -245,56 +312,85 @@ const UserManagement: React.FC = () => {
           animate={{ opacity: 1, scale: 1 }}
           className="bg-white rounded-lg shadow-xl p-6 w-full max-w-md"
         >
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Create New User</h3>
-          
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Create New User
+          </h3>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="create-user-firstname"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   First Name *
                 </label>
                 <input
+                  id="create-user-firstname"
+                  name="firstName"
                   type="text"
+                  autoComplete="given-name"
                   required
                   value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, firstName: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="create-user-lastname"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   Last Name *
                 </label>
                 <input
+                  id="create-user-lastname"
+                  name="lastName"
                   type="text"
+                  autoComplete="family-name"
                   required
                   value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, lastName: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="create-user-email"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Email *
               </label>
               <input
+                id="create-user-email"
+                name="email"
                 type="email"
+                autoComplete="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            
+
             <div>
               <Select
                 id="create-user-role"
+                name="role"
                 label="Role *"
                 required
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, role: e.target.value })
+                }
                 variant="light"
                 size="md"
                 error={!formData.role ? undefined : undefined}
@@ -307,32 +403,45 @@ const UserManagement: React.FC = () => {
                 ))}
               </Select>
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="create-user-organization"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Organization
               </label>
               <input
+                id="create-user-organization"
+                name="organization"
                 type="text"
+                autoComplete="organization"
                 value={formData.organization}
-                onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
+                onChange={(e) =>
+                  setFormData({ ...formData, organization: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
-            
+
             <div className="flex items-center">
               <input
                 type="checkbox"
                 id="sendInvite"
                 checked={formData.sendInvite}
-                onChange={(e) => setFormData({ ...formData, sendInvite: e.target.checked })}
+                onChange={(e) =>
+                  setFormData({ ...formData, sendInvite: e.target.checked })
+                }
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
-              <label htmlFor="sendInvite" className="ml-2 block text-sm text-gray-900">
+              <label
+                htmlFor="sendInvite"
+                className="ml-2 block text-sm text-gray-900"
+              >
                 Send invitation email
               </label>
             </div>
-            
+
             <div className="flex justify-end space-x-3 pt-4">
               <button
                 type="button"
@@ -371,7 +480,7 @@ const UserManagement: React.FC = () => {
             ×
           </button>
         </div>
-        
+
         <div className="space-y-6">
           {/* Profile Section */}
           <div className="flex items-center space-x-4">
@@ -397,48 +506,66 @@ const UserManagement: React.FC = () => {
               </h4>
               <p className="text-gray-600">{sanitizeText(user.email)}</p>
               <div className="flex items-center space-x-2 mt-1">
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
+                <span
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}
+                >
                   {sanitizeText(user.role)}
                 </span>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user)}`}>
+                <span
+                  className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user)}`}
+                >
                   {getStatusText(user)}
                 </span>
               </div>
             </div>
           </div>
-          
+
           {/* Details Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Organization</label>
-              <p className="mt-1 text-sm text-gray-900">{sanitizeText(user.organization || 'Not specified')}</p>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Last Login</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Organization
+              </label>
               <p className="mt-1 text-sm text-gray-900">
-                {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : 'Never'}
+                {sanitizeText(user.organization || 'Not specified')}
               </p>
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700">Created</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Last Login
+              </label>
+              <p className="mt-1 text-sm text-gray-900">
+                {user.lastLogin
+                  ? new Date(user.lastLogin).toLocaleString()
+                  : 'Never'}
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700">
+                Created
+              </label>
               <p className="mt-1 text-sm text-gray-900">
                 {new Date(user.createdAt).toLocaleString()}
               </p>
             </div>
-            
+
             <div>
-              <label className="block text-sm font-medium text-gray-700">Login Attempts</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Login Attempts
+              </label>
               <p className="mt-1 text-sm text-gray-900">{user.loginAttempts}</p>
             </div>
           </div>
-          
+
           {/* Permissions */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Permissions
+            </label>
             <div className="flex flex-wrap gap-2">
-              {user.permissions.map(permission => (
+              {user.permissions.map((permission) => (
                 <span
                   key={permission}
                   className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
@@ -448,11 +575,16 @@ const UserManagement: React.FC = () => {
               ))}
             </div>
           </div>
-          
+
           {/* Actions */}
           <div className="flex justify-end space-x-3 pt-4 border-t">
             <button
-              onClick={() => lockUserMutation.mutate({ userId: user.id, lock: !user.isLocked })}
+              onClick={() =>
+                lockUserMutation.mutate({
+                  userId: user.id,
+                  lock: !user.isLocked,
+                })
+              }
               className={`px-4 py-2 text-sm font-medium rounded-md ${
                 user.isLocked
                   ? 'text-green-600 bg-green-100 hover:bg-green-200'
@@ -471,7 +603,7 @@ const UserManagement: React.FC = () => {
                 </>
               )}
             </button>
-            
+
             <button
               onClick={() => {
                 if (confirm('Are you sure you want to delete this user?')) {
@@ -504,8 +636,12 @@ const UserManagement: React.FC = () => {
         <div className="flex">
           <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800">Error loading users</h3>
-            <p className="text-sm text-red-700 mt-1">Please try refreshing the page.</p>
+            <h3 className="text-sm font-medium text-red-800">
+              Error loading users
+            </h3>
+            <p className="text-sm text-red-700 mt-1">
+              Please try refreshing the page.
+            </p>
           </div>
         </div>
       </div>
@@ -520,7 +656,9 @@ const UserManagement: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{usersData?.total || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {usersData?.total || 0}
+              </p>
             </div>
             <UsersIcon className="h-8 w-8 text-blue-500" />
           </div>
@@ -529,7 +667,9 @@ const UserManagement: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Active Users</p>
-              <p className="text-2xl font-bold text-gray-900">{usersData?.active_count || usersData?.total || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {usersData?.active_count || usersData?.total || 0}
+              </p>
             </div>
             <CheckIcon className="h-8 w-8 text-green-500" />
           </div>
@@ -538,7 +678,9 @@ const UserManagement: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">Locked</p>
-              <p className="text-2xl font-bold text-gray-900">{usersData?.locked_count || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {usersData?.locked_count || 0}
+              </p>
             </div>
             <LockClosedIcon className="h-8 w-8 text-red-500" />
           </div>
@@ -546,8 +688,12 @@ const UserManagement: React.FC = () => {
         <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Pending Invites</p>
-              <p className="text-2xl font-bold text-gray-900">{usersData?.pending_count || 0}</p>
+              <p className="text-sm font-medium text-gray-500">
+                Pending Invites
+              </p>
+              <p className="text-2xl font-bold text-gray-900">
+                {usersData?.pending_count || 0}
+              </p>
             </div>
             <EnvelopeIcon className="h-8 w-8 text-purple-500" />
           </div>
@@ -592,8 +738,14 @@ const UserManagement: React.FC = () => {
             </h3>
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
+                <label htmlFor="quick-invite-email" className="sr-only">
+                  Email for quick invite
+                </label>
                 <input
+                  id="quick-invite-email"
+                  name="email"
                   type="email"
+                  autoComplete="email"
                   placeholder="email@example.com"
                   value={quickInviteEmail}
                   onChange={(e) => setQuickInviteEmail(e.target.value)}
@@ -602,6 +754,8 @@ const UserManagement: React.FC = () => {
               </div>
               <div className="w-full sm:w-48">
                 <Select
+                  id="quick-invite-role"
+                  name="role"
                   aria-label="Select role for invite"
                   value={quickInviteRole}
                   onChange={(e) => setQuickInviteRole(e.target.value)}
@@ -615,7 +769,12 @@ const UserManagement: React.FC = () => {
                 </Select>
               </div>
               <button
-                onClick={() => quickInviteMutation.mutate({ email: quickInviteEmail, role: quickInviteRole })}
+                onClick={() =>
+                  quickInviteMutation.mutate({
+                    email: quickInviteEmail,
+                    role: quickInviteRole,
+                  })
+                }
                 disabled={!quickInviteEmail || quickInviteMutation.isPending}
                 className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
@@ -628,7 +787,8 @@ const UserManagement: React.FC = () => {
               </button>
             </div>
             <p className="text-sm text-gray-500 mt-2">
-              An email invitation will be sent with a link to set up their account.
+              An email invitation will be sent with a link to set up their
+              account.
             </p>
           </motion.div>
         )}
@@ -644,11 +804,17 @@ const UserManagement: React.FC = () => {
             className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center justify-between"
           >
             <span className="text-sm font-medium text-blue-800">
-              {selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''} selected
+              {selectedUsers.size} user{selectedUsers.size !== 1 ? 's' : ''}{' '}
+              selected
             </span>
             <div className="flex gap-2">
               <button
-                onClick={() => bulkLockMutation.mutate({ userIds: Array.from(selectedUsers), lock: true })}
+                onClick={() =>
+                  bulkLockMutation.mutate({
+                    userIds: Array.from(selectedUsers),
+                    lock: true,
+                  })
+                }
                 disabled={bulkLockMutation.isPending}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200"
               >
@@ -656,7 +822,12 @@ const UserManagement: React.FC = () => {
                 Lock Selected
               </button>
               <button
-                onClick={() => bulkLockMutation.mutate({ userIds: Array.from(selectedUsers), lock: false })}
+                onClick={() =>
+                  bulkLockMutation.mutate({
+                    userIds: Array.from(selectedUsers),
+                    lock: false,
+                  })
+                }
                 disabled={bulkLockMutation.isPending}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200"
               >
@@ -678,17 +849,26 @@ const UserManagement: React.FC = () => {
       <div className="bg-white rounded-lg shadow-md p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="relative">
+            <label htmlFor="user-search" className="sr-only">
+              Search users
+            </label>
             <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
+              id="user-search"
+              name="search"
               type="text"
               placeholder="Search users..."
               value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, search: e.target.value })
+              }
               className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          
+
           <Select
+            id="filter-role"
+            name="role"
             aria-label="Filter by role"
             value={filters.role}
             onChange={(e) => setFilters({ ...filters, role: e.target.value })}
@@ -703,8 +883,10 @@ const UserManagement: React.FC = () => {
               </option>
             ))}
           </Select>
-          
+
           <Select
+            id="filter-status"
+            name="status"
             aria-label="Filter by status"
             value={filters.status}
             onChange={(e) => setFilters({ ...filters, status: e.target.value })}
@@ -717,12 +899,19 @@ const UserManagement: React.FC = () => {
             <option value="locked">Locked</option>
             <option value="inactive">Inactive</option>
           </Select>
-          
+
+          <label htmlFor="filter-organization" className="sr-only">
+            Filter by organization
+          </label>
           <input
+            id="filter-organization"
+            name="organization"
             type="text"
             placeholder="Organization"
             value={filters.organization}
-            onChange={(e) => setFilters({ ...filters, organization: e.target.value })}
+            onChange={(e) =>
+              setFilters({ ...filters, organization: e.target.value })
+            }
             className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -737,7 +926,10 @@ const UserManagement: React.FC = () => {
                 <th className="px-4 py-3 text-left">
                   <input
                     type="checkbox"
-                    checked={usersData?.users?.length > 0 && selectedUsers.size === usersData.users.length}
+                    checked={
+                      usersData?.users?.length > 0 &&
+                      selectedUsers.size === usersData.users.length
+                    }
                     onChange={toggleSelectAll}
                     className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
@@ -797,28 +989,39 @@ const UserManagement: React.FC = () => {
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                {sanitizeText(user.firstName)} {sanitizeText(user.lastName)}
-              </div>
-              <div className="text-sm text-gray-500">{sanitizeText(user.email)}</div>
-              {user.organization && (
-                <div className="text-xs text-gray-400">{sanitizeText(user.organization)}</div>
-              )}
+                            {sanitizeText(user.firstName)}{' '}
+                            {sanitizeText(user.lastName)}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {sanitizeText(user.email)}
+                          </div>
+                          {user.organization && (
+                            <div className="text-xs text-gray-400">
+                              {sanitizeText(user.organization)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}>
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}
+                      >
                         <ShieldCheckIcon className="h-3 w-3 mr-1" />
                         {user.role}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user)}`}>
+                      <span
+                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(user)}`}
+                      >
                         {getStatusText(user)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString() : 'Never'}
+                      {user.lastLogin
+                        ? new Date(user.lastLogin).toLocaleDateString()
+                        : 'Never'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
                       <button
@@ -831,10 +1034,23 @@ const UserManagement: React.FC = () => {
                         <EyeIcon className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => lockUserMutation.mutate({ userId: user.id, lock: !user.isLocked })}
-                        className={user.isLocked ? 'text-green-600 hover:text-green-900' : 'text-red-600 hover:text-red-900'}
+                        onClick={() =>
+                          lockUserMutation.mutate({
+                            userId: user.id,
+                            lock: !user.isLocked,
+                          })
+                        }
+                        className={
+                          user.isLocked
+                            ? 'text-green-600 hover:text-green-900'
+                            : 'text-red-600 hover:text-red-900'
+                        }
                       >
-                        {user.isLocked ? <LockOpenIcon className="h-4 w-4" /> : <LockClosedIcon className="h-4 w-4" />}
+                        {user.isLocked ? (
+                          <LockOpenIcon className="h-4 w-4" />
+                        ) : (
+                          <LockClosedIcon className="h-4 w-4" />
+                        )}
                       </button>
                     </td>
                   </motion.tr>
@@ -849,7 +1065,9 @@ const UserManagement: React.FC = () => {
           <div className="px-6 py-4 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-700">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, usersData.total)} of {usersData.total} results
+                Showing {(currentPage - 1) * pageSize + 1} to{' '}
+                {Math.min(currentPage * pageSize, usersData.total)} of{' '}
+                {usersData.total} results
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -863,8 +1081,17 @@ const UserManagement: React.FC = () => {
                   Page {currentPage} of {Math.ceil(usersData.total / pageSize)}
                 </span>
                 <button
-                  onClick={() => setCurrentPage(Math.min(Math.ceil(usersData.total / pageSize), currentPage + 1))}
-                  disabled={currentPage === Math.ceil(usersData.total / pageSize)}
+                  onClick={() =>
+                    setCurrentPage(
+                      Math.min(
+                        Math.ceil(usersData.total / pageSize),
+                        currentPage + 1
+                      )
+                    )
+                  }
+                  disabled={
+                    currentPage === Math.ceil(usersData.total / pageSize)
+                  }
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >
                   <ChevronRightIcon className="h-5 w-5" />
@@ -878,7 +1105,9 @@ const UserManagement: React.FC = () => {
       {/* Modals */}
       <AnimatePresence>
         {showCreateModal && <CreateUserModal />}
-        {showUserModal && selectedUser && <UserDetailModal user={selectedUser} />}
+        {showUserModal && selectedUser && (
+          <UserDetailModal user={selectedUser} />
+        )}
       </AnimatePresence>
     </div>
   );

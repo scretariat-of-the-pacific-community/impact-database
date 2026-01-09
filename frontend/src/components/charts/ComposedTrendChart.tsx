@@ -33,7 +33,7 @@ export default function ComposedTrendChart({
     const { active, payload } = props;
     if (active && payload && payload.length) {
       const data = payload[0].payload as ForecastPoint;
-      
+
       return (
         <div className="rounded-lg border border-white/20 bg-deep-900/95 p-3 shadow-xl backdrop-blur">
           <p className="font-semibold text-white">{data.period}</p>
@@ -44,7 +44,8 @@ export default function ComposedTrendChart({
             {data.isForecast && data.lowerBound && data.upperBound && (
               <>
                 <p className="text-xs text-white/60">
-                  Range: {data.lowerBound.toFixed(1)} - {data.upperBound.toFixed(1)}
+                  Range: {data.lowerBound.toFixed(1)} -{' '}
+                  {data.upperBound.toFixed(1)}
                 </p>
                 {data.confidence && (
                   <p className="text-xs text-pacific-300">
@@ -82,8 +83,8 @@ export default function ComposedTrendChart({
     );
   };
 
-  const actualData = data.filter(d => d.isActual);
-  const forecastData = data.filter(d => d.isForecast);
+  const actualData = data.filter((d) => d.isActual);
+  const forecastData = data.filter((d) => d.isForecast);
   const combinedData = showForecast ? data : actualData;
 
   return (
@@ -96,22 +97,33 @@ export default function ComposedTrendChart({
       {title && (
         <h3 className="text-lg font-semibold text-white mb-4">{title}</h3>
       )}
-      
-      <ResponsiveContainer width="100%" height={350} minWidth={100} minHeight={350}>
-        <ComposedChart data={combinedData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+
+      <ResponsiveContainer
+        width="100%"
+        height={350}
+        minWidth={100}
+        minHeight={350}
+      >
+        <ComposedChart
+          data={combinedData}
+          margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+        >
           <defs>
             <linearGradient id="actualGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#009ee0" stopOpacity={0.3}/>
-              <stop offset="95%" stopColor="#009ee0" stopOpacity={0}/>
+              <stop offset="5%" stopColor="#009ee0" stopOpacity={0.3} />
+              <stop offset="95%" stopColor="#009ee0" stopOpacity={0} />
             </linearGradient>
             <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#ff6b4a" stopOpacity={0.2}/>
-              <stop offset="95%" stopColor="#ff6b4a" stopOpacity={0}/>
+              <stop offset="5%" stopColor="#ff6b4a" stopOpacity={0.2} />
+              <stop offset="95%" stopColor="#ff6b4a" stopOpacity={0} />
             </linearGradient>
           </defs>
-          
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
-          
+
+          <CartesianGrid
+            strokeDasharray="3 3"
+            stroke="rgba(255, 255, 255, 0.1)"
+          />
+
           <XAxis
             dataKey="period"
             stroke="rgba(255, 255, 255, 0.5)"
@@ -124,58 +136,62 @@ export default function ComposedTrendChart({
               return value;
             }}
           />
-          
+
           <YAxis
             stroke="rgba(255, 255, 255, 0.5)"
             tick={{ fill: 'rgba(255, 255, 255, 0.7)', fontSize: 12 }}
           />
-          
+
           <Tooltip content={<CustomTooltip />} />
           <Legend content={<CustomLegend />} />
-          
+
           {/* Actual data as area + line */}
           <Area
             type="monotone"
-            dataKey={(d: ForecastPoint) => d.isActual ? d.value : null}
+            dataKey={(d: ForecastPoint) => (d.isActual ? d.value : null)}
             fill="url(#actualGradient)"
             stroke="none"
             name="Historical Trend"
           />
-          
+
           <Line
             type="monotone"
-            dataKey={(d: ForecastPoint) => d.isActual ? d.value : null}
+            dataKey={(d: ForecastPoint) => (d.isActual ? d.value : null)}
             stroke="#009ee0"
             strokeWidth={3}
             dot={{ fill: '#009ee0', r: 4 }}
             activeDot={{ r: 6 }}
             name="Actual Values"
           />
-          
+
           {/* Forecast as dashed line with confidence interval */}
           {showForecast && (
             <>
               <Area
                 type="monotone"
-                dataKey={(d: ForecastPoint) => d.isForecast && d.upperBound ? d.upperBound : null}
+                dataKey={(d: ForecastPoint) =>
+                  d.isForecast && d.upperBound ? d.upperBound : null
+                }
                 fill="url(#forecastGradient)"
                 stroke="none"
                 name="Upper Bound"
               />
-              
+
               <Line
                 type="monotone"
-                dataKey={(d: ForecastPoint) => d.isForecast ? d.value : null}
+                dataKey={(d: ForecastPoint) => (d.isForecast ? d.value : null)}
                 stroke="#ff6b4a"
                 strokeWidth={2}
                 strokeDasharray="5 5"
                 dot={{ fill: '#ff6b4a', r: 3 }}
                 name="Forecast"
               />
-              
+
               <Line
                 type="monotone"
-                dataKey={(d: ForecastPoint) => d.isForecast && d.lowerBound ? d.lowerBound : null}
+                dataKey={(d: ForecastPoint) =>
+                  d.isForecast && d.lowerBound ? d.lowerBound : null
+                }
                 stroke="#ff6b4a"
                 strokeWidth={1}
                 strokeDasharray="2 2"
@@ -187,12 +203,17 @@ export default function ComposedTrendChart({
           )}
         </ComposedChart>
       </ResponsiveContainer>
-      
+
       {showForecast && forecastData.length > 0 && (
         <div className="mt-4 flex items-center justify-center gap-4 text-xs text-white/60">
-          <span>Forecast Method: {forecastData[0].confidence ? 'Statistical' : 'Moving Average'}</span>
+          <span>
+            Forecast Method:{' '}
+            {forecastData[0].confidence ? 'Statistical' : 'Moving Average'}
+          </span>
           {forecastData[0].confidence && (
-            <span>Avg Confidence: {forecastData[0].confidence.toFixed(0)}%</span>
+            <span>
+              Avg Confidence: {forecastData[0].confidence.toFixed(0)}%
+            </span>
           )}
         </div>
       )}

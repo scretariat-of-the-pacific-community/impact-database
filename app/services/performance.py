@@ -137,8 +137,8 @@ class SpatialIndex:
             db.execute(
                 text(
                     """
-                CREATE INDEX IF NOT EXISTS idx_image_metadata_timestamp 
-                ON image_metadata (timestamp) 
+                CREATE INDEX IF NOT EXISTS idx_image_metadata_timestamp
+                ON image_metadata (timestamp)
                 WHERE timestamp IS NOT NULL
             """
                 )
@@ -148,8 +148,8 @@ class SpatialIndex:
             db.execute(
                 text(
                     """
-                CREATE INDEX IF NOT EXISTS idx_image_metadata_hazard_type 
-                ON image_metadata (hazard_type) 
+                CREATE INDEX IF NOT EXISTS idx_image_metadata_hazard_type
+                ON image_metadata (hazard_type)
                 WHERE hazard_type IS NOT NULL
             """
                 )
@@ -159,8 +159,8 @@ class SpatialIndex:
             db.execute(
                 text(
                     """
-                CREATE INDEX IF NOT EXISTS idx_image_metadata_country 
-                ON image_metadata (country) 
+                CREATE INDEX IF NOT EXISTS idx_image_metadata_country
+                ON image_metadata (country)
                 WHERE country IS NOT NULL
             """
                 )

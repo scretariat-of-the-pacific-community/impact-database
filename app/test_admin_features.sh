@@ -38,12 +38,12 @@ print_info() {
 get_auth_token() {
     local username=$1
     local password=$2
-    
+
     token=$(curl -s -X POST "${API_BASE}/auth/token" \
         -H "Content-Type: application/x-www-form-urlencoded" \
         -d "username=${username}&password=${password}" | \
         python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null || echo "")
-    
+
     echo $token
 }
 
@@ -53,7 +53,7 @@ api_call() {
     local endpoint=$2
     local token=$3
     local data=${4:-""}
-    
+
     if [ -n "$data" ]; then
         curl -s -X "$method" "${API_BASE}${endpoint}" \
             -H "Authorization: Bearer $token" \
@@ -91,7 +91,7 @@ ADMIN_TOKEN=$(get_auth_token "$ADMIN_USERNAME" "$ADMIN_PASSWORD")
 if [ -z "$ADMIN_TOKEN" ]; then
     print_error "Failed to authenticate admin user"
     print_info "Creating default admin user..."
-    
+
     # This would normally be done through a setup script
     print_info "Please create an admin user manually for testing"
     exit 1

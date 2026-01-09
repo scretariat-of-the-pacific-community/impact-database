@@ -1,6 +1,6 @@
 /**
  * World-Class Interactive Tutorial System
- * 
+ *
  * Features:
  * - Progressive disclosure with context-aware tooltips
  * - Interactive checkpoints requiring user actions
@@ -27,7 +27,12 @@ interface TutorialMetrics {
 }
 
 // User role types for personalization
-export type UserRole = 'contributor' | 'curator' | 'admin' | 'viewer' | 'new_user';
+export type UserRole =
+  | 'contributor'
+  | 'curator'
+  | 'admin'
+  | 'viewer'
+  | 'new_user';
 
 // Enhanced step with validation and interactivity
 interface InteractiveStep extends DriveStep {
@@ -54,8 +59,8 @@ export const tutorialSteps = {
     {
       popover: {
         title: '🌊 Welcome to Pacific Impact Atlas',
-        description: `Your mission-critical platform for disaster evidence. 
-        
+        description: `Your mission-critical platform for disaster evidence.
+
 **What you'll master in 90 seconds:**
 - Lightning-fast search for hazard evidence
 - Upload with auto-extracted metadata
@@ -93,7 +98,7 @@ Ready to become a power user? Let's go! 🚀`,
         description: `Drop a photo/video and we handle the rest:
 
 ✅ **Auto-extract** GPS coordinates from EXIF
-✅ **Auto-detect** timestamp and camera metadata  
+✅ **Auto-detect** timestamp and camera metadata
 ✅ **Queue for review** by certified curators
 ✅ **ISO 19115 compliant** metadata
 
@@ -185,7 +190,7 @@ Ready to become a power user? Let's go! 🚀`,
         description: `**🏆 Tutorial complete!** You now know how to:
 
 ✓ Search for evidence instantly
-✓ Upload high-quality documentation  
+✓ Upload high-quality documentation
 ✓ Analyze patterns with data
 ✓ Collaborate with your team
 
@@ -246,7 +251,7 @@ Let's create your first upload! 🎯`,
 - Enables accurate alerts
 
 **Categories:**
-🌀 Cyclone/Hurricane | 🌊 Tsunami | 🌋 Volcanic | 💥 Earthquake  
+🌀 Cyclone/Hurricane | 🌊 Tsunami | 🌋 Volcanic | 💥 Earthquake
 🌪️ Tornado | 🌾 Drought | 🔥 Wildfire | 🏔️ Landslide
 
 **Action:** Select the hazard type.`,
@@ -352,7 +357,7 @@ Let's create your first upload! 🎯`,
 3. **Queue:** Assign to certified curator
 4. **Notify:** Email you when reviewed
 
-**Average review time:** 2-6 hours  
+**Average review time:** 2-6 hours
 **Approval rate:** 94% for complete metadata
 
 Ready to submit? Click the button! 🚀`,
@@ -537,7 +542,7 @@ Let's turn data into decisions! 💡`,
     },
     {
       popover: {
-        title: "🎖️ Analytics Pro Certified!",
+        title: '🎖️ Analytics Pro Certified!',
         description: `**You're now an analytics expert!**
 
 **Skills unlocked:**
@@ -680,7 +685,7 @@ Let's explore! 🎯`,
     },
     {
       popover: {
-        title: "🏆 Search Expert Badge Earned!",
+        title: '🏆 Search Expert Badge Earned!',
         description: `**You're now a search power user!**
 
 **Skills:**
@@ -755,7 +760,7 @@ Let's build your team! 🌟`,
 
 **Use cases:**
 - **Project-based:** "Fiji Flood 2024"
-- **Region-based:** "Vanuatu Operations"  
+- **Region-based:** "Vanuatu Operations"
 - **Theme-based:** "Coastal Infrastructure"
 
 **Benefits:**
@@ -884,14 +889,14 @@ export class TutorialManager {
       ...metric,
       timestamp: Date.now(),
     };
-    
+
     this.metrics.push(fullMetric);
-    
+
     // Send to analytics API (if available)
     if (typeof window !== 'undefined' && (window as any).analytics) {
       (window as any).analytics.track('tutorial_event', fullMetric);
     }
-    
+
     // Store locally for debugging
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('tutorial_metrics') || '[]';
@@ -912,13 +917,13 @@ export class TutorialManager {
    */
   private celebrate() {
     if (typeof window === 'undefined') return;
-    
+
     // Check if confetti library is available
     if ((window as any).confetti) {
       (window as any).confetti({
         particleCount: 100,
         spread: 70,
-        origin: { y: 0.6 }
+        origin: { y: 0.6 },
       });
     }
   }
@@ -927,7 +932,7 @@ export class TutorialManager {
    * Filter steps based on user role
    */
   private filterStepsByRole(steps: InteractiveStep[]): InteractiveStep[] {
-    return steps.filter(step => {
+    return steps.filter((step) => {
       if (!step.roles || step.roles.length === 0) return true;
       return step.roles.includes(this.userRole);
     });
@@ -961,72 +966,76 @@ export class TutorialManager {
       ...config,
       steps: steps.map((step, index) => ({
         ...step,
-        popover: step.popover ? {
-          ...step.popover,
-          onNextClick: () => {
-            this.trackMetric({
-              tourName,
-              stepIndex: index,
-              action: 'interaction',
-              metadata: { step: 'next', analyticsTag: step.analyticsTag },
-            });
-            
-            // Check for required interaction
-            if (step.requiresInteraction && step.validationSelector) {
-              const element = document.querySelector(step.validationSelector);
-              if (element && step.validationFn) {
-                if (!step.validationFn()) {
-                  alert('Please complete the action before continuing!');
-                  return;
+        popover: step.popover
+          ? {
+              ...step.popover,
+              onNextClick: () => {
+                this.trackMetric({
+                  tourName,
+                  stepIndex: index,
+                  action: 'interaction',
+                  metadata: { step: 'next', analyticsTag: step.analyticsTag },
+                });
+
+                // Check for required interaction
+                if (step.requiresInteraction && step.validationSelector) {
+                  const element = document.querySelector(
+                    step.validationSelector
+                  );
+                  if (element && step.validationFn) {
+                    if (!step.validationFn()) {
+                      alert('Please complete the action before continuing!');
+                      return;
+                    }
+                  }
                 }
-              }
+
+                // If this is the last step, mark as completed and destroy
+                if (index === steps.length - 1) {
+                  this.markTourCompleted(tourName);
+                  this.celebrate();
+                  this.driverObj?.destroy();
+                } else {
+                  this.driverObj?.moveNext();
+                }
+              },
+              onPrevClick: () => {
+                this.trackMetric({
+                  tourName,
+                  stepIndex: index,
+                  action: 'interaction',
+                  metadata: { step: 'prev' },
+                });
+                this.driverObj?.movePrevious();
+              },
+              onCloseClick: () => {
+                this.trackMetric({
+                  tourName,
+                  stepIndex: index,
+                  action: 'skipped',
+                  metadata: { reason: 'user_closed' },
+                });
+                this.driverObj?.destroy();
+              },
             }
-            
-            // If this is the last step, mark as completed and destroy
-            if (index === steps.length - 1) {
-              this.markTourCompleted(tourName);
-              this.celebrate();
-              this.driverObj?.destroy();
-            } else {
-              this.driverObj?.moveNext();
-            }
-          },
-          onPrevClick: () => {
-            this.trackMetric({
-              tourName,
-              stepIndex: index,
-              action: 'interaction',
-              metadata: { step: 'prev' },
-            });
-            this.driverObj?.movePrevious();
-          },
-          onCloseClick: () => {
-            this.trackMetric({
-              tourName,
-              stepIndex: index,
-              action: 'skipped',
-              metadata: { reason: 'user_closed' },
-            });
-            this.driverObj?.destroy();
-          },
-        } : undefined,
+          : undefined,
       })),
       onDestroyed: () => {
         const duration = Date.now() - this.startTime;
         const currentStep = this.driverObj?.getActiveIndex() || 0;
         const isCompleted = currentStep === steps.length - 1;
-        
+
         this.trackMetric({
           tourName,
           stepIndex: currentStep,
           action: isCompleted ? 'completed' : 'dropped',
           duration,
         });
-        
+
         if (isCompleted) {
           this.markTourCompleted(tourName);
           this.celebrate();
-          
+
           // Show completion toast
           if (typeof window !== 'undefined' && (window as any).toast) {
             (window as any).toast.success('🎉 Tutorial Complete!', {
@@ -1034,7 +1043,7 @@ export class TutorialManager {
             });
           }
         }
-        
+
         this.driverObj = null;
         this.currentTour = null;
       },
@@ -1048,7 +1057,7 @@ export class TutorialManager {
 
     this.currentTour = tourName;
     this.driverObj.drive();
-    
+
     // Set up inactivity detection (show help if user stuck for 30s)
     this.resetInactivityTimer(tourName);
   }
@@ -1060,13 +1069,14 @@ export class TutorialManager {
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
     }
-    
+
     this.inactivityTimer = setTimeout(() => {
       if (this.driverObj) {
         const currentStep = this.driverObj.getActiveIndex();
-        if (typeof window !== 'undefined' && confirm(
-          'Stuck? Would you like a hint or to skip this step?'
-        )) {
+        if (
+          typeof window !== 'undefined' &&
+          confirm('Stuck? Would you like a hint or to skip this step?')
+        ) {
           // Offer to show video or skip
           this.driverObj.moveNext();
         }
@@ -1087,12 +1097,12 @@ export class TutorialManager {
         action: 'skipped',
         duration: Date.now() - this.startTime,
       });
-      
+
       this.driverObj.destroy();
       this.driverObj = null;
       this.currentTour = null;
     }
-    
+
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
       this.inactivityTimer = null;
@@ -1125,10 +1135,13 @@ export class TutorialManager {
       tours[`${tourName}_completed_at`] = new Date().toISOString();
       localStorage.setItem('tutorial_completed', JSON.stringify(tours));
     } catch {
-      localStorage.setItem('tutorial_completed', JSON.stringify({ 
-        [tourName]: true,
-        [`${tourName}_completed_at`]: new Date().toISOString(),
-      }));
+      localStorage.setItem(
+        'tutorial_completed',
+        JSON.stringify({
+          [tourName]: true,
+          [`${tourName}_completed_at`]: new Date().toISOString(),
+        })
+      );
     }
   }
 
@@ -1175,19 +1188,26 @@ export class TutorialManager {
         tours: {},
       };
     }
-    
+
     const completed = localStorage.getItem('tutorial_completed') || '{}';
     const started = localStorage.getItem('tutorial_started') || '{}';
-    const interactions = parseInt(localStorage.getItem('tutorial_interactions') || '0', 10);
-    
+    const interactions = parseInt(
+      localStorage.getItem('tutorial_interactions') || '0',
+      10
+    );
+
     try {
       const completedTours = JSON.parse(completed);
       const startedTours = JSON.parse(started);
       const totalTours = Object.keys(tutorialSteps).length;
-      const completedToursList = Object.keys(completedTours).filter(k => !k.endsWith('_completed_at'));
+      const completedToursList = Object.keys(completedTours).filter(
+        (k) => !k.endsWith('_completed_at')
+      );
       const completedCount = completedToursList.length;
-      const startedCount = Object.keys(startedTours).filter(k => !k.endsWith('_started_at')).length;
-      
+      const startedCount = Object.keys(startedTours).filter(
+        (k) => !k.endsWith('_started_at')
+      ).length;
+
       return {
         completed: completedCount,
         total: totalTours,
@@ -1239,36 +1259,39 @@ export class TutorialManager {
    * Show contextual help based on current page
    */
   showContextualHelp(context: string) {
-    const helpContent: Record<string, { title: string; description: string }> = {
-      upload_stuck: {
-        title: '🤔 Need Help Uploading?',
-        description: `Common issues:
-        
+    const helpContent: Record<string, { title: string; description: string }> =
+      {
+        upload_stuck: {
+          title: '🤔 Need Help Uploading?',
+          description: `Common issues:
+
 - **File too large?** Max 50MB. Compress or split video.
 - **No EXIF data?** Enter location manually.
 - **Missing fields?** Red asterisk (*) = required.
 
 Want a quick tutorial? Click "Show Me How" below.`,
-      },
-      search_no_results: {
-        title: '🔍 No Results Found',
-        description: `Try:
-        
+        },
+        search_no_results: {
+          title: '🔍 No Results Found',
+          description: `Try:
+
 - **Broaden filters:** Remove date/location restrictions
 - **Check spelling:** "cyclone" not "cyclon"
 - **Use tags:** Try "coastal" or "flood"
 
 Or browse all recent uploads.`,
-      },
-    };
+        },
+      };
 
     const content = helpContent[context];
     if (content) {
       this.driverObj = driver({
         ...defaultConfig,
-        steps: [{
-          popover: content,
-        }],
+        steps: [
+          {
+            popover: content,
+          },
+        ],
       });
       this.driverObj.drive();
     }
@@ -1283,14 +1306,18 @@ export const tutorialManager = new TutorialManager();
  */
 export function useTutorial() {
   return {
-    startTour: (tourName: keyof typeof tutorialSteps, config?: Partial<Config>) => 
-      tutorialManager.startTour(tourName, config),
+    startTour: (
+      tourName: keyof typeof tutorialSteps,
+      config?: Partial<Config>
+    ) => tutorialManager.startTour(tourName, config),
     stopTour: () => tutorialManager.stopTour(),
-    isTourCompleted: (tourName: string) => tutorialManager.isTourCompleted(tourName),
-    markTourCompleted: (tourName: string) => tutorialManager.markTourCompleted(tourName),
+    isTourCompleted: (tourName: string) =>
+      tutorialManager.isTourCompleted(tourName),
+    markTourCompleted: (tourName: string) =>
+      tutorialManager.markTourCompleted(tourName),
     resetTours: () => tutorialManager.resetTours(),
     isFirstVisit: () => tutorialManager.isFirstVisit(),
-    highlight: (element: string, popover?: DriveStep['popover']) => 
+    highlight: (element: string, popover?: DriveStep['popover']) =>
       tutorialManager.highlight(element, popover),
     setUserRole: (role: UserRole) => tutorialManager.setUserRole(role),
     getStats: () => tutorialManager.getCompletionStats(),

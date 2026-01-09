@@ -7,16 +7,16 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { 
-  Check, 
-  X, 
-  Info, 
-  AlertTriangle, 
+import {
+  Check,
+  X,
+  Info,
+  AlertTriangle,
   Loader2,
   Keyboard,
   Download,
   Upload,
-  RefreshCw
+  RefreshCw,
 } from 'lucide-react';
 
 export default function EnhancementsDemoPage() {
@@ -54,7 +54,7 @@ export default function EnhancementsDemoPage() {
   const showLoadingToast = () => {
     setIsLoading(true);
     const loadingToastId = toast.loading('Processing your request...');
-    
+
     setTimeout(() => {
       toast.dismiss(loadingToastId);
       toast.success('Processing complete!');
@@ -63,14 +63,11 @@ export default function EnhancementsDemoPage() {
   };
 
   const showPromiseToast = () => {
-    toast.promise(
-      new Promise((resolve) => setTimeout(resolve, 3000)),
-      {
-        loading: 'Uploading image...',
-        success: 'Image uploaded successfully!',
-        error: 'Failed to upload image',
-      }
-    );
+    toast.promise(new Promise((resolve) => setTimeout(resolve, 3000)), {
+      loading: 'Uploading image...',
+      success: 'Image uploaded successfully!',
+      error: 'Failed to upload image',
+    });
   };
 
   const showCustomToast = () => {
@@ -97,7 +94,8 @@ export default function EnhancementsDemoPage() {
             UX Enhancements Demo
           </h1>
           <p className="text-lg text-gray-600">
-            Explore the new toast notifications, keyboard shortcuts, and PWA features
+            Explore the new toast notifications, keyboard shortcuts, and PWA
+            features
           </p>
         </div>
 
@@ -108,7 +106,9 @@ export default function EnhancementsDemoPage() {
               <Info className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Toast Notifications</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Toast Notifications
+              </h2>
               <p className="text-gray-600">Non-intrusive feedback system</p>
             </div>
           </div>
@@ -151,7 +151,9 @@ export default function EnhancementsDemoPage() {
               disabled={isLoading}
               className="flex items-center justify-center gap-2 rounded-lg border-2 border-purple-200 bg-purple-50 px-4 py-3 font-semibold text-purple-700 transition-all hover:border-purple-300 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Loader2 className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
+              <Loader2
+                className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`}
+              />
               Loading Toast
             </button>
 
@@ -174,8 +176,9 @@ export default function EnhancementsDemoPage() {
 
           <div className="mt-6 rounded-lg bg-blue-50 p-4">
             <p className="text-sm text-blue-800">
-              <strong>Note:</strong> Toast notifications appear in the top-right corner and 
-              automatically dismiss after a few seconds. They support actions, icons, and different variants.
+              <strong>Note:</strong> Toast notifications appear in the top-right
+              corner and automatically dismiss after a few seconds. They support
+              actions, icons, and different variants.
             </p>
           </div>
         </section>
@@ -187,7 +190,9 @@ export default function EnhancementsDemoPage() {
               <Keyboard className="h-6 w-6 text-purple-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-900">Keyboard Shortcuts</h2>
+              <h2 className="text-2xl font-bold text-gray-900">
+                Keyboard Shortcuts
+              </h2>
               <p className="text-gray-600">Power user navigation</p>
             </div>
           </div>
@@ -204,17 +209,23 @@ export default function EnhancementsDemoPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="font-semibold text-gray-700">Focus Search</span>
+                  <span className="font-semibold text-gray-700">
+                    Focus Search
+                  </span>
                   <kbd className="rounded border border-gray-300 bg-white px-2 py-1 text-sm font-semibold">
                     /
                   </kbd>
                 </div>
-                <p className="text-sm text-gray-600">Jump to search input from anywhere</p>
+                <p className="text-sm text-gray-600">
+                  Jump to search input from anywhere
+                </p>
               </div>
 
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="font-semibold text-gray-700">New Upload</span>
+                  <span className="font-semibold text-gray-700">
+                    New Upload
+                  </span>
                   <kbd className="rounded border border-gray-300 bg-white px-2 py-1 text-sm font-semibold">
                     N
                   </kbd>
@@ -234,12 +245,16 @@ export default function EnhancementsDemoPage() {
 
               <div className="rounded-lg bg-gray-50 p-4">
                 <div className="mb-2 flex items-center justify-between">
-                  <span className="font-semibold text-gray-700">Close Modal</span>
+                  <span className="font-semibold text-gray-700">
+                    Close Modal
+                  </span>
                   <kbd className="rounded border border-gray-300 bg-white px-2 py-1 text-sm font-semibold">
                     Esc
                   </kbd>
                 </div>
-                <p className="text-sm text-gray-600">Close any open modal or dialog</p>
+                <p className="text-sm text-gray-600">
+                  Close any open modal or dialog
+                </p>
               </div>
             </div>
 
@@ -269,10 +284,13 @@ export default function EnhancementsDemoPage() {
 
           <div className="space-y-4">
             <div className="rounded-lg border-2 border-green-200 bg-green-50 p-6">
-              <h3 className="mb-3 text-lg font-bold text-green-800">Installable App</h3>
+              <h3 className="mb-3 text-lg font-bold text-green-800">
+                Installable App
+              </h3>
               <p className="mb-4 text-green-700">
-                After your second visit, you&apos;ll see a prompt to install Pacific Impact Atlas as an app. 
-                This gives you a native app experience with offline support.
+                After your second visit, you&apos;ll see a prompt to install
+                Pacific Impact Atlas as an app. This gives you a native app
+                experience with offline support.
               </p>
               <ul className="space-y-2">
                 <li className="flex items-center gap-2 text-green-700">
@@ -295,10 +313,13 @@ export default function EnhancementsDemoPage() {
             </div>
 
             <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-6">
-              <h3 className="mb-3 text-lg font-bold text-blue-800">Offline Upload Queue</h3>
+              <h3 className="mb-3 text-lg font-bold text-blue-800">
+                Offline Upload Queue
+              </h3>
               <p className="mb-4 text-blue-700">
-                When you&apos;re offline, uploads are automatically queued and will sync when you&apos;re back online.
-                Perfect for field work in remote areas.
+                When you&apos;re offline, uploads are automatically queued and
+                will sync when you&apos;re back online. Perfect for field work
+                in remote areas.
               </p>
               <div className="rounded-lg bg-white p-4">
                 <p className="text-sm text-gray-700">
@@ -320,9 +341,24 @@ export default function EnhancementsDemoPage() {
         <section className="mt-12 rounded-2xl bg-gradient-to-r from-blue-600 to-purple-600 p-8 text-white shadow-lg">
           <h2 className="mb-4 text-2xl font-bold">Try It Out!</h2>
           <div className="space-y-2 text-blue-100">
-            <p>• Press <kbd className="mx-1 rounded bg-white/20 px-2 py-1 font-semibold text-white">?</kbd> to see keyboard shortcuts</p>
-            <p>• Press <kbd className="mx-1 rounded bg-white/20 px-2 py-1 font-semibold text-white">/</kbd> to focus the search bar</p>
-            <p>• Click any toast button above to see different notification styles</p>
+            <p>
+              • Press{' '}
+              <kbd className="mx-1 rounded bg-white/20 px-2 py-1 font-semibold text-white">
+                ?
+              </kbd>{' '}
+              to see keyboard shortcuts
+            </p>
+            <p>
+              • Press{' '}
+              <kbd className="mx-1 rounded bg-white/20 px-2 py-1 font-semibold text-white">
+                /
+              </kbd>{' '}
+              to focus the search bar
+            </p>
+            <p>
+              • Click any toast button above to see different notification
+              styles
+            </p>
             <p>• Visit this site again to see the PWA install prompt</p>
             <p>• Try going offline and uploading an image to test the queue</p>
           </div>

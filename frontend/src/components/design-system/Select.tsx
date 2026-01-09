@@ -7,7 +7,8 @@ import { ChevronDown, Loader2 } from 'lucide-react';
 type SelectVariant = 'dark' | 'light';
 type SelectSize = 'sm' | 'md' | 'lg';
 
-export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
+export interface SelectProps
+  extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   /** Visual variant - 'dark' for dark backgrounds, 'light' for light backgrounds */
   variant?: SelectVariant;
   /** Size of the select */
@@ -33,7 +34,8 @@ const baseClasses =
 
 const variantClasses: Record<SelectVariant, string> = {
   dark: 'bg-deep-900/60 border-white/15 text-white focus-visible:ring-pacific-400 focus-visible:ring-offset-deep-950',
-  light: 'bg-white border-slate-200 text-slate-900 focus-visible:ring-brand-500 focus-visible:ring-offset-white',
+  light:
+    'bg-white border-slate-200 text-slate-900 focus-visible:ring-brand-500 focus-visible:ring-offset-white',
 };
 
 const variantErrorClasses: Record<SelectVariant, string> = {
@@ -93,12 +95,12 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
     const id = providedId || generatedId;
     const helperId = `${id}-helper`;
     const errorId = `${id}-error`;
-    
+
     const hasError = Boolean(error);
-    const describedBy = [
-      helperText ? helperId : null,
-      hasError ? errorId : null,
-    ].filter(Boolean).join(' ') || undefined;
+    const describedBy =
+      [helperText ? helperId : null, hasError ? errorId : null]
+        .filter(Boolean)
+        .join(' ') || undefined;
 
     return (
       <div className={clsx(fullWidth && 'w-full')}>
@@ -120,10 +122,12 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
         <div className="relative">
           {/* Left icon */}
           {leftIcon && (
-            <div className={clsx(
-              'absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none',
-              variant === 'dark' ? 'text-white/50' : 'text-slate-400'
-            )}>
+            <div
+              className={clsx(
+                'absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none',
+                variant === 'dark' ? 'text-white/50' : 'text-slate-400'
+              )}
+            >
               {leftIcon}
             </div>
           )}
@@ -150,12 +154,16 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
           </select>
 
           {/* Right side - chevron or loading spinner */}
-          <div className={clsx(
-            'absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none',
-            variant === 'dark' ? 'text-white/50' : 'text-slate-400'
-          )}>
+          <div
+            className={clsx(
+              'absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none',
+              variant === 'dark' ? 'text-white/50' : 'text-slate-400'
+            )}
+          >
             {isLoading ? (
-              <Loader2 className={clsx(iconSizeClasses[size], 'animate-spin')} />
+              <Loader2
+                className={clsx(iconSizeClasses[size], 'animate-spin')}
+              />
             ) : (
               <ChevronDown className={iconSizeClasses[size]} />
             )}
@@ -164,14 +172,21 @@ const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
         {/* Helper text */}
         {helperText && !hasError && (
-          <p id={helperId} className={clsx('mt-1.5 text-xs', helperClasses[variant])}>
+          <p
+            id={helperId}
+            className={clsx('mt-1.5 text-xs', helperClasses[variant])}
+          >
             {helperText}
           </p>
         )}
 
         {/* Error message */}
         {hasError && (
-          <p id={errorId} className={clsx('mt-1.5 text-xs', errorTextClasses[variant])} role="alert">
+          <p
+            id={errorId}
+            className={clsx('mt-1.5 text-xs', errorTextClasses[variant])}
+            role="alert"
+          >
             {error}
           </p>
         )}

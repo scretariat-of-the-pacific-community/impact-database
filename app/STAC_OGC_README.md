@@ -344,7 +344,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    
+
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
@@ -487,12 +487,12 @@ BASE_URL=https://staging.example.com ./test_stac_ogc_apis.sh
 
 All exit criteria have been met:
 
-✅ **External tools can query the catalog** - STAC and OGC APIs fully implemented  
-✅ **SLOs defined and met** - 99.9% availability, <2s response time monitoring  
-✅ **Caching & pagination tuned** - Redis caching, optimized pagination  
-✅ **Spatial indexes implemented** - GiST and B-tree indexes for performance  
-✅ **Presigned URL expiry policy** - Role-based policies with monitoring  
-✅ **Backups & lifecycle rules** - Automated MinIO lifecycle management  
-✅ **Monitoring configured** - Prometheus/Grafana-ready metrics  
+✅ **External tools can query the catalog** - STAC and OGC APIs fully implemented
+✅ **SLOs defined and met** - 99.9% availability, <2s response time monitoring
+✅ **Caching & pagination tuned** - Redis caching, optimized pagination
+✅ **Spatial indexes implemented** - GiST and B-tree indexes for performance
+✅ **Presigned URL expiry policy** - Role-based policies with monitoring
+✅ **Backups & lifecycle rules** - Automated MinIO lifecycle management
+✅ **Monitoring configured** - Prometheus/Grafana-ready metrics
 
 The Pacific Impact Database now provides world-class interoperability through standards-compliant STAC and OGC APIs, with enterprise-grade performance, monitoring, and operational capabilities.

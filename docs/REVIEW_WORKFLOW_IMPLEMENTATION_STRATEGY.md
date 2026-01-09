@@ -37,17 +37,17 @@ grep -r "class.*User" app/models/
 # Extend existing User model instead of replacing
 class User(Base):
     __tablename__ = 'users'
-    
+
     # EXISTING FIELDS (don't modify)
     id = Column(UUID, primary_key=True)
     email = Column(String)
     # ... existing SSO fields ...
-    
+
     # NEW FIELDS (add via migration)
     role_id = Column(Integer, ForeignKey('roles.id'))
     notification_preferences = Column(JSONB, default={})
     review_preferences = Column(JSONB, default={})
-    
+
     # RELATIONSHIPS
     role = relationship('Role', back_populates='users')
 ```
@@ -148,11 +148,11 @@ INSERT INTO permissions (name, resource, action) VALUES
 ('review:approve', 'review_item', 'approve');
 
 -- Assign admin role to existing admins (adjust WHERE clause to match your data)
-UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin') 
+UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'admin')
 WHERE is_admin = true;
 
 -- Assign contributor role to remaining users
-UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'contributor') 
+UPDATE users SET role_id = (SELECT id FROM roles WHERE name = 'contributor')
 WHERE role_id IS NULL;
 
 COMMIT;
@@ -262,14 +262,14 @@ async def update_curation_status(id: str, update: StatusUpdate):
   {/* Existing tabs */}
   <Tab name="review">{/* unchanged */}</Tab>
   <Tab name="metadata">{/* unchanged */}</Tab>
-  
+
   {/* New tabs - feature flagged */}
   {hasPermission('review:assign') && (
     <Tab name="assignments">
       <AssignmentHistory itemId={id} />
     </Tab>
   )}
-  
+
   {hasPermission('audit:view') && (
     <Tab name="audit">
       <AuditTrail itemId={id} />
@@ -696,7 +696,7 @@ interface AuthToken {
 
 export function useAuth() {
   const [auth, setAuth] = useState<AuthToken | null>(null);
-  
+
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     if (token) {
@@ -709,7 +709,7 @@ export function useAuth() {
       }
     }
   }, []);
-  
+
   return auth;
 }
 
@@ -727,24 +727,24 @@ interface PermissionGateProps {
   children: React.ReactNode;
 }
 
-export function PermissionGate({ 
-  permission, 
-  fallback = null, 
-  children 
+export function PermissionGate({
+  permission,
+  fallback = null,
+  children
 }: PermissionGateProps) {
   const hasPermission = usePermission(permission);
   const auth = useAuth();
-  
+
   // Loading state: don't flash UI
   if (auth === null) {
     return <Skeleton />;
   }
-  
+
   // Permission check
   if (!hasPermission) {
     return <>{fallback}</>;
   }
-  
+
   return <>{children}</>;
 }
 ```
@@ -816,7 +816,7 @@ COMMIT;
 ```sql
 -- Disable notifications without data loss
 BEGIN;
-ALTER TABLE notification_preferences 
+ALTER TABLE notification_preferences
   ALTER COLUMN in_app_enabled SET DEFAULT false;
 UPDATE notification_preferences SET in_app_enabled = false;
 COMMIT;
@@ -837,11 +837,11 @@ alerts:
   - name: NotificationBacklog
     condition: background_jobs.count{status=pending} > 500
     severity: warning
-    
+
   - name: HighJobFailureRate
     condition: rate(background_jobs.count{status=failed}[5m]) > 0.1
     severity: critical
-    
+
   - name: SlowAPIResponses
     condition: http_request_duration_seconds{quantile=0.95} > 1
     severity: warning
@@ -858,13 +858,13 @@ alerts:
   - [ ] Token format (JWT, opaque)
   - [ ] Session management
   - [ ] Existing user model structure
-  
+
 - [ ] **Identify API clients**
   - [ ] Web UI (Next.js frontend)
   - [ ] Mobile app (if exists)
   - [ ] External integrations
   - [ ] Admin tools
-  
+
 - [ ] **Assess existing infrastructure**
   - [ ] Email service (SMTP, SendGrid, etc.)
   - [ ] Job queue (Celery? Redis? None?)
@@ -1026,13 +1026,13 @@ def validate_pre_migration():
     # Check for conflicting data
     users_without_email = db.query(User).filter(User.email == None).count()
     assert users_without_email == 0, "All users must have emails"
-    
+
     # Check for orphaned records
     orphaned_images = db.query(ImageMetadata).filter(
         ~ImageMetadata.uploader_id.in_(db.query(User.id))
     ).count()
     assert orphaned_images == 0, "No orphaned images allowed"
-    
+
     print("✅ Pre-migration validation passed")
 ```
 
@@ -1046,15 +1046,15 @@ def validate_post_migration():
     # Verify all users have roles
     users_without_roles = db.query(User).filter(User.role_id == None).count()
     assert users_without_roles == 0, "All users must have roles"
-    
+
     # Verify role-permission mappings
     admin_role = db.query(Role).filter_by(name='admin').first()
     assert len(admin_role.permissions) > 0, "Admin must have permissions"
-    
+
     # Verify indexes exist
     indexes = db.execute("SELECT indexname FROM pg_indexes WHERE tablename = 'review_items'")
     assert 'idx_review_items_status' in [r[0] for r in indexes], "Missing index"
-    
+
     print("✅ Post-migration validation passed")
 ```
 
@@ -1068,21 +1068,21 @@ def check_data_integrity():
     # Count records before and after
     pre_count = get_pre_migration_counts()
     post_count = get_post_migration_counts()
-    
+
     assert pre_count['users'] == post_count['users'], "User count mismatch"
     assert pre_count['images'] == post_count['images'], "Image count mismatch"
-    
+
     # Verify referential integrity
     review_items = db.query(ReviewItem).count()
     valid_image_refs = db.query(ReviewItem).join(ImageMetadata).count()
     assert review_items == valid_image_refs, "Invalid image references"
-    
+
     print("✅ Data integrity check passed")
 ```
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: November 10, 2025  
-**Status**: Implementation Strategy - Ready for Technical Review  
+**Document Version**: 1.0
+**Last Updated**: November 10, 2025
+**Status**: Implementation Strategy - Ready for Technical Review
 **Related**: REVIEW_WORKFLOW_ENHANCEMENT_PROPOSAL.md

@@ -85,24 +85,30 @@ export default function SmartSearch() {
     }
   }, []);
 
-  const handleQueryChange = useCallback((value: string) => {
-    setQuery(value);
-    
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
+  const handleQueryChange = useCallback(
+    (value: string) => {
+      setQuery(value);
 
-    debounceRef.current = setTimeout(() => {
-      search(value);
-    }, 300);
-  }, [search]);
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
 
-  const handleSelect = useCallback((imageId: string) => {
-    setOpen(false);
-    setQuery('');
-    setResults([]);
-    router.push(`/images/${imageId}`);
-  }, [router]);
+      debounceRef.current = setTimeout(() => {
+        search(value);
+      }, 300);
+    },
+    [search]
+  );
+
+  const handleSelect = useCallback(
+    (imageId: string) => {
+      setOpen(false);
+      setQuery('');
+      setResults([]);
+      router.push(`/images/${imageId}`);
+    },
+    [router]
+  );
 
   const buildThumbnailUrl = (result: SearchResult) => {
     if (result.thumbnail_url) {
@@ -198,7 +204,8 @@ export default function SmartSearch() {
                       {/* Details */}
                       <div className="flex-1 overflow-hidden">
                         <p className="truncate font-medium text-white">
-                          {sanitizeText(result.title) || sanitizeText(result.filename)}
+                          {sanitizeText(result.title) ||
+                            sanitizeText(result.filename)}
                         </p>
                         <div className="mt-1 flex items-center gap-2 text-xs text-white/60">
                           {result.hazard_type && (

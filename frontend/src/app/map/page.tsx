@@ -15,10 +15,20 @@ import Skeleton from '@/components/design-system/Skeleton';
 import { trackMapInteraction } from '@/lib/analytics';
 import type { HazardType } from '@/lib/types';
 
-const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((m) => m.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((m) => m.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(() => import('react-leaflet').then((m) => m.Marker), {
+  ssr: false,
+});
+const Popup = dynamic(() => import('react-leaflet').then((m) => m.Popup), {
+  ssr: false,
+});
 const MapUsageTracker = dynamic(
   () =>
     import('react-leaflet').then(({ useMapEvents }) => {
@@ -42,7 +52,7 @@ const MapUsageTracker = dynamic(
 
 export default function MapPage() {
   const [createCustomIcon, setCreateCustomIcon] = useState<any>(null);
-  
+
   useEffect(() => {
     configureLeafletIcons();
     // Dynamically import mapUtils only on client-side
@@ -53,14 +63,16 @@ export default function MapPage() {
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['map-images'],
-    queryFn: () => imageApi.search({ limit: 1000 })
+    queryFn: () => imageApi.search({ limit: 1000 }),
   });
 
   const images = data?.images || [];
   const imagesWithCoordinates = images.filter(
-    (img) => typeof img.latitude === 'number' && typeof img.longitude === 'number'
+    (img) =>
+      typeof img.latitude === 'number' && typeof img.longitude === 'number'
   );
-  const errorMessage = error instanceof Error ? error.message : 'Unable to load map data';
+  const errorMessage =
+    error instanceof Error ? error.message : 'Unable to load map data';
 
   useEffect(() => {
     if (imagesWithCoordinates.length > 0) {
@@ -82,9 +94,16 @@ export default function MapPage() {
         <div className="mx-auto max-w-6xl space-y-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-white/60">Interactive Exploration</p>
-              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">Map View</h1>
-              <p className="mt-2 text-sm text-white/70">Locate geotagged hazards with the same glassmorphism styling as the home dashboard.</p>
+              <p className="text-sm uppercase tracking-[0.2em] text-white/60">
+                Interactive Exploration
+              </p>
+              <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
+                Map View
+              </h1>
+              <p className="mt-2 text-sm text-white/70">
+                Locate geotagged hazards with the same glassmorphism styling as
+                the home dashboard.
+              </p>
             </div>
             <Link
               href="/"
@@ -126,40 +145,54 @@ export default function MapPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, ease: 'easeOut' }}
               >
-                <MapContainer center={[0, 0]} zoom={2} className="h-full w-full">
+                <MapContainer
+                  center={[0, 0]}
+                  zoom={2}
+                  className="h-full w-full"
+                >
                   <TileLayer
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution="&copy; OpenStreetMap contributors"
                   />
                   <MapUsageTracker />
-                  {createCustomIcon && imagesWithCoordinates.map((image, index) => (
-                    <Marker
-                      key={image.id}
-                      position={[image.latitude!, image.longitude!] as [number, number]}
-                      icon={createCustomIcon(image.hazard_type)}
-                    >
-                      <Popup>
-                        <motion.div
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.01 }}
-                          className="text-sm space-y-1"
-                        >
-                          <Link href={`/images/${image.id}`} className="text-blue-600 hover:underline font-medium">
-                            {image.title || image.filename}
-                          </Link>
-                          <div className="text-gray-500">
-                            {image.latitude?.toFixed(2)}, {image.longitude?.toFixed(2)}
-                          </div>
-                          {image.hazard_type && (
-                            <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-600 px-2 py-0.5 text-xs font-semibold">
-                              {image.hazard_type}
-                            </span>
-                          )}
-                        </motion.div>
-                      </Popup>
-                    </Marker>
-                  ))}
+                  {createCustomIcon &&
+                    imagesWithCoordinates.map((image, index) => (
+                      <Marker
+                        key={image.id}
+                        position={
+                          [image.latitude!, image.longitude!] as [
+                            number,
+                            number,
+                          ]
+                        }
+                        icon={createCustomIcon(image.hazard_type)}
+                      >
+                        <Popup>
+                          <motion.div
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.01 }}
+                            className="text-sm space-y-1"
+                          >
+                            <Link
+                              href={`/images/${image.id}`}
+                              className="text-blue-600 hover:underline font-medium"
+                            >
+                              {image.title || image.filename}
+                            </Link>
+                            <div className="text-gray-500">
+                              {image.latitude?.toFixed(2)},{' '}
+                              {image.longitude?.toFixed(2)}
+                            </div>
+                            {image.hazard_type && (
+                              <span className="inline-flex items-center rounded-full bg-blue-50 text-blue-600 px-2 py-0.5 text-xs font-semibold">
+                                {image.hazard_type}
+                              </span>
+                            )}
+                          </motion.div>
+                        </Popup>
+                      </Marker>
+                    ))}
                 </MapContainer>
               </motion.div>
             )}
@@ -181,7 +214,11 @@ interface MapInsightsProps {
   hazardTypeCount: number;
 }
 
-function MapInsights({ geocodedCount, missingCoordinates, hazardTypeCount }: MapInsightsProps) {
+function MapInsights({
+  geocodedCount,
+  missingCoordinates,
+  hazardTypeCount,
+}: MapInsightsProps) {
   const cards = [
     {
       label: 'Geocoded submissions',
@@ -244,7 +281,10 @@ function MapInsightsSkeleton() {
 
 function MapLoadingState() {
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-4 text-white/70" role="status">
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-4 text-white/70"
+      role="status"
+    >
       <Skeleton className="h-8 w-48 bg-white/10" />
       <Skeleton className="h-4 w-64 bg-white/10" />
       <div className="flex gap-3">
@@ -260,9 +300,12 @@ function MapLoadingState() {
 function MapEmptyState({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center">
-      <h2 className="text-xl font-semibold text-white">No geocoded submissions yet</h2>
+      <h2 className="text-xl font-semibold text-white">
+        No geocoded submissions yet
+      </h2>
       <p className="text-sm text-white/70">
-        We have not received any reports with coordinates. Invite field teams to capture latitude/longitude or retry the sync once new data lands.
+        We have not received any reports with coordinates. Invite field teams to
+        capture latitude/longitude or retry the sync once new data lands.
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Link

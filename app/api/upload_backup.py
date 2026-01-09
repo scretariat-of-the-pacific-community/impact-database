@@ -64,7 +64,7 @@ class ImageMetadata:
         self.format_version = ""
         self.transfer_options = {}
         self.resource_locator = ""
-        
+
     def to_dict(self):
         return {
             "title": self.title,
@@ -108,45 +108,45 @@ async def update_image_metadata(
     try:
         # First, check if the image exists
         image = db.query(ImageMetadata).filter(ImageMetadata.filename == filename).first()
-        
+
         if not image:
             raise HTTPException(
                 status_code=404,
                 detail=f"Image with filename '{filename}' not found"
             )
-        
+
         # Track changes for logging
         updated_fields = []
-        
+
         # Update fields if provided in the request
         update_data = metadata_update.dict(exclude_unset=True)
-        
+
         for field, value in update_data.items():
             if hasattr(image, field):
                 old_value = getattr(image, field)
                 if old_value != value:
                     setattr(image, field, value)
                     updated_fields.append(field)
-        
+
         if not updated_fields:
             return UpdateResponse(
                 success=True,
                 message="No changes detected",
                 updated_fields=[]
             )
-        
+
         # Commit the changes
         db.commit()
         db.refresh(image)
-        
+
         logging.info(f"Updated metadata for {filename}. Fields changed: {updated_fields}")
-        
+
         return UpdateResponse(
             success=True,
             message=f"Successfully updated {len(updated_fields)} field(s)",
             updated_fields=updated_fields
         )
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -161,7 +161,7 @@ async def update_image_metadata(
                 updated_iso_metadata[field] = value
                 updated_field_names.append(field)
                 iso_fields_updated = True
-        
+
         # Update geographic extent if lat/lon provided
         if metadata_update.latitude is not None and metadata_update.longitude is not None:
             updated_iso_metadata['extent'] = {
@@ -173,43 +173,43 @@ async def update_image_metadata(
                 }
             }
             iso_fields_updated = True
-        
+
         # Add ISO metadata to update if any ISO fields were updated
         if iso_fields_updated:
             updated_iso_metadata['revision_date'] = datetime.utcnow().isoformat()
             update_fields.append("iso_metadata = %s")
             update_values.append(json.dumps(updated_iso_metadata))
-        
+
         if not update_fields:
             raise HTTPException(
                 status_code=400,
                 detail="No valid fields provided for update"
             )
-        
+
         # Add revision date
         update_fields.append("upload_date = %s")
         update_values.append(datetime.utcnow())
         update_values.append(image_id)
-        
+
         # Execute update query
         update_query = f"""
-            UPDATE images 
+            UPDATE images
             SET {', '.join(update_fields)}
             WHERE id = %s
         """
-        
+
         cursor.execute(update_query, update_values)
         connection.commit()
-        
+
         logger.info(f"Updated image {filename} (ID: {image_id}) with fields: {updated_field_names}")
-        
+
         return UpdateResponse(
             message=f"Successfully updated image metadata for '{filename}'",
             updated_image_id=image_id,
             updated_fields=updated_field_names,
             success=True
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -231,27 +231,27 @@ async def delete_image(
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
-        
+
         # First, get the image details
         cursor.execute(
-            "SELECT id, object_key, bucket_name FROM images WHERE filename = %s", 
+            "SELECT id, object_key, bucket_name FROM images WHERE filename = %s",
             (filename,)
         )
         result = cursor.fetchone()
-        
+
         if not result:
             raise HTTPException(
                 status_code=404,
                 detail=f"Image with filename '{filename}' not found"
             )
-        
+
         image_id, object_key, bucket_name = result
-        
+
         # Delete from MinIO first
         try:
             minio_storage.delete_object(object_key)
             logger.info(f"Deleted object from MinIO: {object_key}")
-            
+
             # Also try to delete thumbnail if it exists
             thumbnail_key = f"thumbnails/{object_key}"
             try:
@@ -259,33 +259,33 @@ async def delete_image(
                 logger.info(f"Deleted thumbnail from MinIO: {thumbnail_key}")
             except Exception as e:
                 logger.warning(f"Could not delete thumbnail {thumbnail_key}: {e}")
-                
+
         except Exception as e:
             logger.error(f"Failed to delete object from MinIO: {e}")
             raise HTTPException(
                 status_code=500,
                 detail=f"Failed to delete file from storage: {str(e)}"
             )
-        
+
         # Delete from database
         cursor.execute("DELETE FROM images WHERE id = %s", (image_id,))
-        
+
         if cursor.rowcount == 0:
             raise HTTPException(
                 status_code=404,
                 detail="Image record not found in database"
             )
-        
+
         connection.commit()
         logger.info(f"Deleted image record from database: {filename} (ID: {image_id})")
-        
+
         return DeleteResponse(
             message=f"Successfully deleted image '{filename}' and associated files",
             deleted_image_id=image_id,
             deleted_object_key=object_key,
             success=True
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -306,25 +306,25 @@ async def get_image_metadata(
     try:
         connection = get_db_connection()
         cursor = connection.cursor()
-        
+
         cursor.execute("""
-            SELECT id, filename, title, abstract, object_key, bucket_name, 
+            SELECT id, filename, title, abstract, object_key, bucket_name,
                    resource_locator, upload_date, file_size, latitude, longitude,
                    hazard_type, keywords
             FROM images WHERE filename = %s
         """, (filename,))
-        
+
         result = cursor.fetchone()
-        
+
         if not result:
             raise HTTPException(
                 status_code=404,
                 detail=f"Image with filename '{filename}' not found"
             )
-        
+
         # Parse keywords if they exist
         keywords = json.loads(result[12]) if result[12] else None
-        
+
         return ImageResponse(
             id=result[0],
             filename=result[1],
@@ -340,7 +340,7 @@ async def get_image_metadata(
             hazard_type=result[11],
             keywords=keywords
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -378,12 +378,12 @@ async def upload_file(
                 status_code=400,
                 detail="Only image files are allowed"
             )
-        
+
         # Generate unique filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         file_extension = os.path.splitext(file.filename)[1]
         object_name = f"{timestamp}_{file.filename}"
-        
+
         # Upload to MinIO
         file_content = await file.read()
         upload_url = minio_storage.upload_file(
@@ -391,12 +391,12 @@ async def upload_file(
             file_data=io.BytesIO(file_content),
             content_type=file.content_type
         )
-        
+
         # Parse keywords
         keywords_list = []
         if keywords:
             keywords_list = [kw.strip() for kw in keywords.split(",") if kw.strip()]
-        
+
         # Prepare metadata for database
         file_metadata = {
             "title": title,
@@ -415,14 +415,14 @@ async def upload_file(
             "object_name": object_name,
             "upload_url": upload_url
         }
-        
+
         # Save metadata to database (using your existing database connection)
         connection = get_db_connection()
         cursor = connection.cursor()
-        
+
         # Insert basic record (you may need to adjust this based on your actual schema)
         cursor.execute("""
-            INSERT INTO images (filename, title, abstract, hazard_type, latitude, longitude, 
+            INSERT INTO images (filename, title, abstract, hazard_type, latitude, longitude,
                               keywords, content_type, file_size, object_key, resource_locator, upload_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
@@ -431,15 +431,15 @@ async def upload_file(
             json.dumps(keywords_list), file.content_type, len(file_content),
             object_name, upload_url, datetime.utcnow()
         ))
-        
+
         image_id = cursor.fetchone()[0]
         connection.commit()
         connection.close()
-        
+
         # Queue thumbnail generation task
         thumbnail_task = generate_thumbnail.delay(object_name)
         logger.info(f"Thumbnail generation queued for {object_name}: {thumbnail_task.id}")
-        
+
         return {
             "message": "File uploaded successfully and thumbnail generation queued",
             "file_id": image_id,
@@ -449,7 +449,7 @@ async def upload_file(
             "thumbnail_task_id": thumbnail_task.id,
             "metadata": file_metadata
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -469,27 +469,27 @@ async def regenerate_thumbnail(
         # Verify image exists in database
         connection = get_db_connection()
         cursor = connection.cursor()
-        
+
         cursor.execute("SELECT id, filename FROM images WHERE filename = %s", (filename,))
         result = cursor.fetchone()
         connection.close()
-        
+
         if not result:
             raise HTTPException(
                 status_code=404,
                 detail=f"Image with filename '{filename}' not found"
             )
-        
+
         # Queue thumbnail generation
         thumbnail_task = generate_thumbnail.delay(filename)
         logger.info(f"Thumbnail regeneration queued for {filename}: {thumbnail_task.id}")
-        
+
         return {
             "message": f"Thumbnail regeneration queued for '{filename}'",
             "task_id": thumbnail_task.id,
             "filename": filename
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

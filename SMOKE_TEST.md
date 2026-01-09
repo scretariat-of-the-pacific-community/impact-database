@@ -383,7 +383,7 @@ Use this quick checklist to validate both modes:
 **Solution:** Check logs with `docker compose logs [service]` to identify the root cause (usually DB connection, MinIO, or missing env vars).
 
 ### Problem: "Connection refused" errors
-**Solution:** 
+**Solution:**
 - Ensure services are fully started (wait 30-60 seconds after `docker compose up`)
 - Check `docker compose ps` to verify all services are `Up`
 - Verify ports aren't already in use: `netstat -tuln | grep -E "3000|3001|8000|8001"`

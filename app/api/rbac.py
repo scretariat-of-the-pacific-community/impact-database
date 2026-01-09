@@ -16,7 +16,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1", tags=["RBAC"])
+router = APIRouter(tags=["RBAC"])
 
 
 # Pydantic Models for API
@@ -153,12 +153,15 @@ async def get_permission(
 
 
 # Users Endpoints
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users")
 async def list_users(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(20, ge=1, le=200, description="Items per page"),
     role: Optional[str] = Query(None, description="Filter by role name"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    status: Optional[str] = Query(
+        None, description="Filter by status (active, locked, inactive)"
+    ),
+    search: Optional[str] = Query(None, description="Search by username or email"),
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(require_permission("user:read")),
 ):
@@ -170,13 +173,74 @@ async def list_users(
 
     if role:
         query = query.join(Role).filter(Role.name == role)
-    if is_active is not None:
-        query = query.filter(DBUser.is_active == is_active)
+
+    if status:
+        status = status.lower()
+        if status == "active":
+            query = query.filter(DBUser.is_active.is_(True), DBUser.is_locked.is_(False))
+        elif status == "locked":
+            query = query.filter(DBUser.is_locked.is_(True))
+        elif status == "inactive":
+            query = query.filter(DBUser.is_active.is_(False))
+
+    if search:
+        like_expr = f"%{search}%"
+        query = query.filter(
+            (DBUser.username.ilike(like_expr)) | (DBUser.email.ilike(like_expr))
+        )
 
     total = query.count()
-    users = query.offset(skip).limit(limit).all()
 
-    return [user.to_dict() for user in users]
+    # Basic status counts for UI display
+    active_count = db.query(DBUser).filter(DBUser.is_active.is_(True), DBUser.is_locked.is_(False)).count()
+    locked_count = db.query(DBUser).filter(DBUser.is_locked.is_(True)).count()
+    inactive_count = db.query(DBUser).filter(DBUser.is_active.is_(False)).count()
+
+    # Pagination
+    offset = (page - 1) * page_size
+    users = query.offset(offset).limit(page_size).all()
+
+    return {
+        "users": [user.to_dict() for user in users],
+        "total": total,
+        "active_count": active_count,
+        "locked_count": locked_count,
+        "inactive_count": inactive_count,
+        "pending_count": 0,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": (total + page_size - 1) // page_size if page_size else 0,
+    }
+
+
+@router.post("/users/{user_id}/lock")
+async def lock_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(require_permission("user:update")),
+):
+    user = db.query(DBUser).filter(DBUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_locked = True
+    user.updated_at = datetime.utcnow()
+    db.commit()
+    return {"message": "User locked", "id": str(user.id)}
+
+
+@router.post("/users/{user_id}/unlock")
+async def unlock_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(require_permission("user:update")),
+):
+    user = db.query(DBUser).filter(DBUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.is_locked = False
+    user.updated_at = datetime.utcnow()
+    db.commit()
+    return {"message": "User unlocked", "id": str(user.id)}
 
 
 @router.get("/users/search")

@@ -22,7 +22,7 @@ def upgrade():
     # Add validation_errors column if it doesn't exist
     op.execute(
         """
-        ALTER TABLE audit_logs 
+        ALTER TABLE audit_logs
         ADD COLUMN IF NOT EXISTS validation_errors jsonb;
     """
     )

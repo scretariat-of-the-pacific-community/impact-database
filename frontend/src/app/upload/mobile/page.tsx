@@ -39,18 +39,22 @@ export default function MobileUploadPage() {
     description: '',
     location: '',
   });
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const previousPreviewRef = useRef<string | null>(null);
 
-  const handleDescriptionChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleDescriptionChange = (
+    event: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
     const sanitizedValue = sanitizeInputValue(event.target.value);
     setFormData((prev) => ({ ...prev, description: sanitizedValue }));
   };
 
-  const handleManualLocationChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleManualLocationChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const sanitizedValue = sanitizeInputValue(event.target.value);
     setFormData((prev) => ({ ...prev, location: sanitizedValue }));
   };
@@ -58,10 +62,13 @@ export default function MobileUploadPage() {
   // Cleanup blob URL when captured image changes or unmounts
   useEffect(() => {
     // Revoke previous blob URL if it exists
-    if (previousPreviewRef.current && previousPreviewRef.current !== captured?.preview) {
+    if (
+      previousPreviewRef.current &&
+      previousPreviewRef.current !== captured?.preview
+    ) {
       URL.revokeObjectURL(previousPreviewRef.current);
     }
-    
+
     // Update reference to current preview
     previousPreviewRef.current = captured?.preview || null;
 
@@ -77,7 +84,11 @@ export default function MobileUploadPage() {
   // Request GPS location immediately on mount and cleanup camera stream on unmount
   useEffect(() => {
     // SSR-safe: Check for browser environment and navigator availability
-    if (typeof window !== 'undefined' && typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+    if (
+      typeof window !== 'undefined' &&
+      typeof navigator !== 'undefined' &&
+      'geolocation' in navigator
+    ) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           // GPS acquired successfully
@@ -109,7 +120,7 @@ export default function MobileUploadPage() {
       console.error('Camera access not available during server render');
       return;
     }
-    
+
     try {
       setIsCapturing(true);
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -127,7 +138,8 @@ export default function MobileUploadPage() {
     } catch (error) {
       console.error('[MobileUpload] Camera access error:', error);
       toast.error('Camera access denied', {
-        description: 'Please enable camera permissions in your browser settings.',
+        description:
+          'Please enable camera permissions in your browser settings.',
       });
       setIsCapturing(false);
     }
@@ -140,54 +152,61 @@ export default function MobileUploadPage() {
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
-    
+
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(videoRef.current, 0, 0);
-      
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], `capture-${Date.now()}.jpg`, {
-            type: 'image/jpeg',
-          });
 
-          // Get current GPS location (SSR-safe)
-          if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-            navigator.geolocation.getCurrentPosition(
-              (position) => {
-                setCaptured({
-                  file,
-                  preview: URL.createObjectURL(blob),
-                  location: {
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude,
-                  },
-                  timestamp: new Date(),
-                });
-                closeCamera();
-              },
-              () => {
-                // Still capture image even without GPS
-                setCaptured({
-                  file,
-                  preview: URL.createObjectURL(blob),
-                  location: null,
-                  timestamp: new Date(),
-                });
-                closeCamera();
-              }
-            );
-          } else {
-            setCaptured({
-              file,
-              preview: URL.createObjectURL(blob),
-              location: null,
-              timestamp: new Date(),
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            const file = new File([blob], `capture-${Date.now()}.jpg`, {
+              type: 'image/jpeg',
             });
-            closeCamera();
+
+            // Get current GPS location (SSR-safe)
+            if (
+              typeof navigator !== 'undefined' &&
+              'geolocation' in navigator
+            ) {
+              navigator.geolocation.getCurrentPosition(
+                (position) => {
+                  setCaptured({
+                    file,
+                    preview: URL.createObjectURL(blob),
+                    location: {
+                      latitude: position.coords.latitude,
+                      longitude: position.coords.longitude,
+                    },
+                    timestamp: new Date(),
+                  });
+                  closeCamera();
+                },
+                () => {
+                  // Still capture image even without GPS
+                  setCaptured({
+                    file,
+                    preview: URL.createObjectURL(blob),
+                    location: null,
+                    timestamp: new Date(),
+                  });
+                  closeCamera();
+                }
+              );
+            } else {
+              setCaptured({
+                file,
+                preview: URL.createObjectURL(blob),
+                location: null,
+                timestamp: new Date(),
+              });
+              closeCamera();
+            }
           }
-        }
-      }, 'image/jpeg', 0.92);
+        },
+        'image/jpeg',
+        0.92
+      );
     }
   };
 
@@ -250,12 +269,21 @@ export default function MobileUploadPage() {
       const uploadFormData = new FormData();
       uploadFormData.append('file', captured.file);
       uploadFormData.append('hazard_type', formData.hazard_type || 'other');
-      uploadFormData.append('description', formData.description || 'Mobile upload');
+      uploadFormData.append(
+        'description',
+        formData.description || 'Mobile upload'
+      );
       if (captured.location?.latitude) {
-        uploadFormData.append('latitude', captured.location.latitude.toString());
+        uploadFormData.append(
+          'latitude',
+          captured.location.latitude.toString()
+        );
       }
       if (captured.location?.longitude) {
-        uploadFormData.append('longitude', captured.location.longitude.toString());
+        uploadFormData.append(
+          'longitude',
+          captured.location.longitude.toString()
+        );
       }
       uploadFormData.append('captured_at', captured.timestamp.toISOString());
 
@@ -277,7 +305,7 @@ export default function MobileUploadPage() {
         };
         await queuePendingUpload(captured.file, metadata);
         toast.info('Offline mode', {
-          description: 'Upload queued. Will sync when you\'re back online.',
+          description: "Upload queued. Will sync when you're back online.",
         });
         router.push('/profile?tab=uploads');
       }
@@ -372,7 +400,10 @@ export default function MobileUploadPage() {
               {captured.location && (
                 <div className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-black/50 px-3 py-1 text-xs backdrop-blur-sm">
                   <MapPin className="h-3 w-3 text-emerald-300" />
-                  <span className="text-white">GPS: {captured.location.latitude.toFixed(4)}, {captured.location.longitude.toFixed(4)}</span>
+                  <span className="text-white">
+                    GPS: {captured.location.latitude.toFixed(4)},{' '}
+                    {captured.location.longitude.toFixed(4)}
+                  </span>
                 </div>
               )}
             </div>
@@ -405,11 +436,13 @@ export default function MobileUploadPage() {
                     className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"
                   >
                     <option value="">Select type...</option>
-                    {HAZARD_TYPES.map((type: { value: string; label: string }) => (
-                      <option key={type.value} value={type.value}>
-                        {type.label}
-                      </option>
-                    ))}
+                    {HAZARD_TYPES.map(
+                      (type: { value: string; label: string }) => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
 
@@ -417,22 +450,28 @@ export default function MobileUploadPage() {
                   <label className="mb-1 block text-sm text-white/80">
                     Description
                   </label>
-                <textarea
-                  value={formData.description}
-                  onChange={handleDescriptionChange}
-                  rows={3}
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"
-                  placeholder="Brief description of what you're documenting..."
-                />
+                  <textarea
+                    value={formData.description}
+                    onChange={handleDescriptionChange}
+                    rows={3}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"
+                    placeholder="Brief description of what you're documenting..."
+                  />
                 </div>
 
                 {!captured.location && (
                   <div>
-                    <label className="mb-1 block text-sm text-white/80">
+                    <label
+                      htmlFor="mobile-location"
+                      className="mb-1 block text-sm text-white/80"
+                    >
                       Location (manual)
                     </label>
                     <input
+                      id="mobile-location"
+                      name="location"
                       type="text"
+                      autoComplete="off"
                       value={formData.location}
                       onChange={handleManualLocationChange}
                       className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"

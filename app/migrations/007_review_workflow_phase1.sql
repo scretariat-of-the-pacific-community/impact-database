@@ -7,45 +7,45 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS review_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     image_id UUID UNIQUE NOT NULL REFERENCES image_metadata(id) ON DELETE CASCADE,
-    
+
     -- Status & Priority
     status VARCHAR(50) NOT NULL DEFAULT 'pending',
     priority VARCHAR(20) NOT NULL DEFAULT 'medium',
-    
+
     -- Assignment
     assigned_to UUID REFERENCES users(id),
     assigned_at TIMESTAMP WITH TIME ZONE,
     assigned_by UUID REFERENCES users(id),
-    
+
     -- Submission Info
     submitted_by UUID NOT NULL REFERENCES users(id),
     submitted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
+
     -- Review Info
     reviewed_by UUID REFERENCES users(id),
     reviewed_at TIMESTAMP WITH TIME ZONE,
     reviewer_notes TEXT,
-    
+
     -- Flagging
     is_flagged BOOLEAN NOT NULL DEFAULT false,
     flag_reason TEXT,
     flagged_by UUID REFERENCES users(id),
     flagged_at TIMESTAMP WITH TIME ZONE,
-    
+
     -- Metadata
     title VARCHAR(255),
     description TEXT,
     metadata JSONB NOT NULL DEFAULT '{}',
-    
+
     -- Duplicates
     is_duplicate BOOLEAN NOT NULL DEFAULT false,
     duplicate_of UUID REFERENCES review_items(id),
-    
+
     -- Timing
     due_date TIMESTAMP WITH TIME ZONE,
     last_modified TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     completed_at TIMESTAMP WITH TIME ZONE,
-    
+
     -- Workflow tracking
     workflow_state JSONB NOT NULL DEFAULT '{}',
     review_duration_minutes INTEGER
@@ -81,35 +81,35 @@ CREATE INDEX IF NOT EXISTS idx_review_assignments_assigned_at ON review_assignme
 CREATE TABLE IF NOT EXISTS review_audit_trail (
     id SERIAL PRIMARY KEY,
     review_item_id UUID NOT NULL REFERENCES review_items(id) ON DELETE CASCADE,
-    
+
     -- Action Details
     action VARCHAR(50) NOT NULL,
     actor_id UUID REFERENCES users(id),
     actor_name VARCHAR(255),
     actor_role VARCHAR(50),
-    
+
     -- Change Details
     field_changed VARCHAR(100),
     old_value TEXT,
     new_value TEXT,
     change_summary JSONB,
-    
+
     -- Context
     reason TEXT,
     notes TEXT,
     source VARCHAR(50) NOT NULL DEFAULT 'web',
-    
+
     -- Request metadata
     ip_address VARCHAR(45),
     user_agent TEXT,
     session_id VARCHAR(255),
     request_id VARCHAR(255),
     api_endpoint VARCHAR(255),
-    
+
     -- Timing
     timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     processing_duration_ms INTEGER,
-    
+
     -- Metadata
     metadata JSONB NOT NULL DEFAULT '{}'
 );
@@ -147,10 +147,10 @@ INSERT INTO review_items (
     description,
     metadata
 )
-SELECT 
+SELECT
     gen_random_uuid(),
     im.id,
-    CASE 
+    CASE
         WHEN im.status = 'approved' THEN 'approved'
         WHEN im.status = 'rejected' THEN 'rejected'
         ELSE 'pending'
@@ -181,7 +181,7 @@ INSERT INTO review_audit_trail (
     notes,
     source
 )
-SELECT 
+SELECT
     ri.id,
     'created',
     'system',
@@ -189,7 +189,7 @@ SELECT
     'migration'
 FROM review_items ri
 WHERE NOT EXISTS (
-    SELECT 1 FROM review_audit_trail rat 
+    SELECT 1 FROM review_audit_trail rat
     WHERE rat.review_item_id = ri.id AND rat.action = 'created'
 );
 

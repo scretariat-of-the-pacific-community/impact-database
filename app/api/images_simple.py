@@ -13,7 +13,8 @@ from geoalchemy2 import WKTElement
 from datetime import datetime, time, timezone
 
 from models.database import get_db, ImageMetadata
-from api.auth_rbac import EnhancedUser, get_current_user_enhanced
+from models.review_workflow import ReviewItem, ReviewStatus
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced, get_current_user_optional
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -106,6 +107,7 @@ def _serialize_image(image: ImageMetadata) -> Dict[str, Any]:
         "purpose": getattr(image, "purpose", None),
         "hazard_type": image.hazard_type,
         "source_agency": getattr(image, "source", None) or getattr(image, "source_type", None),
+        "uploader_id": str(image.uploader_id) if hasattr(image, "uploader_id") and image.uploader_id else None,
         "topic_category": (
             image.topic_category
             if hasattr(image, "topic_category") and image.topic_category
@@ -194,11 +196,26 @@ async def get_images(
     hazard_type: Optional[str] = Query(None, description="Filter by hazard type"),
     country: Optional[str] = Query(None, description="Filter by country"),
     db: Session = Depends(get_db),
+    current_user: Optional[EnhancedUser] = Depends(get_current_user_optional),
 ):
     """Get paginated list of images with optional filtering."""
     try:
-        # Build query
+        # Build query with public visibility filter
         query = db.query(ImageMetadata)
+        
+        # PUBLIC VISIBILITY: Only show approved images unless user is authenticated
+        if not current_user:
+            # Public access - show approved images OR images without review items (legacy/development)
+            query = query.outerjoin(ReviewItem, ReviewItem.image_id == ImageMetadata.id).filter(
+                or_(
+                    ReviewItem.status == ReviewStatus.APPROVED.value,
+                    ReviewItem.id == None  # Include images without review items
+                )
+            )
+            logger.debug("Public access - filtering to approved or unreviewed images")
+        else:
+            # Authenticated user - show all their uploads + approved images
+            logger.debug(f"Authenticated access for user {current_user.id}")
 
         # Apply filters
         if hazard_type:
@@ -320,6 +337,12 @@ async def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to fetch image: {str(e)}")
 
 
+@router.get("/{image_id}/metadata", response_model=Dict[str, Any])
+async def get_image_metadata(image_id: str, db: Session = Depends(get_db)):
+    """Get image metadata by ID or filename. Alias for get_image_by_id."""
+    return await get_image_by_id(image_id, db)
+
+
 @router.put("/{image_id}", response_model=Dict[str, Any])
 async def update_image_by_id(
     image_id: str,
@@ -327,8 +350,9 @@ async def update_image_by_id(
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(get_current_user_enhanced),
 ):
-    """Update editable fields for an image record."""
+    """Update editable fields for an image record. Only the uploader or an admin can edit."""
     try:
+        # Check if user has permission to update metadata
         if "metadata:update" not in current_user.permissions:
             raise HTTPException(
                 status_code=403, detail="Insufficient permissions to update image metadata"
@@ -337,6 +361,16 @@ async def update_image_by_id(
         image = _find_image(db, image_id)
         if not image:
             raise HTTPException(status_code=404, detail=f"Image with id '{image_id}' not found")
+
+        # Check if user is the uploader or an admin
+        is_admin = current_user.role in ["admin", "superadmin"]
+        is_uploader = str(image.uploader_id) == str(current_user.id)
+        
+        if not is_admin and not is_uploader:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the image uploader or an administrator can edit this image"
+            )
 
         updated_fields: List[str] = []
 
@@ -441,10 +475,25 @@ async def search_images(
     ),
     sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
     db: Session = Depends(get_db),
+    current_user: Optional[EnhancedUser] = Depends(get_current_user_optional),
 ):
     """Search images with text query, filters, and sorting."""
     try:
         query = db.query(ImageMetadata)
+        
+        # PUBLIC VISIBILITY: Only show approved images unless user is authenticated
+        if not current_user:
+            # Public access - show approved images OR images without review items (legacy/development)
+            query = query.outerjoin(ReviewItem, ReviewItem.image_id == ImageMetadata.id).filter(
+                or_(
+                    ReviewItem.status == ReviewStatus.APPROVED.value,
+                    ReviewItem.id == None  # Include images without review items
+                )
+            )
+            logger.debug("Public search - filtering to approved or unreviewed images")
+        else:
+            logger.debug(f"Authenticated search for user {current_user.id}")
+        
         date_field = (
             ImageMetadata.date_stamp
             if hasattr(ImageMetadata, "date_stamp")

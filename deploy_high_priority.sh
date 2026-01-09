@@ -13,7 +13,7 @@ cd /home/kishank/impact-database/app
 echo "Step 1: Running database migration for uploader indexes..."
 docker compose exec api alembic upgrade head || {
     echo "Alembic migration failed, running SQL directly..."
-    
+
     # Run index migration SQL directly
     docker compose exec -T postgis_db psql -U postgres -d impact_db <<'EOF'
 -- Add uploader_id indexes for performance
@@ -110,11 +110,11 @@ echo ""
 # Check indexes
 echo "Checking indexes..."
 docker compose exec -T postgis_db psql -U postgres -d impact_db -c "
-SELECT 
-    tablename, 
-    indexname 
-FROM pg_indexes 
-WHERE tablename IN ('image_metadata', 'user_achievements') 
+SELECT
+    tablename,
+    indexname
+FROM pg_indexes
+WHERE tablename IN ('image_metadata', 'user_achievements')
 ORDER BY tablename, indexname;
 "
 

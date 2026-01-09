@@ -17,8 +17,8 @@ STAC Items are GeoJSON Features with additional standardized metadata fields.
 
 ✅ **COMPLETE** - All requirements implemented and tested
 
-**File**: `app/services/stac_generator.py`  
-**Tests**: `app/tests/test_stac_generator.py`  
+**File**: `app/services/stac_generator.py`
+**Tests**: `app/tests/test_stac_generator.py`
 **Test Results**: **24/24 tests passing** (100%)
 
 ## Architecture
@@ -128,16 +128,16 @@ return JSONResponse(content=stac_item)
     "description": "Aerial imagery showing inundation extent",
     "created": "2025-11-07T10:35:00Z",
     "updated": "2025-11-07T11:00:00Z",
-    
+
     "hazard:type": "flood",
     "hazard:event_id": "FLOOD_WELLINGTON_2025",
-    
+
     "impact:status": "approved",
     "impact:data_license": "https://creativecommons.org/licenses/by/4.0/",
-    
+
     "quality:positional_accuracy": 10.5,
     "quality:source_type": "citizen",
-    
+
     "contact:uploader_id": "user123",
     "contact:point_of_contact": "disaster@example.com"
   },
@@ -479,13 +479,13 @@ from services.stac_generator import image_to_stac_item
 def get_stac_item_endpoint(image_id: str, db: Session):
     """API endpoint to get STAC Item for a single image"""
     image = db.query(ImageMetadata).filter_by(id=image_id).first()
-    
+
     if not image:
         raise HTTPException(status_code=404, detail="Image not found")
-    
+
     collection_id = get_collection_id_for_image(image)
     stac_item = image_to_stac_item(image, "https://api.example.com", collection_id)
-    
+
     return JSONResponse(content=stac_item)
 ```
 
@@ -498,7 +498,7 @@ def get_approved_stac_items(db: Session):
     """Get all approved images as STAC Items"""
     images = db.query(ImageMetadata).filter_by(status="approved").all()
     stac_items = batch_images_to_stac_items(images, "https://api.example.com")
-    
+
     return {
         "type": "FeatureCollection",
         "features": stac_items
@@ -520,7 +520,7 @@ def search_stac_items(
         .filter_by(hazard_type=hazard_type, status="approved")\
         .limit(limit)\
         .all()
-    
+
     stac_items = []
     for image in images:
         try:
@@ -529,7 +529,7 @@ def search_stac_items(
             stac_items.append(stac_item)
         except ValueError as e:
             logger.error(f"Skipping invalid image {image.id}: {e}")
-    
+
     return {
         "type": "FeatureCollection",
         "features": stac_items,
@@ -627,7 +627,7 @@ To add new properties, update `image_to_stac_item()`:
 ```python
 properties = {
     # ... existing properties ...
-    
+
     # New extension
     "new:property": image.new_field,
 }

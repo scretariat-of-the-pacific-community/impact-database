@@ -1,6 +1,6 @@
 # Code Review - Post Security Fixes Analysis
-**Date**: December 11, 2025  
-**Reviewer**: GitHub Copilot  
+**Date**: December 11, 2025
+**Reviewer**: GitHub Copilot
 **Commit**: 7dc70391
 
 ## ✅ RECENTLY FIXED ISSUES (Commit 7dc70391)
@@ -35,7 +35,7 @@
 SECRET_KEY = os.getenv("SECRET_KEY", "changeme")  # ⚠️ DANGEROUS
 ```
 
-**Risk**: 
+**Risk**:
 - Default key "changeme" allows JWT token forgery
 - Any attacker can generate valid tokens
 - Complete authentication bypass possible
@@ -118,7 +118,7 @@ if len(content) > MAX_SIZE:
 ```python
 # Validate content type
 allowed_mime_types = {
-    'image/jpeg', 'image/png', 'image/gif', 
+    'image/jpeg', 'image/png', 'image/gif',
     'image/webp', 'image/tiff'
 }
 if file.content_type not in allowed_mime_types:

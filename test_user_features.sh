@@ -82,7 +82,7 @@ RATE_LIMITED=false
 for i in {1..12}; do
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/api/user/stats \
       -H "Authorization: Bearer $TOKEN")
-    
+
     if [ "$HTTP_CODE" = "429" ]; then
         echo "✅ Rate limit triggered at request $i (HTTP 429)"
         RATE_LIMITED=true
@@ -109,12 +109,12 @@ fi
 # Test 9: Verify database tables exist
 echo "9. Verifying database tables..."
 docker compose exec -T postgis_db psql -U postgres -d impact_db -c "
-SELECT 
+SELECT
     table_name,
     (SELECT COUNT(*) FROM user_profiles WHERE table_name = 'user_profiles') as profile_count,
     (SELECT COUNT(*) FROM user_settings WHERE table_name = 'user_settings') as settings_count,
     (SELECT COUNT(*) FROM api_tokens WHERE table_name = 'api_tokens') as token_count
-FROM information_schema.tables 
+FROM information_schema.tables
 WHERE table_name IN ('user_profiles', 'user_settings', 'api_tokens')
 ORDER BY table_name;
 " 2>/dev/null

@@ -13,25 +13,25 @@ if curl -s http://localhost:8000/health > /dev/null 2>&1; then
     echo "   📚 API Docs:      http://localhost:8000/docs"
     echo "   📖 ReDoc:         http://localhost:8000/redoc"
     echo ""
-    
+
     # Test the health endpoint
     echo "🩺 Health Status:"
     curl -s http://localhost:8000/health | python3 -m json.tool 2>/dev/null || echo "  Response received but not valid JSON"
-    
+
     echo ""
     echo "📊 Server Info:"
     echo "   Environment: Development (Simplified)"
     echo "   Database: SQLite (local file)"
     echo "   Storage: Local filesystem"
     echo "   Port: 8000"
-    
+
     # Check if there's a log file
     if [ -f "app_output.log" ]; then
         echo ""
         echo "📋 Recent log entries:"
         tail -5 app_output.log | sed 's/^/   /'
     fi
-    
+
 else
     echo "❌ Backend API is not running"
     echo ""

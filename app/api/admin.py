@@ -46,17 +46,26 @@ class UserResponse(BaseModel):
     id: str
     username: str
     email: str
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
     full_name: Optional[str] = None
     role: str
+    permissions: List[str] = []
     custom_permissions: Optional[List[str]] = None
+    organization: Optional[str] = None
+    isActive: bool
     is_active: bool
-    is_verified: bool
+    isLocked: bool
     is_locked: bool
+    lastLogin: Optional[str] = None
+    last_login: Optional[str] = None
+    createdAt: str
     created_at: str
     updated_at: str
-    last_login: Optional[str] = None
-    organization: Optional[str] = None
+    loginAttempts: int = 0
+    is_verified: bool
     position: Optional[str] = None
+    profilePicture: Optional[str] = None
 
 
 class PasswordChangeRequest(BaseModel):
@@ -87,6 +96,14 @@ class DashboardMetrics(BaseModel):
     queue_metrics: Dict[str, int]
     recent_activity: List[Dict[str, Any]]
     system_health: Dict[str, Any]
+
+
+class UsersListResponse(BaseModel):
+    users: List[UserResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 # Dependencies
@@ -127,6 +144,48 @@ def get_client_ip(request: Request) -> str:
     return request.client.host
 
 
+def user_to_response(user: AdminUser) -> UserResponse:
+    """Convert AdminUser to UserResponse with proper field mapping."""
+    user_dict = user.to_dict()
+    
+    # Split full_name into firstName and lastName
+    full_name = user_dict.get('full_name') or ''
+    name_parts = full_name.split(' ', 1) if full_name else ['', '']
+    first_name = name_parts[0] if len(name_parts) > 0 else ''
+    last_name = name_parts[1] if len(name_parts) > 1 else ''
+    
+    # Get all permissions (role + custom)
+    all_permissions = user._get_role_permissions()
+    if user.custom_permissions:
+        all_permissions.extend(user.custom_permissions)
+    
+    return UserResponse(
+        id=user_dict['id'],
+        username=user_dict['username'],
+        email=user_dict['email'],
+        firstName=first_name,
+        lastName=last_name,
+        full_name=user_dict.get('full_name'),
+        role=user_dict['role'],
+        permissions=list(set(all_permissions)),  # Remove duplicates
+        custom_permissions=user_dict.get('custom_permissions'),
+        organization=user_dict.get('organization'),
+        isActive=user_dict['is_active'],
+        is_active=user_dict['is_active'],
+        isLocked=user_dict['is_locked'],
+        is_locked=user_dict['is_locked'],
+        lastLogin=user_dict.get('last_login'),
+        last_login=user_dict.get('last_login'),
+        createdAt=user_dict['created_at'],
+        created_at=user_dict['created_at'],
+        updated_at=user_dict['updated_at'],
+        loginAttempts=user.failed_login_attempts or 0,
+        is_verified=user_dict['is_verified'],
+        position=user_dict.get('position'),
+        profilePicture=None  # TODO: Add profile picture support
+    )
+
+
 # User Management Endpoints
 @router.post("/users", response_model=UserResponse)
 async def create_user(
@@ -153,19 +212,19 @@ async def create_user(
             created_by=admin_user.username,
         )
 
-        return UserResponse(**new_user.to_dict())
+        return user_to_response(new_user)
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/users", response_model=List[UserResponse])
+@router.get("/users", response_model=UsersListResponse)
 async def list_users(
     active_only: bool = Query(True, description="Show only active users"),
     role: Optional[str] = Query(None, description="Filter by role"),
     search: Optional[str] = Query(None, description="Search in username, email, or full name"),
-    limit: int = Query(50, le=100),
-    offset: int = Query(0),
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, le=100, description="Items per page"),
     admin_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)),
     admin_service: AdminService = Depends(get_admin_service),
 ):
@@ -186,8 +245,23 @@ async def list_users(
             | (AdminUser.full_name.ilike(search_term))
         )
 
-    users = query.offset(offset).limit(limit).all()
-    return [UserResponse(**user.to_dict()) for user in users]
+    # Get total count
+    total = query.count()
+    
+    # Calculate offset and pagination
+    offset = (page - 1) * page_size
+    total_pages = (total + page_size - 1) // page_size  # Ceiling division
+
+    # Get paginated users
+    users = query.offset(offset).limit(page_size).all()
+    
+    return UsersListResponse(
+        users=[user_to_response(user) for user in users],
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
@@ -201,7 +275,7 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    return UserResponse(**user.to_dict())
+    return user_to_response(user)
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
@@ -241,7 +315,7 @@ async def update_user(
     user.updated_at = datetime.utcnow()
     admin_service.db.commit()
 
-    return UserResponse(**user.to_dict())
+    return user_to_response(user)
 
 
 @router.post("/users/{user_id}/lock")
@@ -460,11 +534,17 @@ async def bulk_user_action(
                 user.is_active = False
 
             user.updated_at = datetime.utcnow()
+            admin_service.db.add(user)  # Ensure user is in session
             affected += 1
         except Exception as e:
             errors.append({"user_id": user.id, "error": str(e)})
+            admin_service.db.rollback()  # Rollback on error for this user
 
-    admin_service.db.commit()
+    try:
+        admin_service.db.commit()
+    except Exception as e:
+        admin_service.db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to commit changes: {str(e)}")
 
     # Log the action
     admin_service._log_action(
@@ -487,14 +567,43 @@ async def bulk_user_action(
 @router.get("/roles")
 async def list_roles(admin_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS))):
     """List available user roles."""
+    # Define role permissions mapping
+    role_permission_map = {
+        UserRole.VIEWER: [Permission.VIEW_DATA.value],
+        UserRole.CONTRIBUTOR: [
+            Permission.VIEW_DATA.value,
+            Permission.UPLOAD_DATA.value,
+            Permission.EDIT_OWN_DATA.value,
+        ],
+        UserRole.CURATOR: [
+            Permission.VIEW_DATA.value,
+            Permission.UPLOAD_DATA.value,
+            Permission.EDIT_OWN_DATA.value,
+            Permission.EDIT_ANY_DATA.value,
+            Permission.REVIEW_SUBMISSIONS.value,
+            Permission.EXPORT_DATA.value,
+        ],
+        UserRole.ADMIN: [
+            Permission.VIEW_DATA.value,
+            Permission.UPLOAD_DATA.value,
+            Permission.EDIT_OWN_DATA.value,
+            Permission.EDIT_ANY_DATA.value,
+            Permission.DELETE_DATA.value,
+            Permission.REVIEW_SUBMISSIONS.value,
+            Permission.MANAGE_USERS.value,
+            Permission.BULK_IMPORT.value,
+            Permission.EXPORT_DATA.value,
+            Permission.VIEW_AUDIT_LOGS.value,
+        ],
+        UserRole.SUPER_ADMIN: [perm.value for perm in Permission],
+    }
+    
     return {
         "roles": [
             {
                 "value": role.value,
                 "name": role.name,
-                "permissions": (
-                    AdminUser()._get_role_permissions() if role == UserRole.VIEWER else []
-                ),
+                "permissions": role_permission_map.get(role, []),
             }
             for role in UserRole
         ]
@@ -661,7 +770,7 @@ async def get_own_profile(
     if not admin_user:
         raise HTTPException(status_code=404, detail="User profile not found")
 
-    return UserResponse(**admin_user.to_dict())
+    return user_to_response(admin_user)
 
 
 @router.put("/profile")

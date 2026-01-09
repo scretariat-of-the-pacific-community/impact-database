@@ -1,0 +1,54 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+
+# Testing
+tests/
+test/
+e2e/
+*.test.*
+*.spec.*
+coverage/
+.jest/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+
+# Environment files (will be passed via build args)
+.env*
+!.env.example
+
+# TypeScript
+*.tsbuildinfo
+
+# Misc
+.cache/
+.turbo/
+
+# Development scripts
+*.sh

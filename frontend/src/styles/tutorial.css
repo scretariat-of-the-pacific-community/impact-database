@@ -11,7 +11,9 @@
   background: linear-gradient(135deg, #0c1726 0%, #1e2f45 100%) !important;
   border: 1px solid rgba(0, 158, 224, 0.3) !important;
   border-radius: 16px !important;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 158, 224, 0.1) !important;
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(0, 158, 224, 0.1) !important;
   backdrop-filter: blur(16px) !important;
   max-width: 420px !important;
   padding: 0 !important;
@@ -104,7 +106,9 @@
 .driver-popover-next-btn:hover {
   background: linear-gradient(135deg, #00b8ff 0%, #009ee0 100%) !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 4px 16px rgba(0, 158, 224, 0.4), 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+  box-shadow:
+    0 4px 16px rgba(0, 158, 224, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.2) !important;
   border-color: #00b8ff !important;
 }
 
@@ -125,7 +129,9 @@
 /* Active element highlight */
 .driver-active-element {
   border-radius: 8px !important;
-  box-shadow: 0 0 0 4px rgba(0, 158, 224, 0.4), 0 0 0 2px rgba(255, 255, 255, 0.1) !important;
+  box-shadow:
+    0 0 0 4px rgba(0, 158, 224, 0.4),
+    0 0 0 2px rgba(255, 255, 255, 0.1) !important;
 }
 
 /* Arrow styling */
@@ -217,11 +223,16 @@
 
 /* Highlight pulse effect */
 @keyframes highlight-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(0, 158, 224, 0.8), 0 0 0 2px rgba(255, 255, 255, 0.1);
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(0, 158, 224, 0.8),
+      0 0 0 2px rgba(255, 255, 255, 0.1);
   }
   50% {
-    box-shadow: 0 0 0 12px rgba(0, 158, 224, 0), 0 0 0 2px rgba(255, 255, 255, 0.1);
+    box-shadow:
+      0 0 0 12px rgba(0, 158, 224, 0),
+      0 0 0 2px rgba(255, 255, 255, 0.1);
   }
 }
 
@@ -234,7 +245,11 @@
   content: '';
   position: absolute;
   inset: -1px;
-  background: linear-gradient(135deg, rgba(0, 158, 224, 0.15) 0%, rgba(0, 119, 179, 0.05) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(0, 158, 224, 0.15) 0%,
+    rgba(0, 119, 179, 0.05) 100%
+  );
   border-radius: 16px;
   z-index: -1;
   opacity: 0.5;
@@ -269,22 +284,22 @@
   .driver-popover {
     max-width: calc(100vw - 2rem) !important;
   }
-  
+
   .driver-popover-title {
     font-size: 1.125rem !important;
     padding: 1rem 1rem 0 1rem !important;
   }
-  
+
   .driver-popover-description {
     font-size: 0.875rem !important;
     padding: 0 1rem 1rem 1rem !important;
   }
-  
+
   .driver-popover-footer {
     padding: 0.875rem 1rem !important;
     flex-wrap: wrap !important;
   }
-  
+
   .driver-popover-prev-btn,
   .driver-popover-next-btn {
     padding: 0.5rem 1rem !important;

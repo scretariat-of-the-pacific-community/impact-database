@@ -20,12 +20,16 @@ const hazardColorMap: Record<HazardType | string, string> = {
 };
 
 const getHazardLabel = (hazard: string): string => {
-  return HAZARD_TYPE_LABELS[hazard as HazardType] || 
-    hazard.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return (
+    HAZARD_TYPE_LABELS[hazard as HazardType] ||
+    hazard.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  );
 };
 
 const getHazardColor = (hazard: string): string => {
-  return hazardColorMap[hazard as HazardType] || hazardColorMap.other || '#3b82f6';
+  return (
+    hazardColorMap[hazard as HazardType] || hazardColorMap.other || '#3b82f6'
+  );
 };
 
 interface Location {
@@ -109,7 +113,7 @@ export default function AnalyticsMap({ locations, bounds }: AnalyticsMapProps) {
         }
 
         // Small delay to ensure DOM is cleared
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         if (!mounted) {
           isInitializingRef.current = false;
@@ -143,7 +147,11 @@ export default function AnalyticsMap({ locations, bounds }: AnalyticsMapProps) {
 
       // Fit bounds
       try {
-        if (bounds.length === 2 && Array.isArray(bounds[0]) && Array.isArray(bounds[1])) {
+        if (
+          bounds.length === 2 &&
+          Array.isArray(bounds[0]) &&
+          Array.isArray(bounds[1])
+        ) {
           map.fitBounds(bounds, { padding: [20, 20] });
         } else if (bounds.length >= 1) {
           map.setView(bounds[0], 5);
@@ -191,7 +199,7 @@ export default function AnalyticsMap({ locations, bounds }: AnalyticsMapProps) {
     // Cleanup function - runs synchronously before next effect
     return () => {
       mounted = false;
-      
+
       // Prevent duplicate cleanup
       if (cleanupExecutedRef.current) {
         return;
@@ -229,8 +237,8 @@ export default function AnalyticsMap({ locations, bounds }: AnalyticsMapProps) {
   }
 
   return (
-    <div 
-      ref={containerRef} 
+    <div
+      ref={containerRef}
       className="h-96 rounded-xl overflow-hidden"
       style={{ height: '384px', width: '100%' }}
     />

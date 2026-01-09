@@ -30,7 +30,7 @@ CREATE TABLE users (
     last_login TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
+
     -- Profile
     avatar_url VARCHAR(500),
     bio TEXT,
@@ -38,15 +38,15 @@ CREATE TABLE users (
     position VARCHAR(100),
     timezone VARCHAR(50) DEFAULT 'UTC',
     language VARCHAR(10) DEFAULT 'en',
-    
+
     -- Preferences
     notification_preferences JSONB DEFAULT '{"email": true, "slack": false, "in_app": true}',
     review_preferences JSONB DEFAULT '{}',
-    
+
     -- Stats
     reviews_completed INTEGER DEFAULT 0,
     avg_review_time_minutes INTEGER,
-    
+
     INDEX idx_users_email (email),
     INDEX idx_users_username (username),
     INDEX idx_users_role (role_id)
@@ -63,7 +63,7 @@ CREATE TABLE roles (
     level INTEGER NOT NULL, -- Hierarchy: 1=Admin, 2=Senior Reviewer, 3=Reviewer, 4=Contributor
     is_system_role BOOLEAN DEFAULT false, -- Cannot be deleted
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
+
     INDEX idx_roles_name (name),
     INDEX idx_roles_level (level)
 );
@@ -85,7 +85,7 @@ CREATE TABLE permissions (
     resource VARCHAR(50) NOT NULL, -- e.g., 'review_item', 'metadata', 'user'
     action VARCHAR(50) NOT NULL,   -- e.g., 'read', 'create', 'update', 'delete', 'approve'
     description TEXT,
-    
+
     INDEX idx_permissions_resource (resource),
     INDEX idx_permissions_action (action)
 );
@@ -112,7 +112,7 @@ CREATE TABLE role_permissions (
     role_id INTEGER REFERENCES roles(id) ON DELETE CASCADE,
     permission_id INTEGER REFERENCES permissions(id) ON DELETE CASCADE,
     granted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
+
     PRIMARY KEY (role_id, permission_id),
     INDEX idx_role_permissions_role (role_id),
     INDEX idx_role_permissions_permission (permission_id)
@@ -124,50 +124,50 @@ CREATE TABLE role_permissions (
 CREATE TABLE review_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     image_id UUID REFERENCES image_metadata(id) ON DELETE CASCADE,
-    
+
     -- Status & Priority
     status VARCHAR(50) DEFAULT 'pending',
     -- pending, under_review, approved, rejected, needs_changes, duplicate, archived
     priority VARCHAR(20) DEFAULT 'medium', -- low, medium, high, urgent
-    
+
     -- Assignment
     assigned_to UUID REFERENCES users(id),
     assigned_at TIMESTAMP WITH TIME ZONE,
     assigned_by UUID REFERENCES users(id),
-    
+
     -- Submission Info
     submitted_by UUID REFERENCES users(id) NOT NULL,
     submitted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
+
     -- Review Info
     reviewed_by UUID REFERENCES users(id),
     reviewed_at TIMESTAMP WITH TIME ZONE,
     reviewer_notes TEXT,
-    
+
     -- Flagging
     is_flagged BOOLEAN DEFAULT false,
     flag_reason TEXT,
     flagged_by UUID REFERENCES users(id),
     flagged_at TIMESTAMP WITH TIME ZONE,
-    
+
     -- Metadata
     title VARCHAR(255),
     description TEXT,
     metadata JSONB DEFAULT '{}',
-    
+
     -- Duplicates
     is_duplicate BOOLEAN DEFAULT false,
     duplicate_of UUID REFERENCES review_items(id),
-    
+
     -- Timing
     due_date TIMESTAMP WITH TIME ZONE,
     last_modified TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     completed_at TIMESTAMP WITH TIME ZONE,
-    
+
     -- Workflow tracking
     workflow_state JSONB DEFAULT '{}', -- Stores state machine data
     review_duration_minutes INTEGER, -- Auto-calculated on completion
-    
+
     INDEX idx_review_items_status (status),
     INDEX idx_review_items_assigned_to (assigned_to),
     INDEX idx_review_items_submitted_by (submitted_by),
@@ -188,7 +188,7 @@ CREATE TABLE review_assignments (
     unassigned_at TIMESTAMP WITH TIME ZONE,
     reason VARCHAR(50), -- auto, manual, reassigned, escalated
     notes TEXT,
-    
+
     INDEX idx_review_assignments_item (review_item_id),
     INDEX idx_review_assignments_assigned_to (assigned_to),
     INDEX idx_review_assignments_assigned_at (assigned_at)
@@ -206,7 +206,7 @@ CREATE TABLE mentions (
     mentioned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     is_read BOOLEAN DEFAULT false,
     read_at TIMESTAMP WITH TIME ZONE,
-    
+
     INDEX idx_mentions_user (mentioned_user_id),
     INDEX idx_mentions_item (review_item_id),
     INDEX idx_mentions_unread (mentioned_user_id, is_read)
@@ -219,27 +219,27 @@ CREATE TABLE comments (
     id SERIAL PRIMARY KEY,
     review_item_id UUID REFERENCES review_items(id) ON DELETE CASCADE,
     parent_comment_id INTEGER REFERENCES comments(id), -- For threaded comments
-    
+
     author_id UUID REFERENCES users(id),
     content TEXT NOT NULL,
-    
+
     -- Visibility
     is_internal BOOLEAN DEFAULT false, -- Internal team notes vs public
     visibility VARCHAR(20) DEFAULT 'team', -- team, public, private
-    
+
     -- Rich content
     attachments JSONB DEFAULT '[]', -- [{url, filename, type}]
     mentions JSONB DEFAULT '[]', -- [@user_id]
-    
+
     -- Status
     is_edited BOOLEAN DEFAULT false,
     is_deleted BOOLEAN DEFAULT false,
     edited_at TIMESTAMP WITH TIME ZONE,
     deleted_at TIMESTAMP WITH TIME ZONE,
-    
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    
+
     INDEX idx_comments_review_item (review_item_id),
     INDEX idx_comments_author (author_id),
     INDEX idx_comments_created_at (created_at)
@@ -251,41 +251,41 @@ CREATE TABLE comments (
 CREATE TABLE notifications (
     id SERIAL PRIMARY KEY,
     recipient_id UUID REFERENCES users(id),
-    
+
     -- Notification Type
-    type VARCHAR(50) NOT NULL, 
+    type VARCHAR(50) NOT NULL,
     -- assignment, mention, status_change, comment, flag, escalation, due_date, approval
-    
+
     -- Content
     title VARCHAR(255) NOT NULL,
     message TEXT NOT NULL,
     action_url VARCHAR(500),
-    
+
     -- Reference
     review_item_id UUID REFERENCES review_items(id),
     comment_id INTEGER REFERENCES comments(id),
     triggered_by UUID REFERENCES users(id),
-    
+
     -- Delivery Status
     is_read BOOLEAN DEFAULT false,
     read_at TIMESTAMP WITH TIME ZONE,
-    
+
     email_sent BOOLEAN DEFAULT false,
     email_sent_at TIMESTAMP WITH TIME ZONE,
     email_error TEXT,
-    
+
     slack_sent BOOLEAN DEFAULT false,
     slack_sent_at TIMESTAMP WITH TIME ZONE,
     slack_error TEXT,
-    
+
     push_sent BOOLEAN DEFAULT false,
     push_sent_at TIMESTAMP WITH TIME ZONE,
-    
+
     -- Metadata
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     expires_at TIMESTAMP WITH TIME ZONE, -- Auto-delete old notifications
-    
+
     INDEX idx_notifications_recipient (recipient_id),
     INDEX idx_notifications_type (type),
     INDEX idx_notifications_unread (recipient_id, is_read),
@@ -298,18 +298,18 @@ CREATE TABLE notifications (
 CREATE TABLE notification_preferences (
     id SERIAL PRIMARY KEY,
     user_id UUID REFERENCES users(id) UNIQUE,
-    
+
     -- Channel preferences
     email_enabled BOOLEAN DEFAULT true,
     slack_enabled BOOLEAN DEFAULT false,
     in_app_enabled BOOLEAN DEFAULT true,
     push_enabled BOOLEAN DEFAULT false,
-    
+
     -- Frequency
     digest_mode VARCHAR(20) DEFAULT 'instant', -- instant, hourly, daily, weekly
     quiet_hours_start TIME, -- e.g., '22:00:00'
     quiet_hours_end TIME,   -- e.g., '08:00:00'
-    
+
     -- Event-specific preferences
     notify_on_assignment BOOLEAN DEFAULT true,
     notify_on_mention BOOLEAN DEFAULT true,
@@ -317,15 +317,15 @@ CREATE TABLE notification_preferences (
     notify_on_status_change BOOLEAN DEFAULT true,
     notify_on_flag BOOLEAN DEFAULT true,
     notify_on_due_date BOOLEAN DEFAULT true,
-    
+
     -- Digest summary
     last_digest_sent_at TIMESTAMP WITH TIME ZONE,
-    
+
     -- Slack integration
     slack_webhook_url VARCHAR(500),
     slack_channel VARCHAR(100),
     slack_user_id VARCHAR(100),
-    
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -336,41 +336,41 @@ CREATE TABLE notification_preferences (
 CREATE TABLE review_audit_trail (
     id SERIAL PRIMARY KEY,
     review_item_id UUID REFERENCES review_items(id) ON DELETE CASCADE,
-    
+
     -- Action Details
     action VARCHAR(50) NOT NULL,
     -- created, updated, status_changed, assigned, unassigned, flagged, commented,
     -- approved, rejected, metadata_updated, duplicate_marked
-    
+
     actor_id UUID REFERENCES users(id),
     actor_name VARCHAR(255),
     actor_role VARCHAR(50),
-    
+
     -- Change Details
     field_changed VARCHAR(100),
     old_value TEXT,
     new_value TEXT,
     change_summary JSONB, -- Full before/after snapshot
-    
+
     -- Context
     reason TEXT,
     notes TEXT,
     source VARCHAR(50) DEFAULT 'web', -- web, api, background_job, system
-    
+
     -- Request metadata
     ip_address INET,
     user_agent TEXT,
     session_id VARCHAR(255),
     request_id VARCHAR(255),
     api_endpoint VARCHAR(255),
-    
+
     -- Timing
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     processing_duration_ms INTEGER,
-    
+
     -- Metadata
     metadata JSONB DEFAULT '{}',
-    
+
     INDEX idx_audit_review_item (review_item_id),
     INDEX idx_audit_actor (actor_id),
     INDEX idx_audit_action (action),
@@ -383,40 +383,40 @@ CREATE TABLE review_audit_trail (
 CREATE TABLE background_jobs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     job_type VARCHAR(100) NOT NULL,
-    -- send_notification, send_digest, check_due_dates, auto_assign, 
+    -- send_notification, send_digest, check_due_dates, auto_assign,
     -- duplicate_detection, export_report, cleanup
-    
+
     status VARCHAR(20) DEFAULT 'pending',
     -- pending, running, completed, failed, cancelled, retrying
-    
+
     priority INTEGER DEFAULT 0, -- Higher = more priority
-    
+
     -- Payload
     payload JSONB NOT NULL,
     result JSONB,
     error_message TEXT,
     error_stack TEXT,
-    
+
     -- Execution
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     started_at TIMESTAMP WITH TIME ZONE,
     completed_at TIMESTAMP WITH TIME ZONE,
     scheduled_for TIMESTAMP WITH TIME ZONE, -- Delayed execution
-    
+
     -- Retry logic
     attempts INTEGER DEFAULT 0,
     max_attempts INTEGER DEFAULT 3,
     last_attempt_at TIMESTAMP WITH TIME ZONE,
     next_retry_at TIMESTAMP WITH TIME ZONE,
-    
+
     -- Worker info
     worker_id VARCHAR(100),
     worker_hostname VARCHAR(255),
-    
+
     -- Metadata
     created_by UUID REFERENCES users(id),
     related_review_item_id UUID REFERENCES review_items(id),
-    
+
     INDEX idx_jobs_status (status),
     INDEX idx_jobs_type (job_type),
     INDEX idx_jobs_scheduled (scheduled_for),
@@ -432,13 +432,13 @@ CREATE TABLE email_templates (
     subject VARCHAR(255) NOT NULL,
     body_html TEXT NOT NULL,
     body_text TEXT NOT NULL,
-    
+
     -- Variables available: {{user_name}}, {{review_item_title}}, {{action_url}}, etc.
     variables JSONB DEFAULT '[]',
-    
+
     is_active BOOLEAN DEFAULT true,
     category VARCHAR(50), -- assignment, notification, digest, etc.
-    
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -744,32 +744,32 @@ interface ReviewItemState {
   item: ReviewItem | null;
   loading: boolean;
   error: string | null;
-  
+
   // Permissions
   canEdit: boolean;
   canApprove: boolean;
   canAssign: boolean;
   canFlag: boolean;
-  
+
   // UI State
   activeTab: 'review' | 'metadata' | 'comments' | 'audit' | 'duplicates';
   showAssignModal: boolean;
   showFlagModal: boolean;
   showNotificationPreview: boolean;
-  
+
   // Assignment
   assignedUser: User | null;
   assignmentReason: string;
-  
+
   // Comments
   comments: Comment[];
   newComment: string;
   mentionedUsers: string[];
-  
+
   // Audit
   auditEvents: AuditEvent[];
   auditFilter: string;
-  
+
   // Notifications
   unreadNotifications: number;
   notificationPreferences: NotificationPreferences;
@@ -780,7 +780,7 @@ interface ReviewItemState {
 ```typescript
 const usePermission = (permission: string) => {
   const { user } = useAuth();
-  
+
   return useMemo(() => {
     if (!user || !user.role) return false;
     return user.role.permissions.includes(permission);
@@ -918,7 +918,7 @@ const canAssign = usePermission('review:assign');
 def send_notification(self, notification_id: int):
     """
     Send notification via configured channels (email, Slack, in-app)
-    
+
     Payload:
     {
         "notification_id": 123,
@@ -929,16 +929,16 @@ def send_notification(self, notification_id: int):
     try:
         notif = get_notification(notification_id)
         user_prefs = get_user_preferences(notif.recipient_id)
-        
+
         if user_prefs.email_enabled and 'email' in channels:
             send_email(notif)
-        
+
         if user_prefs.slack_enabled and 'slack' in channels:
             send_slack(notif)
-        
+
         # In-app is always created in DB
         mark_notification_created(notification_id)
-        
+
     except Exception as exc:
         # Retry with exponential backoff
         raise self.retry(exc=exc, countdown=60 * (2 ** self.request.retries))
@@ -950,9 +950,9 @@ def send_notification(self, notification_id: int):
 def send_daily_digest():
     """
     Send daily/weekly digest to users who opted in
-    
+
     Runs: Daily at 8 AM user's timezone
-    
+
     Payload:
     {
         "digest_type": "daily",
@@ -960,15 +960,15 @@ def send_daily_digest():
     }
     """
     users = get_users_with_digest_enabled('daily')
-    
+
     for user in users:
         # Check quiet hours
         if is_in_quiet_hours(user):
             continue
-        
+
         # Aggregate notifications
         notifications = get_unread_notifications(user.id, since=yesterday())
-        
+
         if notifications:
             send_digest_email(user, notifications)
 ```
@@ -979,9 +979,9 @@ def send_daily_digest():
 def check_due_dates():
     """
     Check for upcoming/overdue review items and notify assignees
-    
+
     Runs: Every hour
-    
+
     Notifications:
     - 24 hours before: "Reminder: Review due tomorrow"
     - At due time: "Review is now due"
@@ -992,12 +992,12 @@ def check_due_dates():
     upcoming = get_reviews_due_within(hours=24)
     for review in upcoming:
         send_notification(review.assigned_to, 'due_soon', review)
-    
+
     # Overdue
     overdue = get_overdue_reviews()
     for review in overdue:
         days_overdue = (now() - review.due_date).days
-        
+
         if days_overdue == 1:
             send_notification(review.assigned_to, 'overdue', review)
         elif days_overdue == 3:
@@ -1011,9 +1011,9 @@ def check_due_dates():
 def auto_assign_reviews():
     """
     Auto-assign new reviews based on workload balancing
-    
+
     Runs: Every 30 minutes
-    
+
     Logic:
     - Get unassigned items
     - Calculate reviewer workload
@@ -1023,7 +1023,7 @@ def auto_assign_reviews():
     """
     unassigned = get_unassigned_reviews(status='pending')
     reviewers = get_available_reviewers()
-    
+
     for review in unassigned:
         # Find best reviewer
         best_reviewer = find_best_reviewer(
@@ -1031,7 +1031,7 @@ def auto_assign_reviews():
             reviewers,
             criteria=['workload', 'expertise', 'timezone']
         )
-        
+
         if best_reviewer:
             assign_review(review.id, best_reviewer.id, reason='auto_balanced')
 ```
@@ -1042,9 +1042,9 @@ def auto_assign_reviews():
 def detect_duplicates():
     """
     Run duplicate detection on new submissions
-    
+
     Runs: On new submission + Daily batch
-    
+
     Algorithm:
     - Image similarity (perceptual hash)
     - Metadata similarity (location, date, hazard type)
@@ -1052,14 +1052,14 @@ def detect_duplicates():
     - Flag potential duplicates (> 80% similarity)
     """
     recent_images = get_recent_submissions(hours=24)
-    
+
     for image in recent_images:
         similar_images = find_similar_images(
             image,
             threshold=0.8,
             check=['image_hash', 'location', 'metadata']
         )
-        
+
         if similar_images:
             mark_potential_duplicate(image.id, similar_images)
             send_notification(
@@ -1075,9 +1075,9 @@ def detect_duplicates():
 def cleanup_old_data():
     """
     Clean up old notifications, audit logs, etc.
-    
+
     Runs: Daily at 2 AM
-    
+
     Actions:
     - Delete read notifications > 30 days
     - Archive completed jobs > 7 days
@@ -1096,22 +1096,22 @@ def cleanup_old_data():
 def export_audit_report(user_id: str, filters: dict):
     """
     Generate audit report export
-    
+
     Triggered: On-demand by admin
-    
+
     Formats: CSV, JSON, PDF
     """
     audit_logs = get_audit_logs(filters)
-    
+
     # Generate report
     report_file = generate_report(
         audit_logs,
         format=filters.get('format', 'csv')
     )
-    
+
     # Upload to S3
     report_url = upload_to_storage(report_file)
-    
+
     # Notify user
     send_notification(
         user_id,
@@ -1174,7 +1174,7 @@ DEFAULT_FROM_EMAIL = os.getenv('FROM_EMAIL', 'noreply@impactdb.org')
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .header { background: #3b82f6; color: white; padding: 20px; text-align: center; }
     .content { padding: 20px; background: #f9fafb; }
-    .button { background: #3b82f6; color: white; padding: 12px 24px; 
+    .button { background: #3b82f6; color: white; padding: 12px 24px;
               text-decoration: none; border-radius: 6px; display: inline-block; }
   </style>
 </head>
@@ -1185,9 +1185,9 @@ DEFAULT_FROM_EMAIL = os.getenv('FROM_EMAIL', 'noreply@impactdb.org')
     </div>
     <div class="content">
       <p>Hi {{user_name}},</p>
-      
+
       <p>You have been assigned a new review item:</p>
-      
+
       <div style="background: white; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0;">
         <h3 style="margin-top: 0;">{{review_title}}</h3>
         <p><strong>Hazard Type:</strong> {{hazard_type}}</p>
@@ -1195,13 +1195,13 @@ DEFAULT_FROM_EMAIL = os.getenv('FROM_EMAIL', 'noreply@impactdb.org')
         <p><strong>Due Date:</strong> {{due_date}}</p>
         <p><strong>Assigned By:</strong> {{assigned_by}}</p>
       </div>
-      
+
       <p>{{notes}}</p>
-      
+
       <p style="margin-top: 30px;">
         <a href="{{action_url}}" class="button">Review Now</a>
       </p>
-      
+
       <p style="color: #6b7280; font-size: 12px; margin-top: 30px;">
         Impact Database · <a href="{{unsubscribe_url}}">Unsubscribe</a>
       </p>
@@ -1232,7 +1232,7 @@ import requests
 
 def send_slack_notification(webhook_url: str, notification: dict):
     """Send notification to Slack via webhook"""
-    
+
     # Format Slack message
     slack_message = {
         "text": notification['title'],
@@ -1267,7 +1267,7 @@ def send_slack_notification(webhook_url: str, notification: dict):
             }
         ]
     }
-    
+
     response = requests.post(webhook_url, json=slack_message)
     return response.ok
 ```
@@ -1305,7 +1305,7 @@ const ws = new WebSocket('wss://api.example.com/ws/notifications');
 
 ws.onmessage = (event) => {
   const notification = JSON.parse(event.data);
-  
+
   // Show toast notification
   toast.info(notification.title, {
     description: notification.message,
@@ -1314,7 +1314,7 @@ ws.onmessage = (event) => {
       onClick: () => navigate(notification.action_url)
     }
   });
-  
+
   // Update unread count
   dispatch(incrementUnreadCount());
 };
@@ -1403,7 +1403,7 @@ def get_user_permissions(user_id: str) -> List[str]:
 @cache.cached(timeout=60, key_prefix='notification_count')
 def get_unread_notification_count(user_id: str) -> int:
     return db.query(Notification).filter_by(
-        recipient_id=user_id, 
+        recipient_id=user_id,
         is_read=False
     ).count()
 ```
@@ -1453,9 +1453,9 @@ def test_assign_review_item():
     """Test review item assignment"""
     review = create_test_review_item()
     user = create_test_user(role='reviewer')
-    
+
     result = assign_review(review.id, user.id, reason='test')
-    
+
     assert result.assigned_to == user.id
     assert result.status == 'under_review'
     assert notification_sent(user.id, 'assignment')
@@ -1464,7 +1464,7 @@ def test_permission_checking():
     """Test RBAC permission checking"""
     reviewer = create_user(role='reviewer')
     admin = create_user(role='admin')
-    
+
     assert has_permission(reviewer, 'review:read')
     assert not has_permission(reviewer, 'user:manage')
     assert has_permission(admin, 'user:manage')
@@ -1476,21 +1476,21 @@ def test_complete_review_workflow():
     """Test complete review workflow with notifications"""
     # Create submission
     item = create_review_item(submitted_by=contributor_user)
-    
+
     # Auto-assign
     run_job('auto_assign_reviews')
     assert item.assigned_to is not None
     assert notification_exists(item.assigned_to, 'assignment')
-    
+
     # Add comment with mention
     add_comment(item.id, "Hey @senior, please review", author=reviewer)
     assert notification_exists(senior_user, 'mention')
-    
+
     # Approve
     approve_review(item.id, reviewer=reviewer_user)
     assert item.status == 'approved'
     assert notification_exists(contributor_user, 'status_change')
-    
+
     # Check audit trail
     audit = get_audit_trail(item.id)
     assert len(audit) >= 4  # Created, assigned, commented, approved
@@ -1559,6 +1559,6 @@ def test_complete_review_workflow():
 
 ---
 
-**Document Version**: 1.0  
-**Last Updated**: November 10, 2025  
+**Document Version**: 1.0
+**Last Updated**: November 10, 2025
 **Status**: Proposal - Ready for Review

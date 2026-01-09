@@ -1,7 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Upload, Activity, Award, BarChart3, Settings, LucideIcon } from 'lucide-react';
+import {
+  Upload,
+  Activity,
+  Award,
+  BarChart3,
+  Settings,
+  LucideIcon,
+} from 'lucide-react';
 
 interface NavItem {
   id: string;
@@ -15,7 +22,11 @@ interface MobileBottomNavProps {
   items: NavItem[];
 }
 
-export default function MobileBottomNav({ activeTab, onTabChange, items }: MobileBottomNavProps) {
+export default function MobileBottomNav({
+  activeTab,
+  onTabChange,
+  items,
+}: MobileBottomNavProps) {
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 md:hidden"
@@ -27,13 +38,15 @@ export default function MobileBottomNav({ activeTab, onTabChange, items }: Mobil
           {items.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
-            
+
             return (
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
                 className={`relative flex flex-col items-center justify-center min-w-[44px] min-h-[44px] px-3 py-2 rounded-xl transition-all ${
-                  isActive ? 'text-pacific-400' : 'text-white/60 active:bg-white/10'
+                  isActive
+                    ? 'text-pacific-400'
+                    : 'text-white/60 active:bg-white/10'
                 }`}
                 aria-label={`${item.label} tab`}
                 aria-current={isActive ? 'page' : undefined}
@@ -45,8 +58,12 @@ export default function MobileBottomNav({ activeTab, onTabChange, items }: Mobil
                     transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                   />
                 )}
-                <Icon className={`h-5 w-5 mb-0.5 relative z-10 ${isActive ? 'text-pacific-400' : ''}`} />
-                <span className={`text-[10px] font-medium relative z-10 ${isActive ? 'text-pacific-300' : ''}`}>
+                <Icon
+                  className={`h-5 w-5 mb-0.5 relative z-10 ${isActive ? 'text-pacific-400' : ''}`}
+                />
+                <span
+                  className={`text-[10px] font-medium relative z-10 ${isActive ? 'text-pacific-300' : ''}`}
+                >
                   {item.label}
                 </span>
               </button>

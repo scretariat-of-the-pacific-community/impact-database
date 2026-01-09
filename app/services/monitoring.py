@@ -16,8 +16,11 @@ from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTEN
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from middleware.logging import get_logger
 from models.database import get_db, ImageMetadata
 from core.config import settings
+
+logger = get_logger(__name__)
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -538,12 +541,18 @@ async def monitoring_background_tasks():
             # Check alerts every 5 minutes
             alerts = await AlertManager.check_alerts()
             if alerts:
-                print(f"Active alerts: {len(alerts)}")
-                for alert in alerts:
-                    print(f"  {alert['severity']}: {alert['message']}")
+                logger.warning(
+                    "monitoring_alerts_detected",
+                    alert_count=len(alerts),
+                    alerts=alerts,
+                )
 
             await asyncio.sleep(300)  # 5 minutes
 
         except Exception as e:
-            print(f"Monitoring background task error: {e}")
+            logger.error(
+                "monitoring_background_task_error",
+                error=str(e),
+                error_type=type(e).__name__,
+            )
             await asyncio.sleep(60)  # Wait 1 minute before retrying

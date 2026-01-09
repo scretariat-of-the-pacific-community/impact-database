@@ -11,13 +11,13 @@ import random
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import desc, or_
 from sqlalchemy.orm import Session
 
-from api.auth_rbac import EnhancedUser, get_current_user_enhanced
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced, get_current_user_optional
 from models.database import ImageMetadata, get_db
 from models.rbac import User as DBUser
 from models.review_workflow import ReviewItem
@@ -35,14 +35,43 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS middleware - essential for frontend communication
+# Get environment configuration first
+environment = os.getenv("ENVIRONMENT", "development").lower()
+
+# SECURITY FIX: Add security headers middleware
+from middleware.security_headers import SecurityHeadersMiddleware
+
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    environment=environment,
+    enable_hsts=environment == "production",
+)
+
+# CORS middleware - SECURITY FIX: Explicit origin whitelist
+# Only allow requests from trusted frontend origins
+allowed_origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
+]
+
+# Check for production environment and use production domain
+if environment == "production":
+    production_domain = os.getenv("PRODUCTION_DOMAIN", "")
+    if production_domain:
+        allowed_origins = [
+            f"https://{production_domain}",
+            f"https://www.{production_domain}",
+        ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, be more specific
+    allow_origins=allowed_origins,  # SECURITY: Explicit whitelist instead of wildcard
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
-    max_age=86400,  # Cache preflight responses for 24 hours (reduces 300ms overhead)
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],  # Explicit headers
+    max_age=86400,  # Cache preflight responses for 24 hours
 )
 
 
@@ -293,7 +322,7 @@ try:
     # Import RBAC API (Phase 0: Foundation)
     from api.rbac import router as rbac_router
 
-    app.include_router(rbac_router, tags=["rbac"])
+    app.include_router(rbac_router, prefix="/api/rbac", tags=["rbac"])
 
     # Import Review Workflow API (Phase 1: Assignment & Audit Trail)
     from api.review_workflow import router as review_workflow_router
@@ -320,6 +349,16 @@ try:
 
     app.include_router(push_router, prefix="/api", tags=["push-notifications"])
 
+    # Import Batch Upload API
+    from api.batch_upload import router as batch_upload_router
+
+    app.include_router(batch_upload_router, tags=["batch-upload"])
+
+    # Import Curation API for admin review workflow
+    from api.curation import router as curation_router
+
+    app.include_router(curation_router, prefix="/api/admin/curation", tags=["admin", "curation"])
+
     # Initialize cache manager
     try:
         import redis
@@ -341,7 +380,7 @@ try:
         logger.warning(f"Failed to initialize Redis cache: {e}")
 
     logger.info(
-        "Auth API, Images API, Upload API, RBAC API, Review Workflow API, Featured Stories API, User API, Avatar API, and Push Notifications API routers included"
+        "Auth API, Images API, Upload API, RBAC API, Review Workflow API, Curation API, Featured Stories API, User API, Avatar API, and Push Notifications API routers included"
     )
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
@@ -550,6 +589,7 @@ async def search_images(
 
 @app.get("/api/search")
 async def api_search(
+    request: Request,
     q: Optional[str] = None,
     hazard_type: Optional[List[str]] = Query(
         None, description="Filter by hazard type (repeat parameter to select multiple)"
@@ -565,45 +605,37 @@ async def api_search(
     limit: int = 24,
     offset: int = 0,
     page: int = 1,
+    db: Session = Depends(get_db),
+    current_user: Optional[EnhancedUser] = Depends(get_current_user_optional),
 ):
     """
     API search endpoint that frontend uses
     Proxy to the actual images search endpoint
     """
     try:
-        from fastapi import Depends
-        from models.database import get_db
-        from sqlalchemy.orm import Session
         from api.images_simple import search_images as real_search
 
         # Calculate offset from page if provided
         if page > 1:
             offset = (page - 1) * limit
 
-        # Get database session
-        db_gen = get_db()
-        db = next(db_gen)
+        # Call the real search function with properly resolved dependencies
+        result = await real_search(
+            q=q,
+            hazard_type=hazard_type,
+            country=country,
+            source_agency=source_agency,
+            date_from=date_from,
+            date_to=date_to,
+            skip=offset,
+            limit=limit,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            db=db,
+            current_user=current_user,
+        )
 
-        try:
-            # Call the real search function
-            result = await real_search(
-                q=q,
-                hazard_type=hazard_type,
-                country=country,
-                source_agency=source_agency,
-                date_from=date_from,
-                date_to=date_to,
-                skip=offset,
-                limit=limit,
-                sort_by=sort_by,
-                sort_order=sort_order,
-                db=db,
-            )
-
-            return result
-        finally:
-            # Close database session
-            db.close()
+        return result
 
     except Exception as e:
         logger.error(f"Error in API search: {e}")

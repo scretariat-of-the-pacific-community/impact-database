@@ -28,7 +28,7 @@ export const COUNTRY_CODES: Record<string, string> = {
   MP: 'Northern Mariana Islands',
   NF: 'Norfolk Island',
   PN: 'Pitcairn Islands',
-  
+
   // Nearby major countries
   AU: 'Australia',
   NZ: 'New Zealand',
@@ -39,7 +39,7 @@ export const COUNTRY_CODES: Record<string, string> = {
   MY: 'Malaysia',
   TH: 'Thailand',
   VN: 'Vietnam',
-  
+
   // Other common countries
   US: 'United States',
   GB: 'United Kingdom',

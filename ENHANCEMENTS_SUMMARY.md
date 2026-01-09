@@ -25,7 +25,7 @@ python app/scripts/backfill_altitude.py --batch-size 20
 ---
 
 ### 2. Upload Failures Monitoring
-**Files:** 
+**Files:**
 - `app/api/admin_failures.py` (API endpoints)
 - `frontend/src/app/admin/failures/page.tsx` (React UI)
 
@@ -338,7 +338,7 @@ processed_file, format_name = handle_image_format(image_file)
 
 # Disable auto-conversion
 processed_file, format_name = handle_image_format(
-    image_file, 
+    image_file,
     auto_convert_heif=False
 )
 ```
@@ -440,17 +440,17 @@ celery -A app.workers.batch_upload_tasks beat
 1. **Real-time Progress via WebSockets**
    - Replace polling with WebSocket updates
    - Instant progress notifications
-   
+
 2. **Advanced Batch Operations**
    - Resume failed batches
    - Retry individual failures
    - Bulk edit batch metadata
-   
+
 3. **Machine Learning Integration**
    - Auto-categorize hazard types from images
    - Detect GPS spoofing using ML
    - Image quality assessment
-   
+
 4. **Additional Format Support**
    - RAW formats (CR2, NEF, ARW)
    - Video files with GPS tracks
@@ -476,5 +476,5 @@ For issues or questions:
 
 ---
 
-**Last Updated:** 2024-01-XX  
+**Last Updated:** 2024-01-XX
 **Version:** 2.0 (Medium/Long-term Enhancements)

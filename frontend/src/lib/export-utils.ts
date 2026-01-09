@@ -29,7 +29,8 @@ export function exportJSON(data: AnalyticsData, filename?: string): void {
   const url = URL.createObjectURL(dataBlob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `analytics-${new Date().toISOString().split('T')[0]}.json`;
+  link.download =
+    filename || `analytics-${new Date().toISOString().split('T')[0]}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -45,10 +46,22 @@ export function exportCSV(data: AnalyticsData, filename?: string): void {
     ['=== SUMMARY METRICS ==='],
     ['Metric', 'Value'],
     ['Total Images', data.totalImages.toString()],
-    ['Monthly Trend', `${data.trends.monthly > 0 ? '+' : ''}${data.trends.monthly.toFixed(2)}%`],
-    ['Total Growth', `${data.trends.totalGrowth > 0 ? '+' : ''}${data.trends.totalGrowth.toFixed(2)}%`],
-    ['Unique Hazard Types', Object.keys(data.hazardDistribution).length.toString()],
-    ['Unique Countries', Object.keys(data.countryDistribution).length.toString()],
+    [
+      'Monthly Trend',
+      `${data.trends.monthly > 0 ? '+' : ''}${data.trends.monthly.toFixed(2)}%`,
+    ],
+    [
+      'Total Growth',
+      `${data.trends.totalGrowth > 0 ? '+' : ''}${data.trends.totalGrowth.toFixed(2)}%`,
+    ],
+    [
+      'Unique Hazard Types',
+      Object.keys(data.hazardDistribution).length.toString(),
+    ],
+    [
+      'Unique Countries',
+      Object.keys(data.countryDistribution).length.toString(),
+    ],
     [''],
     ['=== HAZARD DISTRIBUTION ==='],
     ['Hazard Type', 'Count', 'Percentage'],
@@ -57,7 +70,7 @@ export function exportCSV(data: AnalyticsData, filename?: string): void {
       .map(([hazard, count]) => [
         hazard,
         count.toString(),
-        `${((count / data.totalImages) * 100).toFixed(2)}%`
+        `${((count / data.totalImages) * 100).toFixed(2)}%`,
       ]),
     [''],
     ['=== COUNTRY DISTRIBUTION ==='],
@@ -67,7 +80,7 @@ export function exportCSV(data: AnalyticsData, filename?: string): void {
       .map(([country, count]) => [
         country,
         count.toString(),
-        `${((count / data.totalImages) * 100).toFixed(2)}%`
+        `${((count / data.totalImages) * 100).toFixed(2)}%`,
       ]),
     [''],
     ['=== MONTHLY UPLOADS ==='],
@@ -77,12 +90,15 @@ export function exportCSV(data: AnalyticsData, filename?: string): void {
       .map(([month, count]) => [month, count.toString()]),
   ];
 
-  const csv = rows.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+  const csv = rows
+    .map((row) => row.map((cell) => `"${cell}"`).join(','))
+    .join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `analytics-${new Date().toISOString().split('T')[0]}.csv`;
+  link.download =
+    filename || `analytics-${new Date().toISOString().split('T')[0]}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }
@@ -97,7 +113,7 @@ async function captureElement(elementId: string): Promise<string | null> {
   try {
     // Dynamic import to avoid SSR issues
     const html2canvas = (await import('html2canvas')).default;
-    
+
     const canvas = await html2canvas(element, {
       backgroundColor: '#020917',
       scale: 2,
@@ -128,34 +144,50 @@ export async function exportPDF(
   // Add title page
   pdf.setFontSize(24);
   pdf.setTextColor(0, 158, 224); // Pacific blue
-  pdf.text('Pacific Impact Atlas', pageWidth / 2, yPosition, { align: 'center' });
-  
+  pdf.text('Pacific Impact Atlas', pageWidth / 2, yPosition, {
+    align: 'center',
+  });
+
   yPosition += 12;
   pdf.setFontSize(18);
   pdf.setTextColor(100, 100, 100);
   pdf.text('Analytics Report', pageWidth / 2, yPosition, { align: 'center' });
-  
+
   yPosition += 10;
   pdf.setFontSize(10);
   pdf.setTextColor(150, 150, 150);
-  pdf.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, yPosition, { align: 'center' });
-  
+  pdf.text(
+    `Generated: ${new Date().toLocaleString()}`,
+    pageWidth / 2,
+    yPosition,
+    { align: 'center' }
+  );
+
   // Executive Summary
   yPosition = 50;
   pdf.setFontSize(16);
   pdf.setTextColor(0, 0, 0);
   pdf.text('Executive Summary', 20, yPosition);
-  
+
   yPosition += 10;
   pdf.setFontSize(10);
   pdf.setTextColor(80, 80, 80);
-  
+
   const summaryData = [
     ['Total Images:', data.totalImages.toString()],
     ['Unique Hazards:', Object.keys(data.hazardDistribution).length.toString()],
-    ['Unique Countries:', Object.keys(data.countryDistribution).length.toString()],
-    ['Monthly Trend:', `${data.trends.monthly > 0 ? '+' : ''}${data.trends.monthly.toFixed(2)}%`],
-    ['Overall Growth:', `${data.trends.totalGrowth > 0 ? '+' : ''}${data.trends.totalGrowth.toFixed(2)}%`],
+    [
+      'Unique Countries:',
+      Object.keys(data.countryDistribution).length.toString(),
+    ],
+    [
+      'Monthly Trend:',
+      `${data.trends.monthly > 0 ? '+' : ''}${data.trends.monthly.toFixed(2)}%`,
+    ],
+    [
+      'Overall Growth:',
+      `${data.trends.totalGrowth > 0 ? '+' : ''}${data.trends.totalGrowth.toFixed(2)}%`,
+    ],
   ];
 
   summaryData.forEach(([label, value]) => {
@@ -171,7 +203,7 @@ export async function exportPDF(
   pdf.setFontSize(14);
   pdf.setTextColor(0, 0, 0);
   pdf.text('Top Hazard Types', 20, yPosition);
-  
+
   yPosition += 8;
   pdf.setFontSize(9);
   data.topHazards.slice(0, 5).forEach(([hazard, count], index) => {
@@ -186,7 +218,7 @@ export async function exportPDF(
   pdf.setFontSize(14);
   pdf.setTextColor(0, 0, 0);
   pdf.text('Top Countries', 20, yPosition);
-  
+
   yPosition += 8;
   pdf.setFontSize(9);
   data.topCountries.slice(0, 5).forEach(([country, count], index) => {
@@ -201,21 +233,25 @@ export async function exportPDF(
     for (const chartId of chartIds) {
       pdf.addPage();
       yPosition = 20;
-      
+
       pdf.setFontSize(14);
       pdf.setTextColor(0, 0, 0);
-      pdf.text(`Chart: ${chartId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`, 20, yPosition);
-      
+      pdf.text(
+        `Chart: ${chartId.replace(/-/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}`,
+        20,
+        yPosition
+      );
+
       const imageData = await captureElement(chartId);
       if (imageData) {
         const imgWidth = pageWidth - 40;
         const imgHeight = (imgWidth * 3) / 4; // 4:3 aspect ratio
-        
+
         if (yPosition + imgHeight > pageHeight - 20) {
           pdf.addPage();
           yPosition = 20;
         }
-        
+
         pdf.addImage(imageData, 'PNG', 20, yPosition + 10, imgWidth, imgHeight);
       }
     }
@@ -232,7 +268,9 @@ export async function exportPDF(
   );
 
   // Save PDF
-  pdf.save(filename || `analytics-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  pdf.save(
+    filename || `analytics-report-${new Date().toISOString().split('T')[0]}.pdf`
+  );
 }
 
 /**
@@ -249,12 +287,13 @@ export function exportTimeSeriesCSV(
       .map(([month, count]) => [month, count.toString()]),
   ];
 
-  const csv = rows.map(row => row.join(',')).join('\n');
+  const csv = rows.map((row) => row.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = filename || `time-series-${new Date().toISOString().split('T')[0]}.csv`;
+  link.download =
+    filename || `time-series-${new Date().toISOString().split('T')[0]}.csv`;
   link.click();
   URL.revokeObjectURL(url);
 }

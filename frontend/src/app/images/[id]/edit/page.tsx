@@ -9,6 +9,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion } from 'framer-motion';
+import { config } from '@/lib/config';
 import {
   ArrowLeft,
   Save,
@@ -25,7 +26,11 @@ import {
   Clock,
 } from 'lucide-react';
 import { imageApi } from '@/lib/api';
-import { FormField, Button, Tag as TagComponent } from '@/components/design-system';
+import {
+  FormField,
+  Button,
+  Tag as TagComponent,
+} from '@/components/design-system';
 import { toast } from 'sonner';
 import dompurify from 'dompurify';
 
@@ -55,10 +60,10 @@ const WaveLoader = () => (
 );
 
 const INPUT_SANITIZE_CONFIG = {
-  ALLOWED_TAGS: [],
-  ALLOWED_ATTR: [],
+  ALLOWED_TAGS: [] as string[],
+  ALLOWED_ATTR: [] as string[],
   KEEP_CONTENT: true,
-} as const;
+};
 
 type SanitizeSetValueOptions = {
   shouldDirty?: boolean;
@@ -97,7 +102,7 @@ export default function EditImagePage() {
   const params = useParams();
   const router = useRouter();
   const pathname = usePathname();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading, hasRole } = useAuth();
   const imageId = params.id as string;
 
   // Auth guard - redirect to login if not authenticated
@@ -121,10 +126,30 @@ export default function EditImagePage() {
   });
 
   // Fetch image data
-  const { data: image, isLoading, error } = useQuery({
+  const {
+    data: image,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['image', imageId],
     queryFn: () => imageApi.getById(imageId),
   });
+
+  // Check if user can edit this image
+  const canEdit = useMemo(() => {
+    if (!image || !user) return false;
+    const isAdmin = hasRole('admin');
+    const isUploader = image.uploader_id === user.id;
+    return isAdmin || isUploader;
+  }, [image, user, hasRole]);
+
+  // Redirect if user cannot edit
+  useEffect(() => {
+    if (!isLoading && !authLoading && image && !canEdit) {
+      toast.error('You do not have permission to edit this image');
+      router.push(`/images/${imageId}`);
+    }
+  }, [image, canEdit, isLoading, authLoading, imageId, router]);
 
   // Fetch version history
   const { data: versionHistory } = useQuery<VersionHistory[]>({
@@ -153,7 +178,7 @@ export default function EditImagePage() {
   } = useForm<EditFormData>();
   const sanitizeInputValue = useCallback(
     (value: string | null | undefined) =>
-      DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG),
+      DOMPurify?.sanitize(value ?? '', INPUT_SANITIZE_CONFIG) ?? value ?? '',
     []
   );
 
@@ -170,7 +195,7 @@ export default function EditImagePage() {
           if (sanitizedValue !== inputValue) {
             event.target.value = sanitizedValue;
           }
-          setValue(name, sanitizedValue as EditFormData[TFieldName], {
+          setValue(name, sanitizedValue as any, {
             shouldDirty: true,
             shouldValidate: true,
           });
@@ -188,7 +213,7 @@ export default function EditImagePage() {
       value: string | null | undefined,
       options?: SanitizeSetValueOptions
     ) => {
-      setValue(name, sanitizeInputValue(value) as EditFormData[TFieldName], options);
+      setValue(name, sanitizeInputValue(value) as any, options);
     },
     [sanitizeInputValue, setValue]
   );
@@ -244,27 +269,86 @@ export default function EditImagePage() {
 
     // Hazard-based keywords
     const hazardKeywords: Record<string, string[]> = {
-      cyclone: ['wind damage', 'storm surge', 'flooding', 'coastal erosion', 'debris'],
-      flood: ['water damage', 'inundation', 'infrastructure', 'displacement', 'sanitation'],
-      tsunami: ['coastal damage', 'wave impact', 'evacuation', 'warning system', 'reconstruction'],
-      earthquake: ['structural damage', 'collapse', 'aftershock', 'rubble', 'rescue operations'],
-      drought: ['water scarcity', 'crop failure', 'desertification', 'livestock', 'food security'],
-      wildfire: ['fire damage', 'smoke', 'vegetation loss', 'evacuation', 'air quality'],
-      landslide: ['slope failure', 'debris flow', 'road blockage', 'erosion', 'displacement'],
-      volcano: ['ash fall', 'lava flow', 'pyroclastic', 'evacuation', 'air quality'],
+      cyclone: [
+        'wind damage',
+        'storm surge',
+        'flooding',
+        'coastal erosion',
+        'debris',
+      ],
+      flood: [
+        'water damage',
+        'inundation',
+        'infrastructure',
+        'displacement',
+        'sanitation',
+      ],
+      tsunami: [
+        'coastal damage',
+        'wave impact',
+        'evacuation',
+        'warning system',
+        'reconstruction',
+      ],
+      earthquake: [
+        'structural damage',
+        'collapse',
+        'aftershock',
+        'rubble',
+        'rescue operations',
+      ],
+      drought: [
+        'water scarcity',
+        'crop failure',
+        'desertification',
+        'livestock',
+        'food security',
+      ],
+      wildfire: [
+        'fire damage',
+        'smoke',
+        'vegetation loss',
+        'evacuation',
+        'air quality',
+      ],
+      landslide: [
+        'slope failure',
+        'debris flow',
+        'road blockage',
+        'erosion',
+        'displacement',
+      ],
+      volcano: [
+        'ash fall',
+        'lava flow',
+        'pyroclastic',
+        'evacuation',
+        'air quality',
+      ],
     };
 
-    if (watchedValues.hazard_type && hazardKeywords[watchedValues.hazard_type.toLowerCase()]) {
-      hazardKeywords[watchedValues.hazard_type.toLowerCase()].forEach((keyword) => {
-        if (!selectedKeywords.includes(keyword)) {
-          suggestions.push({ keyword, relevance: 0.9, source: 'hazard' });
+    if (
+      watchedValues.hazard_type &&
+      hazardKeywords[watchedValues.hazard_type.toLowerCase()]
+    ) {
+      hazardKeywords[watchedValues.hazard_type.toLowerCase()].forEach(
+        (keyword) => {
+          if (!selectedKeywords.includes(keyword)) {
+            suggestions.push({ keyword, relevance: 0.9, source: 'hazard' });
+          }
         }
-      });
+      );
     }
 
     // Location-based keywords
     if (watchedValues.location) {
-      const locationKeywords = ['coastal', 'urban', 'rural', 'infrastructure', 'community'];
+      const locationKeywords = [
+        'coastal',
+        'urban',
+        'rural',
+        'infrastructure',
+        'community',
+      ];
       locationKeywords.forEach((keyword) => {
         if (!selectedKeywords.includes(keyword)) {
           suggestions.push({ keyword, relevance: 0.7, source: 'location' });
@@ -301,7 +385,9 @@ export default function EditImagePage() {
     },
     onSuccess: (_, variables) => {
       const wasDraft = variables.is_draft;
-      toast.success(wasDraft ? 'Draft saved successfully' : 'Image updated successfully');
+      toast.success(
+        wasDraft ? 'Draft saved successfully' : 'Image updated successfully'
+      );
       setHasUnsavedChanges(false);
       if (!wasDraft) {
         router.push(`/images/${imageId}`);
@@ -324,7 +410,11 @@ export default function EditImagePage() {
     })();
   };
 
-  const handleCoordinatesChange = (lat: number, lng: number, locationName?: string) => {
+  const handleCoordinatesChange = (
+    lat: number,
+    lng: number,
+    locationName?: string
+  ) => {
     setValue('latitude', lat, { shouldDirty: true });
     setValue('longitude', lng, { shouldDirty: true });
     if (locationName) {
@@ -362,9 +452,16 @@ export default function EditImagePage() {
       <div className="min-h-screen bg-gradient-to-b from-deep-950 via-deep-900 to-deep-950 flex items-center justify-center">
         <div className="text-center">
           <AlertCircle className="h-16 w-16 text-coral-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-semibold text-white mb-2">Image Not Found</h1>
-          <p className="text-white/70 mb-6">The image you're trying to edit doesn't exist.</p>
-          <Link href="/search" className="text-pacific-400 hover:text-pacific-300">
+          <h1 className="text-2xl font-semibold text-white mb-2">
+            Image Not Found
+          </h1>
+          <p className="text-white/70 mb-6">
+            The image you&apos;re trying to edit doesn&apos;t exist.
+          </p>
+          <Link
+            href="/search"
+            className="text-pacific-400 hover:text-pacific-300"
+          >
             Back to Search
           </Link>
         </div>
@@ -373,8 +470,8 @@ export default function EditImagePage() {
   }
 
   // Construct URLs - use thumbnail for preview, full image for download
-  const thumbnailUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}/thumbnail`;
-  const imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}`;
+  const thumbnailUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent(image.filename)}/thumbnail`;
+  const imageUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent(image.filename)}`;
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -382,7 +479,9 @@ export default function EditImagePage() {
       <div className="min-h-screen bg-gradient-to-br from-deep-900 via-deep-800 to-deep-900 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pacific-400 mx-auto mb-2" />
-          <p className="text-sm text-surface-soft/70">Verifying authentication...</p>
+          <p className="text-sm text-surface-soft/70">
+            Verifying authentication...
+          </p>
         </div>
       </div>
     );
@@ -402,7 +501,11 @@ export default function EditImagePage() {
             <button
               onClick={() => {
                 if (hasUnsavedChanges) {
-                  if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
+                  if (
+                    window.confirm(
+                      'You have unsaved changes. Are you sure you want to leave?'
+                    )
+                  ) {
                     router.push(`/images/${imageId}`);
                   }
                 } else {
@@ -470,7 +573,8 @@ export default function EditImagePage() {
                 {image.latitude && image.longitude && (
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    Coordinates: {image.latitude.toFixed(4)}, {image.longitude.toFixed(4)}
+                    Coordinates: {image.latitude.toFixed(4)},{' '}
+                    {image.longitude.toFixed(4)}
                   </div>
                 )}
               </div>
@@ -500,17 +604,24 @@ export default function EditImagePage() {
                             {version.action}
                           </span>
                         </div>
-                        <div className="text-white/50 line-through">{version.old_value}</div>
+                        <div className="text-white/50 line-through">
+                          {version.old_value}
+                        </div>
                         <div className="text-white/70">{version.new_value}</div>
                         <div className="text-xs text-white/50 mt-1 flex items-center gap-2">
                           <Clock className="h-3 w-3" />
-                          {new Date(version.changed_at).toLocaleString()} by {version.changed_by || 'system'}
+                          {new Date(
+                            version.changed_at
+                          ).toLocaleString()} by{' '}
+                          {version.changed_by || 'system'}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-white/50 text-sm">No edit history available</p>
+                  <p className="text-white/50 text-sm">
+                    No edit history available
+                  </p>
                 )}
               </motion.div>
             )}
@@ -524,7 +635,9 @@ export default function EditImagePage() {
           >
             <form className="space-y-6">
               <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/60 to-deep-900/40 p-6 backdrop-blur">
-                <h2 className="text-xl font-semibold text-white mb-6">Edit Metadata</h2>
+                <h2 className="text-xl font-semibold text-white mb-6">
+                  Edit Metadata
+                </h2>
 
                 {/* Title */}
                 <FormField
@@ -534,7 +647,9 @@ export default function EditImagePage() {
                   required
                 >
                   <input
-                    {...registerSanitizedField('title', { required: 'Title is required' })}
+                    {...registerSanitizedField('title', {
+                      required: 'Title is required',
+                    })}
                     id="edit-title"
                     type="text"
                     className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
@@ -565,27 +680,84 @@ export default function EditImagePage() {
                   required
                 >
                   <select
-                    {...register('hazard_type', { required: 'Hazard type is required' })}
+                    {...register('hazard_type', {
+                      required: 'Hazard type is required',
+                    })}
                     id="edit-hazard-type"
                     className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition appearance-none"
                     style={{
                       backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                       backgroundPosition: 'right 0.5rem center',
                       backgroundRepeat: 'no-repeat',
-                      backgroundSize: '1.5em 1.5em'
+                      backgroundSize: '1.5em 1.5em',
                     }}
                   >
-                    <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Select hazard type</option>
-                    <option value="cyclone" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Cyclone</option>
-                    <option value="flood" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Flood</option>
-                    <option value="tsunami" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Tsunami</option>
-                    <option value="earthquake" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Earthquake</option>
-                    <option value="drought" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Drought</option>
-                    <option value="wildfire" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Wildfire</option>
-                    <option value="landslide" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Landslide</option>
-                    <option value="volcano" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Volcanic Eruption</option>
-                    <option value="storm" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Storm</option>
-                    <option value="other" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Other</option>
+                    <option
+                      value=""
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Select hazard type
+                    </option>
+                    <option
+                      value="cyclone"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Cyclone
+                    </option>
+                    <option
+                      value="flood"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Flood
+                    </option>
+                    <option
+                      value="tsunami"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Tsunami
+                    </option>
+                    <option
+                      value="earthquake"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Earthquake
+                    </option>
+                    <option
+                      value="drought"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Drought
+                    </option>
+                    <option
+                      value="wildfire"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Wildfire
+                    </option>
+                    <option
+                      value="landslide"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Landslide
+                    </option>
+                    <option
+                      value="volcano"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Volcanic Eruption
+                    </option>
+                    <option
+                      value="storm"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Storm
+                    </option>
+                    <option
+                      value="other"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Other
+                    </option>
                   </select>
                 </FormField>
 
@@ -596,6 +768,7 @@ export default function EditImagePage() {
                       {...registerSanitizedField('location')}
                       id="edit-location"
                       type="text"
+                      autoComplete="off"
                       className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
                       placeholder="e.g., Nadi, Fiji"
                     />
@@ -617,13 +790,19 @@ export default function EditImagePage() {
                       watchedValues.latitude && watchedValues.longitude
                         ? [watchedValues.latitude, watchedValues.longitude]
                         : image.latitude && image.longitude
-                        ? [image.latitude, image.longitude]
-                        : undefined
+                          ? [image.latitude, image.longitude]
+                          : undefined
                     }
                     onConfirm={(data) => {
-                      handleCoordinatesChange(data.lat, data.lng, data.placeName);
+                      handleCoordinatesChange(
+                        data.lat,
+                        data.lng,
+                        data.placeName
+                      );
                       if (data.countryCode) {
-                        setValue('country', data.countryCode.toUpperCase(), { shouldDirty: true });
+                        setValue('country', data.countryCode.toUpperCase(), {
+                          shouldDirty: true,
+                        });
                       }
                     }}
                     onCancel={() => setShowMap(false)}
@@ -640,15 +819,29 @@ export default function EditImagePage() {
                       backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                       backgroundPosition: 'right 0.5rem center',
                       backgroundRepeat: 'no-repeat',
-                      backgroundSize: '1.5em 1.5em'
+                      backgroundSize: '1.5em 1.5em',
                     }}
                   >
-                    <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>Select country</option>
-                    {vocabData?.countries?.map((country: { id: string; label: string }) => (
-                      <option key={country.id} value={country.id} style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
-                        {country.label}
-                      </option>
-                    ))}
+                    <option
+                      value=""
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Select country
+                    </option>
+                    {vocabData?.countries?.map(
+                      (country: { id: string; label: string }) => (
+                        <option
+                          key={country.id}
+                          value={country.id}
+                          style={{
+                            backgroundColor: '#0c1222',
+                            color: '#ffffff',
+                          }}
+                        >
+                          {country.label}
+                        </option>
+                      )
+                    )}
                   </select>
                 </FormField>
 
@@ -681,7 +874,9 @@ export default function EditImagePage() {
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Sparkles className="h-4 w-4 text-palm-400" />
-                          <span className="text-sm text-white/70">Suggested Keywords</span>
+                          <span className="text-sm text-white/70">
+                            Suggested Keywords
+                          </span>
                         </div>
                         <div className="flex flex-wrap gap-2">
                           {keywordSuggestions.map((suggestion) => (
@@ -701,7 +896,10 @@ export default function EditImagePage() {
 
                     {/* Manual Keyword Input */}
                     <input
+                      id="custom-keyword"
+                      name="custom-keyword"
                       type="text"
+                      autoComplete="off"
                       className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
                       placeholder="Type and press Enter to add custom keywords"
                       onKeyDown={(e) => {

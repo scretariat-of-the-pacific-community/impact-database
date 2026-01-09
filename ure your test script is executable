@@ -3,7 +3,7 @@ Author: Kishan Chimman Kumar <53712176+kishkumar96@users.noreply.github.com>
 Date:   Sun Aug 10 08:23:00 2025 +0000
 
     🧪 Add comprehensive testing infrastructure and ISO compliance
-    
+
     Major Features Added:
     - Comprehensive test suite (test.sh) with 20 automated tests covering:
       * Infrastructure tests (Docker, Database, Redis, MinIO)
@@ -11,22 +11,22 @@ Date:   Sun Aug 10 08:23:00 2025 +0000
       * Upload and database functionality tests
       * Advanced feature validation (EXIF, ISO vocabulary, GraphQL)
       * Python unit test integration
-    
+
     - Pytest configuration and test dependencies
       * pytest.ini with proper test path configuration
       * requirements-test.txt with all testing dependencies
       * conftest.py with shared test fixtures
       * Unit tests for metadata validation and API endpoints
-    
+
     - ISO 19115 compliance improvements
       * ISO_19115_COMPLIANCE.md documentation
       * migrate_to_iso.py for metadata migration
       * JSON schema validation (metadata.schema.json)
-    
+
     - Enhanced database initialization
       * Improved entrypoint.sh with better error handling
       * Graceful schema creation with conflict resolution
-    
+
     Testing Coverage:
     - ✅ 20 comprehensive system tests
     - ✅ Unit tests for core functionality
@@ -34,7 +34,7 @@ Date:   Sun Aug 10 08:23:00 2025 +0000
     - ✅ Authentication and upload workflow tests
     - ✅ ISO compliance validation
     - ✅ EXIF extraction and metadata validation
-    
+
     This establishes a robust testing foundation for the Impact Database project.
 
  app/.gitignore | 31 [32m+++++++++++++++++++++++++++++++[m

@@ -4,13 +4,14 @@ import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { config } from '@/lib/config';
 import {
   ArrowLeft,
-  MapPin, 
-  Calendar, 
-  Download, 
-  Share2, 
-  Eye, 
+  MapPin,
+  Calendar,
+  Download,
+  Share2,
+  Eye,
   Info,
   Globe,
   Camera,
@@ -21,12 +22,17 @@ import {
   Tag,
   Clock,
   Database,
-  ExternalLink
+  ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 
 import { imageApi } from '@/lib/api';
-import { ImageMetadata, HAZARD_TYPE_LABELS, SOURCE_AGENCY_LABELS, TOPIC_CATEGORY_LABELS } from '@/lib/types';
+import {
+  ImageMetadata,
+  HAZARD_TYPE_LABELS,
+  SOURCE_AGENCY_LABELS,
+  TOPIC_CATEGORY_LABELS,
+} from '@/lib/types';
 
 import dynamic from 'next/dynamic';
 import { configureLeafletIcons } from '@/lib/leaflet-config';
@@ -39,35 +45,56 @@ const formatFileSize = (bytes?: number) => {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 };
 
-const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
-const Marker = dynamic(() => import('react-leaflet').then(m => m.Marker), { ssr: false });
-const Popup = dynamic(() => import('react-leaflet').then(m => m.Popup), { ssr: false });
+const MapContainer = dynamic(
+  () => import('react-leaflet').then((m) => m.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import('react-leaflet').then((m) => m.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(() => import('react-leaflet').then((m) => m.Marker), {
+  ssr: false,
+});
+const Popup = dynamic(() => import('react-leaflet').then((m) => m.Popup), {
+  ssr: false,
+});
 
 export default function ImageDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'overview' | 'metadata' | 'map'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'metadata' | 'map'>(
+    'overview'
+  );
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
-  
+
   const imageId = params.id as string;
-  
+
   // Call hooks before any conditional returns
-  const { data: image, isLoading, error } = useQuery({
+  const {
+    data: image,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['image', imageId],
     queryFn: () => imageApi.getById(imageId),
-    enabled: !!imageId && imageId !== 'undefined' && imageId !== 'null'
+    enabled: !!imageId && imageId !== 'undefined' && imageId !== 'null',
   });
-  
+
   // Handle invalid image IDs
   if (!imageId || imageId === 'undefined' || imageId === 'null') {
     return (
       <div className="min-h-screen bg-deep-950 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-400 text-xl mb-2">Invalid Image ID</div>
-          <p className="text-surface-soft/70 mb-4">No valid image ID was provided</p>
-          <Link href="/search" className="text-pacific-400 hover:text-pacific-300">
+          <p className="text-surface-soft/70 mb-4">
+            No valid image ID was provided
+          </p>
+          <Link
+            href="/search"
+            className="text-pacific-400 hover:text-pacific-300"
+          >
             Back to search
           </Link>
         </div>
@@ -76,7 +103,9 @@ export default function ImageDetailPage() {
   }
 
   // Construct the image URL
-  const imageUrl = image ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/upload/images/${encodeURIComponent(image.filename)}` : '';
+  const imageUrl = image
+    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(image.filename)}`
+    : '';
   const fileSizeLabel = formatFileSize(image?.file_size);
 
   const handleDownload = async () => {
@@ -84,10 +113,10 @@ export default function ImageDetailPage() {
     try {
       setDownloadError(null);
       setIsDownloading(true);
-      
+
       // Use the download=true query parameter to force download
       const downloadUrl = `${imageUrl}?download=true`;
-      
+
       // Use a direct anchor element with the download attribute
       // This allows the browser to handle the download natively
       const link = document.createElement('a');
@@ -97,7 +126,8 @@ export default function ImageDetailPage() {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unable to download file';
+      const message =
+        err instanceof Error ? err.message : 'Unable to download file';
       setDownloadError(message);
     } finally {
       setIsDownloading(false);
@@ -118,8 +148,13 @@ export default function ImageDetailPage() {
       <div className="min-h-screen bg-deep-950 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-400 text-xl mb-2">Image not found</div>
-          <p className="text-surface-soft/70 mb-4">The requested image could not be found</p>
-          <Link href="/search" className="text-pacific-400 hover:text-pacific-300">
+          <p className="text-surface-soft/70 mb-4">
+            The requested image could not be found
+          </p>
+          <Link
+            href="/search"
+            className="text-pacific-400 hover:text-pacific-300"
+          >
             Back to search
           </Link>
         </div>
@@ -146,7 +181,7 @@ export default function ImageDetailPage() {
                 {image.title || image.filename}
               </h1>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               <Link
                 href={`/images/${imageId}/edit`}
@@ -190,6 +225,7 @@ export default function ImageDetailPage() {
                     alt={image.title || image.filename}
                     fill
                     className="object-contain"
+                    unoptimized
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
@@ -217,7 +253,11 @@ export default function ImageDetailPage() {
             <div className="bg-deep-900/50 rounded-2xl border border-white/10 backdrop-blur-sm">
               {/* Tab Navigation */}
               <div className="border-b border-white/10">
-                <nav className="flex space-x-8 px-6" role="navigation" aria-label="Image detail sections">
+                <nav
+                  className="flex space-x-8 px-6"
+                  role="navigation"
+                  aria-label="Image detail sections"
+                >
                   <button
                     onClick={() => setActiveTab('overview')}
                     className={`py-4 border-b-2 font-medium text-sm transition-colors ${
@@ -267,15 +307,20 @@ export default function ImageDetailPage() {
           <div className="space-y-6">
             {/* Basic Information */}
             <div className="bg-deep-900/50 rounded-2xl border border-white/10 p-6 backdrop-blur-sm">
-              <h2 className="text-lg font-semibold text-white mb-4">Quick Info</h2>
-              
+              <h2 className="text-lg font-semibold text-white mb-4">
+                Quick Info
+              </h2>
+
               <div className="space-y-4">
                 <div className="flex items-start space-x-3">
                   <Tag className="w-5 h-5 text-pacific-400 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-white">Hazard Type</p>
+                    <p className="text-sm font-medium text-white">
+                      Hazard Type
+                    </p>
                     <p className="text-sm text-surface-soft capitalize">
-                      {HAZARD_TYPE_LABELS[image.hazard_type] || image.hazard_type}
+                      {HAZARD_TYPE_LABELS[image.hazard_type] ||
+                        image.hazard_type}
                     </p>
                   </div>
                 </div>
@@ -284,9 +329,12 @@ export default function ImageDetailPage() {
                   <div className="flex items-start space-x-3">
                     <Building className="w-5 h-5 text-pacific-400 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-white">Source Agency</p>
+                      <p className="text-sm font-medium text-white">
+                        Source Agency
+                      </p>
                       <p className="text-sm text-surface-soft">
-                        {SOURCE_AGENCY_LABELS[image.source_agency] || image.source_agency}
+                        {SOURCE_AGENCY_LABELS[image.source_agency] ||
+                          image.source_agency}
                       </p>
                     </div>
                   </div>
@@ -295,7 +343,9 @@ export default function ImageDetailPage() {
                 <div className="flex items-start space-x-3">
                   <Calendar className="w-5 h-5 text-pacific-400 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-white">Upload Date</p>
+                    <p className="text-sm font-medium text-white">
+                      Upload Date
+                    </p>
                     <p className="text-sm text-surface-soft">
                       {new Date(image.upload_date).toLocaleDateString()}
                     </p>
@@ -306,9 +356,12 @@ export default function ImageDetailPage() {
                   <div className="flex items-start space-x-3">
                     <MapPin className="w-5 h-5 text-pacific-400 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-white">Coordinates</p>
+                      <p className="text-sm font-medium text-white">
+                        Coordinates
+                      </p>
                       <p className="text-sm text-surface-soft font-mono">
-                        {image.latitude.toFixed(6)}, {image.longitude.toFixed(6)}
+                        {image.latitude.toFixed(6)},{' '}
+                        {image.longitude.toFixed(6)}
                       </p>
                     </div>
                   </div>
@@ -318,7 +371,9 @@ export default function ImageDetailPage() {
                   <div className="flex items-start space-x-3">
                     <FileText className="w-5 h-5 text-pacific-400 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-white">File Info</p>
+                      <p className="text-sm font-medium text-white">
+                        File Info
+                      </p>
                       <p className="text-sm text-surface-soft">
                         {image.format_name || 'Unknown format'}
                         {fileSizeLabel ? ` • ${fileSizeLabel}` : ''}
@@ -332,7 +387,9 @@ export default function ImageDetailPage() {
             {/* Keywords */}
             {image.keywords && image.keywords.length > 0 && (
               <div className="bg-deep-900/50 rounded-2xl border border-white/10 p-6 backdrop-blur-sm">
-                <h2 className="text-lg font-semibold text-white mb-4">Keywords</h2>
+                <h2 className="text-lg font-semibold text-white mb-4">
+                  Keywords
+                </h2>
                 <div className="flex flex-wrap gap-2">
                   {image.keywords.map((keyword, index) => (
                     <span
@@ -349,14 +406,20 @@ export default function ImageDetailPage() {
             {/* Contact Information */}
             {image.contact && (
               <div className="bg-deep-900/50 rounded-2xl border border-white/10 p-6 backdrop-blur-sm">
-                <h2 className="text-lg font-semibold text-white mb-4">Contact</h2>
+                <h2 className="text-lg font-semibold text-white mb-4">
+                  Contact
+                </h2>
                 <div className="space-y-4">
                   {image.contact.organisation_name && (
                     <div className="flex items-start space-x-3">
                       <Building className="w-4 h-4 text-pacific-400 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-white">Organisation</p>
-                        <p className="text-sm text-surface-soft">{image.contact.organisation_name}</p>
+                        <p className="text-sm font-medium text-white">
+                          Organisation
+                        </p>
+                        <p className="text-sm text-surface-soft">
+                          {image.contact.organisation_name}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -364,8 +427,12 @@ export default function ImageDetailPage() {
                     <div className="flex items-start space-x-3">
                       <User className="w-4 h-4 text-pacific-400 mt-0.5" />
                       <div>
-                        <p className="text-sm font-medium text-white">Individual</p>
-                        <p className="text-sm text-surface-soft">{image.contact.individual_name}</p>
+                        <p className="text-sm font-medium text-white">
+                          Individual
+                        </p>
+                        <p className="text-sm text-surface-soft">
+                          {image.contact.individual_name}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -374,7 +441,7 @@ export default function ImageDetailPage() {
                       <ExternalLink className="w-4 h-4 text-pacific-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-white">Email</p>
-                        <a 
+                        <a
                           href={`mailto:${image.contact.contact_info.email}`}
                           className="text-sm text-pacific-400 hover:text-pacific-300"
                         >
@@ -413,16 +480,18 @@ function OverviewTab({ image }: { image: ImageMetadata }) {
       )}
 
       {/* Topic Categories */}
-            {image.topic_category && image.topic_category.length > 0 && (
-              <div>
-                <h3 className="text-lg font-medium text-white mb-3">Topic Categories</h3>
-                <div className="flex flex-wrap gap-2">
-                  {image.topic_category.map((category) => (
-                    <span
-                      key={`${category}-${image.id}`}
-                      className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-green-500/20 text-green-300 border border-green-500/30"
-                    >
-                      {TOPIC_CATEGORY_LABELS[category] || category}
+      {image.topic_category && image.topic_category.length > 0 && (
+        <div>
+          <h3 className="text-lg font-medium text-white mb-3">
+            Topic Categories
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {image.topic_category.map((category) => (
+              <span
+                key={`${category}-${image.id}`}
+                className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-green-500/20 text-green-300 border border-green-500/30"
+              >
+                {TOPIC_CATEGORY_LABELS[category] || category}
               </span>
             ))}
           </div>
@@ -432,31 +501,41 @@ function OverviewTab({ image }: { image: ImageMetadata }) {
       {/* Camera Information */}
       {image.camera_info && (
         <div>
-          <h3 className="text-lg font-medium text-white mb-3">Camera Information</h3>
+          <h3 className="text-lg font-medium text-white mb-3">
+            Camera Information
+          </h3>
           <div className="bg-white/5 rounded-lg p-4 border border-white/10">
             <div className="grid grid-cols-2 gap-4 text-sm">
               {image.camera_info.make && (
                 <div>
                   <span className="font-medium text-white">Make:</span>
-                  <span className="ml-2 text-surface-soft">{image.camera_info.make}</span>
+                  <span className="ml-2 text-surface-soft">
+                    {image.camera_info.make}
+                  </span>
                 </div>
               )}
               {image.camera_info.model && (
                 <div>
                   <span className="font-medium text-white">Model:</span>
-                  <span className="ml-2 text-surface-soft">{image.camera_info.model}</span>
+                  <span className="ml-2 text-surface-soft">
+                    {image.camera_info.model}
+                  </span>
                 </div>
               )}
               {image.camera_info.focal_length && (
                 <div>
                   <span className="font-medium text-white">Focal Length:</span>
-                  <span className="ml-2 text-surface-soft">{image.camera_info.focal_length}</span>
+                  <span className="ml-2 text-surface-soft">
+                    {image.camera_info.focal_length}
+                  </span>
                 </div>
               )}
               {image.camera_info.aperture && (
                 <div>
                   <span className="font-medium text-white">Aperture:</span>
-                  <span className="ml-2 text-surface-soft">{image.camera_info.aperture}</span>
+                  <span className="ml-2 text-surface-soft">
+                    {image.camera_info.aperture}
+                  </span>
                 </div>
               )}
             </div>
@@ -484,24 +563,43 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
     { label: 'Language', value: image.language, icon: Globe },
     { label: 'Character Set', value: image.character_set, icon: FileText },
     { label: 'Hierarchy Level', value: image.hierarchy_level, icon: Shield },
-    { label: 'Date Stamp', value: formatDateStamp(image.date_stamp), icon: Clock },
-    { label: 'Spatial Resolution', value: image.spatial_resolution, icon: MapPin },
-    { label: 'Reference System', value: image.reference_system_info, icon: Globe },
+    {
+      label: 'Date Stamp',
+      value: formatDateStamp(image.date_stamp),
+      icon: Clock,
+    },
+    {
+      label: 'Spatial Resolution',
+      value: image.spatial_resolution,
+      icon: MapPin,
+    },
+    {
+      label: 'Reference System',
+      value: image.reference_system_info,
+      icon: Globe,
+    },
     { label: 'Format Name', value: image.format_name, icon: FileText },
     { label: 'Format Version', value: image.format_version, icon: FileText },
-    { label: 'Access Constraints', value: image.access_constraints, icon: Shield },
+    {
+      label: 'Access Constraints',
+      value: image.access_constraints,
+      icon: Shield,
+    },
     { label: 'Use Constraints', value: image.use_constraints, icon: Shield },
     { label: 'Processing Level', value: image.processing_level, icon: Tag },
   ];
 
-  const validFields = metadataFields.filter(field => field.value);
+  const validFields = metadataFields.filter((field) => field.value);
 
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-white mb-4">ISO 19115 Metadata Record</h3>
+        <h3 className="text-lg font-medium text-white mb-4">
+          ISO 19115 Metadata Record
+        </h3>
         <p className="text-sm text-surface-soft/70 mb-6">
-          This image follows the ISO 19115 geographic information metadata standard.
+          This image follows the ISO 19115 geographic information metadata
+          standard.
         </p>
       </div>
 
@@ -509,11 +607,16 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
         {validFields.map((field) => {
           const IconComponent = field.icon;
           return (
-            <div key={field.label} className="flex items-start space-x-3 py-3 border-b border-white/10 last:border-b-0">
+            <div
+              key={field.label}
+              className="flex items-start space-x-3 py-3 border-b border-white/10 last:border-b-0"
+            >
               <IconComponent className="w-5 h-5 text-pacific-400 mt-0.5 flex-shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-white">{field.label}</p>
-                <p className="text-sm text-surface-soft break-words">{field.value}</p>
+                <p className="text-sm text-surface-soft break-words">
+                  {field.value}
+                </p>
               </div>
             </div>
           );
@@ -523,7 +626,9 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
       {/* Geographic Extent */}
       {image.geographic_element && (
         <div className="mt-6">
-          <h4 className="text-md font-medium text-white mb-3">Geographic Extent</h4>
+          <h4 className="text-md font-medium text-white mb-3">
+            Geographic Extent
+          </h4>
           <div className="bg-white/5 rounded-lg p-4 border border-white/10">
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
@@ -570,8 +675,12 @@ function LocationTab({ image }: { image: ImageMetadata }) {
     return (
       <div className="text-center py-8">
         <MapPin className="w-12 h-12 text-pacific-400 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-white mb-2">No location data</h3>
-        <p className="text-surface-soft/70">This image does not have geographic coordinates.</p>
+        <h3 className="text-lg font-medium text-white mb-2">
+          No location data
+        </h3>
+        <p className="text-surface-soft/70">
+          This image does not have geographic coordinates.
+        </p>
       </div>
     );
   }
@@ -579,33 +688,45 @@ function LocationTab({ image }: { image: ImageMetadata }) {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium text-white mb-4">Location Information</h3>
-        
+        <h3 className="text-lg font-medium text-white mb-4">
+          Location Information
+        </h3>
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div className="bg-white/5 rounded-lg p-4 border border-white/10">
             <h4 className="font-medium text-white mb-2">Coordinates</h4>
             <div className="space-y-2 text-sm">
               <div>
                 <span className="font-medium text-white">Latitude:</span>
-                <span className="ml-2 font-mono text-surface-soft">{image.latitude.toFixed(6)}°</span>
+                <span className="ml-2 font-mono text-surface-soft">
+                  {image.latitude.toFixed(6)}°
+                </span>
               </div>
               <div>
                 <span className="font-medium text-white">Longitude:</span>
-                <span className="ml-2 font-mono text-surface-soft">{image.longitude.toFixed(6)}°</span>
+                <span className="ml-2 font-mono text-surface-soft">
+                  {image.longitude.toFixed(6)}°
+                </span>
               </div>
               <div>
                 <span className="font-medium text-white">System:</span>
-                <span className="ml-2 text-surface-soft">{image.reference_system_info}</span>
+                <span className="ml-2 text-surface-soft">
+                  {image.reference_system_info}
+                </span>
               </div>
             </div>
           </div>
 
           {image.spatial_resolution && (
             <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-              <h4 className="font-medium text-white mb-2">Spatial Information</h4>
+              <h4 className="font-medium text-white mb-2">
+                Spatial Information
+              </h4>
               <div className="text-sm">
                 <span className="font-medium text-white">Resolution:</span>
-                <span className="ml-2 text-surface-soft">{image.spatial_resolution}</span>
+                <span className="ml-2 text-surface-soft">
+                  {image.spatial_resolution}
+                </span>
               </div>
             </div>
           )}

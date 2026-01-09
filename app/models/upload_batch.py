@@ -1,7 +1,6 @@
 """Batch upload model for tracking multi-file upload jobs."""
 
-from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, ForeignKey, JSON
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, JSON
 from datetime import datetime, timezone
 from enum import Enum
 import uuid
@@ -25,7 +24,8 @@ class UploadBatch(Base):
 
     __tablename__ = "upload_batches"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Stored as string (matches existing migrations that create VARCHAR columns)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
 
     # User information
     uploader_id = Column(String, nullable=False, index=True)

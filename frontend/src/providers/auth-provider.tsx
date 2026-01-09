@@ -1,6 +1,12 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  ReactNode,
+} from 'react';
 import { User, AuthSession } from '@/lib/types';
 import { sanitizeReturnUrl, readCookie } from '@/lib/security';
 import { oceanPortalApi } from '@/lib/api';
@@ -44,14 +50,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
 
     try {
-      const safePayload: CachedSessionMetadata = {
-        user: session.user,
-        expires_at: session.expires_at,
+      // SECURITY FIX: Only store non-sensitive UI preferences in localStorage
+      // DO NOT store user IDs, emails, roles, or any authentication data
+      // Session is maintained via HttpOnly cookies set by backend
+      const safePayload = {
+        // Only cache UI preferences, not sensitive data
+        theme: session.user?.preferences?.theme || 'light',
+        language: session.user?.preferences?.language || 'en',
+        // DO NOT include: user.id, user.email, user.role, expires_at, tokens
       };
-      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(safePayload));
-      // Server sets HttpOnly cookie, no need to set it here
+      localStorage.setItem('ui_preferences', JSON.stringify(safePayload));
+      // Actual session is maintained by HttpOnly cookies set server-side
+      // This prevents XSS attacks from stealing session data
     } catch (error) {
-      console.error('Failed to cache session metadata:', error);
+      console.error('Failed to cache UI preferences:', error);
     }
   };
 
@@ -59,7 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // SECURITY: Cookie is now set server-side with HttpOnly flag
     // This function is kept for clearing cookies only
     if (typeof document === 'undefined') return;
-    
+
     if (!token) {
       // Only clear cookie on logout
       document.cookie = `ocean_portal_token=; Max-Age=0; path=/; SameSite=Strict`;
@@ -104,22 +116,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let resolvedUser = cachedSession?.user ?? null;
       let resolvedExpiry = cachedSession?.expires_at ?? 0;
 
-      const cacheExpired = cachedSession ? isCachedSessionExpired(cachedSession) : true;
+      const cacheExpired = cachedSession
+        ? isCachedSessionExpired(cachedSession)
+        : true;
 
       if (!resolvedUser || cacheExpired) {
         try {
           resolvedUser = await oceanPortalApi.getCurrentUser();
-          resolvedExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days to match token expiration
+          resolvedExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days to match token expiration
         } catch (error: any) {
           // Only clear session on actual auth errors, not network errors
-          if (error?.response?.status === 401 || error?.response?.status === 403) {
-            console.error('Session validation failed - authentication error:', error);
+          if (
+            error?.response?.status === 401 ||
+            error?.response?.status === 403
+          ) {
+            console.error(
+              'Session validation failed - authentication error:',
+              error
+            );
             clearCachedSession();
             setSession(null);
             setUser(null);
           } else {
             // Network error or other issue - keep cached session if available
-            console.warn('Failed to validate session, keeping cached data:', error);
+            console.warn(
+              'Failed to validate session, keeping cached data:',
+              error
+            );
             if (cachedSession?.user) {
               resolvedUser = cachedSession.user;
               resolvedExpiry = cachedSession.expires_at;
@@ -137,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!resolvedExpiry) {
-        resolvedExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000);  // 7 days
+        resolvedExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
       }
 
       const restoredSession: AuthSession = {
@@ -179,8 +202,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-
-
   const signOut = async () => {
     try {
       // Clear local state
@@ -193,7 +214,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.location.href = '/';
     } catch (error) {
       console.error('Sign out failed:', error);
-      setAuthError('We were unable to sign you out completely. Please close the tab or try again.');
+      setAuthError(
+        'We were unable to sign you out completely. Please close the tab or try again.'
+      );
       // Still clear local state even if remote logout fails
       window.location.href = '/';
     }
@@ -202,8 +225,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasRole = (role: string): boolean => {
     return user?.roles?.includes(role as any) || false;
   };
-
-
 
   const value: AuthContextType = {
     user,
@@ -216,11 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearError: () => setAuthError(null),
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): AuthContextType {

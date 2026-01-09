@@ -1,10 +1,23 @@
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  LabelList,
+} from 'recharts';
 import { motion } from 'framer-motion';
 import { useMemo } from 'react';
 import { AlertTriangle, MapPin } from 'lucide-react';
-import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import type {
+  NameType,
+  ValueType,
+} from 'recharts/types/component/DefaultTooltipContent';
 
 interface MetricData {
   name: string;
@@ -18,37 +31,57 @@ interface Props {
   className?: string;
 }
 
-const COLORS = ['#009ee0', '#18b374', '#ff6b4a', '#8b5cf6', '#eab308', '#ef4444', '#06b6d4', '#f59e0b', '#84cc16', '#14b8a6'];
+const COLORS = [
+  '#009ee0',
+  '#18b374',
+  '#ff6b4a',
+  '#8b5cf6',
+  '#eab308',
+  '#ef4444',
+  '#06b6d4',
+  '#f59e0b',
+  '#84cc16',
+  '#14b8a6',
+];
 
-export default function ImpactMetricsBar({ data, title, className = '' }: Props) {
-  const sortedData = useMemo(() => 
-    [...data].sort((a, b) => b.value - a.value).slice(0, 10),
+export default function ImpactMetricsBar({
+  data,
+  title,
+  className = '',
+}: Props) {
+  const sortedData = useMemo(
+    () => [...data].sort((a, b) => b.value - a.value).slice(0, 10),
     [data]
   );
 
-  const totalReports = useMemo(() => 
-    data.reduce((sum, item) => sum + item.value, 0),
+  const totalReports = useMemo(
+    () => data.reduce((sum, item) => sum + item.value, 0),
     [data]
   );
 
   const unspecifiedCount = useMemo(() => {
-    const unspecified = data.find(d => 
-      d.name === 'Unspecified location' || 
-      d.name === 'Unknown' ||
-      d.country === 'Unspecified location'
+    const unspecified = data.find(
+      (d) =>
+        d.name === 'Unspecified location' ||
+        d.name === 'Unknown' ||
+        d.country === 'Unspecified location'
     );
     return unspecified?.value || 0;
   }, [data]);
 
-  const unspecifiedPct = useMemo(() => 
-    totalReports > 0 ? Math.round((unspecifiedCount / totalReports) * 100) : 0,
+  const unspecifiedPct = useMemo(
+    () =>
+      totalReports > 0
+        ? Math.round((unspecifiedCount / totalReports) * 100)
+        : 0,
     [unspecifiedCount, totalReports]
   );
 
   const hasUnspecified = unspecifiedCount > 0;
   const topCountry = sortedData[0]?.name || 'N/A';
   const topCountryCount = sortedData[0]?.value || 0;
-  const topCountryPct = totalReports > 0 ? Math.round((topCountryCount / totalReports) * 100) : 0;
+  const topCountryPct =
+    totalReports > 0 ? Math.round((topCountryCount / totalReports) * 100) : 0;
 
   // Generate dynamic insight
   const insight = useMemo(() => {
@@ -56,8 +89,8 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
       return 'No country data available yet.';
     }
 
-    const knownCountries = sortedData.filter(d => 
-      d.name !== 'Unspecified location' && d.name !== 'Unknown'
+    const knownCountries = sortedData.filter(
+      (d) => d.name !== 'Unspecified location' && d.name !== 'Unknown'
     );
 
     if (knownCountries.length === 0) {
@@ -85,17 +118,16 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
   }) => {
     if (active && payload && payload.length) {
       const item = payload[0].payload as MetricData;
-      const pct = totalReports > 0 ? ((item.value / totalReports) * 100).toFixed(1) : '0';
-      
+      const pct =
+        totalReports > 0 ? ((item.value / totalReports) * 100).toFixed(1) : '0';
+
       return (
         <div className="rounded-lg border border-white/20 bg-deep-900/95 p-3 shadow-xl backdrop-blur">
           <p className="font-semibold text-white">{item.name}</p>
           <p className="text-sm text-pacific-300">
             {item.value} report{item.value !== 1 ? 's' : ''}
           </p>
-          <p className="text-xs text-surface-soft">
-            {pct}% of total
-          </p>
+          <p className="text-xs text-surface-soft">{pct}% of total</p>
         </div>
       );
     }
@@ -103,7 +135,11 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
   };
 
   // Edge case: Everything is "Unspecified location"
-  if (sortedData.length === 1 && (sortedData[0].name === 'Unspecified location' || sortedData[0].name === 'Unknown')) {
+  if (
+    sortedData.length === 1 &&
+    (sortedData[0].name === 'Unspecified location' ||
+      sortedData[0].name === 'Unknown')
+  ) {
     return (
       <motion.div
         className={`${className} flex flex-col items-center justify-center rounded-xl border border-coral-500/30 bg-coral-900/20 p-8 text-center`}
@@ -116,8 +152,9 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
           Missing Country Attribution
         </h4>
         <p className="mb-4 max-w-md text-sm text-surface-soft">
-          All {sortedData[0].value} report{sortedData[0].value !== 1 ? 's' : ''} lack country metadata. 
-          Geographic analysis requires location information.
+          All {sortedData[0].value} report{sortedData[0].value !== 1 ? 's' : ''}{' '}
+          lack country metadata. Geographic analysis requires location
+          information.
         </p>
         <div className="text-xs text-surface-soft">
           <p className="font-medium text-pacific-300">Next Actions:</p>
@@ -156,19 +193,27 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
       {title && (
         <h3 className="mb-4 text-lg font-semibold text-white">{title}</h3>
       )}
-      
+
       {/* Warning for high unspecified percentage */}
       {hasUnspecified && unspecifiedPct >= 20 && (
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-coral-500/30 bg-coral-900/10 p-3 text-xs text-surface-soft">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-coral-400" />
           <p>
-            <span className="font-medium text-coral-300">{unspecifiedPct}% of reports</span> lack country metadata. 
-            Some uploads are missing location information.
+            <span className="font-medium text-coral-300">
+              {unspecifiedPct}% of reports
+            </span>{' '}
+            lack country metadata. Some uploads are missing location
+            information.
           </p>
         </div>
       )}
 
-      <ResponsiveContainer width="100%" height={Math.max(300, rankedData.length * 45)} minWidth={100} minHeight={300}>
+      <ResponsiveContainer
+        width="100%"
+        height={Math.max(300, rankedData.length * 45)}
+        minWidth={100}
+        minHeight={300}
+      >
         <BarChart
           data={rankedData}
           layout="vertical"
@@ -189,17 +234,15 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
             width={150}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Bar
-            dataKey="value"
-            radius={[0, 8, 8, 0]}
-            animationDuration={1000}
-          >
+          <Bar dataKey="value" radius={[0, 8, 8, 0]} animationDuration={1000}>
             {rankedData.map((entry, index) => (
               <Cell
                 key={`cell-${index}`}
-                fill={entry.name === 'Unspecified location' || entry.name === 'Unknown' 
-                  ? '#6b7280' // Gray for unspecified
-                  : COLORS[index % COLORS.length]
+                fill={
+                  entry.name === 'Unspecified location' ||
+                  entry.name === 'Unknown'
+                    ? '#6b7280' // Gray for unspecified
+                    : COLORS[index % COLORS.length]
                 }
               />
             ))}
@@ -214,12 +257,10 @@ export default function ImpactMetricsBar({ data, title, className = '' }: Props)
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      
+
       {/* Insight Line */}
       <div className="mt-3 border-t border-white/5 pt-3">
-        <p className="text-xs text-surface-soft">
-          💡 {insight}
-        </p>
+        <p className="text-xs text-surface-soft">💡 {insight}</p>
       </div>
     </motion.div>
   );

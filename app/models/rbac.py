@@ -121,6 +121,7 @@ class User(Base):
     # Status flags
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
+    is_locked = Column(Boolean, default=False)
 
     # Timestamps
     last_login = Column(DateTime(timezone=True), nullable=True)

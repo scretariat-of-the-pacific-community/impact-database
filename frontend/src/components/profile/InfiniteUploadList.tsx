@@ -9,7 +9,8 @@ import { Card, Button } from '@/components/design-system';
 import { imageApi } from '@/lib/api';
 import { HAZARD_TYPE_LABELS } from '@/lib/types';
 
-const glassCard = 'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
+const glassCard =
+  'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
 const PAGE_SIZE = 20;
 
 interface Upload {
@@ -31,9 +32,12 @@ interface InfiniteUploadListProps {
   isActive?: boolean;
 }
 
-export default function InfiniteUploadList({ enabled, isActive = true }: InfiniteUploadListProps) {
+export default function InfiniteUploadList({
+  enabled,
+  isActive = true,
+}: InfiniteUploadListProps) {
   const observerTarget = useRef<HTMLDivElement>(null);
-  
+
   // Only fetch when enabled AND tab is active
   const shouldFetch = enabled && isActive;
 
@@ -95,7 +99,9 @@ export default function InfiniteUploadList({ enabled, isActive = true }: Infinit
     return (
       <div className="rounded-2xl border border-dashed border-coral-500/20 bg-coral-500/5 p-8 text-center">
         <p className="text-coral-200">Failed to load uploads</p>
-        <p className="text-sm text-coral-200/70 mt-2">{(error as Error).message}</p>
+        <p className="text-sm text-coral-200/70 mt-2">
+          {(error as Error).message}
+        </p>
       </div>
     );
   }
@@ -108,9 +114,22 @@ export default function InfiniteUploadList({ enabled, isActive = true }: Infinit
     );
   }
 
-  const UploadRow = ({ index, style }: { index: number; style: React.CSSProperties }) => {
+  const UploadRow = ({
+    index,
+    style,
+  }: {
+    index: number;
+    style: React.CSSProperties;
+  }) => {
     const upload = uploads[index];
-    const statusConfig: Record<string, { label: string; className: string; Icon: ComponentType<{ className?: string }> }> = {
+    const statusConfig: Record<
+      string,
+      {
+        label: string;
+        className: string;
+        Icon: ComponentType<{ className?: string }>;
+      }
+    > = {
       approved: {
         label: 'Approved',
         className: 'bg-emerald-400/20 text-emerald-200',
@@ -128,7 +147,7 @@ export default function InfiniteUploadList({ enabled, isActive = true }: Infinit
       },
     };
     const status = statusConfig[upload.approval_status] || statusConfig.pending;
-    
+
     return (
       <div style={style} className="px-2">
         <Card
@@ -159,7 +178,9 @@ export default function InfiniteUploadList({ enabled, isActive = true }: Infinit
           <div className="mt-4 flex items-center justify-between text-sm text-white/60">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <MapPin className="h-4 w-4 text-pacific-300 flex-shrink-0" />
-              <span className="truncate">{upload.location || 'Location pending'}</span>
+              <span className="truncate">
+                {upload.location || 'Location pending'}
+              </span>
             </div>
             <Button
               variant="secondary"
@@ -180,9 +201,13 @@ export default function InfiniteUploadList({ enabled, isActive = true }: Infinit
       {/* Mobile: Simple list with infinite scroll */}
       <div className="md:hidden">
         {uploads.map((upload) => (
-          <UploadRow key={upload.id} index={uploads.indexOf(upload)} style={{}} />
+          <UploadRow
+            key={upload.id}
+            index={uploads.indexOf(upload)}
+            style={{}}
+          />
         ))}
-        
+
         {/* Infinite scroll trigger */}
         <div ref={observerTarget} className="py-4 text-center">
           {isFetchingNextPage && (
@@ -203,7 +228,8 @@ export default function InfiniteUploadList({ enabled, isActive = true }: Infinit
           {({ height, width }) => {
             const itemSize = (index: number) => {
               const upload = uploads[index];
-              const titleLength = (upload.title || upload.filename || '').length;
+              const titleLength = (upload.title || upload.filename || '')
+                .length;
               const locationLength = (upload.location || '').length;
               const base = 140;
               const titleRows = Math.max(1, Math.ceil(titleLength / 32));

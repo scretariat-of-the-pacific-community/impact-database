@@ -196,7 +196,7 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'view') {
     const urlToOpen = event.notification.data?.url || '/profile';
-    
+
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
         // Focus existing window if available
@@ -229,7 +229,7 @@ async function syncPendingUploads() {
       try {
         const formData = new FormData();
         formData.append('file', upload.file);
-        
+
         // Add metadata
         for (const [key, value] of Object.entries(upload.metadata)) {
           formData.append(key, String(value));

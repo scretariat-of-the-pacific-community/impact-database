@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 CREATE INDEX IF NOT EXISTS ix_user_profiles_user_id ON user_profiles(user_id);
 
--- user_settings table  
+-- user_settings table
 CREATE TABLE IF NOT EXISTS user_settings (
     id SERIAL PRIMARY KEY,
     user_id VARCHAR UNIQUE NOT NULL REFERENCES users(username) ON DELETE CASCADE,

@@ -38,17 +38,21 @@ interface AnalyticsData {
  * Calculate statistical measures
  */
 function calculateStats(values: number[]) {
-  if (values.length === 0) return { mean: 0, median: 0, stdDev: 0, min: 0, max: 0 };
-  
+  if (values.length === 0)
+    return { mean: 0, median: 0, stdDev: 0, min: 0, max: 0 };
+
   const sorted = [...values].sort((a, b) => a - b);
   const mean = values.reduce((sum, val) => sum + val, 0) / values.length;
-  const median = sorted.length % 2 === 0
-    ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-    : sorted[Math.floor(sorted.length / 2)];
-  
-  const variance = values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / values.length;
+  const median =
+    sorted.length % 2 === 0
+      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+      : sorted[Math.floor(sorted.length / 2)];
+
+  const variance =
+    values.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+    values.length;
   const stdDev = Math.sqrt(variance);
-  
+
   return {
     mean,
     median,
@@ -63,12 +67,12 @@ function calculateStats(values: number[]) {
  */
 function detectAnomalies(data: TimeSeriesData[]): Insight[] {
   const insights: Insight[] = [];
-  const values = data.map(d => d.value);
+  const values = data.map((d) => d.value);
   const stats = calculateStats(values);
-  
+
   data.forEach((point, index) => {
     const zScore = Math.abs((point.value - stats.mean) / stats.stdDev);
-    
+
     if (zScore > 2 && stats.stdDev > 0) {
       const isHigh = point.value > stats.mean;
       insights.push({
@@ -84,7 +88,7 @@ function detectAnomalies(data: TimeSeriesData[]): Insight[] {
       });
     }
   });
-  
+
   return insights;
 }
 
@@ -93,22 +97,30 @@ function detectAnomalies(data: TimeSeriesData[]): Insight[] {
  */
 function analyzeTrends(data: TimeSeriesData[], windowSize = 3): Insight[] {
   const insights: Insight[] = [];
-  
+
   if (data.length < windowSize * 2) return insights;
-  
+
   // Calculate moving average
   const movingAvg = (arr: number[], start: number, end: number) => {
     const slice = arr.slice(start, end);
     return slice.reduce((sum, val) => sum + val, 0) / slice.length;
   };
-  
-  const values = data.map(d => d.value);
-  const recentAvg = movingAvg(values, values.length - windowSize, values.length);
-  const previousAvg = movingAvg(values, values.length - windowSize * 2, values.length - windowSize);
-  
+
+  const values = data.map((d) => d.value);
+  const recentAvg = movingAvg(
+    values,
+    values.length - windowSize,
+    values.length
+  );
+  const previousAvg = movingAvg(
+    values,
+    values.length - windowSize * 2,
+    values.length - windowSize
+  );
+
   if (previousAvg > 0) {
     const trendChange = ((recentAvg - previousAvg) / previousAvg) * 100;
-    
+
     if (Math.abs(trendChange) > 15) {
       insights.push({
         id: 'trend-overall',
@@ -123,7 +135,7 @@ function analyzeTrends(data: TimeSeriesData[], windowSize = 3): Insight[] {
       });
     }
   }
-  
+
   return insights;
 }
 
@@ -132,30 +144,31 @@ function analyzeTrends(data: TimeSeriesData[], windowSize = 3): Insight[] {
  */
 function findCorrelations(data: AnalyticsData): Insight[] {
   const insights: Insight[] = [];
-  
+
   // Top hazard in top country
   if (data.topHazards.length > 0 && data.topCountries.length > 0) {
     const topHazard = data.topHazards[0];
     const topCountry = data.topCountries[0];
-    
+    const total = data.totalImages || 1;
+
     insights.push({
       id: 'correlation-top',
       type: 'correlation',
       severity: 'info',
       title: `${topHazard[0]} most common in ${topCountry[0]}`,
-      description: `${topCountry[0]} accounts for ${((topCountry[1] / data.totalImages) * 100).toFixed(1)}% of all records, with ${topHazard[0]} being the predominant hazard type`,
+      description: `${topCountry[0]} accounts for ${((topCountry[1] / total) * 100).toFixed(1)}% of all records, with ${topHazard[0]} being the predominant hazard type`,
       confidence: 85,
       timestamp: new Date(),
     });
   }
-  
+
   // Hazard diversity analysis
   const hazardCount = Object.keys(data.hazardDistribution).length;
   const countryCount = Object.keys(data.countryDistribution).length;
-  
+
   if (hazardCount > 0 && countryCount > 0) {
     const diversity = hazardCount / countryCount;
-    
+
     if (diversity > 2) {
       insights.push({
         id: 'correlation-diversity',
@@ -168,7 +181,7 @@ function findCorrelations(data: AnalyticsData): Insight[] {
       });
     }
   }
-  
+
   return insights;
 }
 
@@ -177,7 +190,7 @@ function findCorrelations(data: AnalyticsData): Insight[] {
  */
 function generateRecommendations(data: AnalyticsData): Insight[] {
   const insights: Insight[] = [];
-  
+
   // Low data quality check
   if (data.totalImages < 50) {
     insights.push({
@@ -190,7 +203,7 @@ function generateRecommendations(data: AnalyticsData): Insight[] {
       timestamp: new Date(),
     });
   }
-  
+
   // Geographic coverage
   const countryCount = Object.keys(data.countryDistribution).length;
   if (countryCount < 5) {
@@ -204,7 +217,7 @@ function generateRecommendations(data: AnalyticsData): Insight[] {
       timestamp: new Date(),
     });
   }
-  
+
   // Recent activity check
   if (data.trends.monthly < -20) {
     insights.push({
@@ -217,25 +230,36 @@ function generateRecommendations(data: AnalyticsData): Insight[] {
       timestamp: new Date(),
     });
   }
-  
+
   return insights;
 }
 
 /**
  * Main insights generation function
  */
-export function generateInsights(data: AnalyticsData): Insight[] {
-  const timeSeriesData = Object.entries(data.monthlyUploads)
+export function generateInsights(rawData: AnalyticsData): Insight[] {
+  const data: AnalyticsData = {
+    totalImages: rawData?.totalImages ?? 0,
+    hazardDistribution: rawData?.hazardDistribution ?? {},
+    countryDistribution: rawData?.countryDistribution ?? {},
+    monthlyUploads: rawData?.monthlyUploads ?? {},
+    dailyUploads: rawData?.dailyUploads ?? {},
+    trends: rawData?.trends ?? { monthly: 0, totalGrowth: 0 },
+    topHazards: rawData?.topHazards ?? [],
+    topCountries: rawData?.topCountries ?? [],
+  };
+
+  const timeSeriesData = Object.entries(data.monthlyUploads || {})
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, value]) => ({ key, value }));
-  
+
   const allInsights: Insight[] = [
     ...detectAnomalies(timeSeriesData),
     ...analyzeTrends(timeSeriesData),
     ...findCorrelations(data),
     ...generateRecommendations(data),
   ];
-  
+
   // Sort by severity and confidence
   return allInsights.sort((a, b) => {
     const severityOrder = { critical: 3, warning: 2, info: 1 };
@@ -252,7 +276,7 @@ export function calculateStatistics(data: AnalyticsData) {
   const hazardValues = Object.values(data.hazardDistribution);
   const countryValues = Object.values(data.countryDistribution);
   const monthlyValues = Object.values(data.monthlyUploads);
-  
+
   return {
     hazardStats: calculateStats(hazardValues),
     countryStats: calculateStats(countryValues),

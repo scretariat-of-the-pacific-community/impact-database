@@ -20,9 +20,9 @@ const createCSP = () => {
   const apiOrigin = getApiOrigin();
   const sources = {
     imgSrc: [
-      "'self'", 
-      'data:', 
-      'blob:', 
+      "'self'",
+      'data:',
+      'blob:',
       'https://*.tile.openstreetmap.org',
       'https://*.abc-cdn.net.au',
       'https://live-production.wcms.abc-cdn.net.au',
@@ -105,7 +105,7 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
-  transpilePackages: ['framer-motion'],
+  transpilePackages: ['framer-motion', 'es-toolkit'],
   images: {
     remotePatterns: [
       {
@@ -136,12 +136,26 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'live-production.wcms.abc-cdn.net.au',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '8000',
+        pathname: '/upload/images/**',
+      },
     ],
-    unoptimized: true
+    formats: ['image/webp', 'image/avif'],
+    deviceSizes: [64, 128, 256, 384, 640, 750, 828, 1080, 1200],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 3600, // Cache optimized images for 1 hour
+    // Disable optimization for development (private IPs blocked by Next.js security)
+    // In production with a real domain, set this to false
+    unoptimized: process.env.NODE_ENV !== 'production',
   },
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
   },
+  // Enable standalone output for Docker production builds
+  output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Fix cross-origin warnings in development
   allowedDevOrigins: ['127.0.0.1'],
   // Enable strict mode for better performance

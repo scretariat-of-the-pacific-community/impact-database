@@ -21,16 +21,16 @@ def generate_password(length=32):
 
 def generate_vapid_keys():
     """Generate VAPID keys for web push notifications.
-    
+
     Note: This requires the py-vapid library.
     If not installed: pip install py-vapid
     """
     try:
         from vapid import Vapid
-        
+
         vapid = Vapid()
         vapid.generate_keys()
-        
+
         return {
             'private': vapid.private_key.private_bytes(
                 encoding=serialization.Encoding.PEM,
@@ -61,7 +61,7 @@ def main():
     print("")
     print("=" * 70)
     print("")
-    
+
     # Generate all secrets
     secrets_dict = {
         'SECRET_KEY': generate_secret_key(64),
@@ -72,24 +72,24 @@ def main():
         'REDIS_PASSWORD': generate_password(32),
         'CSRF_SECRET': generate_secret_key(32),
     }
-    
+
     # Print in .env format
     print("# Copy these to your production environment variables or secrets manager")
     print("#" * 70)
     print("")
-    
+
     for key, value in secrets_dict.items():
         print(f"{key}={value}")
-    
+
     print("")
     print("# VAPID Keys (for web push notifications)")
     print("# Note: These require the py-vapid library (pip install py-vapid)")
     print("")
-    
+
     vapid = generate_vapid_keys()
     print(f"VAPID_PRIVATE_KEY=\"{vapid['private']}\"")
     print(f"VAPID_PUBLIC_KEY=\"{vapid['public']}\"")
-    
+
     print("")
     print("#" * 70)
     print("")

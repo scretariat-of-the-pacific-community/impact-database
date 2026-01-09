@@ -1,4 +1,4 @@
-"""Admin UI for reviewing upload failures - React component."""
+/* Admin UI for reviewing upload failures - React component. */
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -39,7 +39,7 @@ export default function UploadFailuresAdmin() {
   const [selectedReason, setSelectedReason] = useState<string>('all');
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
     start: '',
-    end: ''
+    end: '',
   });
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -80,7 +80,7 @@ export default function UploadFailuresAdmin() {
     try {
       const params = new URLSearchParams({
         limit: '20',
-        offset: String(page * 20)
+        offset: String(page * 20),
       });
 
       if (selectedReason && selectedReason !== 'all') {
@@ -110,7 +110,7 @@ export default function UploadFailuresAdmin() {
 
     try {
       const response = await fetch(`/api/admin/failures/cleanup?days=${days}`, {
-        method: 'DELETE'
+        method: 'DELETE',
       });
       const data = await response.json();
       alert(`Deleted ${data.deleted} old failure records`);
@@ -127,7 +127,7 @@ export default function UploadFailuresAdmin() {
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
   return (
@@ -138,26 +138,39 @@ export default function UploadFailuresAdmin() {
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Total Failures</h3>
-            <p className="text-3xl font-bold text-gray-900">{stats.total_failures}</p>
+            <h3 className="text-gray-500 text-sm font-medium">
+              Total Failures
+            </h3>
+            <p className="text-3xl font-bold text-gray-900">
+              {stats.total_failures}
+            </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
             <h3 className="text-gray-500 text-sm font-medium">Top Reason</h3>
             <p className="text-lg font-semibold text-gray-900">
-              {Object.entries(stats.by_reason).sort((a, b) => b[1] - a[1])[0]?.[0] || 'N/A'}
+              {Object.entries(stats.by_reason).sort(
+                (a, b) => b[1] - a[1]
+              )[0]?.[0] || 'N/A'}
             </p>
             <p className="text-sm text-gray-600">
-              {Object.entries(stats.by_reason).sort((a, b) => b[1] - a[1])[0]?.[1] || 0} failures
+              {Object.entries(stats.by_reason).sort(
+                (a, b) => b[1] - a[1]
+              )[0]?.[1] || 0}{' '}
+              failures
             </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-gray-500 text-sm font-medium">Most Active Uploader</h3>
+            <h3 className="text-gray-500 text-sm font-medium">
+              Most Active Uploader
+            </h3>
             <p className="text-lg font-semibold text-gray-900 truncate">
               {stats.top_uploaders[0]?.uploader_id.substring(0, 12) || 'N/A'}...
             </p>
-            <p className="text-sm text-gray-600">{stats.top_uploaders[0]?.count || 0} failures</p>
+            <p className="text-sm text-gray-600">
+              {stats.top_uploaders[0]?.count || 0} failures
+            </p>
           </div>
 
           <div className="bg-white rounded-lg shadow p-6">
@@ -179,9 +192,14 @@ export default function UploadFailuresAdmin() {
         </div>
         <div className="p-6">
           {patterns.map((pattern) => (
-            <div key={pattern.reason} className="mb-6 pb-6 border-b border-gray-200 last:border-0">
+            <div
+              key={pattern.reason}
+              className="mb-6 pb-6 border-b border-gray-200 last:border-0"
+            >
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-medium">{pattern.reason.replace(/_/g, ' ')}</h3>
+                <h3 className="text-lg font-medium">
+                  {pattern.reason.replace(/_/g, ' ')}
+                </h3>
                 <span className="text-sm text-gray-600">
                   {pattern.count} ({pattern.percentage.toFixed(1)}%)
                 </span>
@@ -189,7 +207,9 @@ export default function UploadFailuresAdmin() {
 
               {pattern.common_errors.length > 0 && (
                 <div className="mb-3">
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Common Errors:</h4>
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">
+                    Common Errors:
+                  </h4>
                   <ul className="list-disc list-inside text-sm text-gray-600">
                     {pattern.common_errors.map((error, idx) => (
                       <li key={idx}>{error}</li>
@@ -200,7 +220,9 @@ export default function UploadFailuresAdmin() {
 
               {pattern.recommendations.length > 0 && (
                 <div className="bg-blue-50 p-3 rounded">
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">Recommendations:</h4>
+                  <h4 className="text-sm font-medium text-blue-900 mb-1">
+                    Recommendations:
+                  </h4>
                   <ul className="list-disc list-inside text-sm text-blue-800">
                     {pattern.recommendations.map((rec, idx) => (
                       <li key={idx}>{rec}</li>
@@ -218,7 +240,9 @@ export default function UploadFailuresAdmin() {
         <h2 className="text-xl font-semibold mb-4">Filter Failures</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason
+            </label>
             <select
               value={selectedReason}
               onChange={(e) => setSelectedReason(e.target.value)}
@@ -235,21 +259,29 @@ export default function UploadFailuresAdmin() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
             <input
               type="date"
               value={dateRange.start}
-              onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+              onChange={(e) =>
+                setDateRange({ ...dateRange, start: e.target.value })
+              }
               className="w-full border border-gray-300 rounded-md shadow-sm p-2"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
             <input
               type="date"
               value={dateRange.end}
-              onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+              onChange={(e) =>
+                setDateRange({ ...dateRange, end: e.target.value })
+              }
               className="w-full border border-gray-300 rounded-md shadow-sm p-2"
             />
           </div>
@@ -265,7 +297,9 @@ export default function UploadFailuresAdmin() {
           {loading ? (
             <div className="p-6 text-center text-gray-500">Loading...</div>
           ) : failures.length === 0 ? (
-            <div className="p-6 text-center text-gray-500">No failures found</div>
+            <div className="p-6 text-center text-gray-500">
+              No failures found
+            </div>
           ) : (
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -305,7 +339,10 @@ export default function UploadFailuresAdmin() {
                       {formatBytes(failure.file_size)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {format(new Date(failure.attempted_at), 'MMM d, yyyy HH:mm')}
+                      {format(
+                        new Date(failure.attempted_at),
+                        'MMM d, yyyy HH:mm'
+                      )}
                     </td>
                   </tr>
                 ))}

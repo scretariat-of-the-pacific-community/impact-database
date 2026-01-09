@@ -20,9 +20,9 @@ print_test_result() {
     local test_name="$1"
     local result="$2"
     local details="$3"
-    
+
     TOTAL_TESTS=$((TOTAL_TESTS + 1))
-    
+
     if [ "$result" = "PASS" ]; then
         echo -e "✅ ${GREEN}PASS${NC} - $test_name"
         PASSED_TESTS=$((PASSED_TESTS + 1))
@@ -40,7 +40,7 @@ check_service() {
     local service_name="$1"
     local url="$2"
     local expected_status="${3:-200}"
-    
+
     response=$(curl -s -o /dev/null -w "%{http_code}" "$url" 2>/dev/null)
     if [ "$response" = "$expected_status" ]; then
         print_test_result "$service_name Service" "PASS"
@@ -56,7 +56,7 @@ test_api_endpoint() {
     local endpoint_name="$1"
     local url="$2"
     local expected_field="$3"
-    
+
     response=$(curl -s "$url" 2>/dev/null)
     if echo "$response" | jq -e ".$expected_field" > /dev/null 2>&1; then
         print_test_result "$endpoint_name Endpoint" "PASS"
@@ -147,7 +147,7 @@ if [ -f "hazard_test_images/flood_1.jpg" ] && [ -n "$ACCESS_TOKEN" ]; then
       -F "location=Test Location for Automated Testing" \
       -F "manual_latitude=-17.7334" \
       -F "manual_longitude=168.3273" 2>/dev/null)
-    
+
     if echo "$upload_response" | jq -e '.filename' > /dev/null 2>&1; then
         print_test_result "Image Upload" "PASS"
         TEST_IMAGE_UPLOADED=true

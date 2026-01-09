@@ -38,7 +38,7 @@ async def get_current_user(token: Optional[str] = Depends(oauth2_scheme)) -> Use
 ### 3. **No Production Token Path** ❌ → ✅
 **Problem**: Even in production, there was no way to acquire tokens (router not mounted).
 
-**Solution**: 
+**Solution**:
 - Auth router mounted (see fix #1)
 - Token endpoint: `POST /api/auth/token` with form data `username` and `password`
 - Returns JWT token in response

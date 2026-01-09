@@ -26,7 +26,7 @@ services:
     command: ["npm", "run", "dev:host"]
     # Fix API URL for client-side (browser) access
     environment:
-      NEXT_PUBLIC_API_URL: "http://localhost:8001"
+      NEXT_PUBLIC_API_URL: "http://localhost:8000"
       NEXT_PUBLIC_API_URL_INTERNAL: "http://api:8000"
       # Disable Sentry to avoid instrumentation overhead in dev
       NEXT_PUBLIC_SENTRY_DSN: ""

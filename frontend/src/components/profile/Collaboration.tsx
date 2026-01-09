@@ -16,7 +16,12 @@ import {
   Users,
 } from 'lucide-react';
 import { Card, Button, Select } from '@/components/design-system';
-import type { UserStats, UserUpload, UserActivityEvent, HazardType } from '@/lib/types';
+import type {
+  UserStats,
+  UserUpload,
+  UserActivityEvent,
+  HazardType,
+} from '@/lib/types';
 import { HAZARD_TYPE_LABELS } from '@/lib/types';
 import { USER_ACTIVITY_QUERY_KEY, fetchUserActivity } from './ActivityTimeline';
 import { authFetch } from '@/lib/auth-utils';
@@ -75,7 +80,12 @@ interface CollabNote {
 interface CollaborationState {
   followed: Record<string, boolean>;
   workspaces: WorkspaceSummary[];
-  invites: Array<{ email: string; workspaceId: string; role: Role; createdAt: string }>;
+  invites: Array<{
+    email: string;
+    workspaceId: string;
+    role: Role;
+    createdAt: string;
+  }>;
   notes: CollabNote[];
 }
 
@@ -129,7 +139,11 @@ const relativeTimeFrom = (isoDate?: string) => {
   return `${diffDays}d ago`;
 };
 
-export default function Collaboration({ uploads = [], stats, isActive = true }: CollaborationProps) {
+export default function Collaboration({
+  uploads = [],
+  stats,
+  isActive = true,
+}: CollaborationProps) {
   const queryClient = useQueryClient();
   const { data: activityData } = useQuery({
     // Shared query key - same data used by ActivityTimeline.tsx (avoids duplicate API calls)
@@ -178,25 +192,27 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
 
   const activityEvents = activityData?.events ?? [];
 
-  useEffect(() => {
-    if (!isActive || typeof window === 'undefined') return;
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    const ws = new WebSocket(`${protocol}://${window.location.host}/ws/collaboration`);
-    ws.onopen = () => ws.send('online');
-    ws.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload?.type === 'comment_created' || payload?.type === 'workspace_created') {
-          queryClient.invalidateQueries({ queryKey: ['collaboration', 'notifications'] });
-        }
-      } catch {
-        // ignore
-      }
-    };
-    return () => {
-      ws.close();
-    };
-  }, [isActive, queryClient]);
+  // WebSocket for real-time collaboration updates (disabled - endpoint not implemented)
+  // TODO: Implement /ws/collaboration endpoint in backend for real-time updates
+  // useEffect(() => {
+  //   if (!isActive || typeof window === 'undefined') return;
+  //   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  //   const ws = new WebSocket(`${protocol}://${window.location.host}/ws/collaboration`);
+  //   ws.onopen = () => ws.send('online');
+  //   ws.onmessage = (event) => {
+  //     try {
+  //       const payload = JSON.parse(event.data);
+  //       if (payload?.type === 'comment_created' || payload?.type === 'workspace_created') {
+  //         queryClient.invalidateQueries({ queryKey: ['collaboration', 'notifications'] });
+  //       }
+  //     } catch {
+  //       // ignore
+  //     }
+  //   };
+  //   return () => {
+  //     ws.close();
+  //   };
+  // }, [isActive, queryClient]);
 
   useEffect(() => {
     if (serverWorkspaces && serverWorkspaces.length) {
@@ -206,7 +222,10 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         role: 'admin',
         // Only include counts if backend provides real data
         members: ws.members && ws.members > 0 ? ws.members : undefined,
-        channels: ws.shared_spaces && ws.shared_spaces > 0 ? ws.shared_spaces : undefined,
+        channels:
+          ws.shared_spaces && ws.shared_spaces > 0
+            ? ws.shared_spaces
+            : undefined,
         permissions: ['Upload & edit', 'Invite collaborators'],
         description: ws.description || 'Workspace',
       }));
@@ -219,7 +238,10 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
     uploads.forEach((upload) => {
       const key = upload.hazard_type || 'other';
       const current = counts.get(key) || { count: 0 };
-      counts.set(key, { count: current.count + 1, sample: current.sample ?? upload });
+      counts.set(key, {
+        count: current.count + 1,
+        sample: current.sample ?? upload,
+      });
     });
     return Array.from(counts.entries())
       .sort((a, b) => b[1].count - a[1].count)
@@ -231,7 +253,10 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
     uploads.forEach((upload) => {
       const key = upload.location || upload.country || 'Unspecified region';
       const current = counts.get(key) || { count: 0 };
-      counts.set(key, { count: current.count + 1, hazard: current.hazard ?? upload.hazard_type });
+      counts.set(key, {
+        count: current.count + 1,
+        hazard: current.hazard ?? upload.hazard_type,
+      });
     });
     return Array.from(counts.entries())
       .filter(([, data]) => data.count > 0)
@@ -244,9 +269,14 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
       id: `haz-${key}`,
       label: mapHazardLabel(key as HazardType),
       type: 'hazard' as const,
-      context: data.sample?.location || data.sample?.country || 'No location provided',
+      context:
+        data.sample?.location || data.sample?.country || 'No location provided',
       // Severity based on actual upload count - more honest indicator
-      severity: (data.count >= 5 ? 'high' : data.count >= 2 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
+      severity: (data.count >= 5
+        ? 'high'
+        : data.count >= 2
+          ? 'medium'
+          : 'low') as 'high' | 'medium' | 'low',
       uploadCount: data.count,
     }));
     const regionEntries = regionAggregates.map(([region, data]) => ({
@@ -254,7 +284,11 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
       label: region,
       type: 'region' as const,
       context: mapHazardLabel(data.hazard),
-      severity: (data.count >= 5 ? 'high' : data.count >= 2 ? 'medium' : 'low') as 'high' | 'medium' | 'low',
+      severity: (data.count >= 5
+        ? 'high'
+        : data.count >= 2
+          ? 'medium'
+          : 'low') as 'high' | 'medium' | 'low',
       uploadCount: data.count,
     }));
     return [...hazardEntries, ...regionEntries].slice(0, 4);
@@ -268,7 +302,10 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         role: 'admin',
         // Only include member/channel counts if provided by backend
         members: ws.members && ws.members > 0 ? ws.members : undefined,
-        channels: ws.shared_spaces && ws.shared_spaces > 0 ? ws.shared_spaces : undefined,
+        channels:
+          ws.shared_spaces && ws.shared_spaces > 0
+            ? ws.shared_spaces
+            : undefined,
         permissions: ['Upload & edit', 'Invite collaborators'],
         description: ws.description || 'Workspace',
       }));
@@ -280,7 +317,11 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         name: stats.organization || 'Independent Workspace',
         role: 'admin' as Role,
         // No fake member/channel counts for fallback workspaces
-        permissions: ['Upload & edit', 'Invite collaborators', 'Manage reviews'],
+        permissions: [
+          'Upload & edit',
+          'Invite collaborators',
+          'Manage reviews',
+        ],
         description: 'Automatically generated from your organisation profile.',
       });
     }
@@ -326,7 +367,7 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
       invites: [],
       notes: [],
     }),
-    [workspaceSummaries],
+    [workspaceSummaries]
   );
 
   const loadCollaborationState = () => {
@@ -339,7 +380,9 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         ...defaultCollabState,
         ...parsed,
         followed: parsed.followed || {},
-        workspaces: parsed.workspaces?.length ? parsed.workspaces : defaultCollabState.workspaces,
+        workspaces: parsed.workspaces?.length
+          ? parsed.workspaces
+          : defaultCollabState.workspaces,
         invites: parsed.invites || [],
         notes: parsed.notes || [],
       } as CollaborationState;
@@ -361,8 +404,13 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
     queryClient.setQueryData(['collaboration-state'], next);
   };
 
-  const updateCollaborationState = (updater: (curr: CollaborationState) => CollaborationState) => {
-    const current = (queryClient.getQueryData(['collaboration-state']) as CollaborationState) || collaborationState;
+  const updateCollaborationState = (
+    updater: (curr: CollaborationState) => CollaborationState
+  ) => {
+    const current =
+      (queryClient.getQueryData([
+        'collaboration-state',
+      ]) as CollaborationState) || collaborationState;
     const next = updater(current);
     persistCollaborationState(next);
     return next;
@@ -402,13 +450,18 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
               event.type === 'upload'
                 ? 'uploaded'
                 : event.type === 'review'
-                ? 'reviewed'
-                : event.type === 'achievement'
-                ? 'earned'
-                : 'updated',
+                  ? 'reviewed'
+                  : event.type === 'achievement'
+                    ? 'earned'
+                    : 'updated',
             target: event.description,
             timestamp: relativeTimeFrom(event.timestamp),
-            icon: event.type === 'review' ? ShieldCheck : event.type === 'upload' ? Share2 : Bell,
+            icon:
+              event.type === 'review'
+                ? ShieldCheck
+                : event.type === 'upload'
+                  ? Share2
+                  : Bell,
           }))
         : [
             {
@@ -431,21 +484,35 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         icon: Bell,
       })) || [];
 
-    const localNotes = (collaborationState.notes || []).map<ActivityEntry>((note) => ({
-      id: note.id,
-      actor: stats?.name || 'You',
-      action: 'shared',
-      target: note.body,
-      timestamp: relativeTimeFrom(note.createdAt),
-      icon: Target,
-    }));
+    const localNotes = (collaborationState.notes || []).map<ActivityEntry>(
+      (note) => ({
+        id: note.id,
+        actor: stats?.name || 'You',
+        action: 'shared',
+        target: note.body,
+        timestamp: relativeTimeFrom(note.createdAt),
+        icon: Target,
+      })
+    );
 
     return [...notificationEntries, ...localNotes, ...baseFeed].slice(0, 8);
-  }, [activityEvents, stats?.name, stats?.organization, collaborationState.notes, notifications]);
+  }, [
+    activityEvents,
+    stats?.name,
+    stats?.organization,
+    collaborationState.notes,
+    notifications,
+  ]);
 
-  const [activeWorkspace, setActiveWorkspace] = useState<string | undefined>(collaborationState.workspaces[0]?.id);
+  const [activeWorkspace, setActiveWorkspace] = useState<string | undefined>(
+    collaborationState.workspaces[0]?.id
+  );
   const [note, setNote] = useState('');
-  const [inviteForm, setInviteForm] = useState<{ email: string; role: Role; workspaceId: string }>({
+  const [inviteForm, setInviteForm] = useState<{
+    email: string;
+    role: Role;
+    workspaceId: string;
+  }>({
     email: '',
     role: 'editor',
     workspaceId: collaborationState.workspaces[0]?.id || 'workspace-fallback',
@@ -457,10 +524,15 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
     if (!activeWorkspace && collaborationState.workspaces[0]?.id) {
       setActiveWorkspace(collaborationState.workspaces[0].id);
     }
-    if (!collaborationState.workspaces.find((ws) => ws.id === inviteForm.workspaceId)) {
+    if (
+      !collaborationState.workspaces.find(
+        (ws) => ws.id === inviteForm.workspaceId
+      )
+    ) {
       setInviteForm((prev) => ({
         ...prev,
-        workspaceId: collaborationState.workspaces[0]?.id || 'workspace-fallback',
+        workspaceId:
+          collaborationState.workspaces[0]?.id || 'workspace-fallback',
       }));
     }
   }, [collaborationState.workspaces, activeWorkspace, inviteForm.workspaceId]);
@@ -471,7 +543,9 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         acc[entry.area_id] = true;
         return acc;
       }, {}) || {};
-    return Object.keys(serverMap).length ? serverMap : collaborationState.followed;
+    return Object.keys(serverMap).length
+      ? serverMap
+      : collaborationState.followed;
   }, [serverFollows, collaborationState.followed]);
 
   const followMutation = useMutation({
@@ -480,7 +554,13 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
       try {
         await authFetch('/api/follows', {
           method: shouldFollow ? 'POST' : 'DELETE',
-          body: shouldFollow ? JSON.stringify({ area_id: area.id, type: area.type, label: area.label }) : undefined,
+          body: shouldFollow
+            ? JSON.stringify({
+                area_id: area.id,
+                type: area.type,
+                label: area.label,
+              })
+            : undefined,
         });
       } catch {
         // Graceful fallback to local persistence only
@@ -527,7 +607,14 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
   });
 
   const inviteMutation = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: Role; workspaceId: string }) => {
+    mutationFn: async ({
+      email,
+      role,
+    }: {
+      email: string;
+      role: Role;
+      workspaceId: string;
+    }) => {
       // Use the admin invite endpoint (requires admin permissions)
       const response = await authFetch('/api/admin/users/invite', {
         method: 'POST',
@@ -539,7 +626,10 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         if (response.status === 403) {
           throw new Error('You need admin permissions to invite users');
         }
-        if (response.status === 400 && details?.detail?.includes('already exists')) {
+        if (
+          response.status === 400 &&
+          details?.detail?.includes('already exists')
+        ) {
           throw new Error('A user with this email already exists');
         }
         throw new Error(details?.detail || 'Failed to send invite');
@@ -557,7 +647,9 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         ...curr,
         invites: [inviteEntry, ...curr.invites].slice(0, 20),
       }));
-      setInviteFeedback(`Invitation sent to ${variables.email} (${variables.role}).`);
+      setInviteFeedback(
+        `Invitation sent to ${variables.email} (${variables.role}).`
+      );
       setInviteForm((prev) => ({ ...prev, email: '' }));
       setTimeout(() => setInviteFeedback(null), 4000);
     },
@@ -596,7 +688,9 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
         ...curr,
         workspaces: [newWorkspace, ...curr.workspaces],
       }));
-      queryClient.invalidateQueries({ queryKey: ['collaboration', 'workspaces'] });
+      queryClient.invalidateQueries({
+        queryKey: ['collaboration', 'workspaces'],
+      });
       setActiveWorkspace(newWorkspace.id);
       setInviteForm((prev) => ({ ...prev, workspaceId: newWorkspace.id }));
     },
@@ -611,7 +705,8 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
     }
     return mentionableTeammates.filter(
       (member) =>
-        member.handle.toLowerCase().includes(query) || member.name.toLowerCase().includes(query),
+        member.handle.toLowerCase().includes(query) ||
+        member.name.toLowerCase().includes(query)
     );
   }, [mentionTrigger, mentionableTeammates]);
 
@@ -630,7 +725,8 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
   };
 
   const handleCreateWorkspace = () => {
-    const name = typeof window !== 'undefined' ? window.prompt('Workspace name') : null;
+    const name =
+      typeof window !== 'undefined' ? window.prompt('Workspace name') : null;
     if (!name || !name.trim()) return;
     createWorkspaceMutation.mutate(name.trim());
   };
@@ -638,15 +734,25 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
   return (
     <section className="space-y-8">
       <header className="flex flex-col gap-3 text-white">
-        <p className="text-sm uppercase tracking-[0.3em] text-white/40">Collaboration</p>
+        <p className="text-sm uppercase tracking-[0.3em] text-white/40">
+          Collaboration
+        </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold">Team workspaces & shared intelligence</h2>
+            <h2 className="text-2xl font-semibold">
+              Team workspaces & shared intelligence
+            </h2>
             <p className="text-white/70">
-              Follow emerging hazards, coordinate uploads, and keep your organisation in sync.
+              Follow emerging hazards, coordinate uploads, and keep your
+              organisation in sync.
             </p>
           </div>
-          <Button variant="secondary" className="w-full sm:w-auto" onClick={handleCreateWorkspace} disabled={createWorkspaceMutation.isPending}>
+          <Button
+            variant="secondary"
+            className="w-full sm:w-auto"
+            onClick={handleCreateWorkspace}
+            disabled={createWorkspaceMutation.isPending}
+          >
             <UserPlus className="mr-2 h-4 w-4" />
             New workspace
           </Button>
@@ -658,7 +764,9 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-white/60">Followed focus areas</p>
-              <h3 className="text-lg font-semibold">Hazards & geographic watches</h3>
+              <h3 className="text-lg font-semibold">
+                Hazards & geographic watches
+              </h3>
             </div>
             <Bookmark className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
@@ -670,7 +778,9 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-white">{area.label}</p>
+                    <p className="text-sm font-semibold text-white">
+                      {area.label}
+                    </p>
                     <p className="text-xs text-white/60">{area.context}</p>
                   </div>
                   <span
@@ -678,12 +788,13 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                       area.severity === 'high'
                         ? 'bg-rose-500/20 text-rose-100'
                         : area.severity === 'medium'
-                        ? 'bg-amber-400/20 text-amber-100'
-                        : 'bg-emerald-400/20 text-emerald-100'
+                          ? 'bg-amber-400/20 text-amber-100'
+                          : 'bg-emerald-400/20 text-emerald-100'
                     }`}
                   >
                     {/* Show upload count-based activity level, not fake popularity */}
-                    {area.uploadCount} {area.uploadCount === 1 ? 'upload' : 'uploads'}
+                    {area.uploadCount}{' '}
+                    {area.uploadCount === 1 ? 'upload' : 'uploads'}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-sm text-white/70">
@@ -709,7 +820,9 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-white/60">Workspaces</p>
-              <h3 className="text-lg font-semibold">Organisation hubs & roles</h3>
+              <h3 className="text-lg font-semibold">
+                Organisation hubs & roles
+              </h3>
             </div>
             <Users className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
@@ -722,15 +835,23 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                   type="button"
                   onClick={() => setActiveWorkspace(workspace.id)}
                   className={`w-full rounded-2xl border p-4 text-left transition ${
-                    isActive ? 'border-pacific-400/60 bg-pacific-400/10' : 'border-white/10 bg-white/5 hover:border-white/30'
+                    isActive
+                      ? 'border-pacific-400/60 bg-pacific-400/10'
+                      : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-base font-semibold">{workspace.name}</p>
-                      <p className="text-sm text-white/70">{workspace.description}</p>
+                      <p className="text-base font-semibold">
+                        {workspace.name}
+                      </p>
+                      <p className="text-sm text-white/70">
+                        {workspace.description}
+                      </p>
                     </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${rolePalette[workspace.role]}`}>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${rolePalette[workspace.role]}`}
+                    >
                       {workspace.role}
                     </span>
                   </div>
@@ -739,7 +860,8 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                     {workspace.members && workspace.members > 0 ? (
                       <span className="flex items-center gap-1">
                         <Users className="h-3.5 w-3.5" />
-                        {workspace.members} {workspace.members === 1 ? 'member' : 'members'}
+                        {workspace.members}{' '}
+                        {workspace.members === 1 ? 'member' : 'members'}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1">
@@ -750,7 +872,8 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                     {workspace.channels && workspace.channels > 0 ? (
                       <span className="flex items-center gap-1">
                         <MapIcon className="h-3.5 w-3.5" />
-                        {workspace.channels} shared {workspace.channels === 1 ? 'space' : 'spaces'}
+                        {workspace.channels} shared{' '}
+                        {workspace.channels === 1 ? 'space' : 'spaces'}
                       </span>
                     ) : (
                       <span className="flex items-center gap-1">
@@ -781,13 +904,18 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-white/60">Shared upload folders</p>
-              <h3 className="text-lg font-semibold">Collaborative documentation</h3>
+              <h3 className="text-lg font-semibold">
+                Collaborative documentation
+              </h3>
             </div>
             <FolderOpen className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
           <div className="mt-4 divide-y divide-white/5 border border-white/10 rounded-2xl overflow-hidden">
             {sharedFolders.map((folder) => (
-              <div key={folder.id} className="flex flex-wrap items-center gap-4 bg-white/5 px-4 py-3">
+              <div
+                key={folder.id}
+                className="flex flex-wrap items-center gap-4 bg-white/5 px-4 py-3"
+              >
                 <div className="flex-1">
                   <p className="text-sm font-semibold">{folder.name}</p>
                   <p className="text-xs text-white/60">
@@ -818,12 +946,17 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-white/60">@mention comments</p>
-              <h3 className="text-lg font-semibold">Notify teammates with context</h3>
+              <h3 className="text-lg font-semibold">
+                Notify teammates with context
+              </h3>
             </div>
             <Target className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
           <div className="mt-4 space-y-3">
-            <label htmlFor="collab-mention-note" className="text-sm text-white/70">
+            <label
+              htmlFor="collab-mention-note"
+              className="text-sm text-white/70"
+            >
               Draft a note to your team
             </label>
             <textarea
@@ -843,10 +976,14 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                 {postNoteMutation.isPending ? 'Posting…' : 'Post update'}
               </Button>
             </div>
-            {noteFeedback && <p className="text-xs text-emerald-200">{noteFeedback}</p>}
+            {noteFeedback && (
+              <p className="text-xs text-emerald-200">{noteFeedback}</p>
+            )}
             {mentionTrigger && mentionSuggestions.length > 0 && (
               <div className="rounded-2xl border border-white/10 bg-deep-900/80 p-3 shadow-lg">
-                <p className="text-xs uppercase tracking-wide text-white/50 mb-2">Mention teammates</p>
+                <p className="text-xs uppercase tracking-wide text-white/50 mb-2">
+                  Mention teammates
+                </p>
                 <div className="space-y-2">
                   {mentionSuggestions.map((member) => (
                     <button
@@ -857,9 +994,14 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                     >
                       <div>
                         <p className="font-semibold">{member.name}</p>
-                        <p className="text-white/60">@{member.handle} • {member.role}</p>
+                        <p className="text-white/60">
+                          @{member.handle} • {member.role}
+                        </p>
                       </div>
-                      <ShieldCheck className="h-4 w-4 text-pacific-300" aria-hidden="true" />
+                      <ShieldCheck
+                        className="h-4 w-4 text-pacific-300"
+                        aria-hidden="true"
+                      />
                     </button>
                   ))}
                 </div>
@@ -885,11 +1027,15 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                 className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/5 px-4 py-3"
               >
                 <span className="rounded-xl bg-white/10 p-2">
-                  <entry.icon className="h-4 w-4 text-pacific-300" aria-hidden="true" />
+                  <entry.icon
+                    className="h-4 w-4 text-pacific-300"
+                    aria-hidden="true"
+                  />
                 </span>
                 <div className="flex-1">
                   <p className="text-sm text-white">
-                    <span className="font-semibold">{entry.actor}</span> {entry.action}{' '}
+                    <span className="font-semibold">{entry.actor}</span>{' '}
+                    {entry.action}{' '}
                     <span className="font-semibold">{entry.target}</span>
                   </p>
                   <p className="text-xs text-white/60">{entry.timestamp}</p>
@@ -908,15 +1054,25 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
             <UserPlus className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
           <form className="mt-4 space-y-3" onSubmit={handleInviteSubmit}>
-            <label className="text-sm text-white/70" htmlFor="collab-invite-email">
+            <label
+              className="text-sm text-white/70"
+              htmlFor="collab-invite-email"
+            >
               Email address
             </label>
             <input
               id="collab-invite-email"
+              name="email"
               type="email"
+              autoComplete="email"
               required
               value={inviteForm.email}
-              onChange={(event) => setInviteForm((prev) => ({ ...prev, email: event.target.value.trim() }))}
+              onChange={(event) =>
+                setInviteForm((prev) => ({
+                  ...prev,
+                  email: event.target.value.trim(),
+                }))
+              }
               className="w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-white/40 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/40"
               placeholder="analyst@agency.org"
             />
@@ -925,7 +1081,12 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                 id="collab-invite-role"
                 label="Role"
                 value={inviteForm.role}
-                onChange={(event) => setInviteForm((prev) => ({ ...prev, role: event.target.value as Role }))}
+                onChange={(event) =>
+                  setInviteForm((prev) => ({
+                    ...prev,
+                    role: event.target.value as Role,
+                  }))
+                }
                 variant="dark"
                 size="md"
               >
@@ -937,7 +1098,12 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                 id="collab-invite-workspace"
                 label="Workspace"
                 value={inviteForm.workspaceId}
-                onChange={(event) => setInviteForm((prev) => ({ ...prev, workspaceId: event.target.value }))}
+                onChange={(event) =>
+                  setInviteForm((prev) => ({
+                    ...prev,
+                    workspaceId: event.target.value,
+                  }))
+                }
                 variant="dark"
                 size="md"
               >
@@ -948,11 +1114,17 @@ export default function Collaboration({ uploads = [], stats, isActive = true }: 
                 ))}
               </Select>
             </div>
-            <Button type="submit" className="w-full" disabled={!inviteForm.email || inviteMutation.isPending}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={!inviteForm.email || inviteMutation.isPending}
+            >
               {inviteMutation.isPending ? 'Sending…' : 'Send invitation'}
             </Button>
             {inviteFeedback && (
-              <p className="rounded-2xl bg-pacific-400/10 px-3 py-2 text-sm text-pacific-100">{inviteFeedback}</p>
+              <p className="rounded-2xl bg-pacific-400/10 px-3 py-2 text-sm text-pacific-100">
+                {inviteFeedback}
+              </p>
             )}
           </form>
         </Card>

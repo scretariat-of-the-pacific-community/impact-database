@@ -58,14 +58,14 @@ function calculateEMA(data: number[], smoothing: number = 0.3): number[] {
 function calculateMAPE(actual: number[], predicted: number[]): number {
   let sum = 0;
   let count = 0;
-  
+
   for (let i = 0; i < actual.length; i++) {
     if (actual[i] !== 0) {
       sum += Math.abs((actual[i] - predicted[i]) / actual[i]);
       count++;
     }
   }
-  
+
   return count > 0 ? (sum / count) * 100 : 0;
 }
 
@@ -78,33 +78,35 @@ function generateFuturePeriods(
   granularity: 'daily' | 'monthly' | 'yearly'
 ): string[] {
   const periods: string[] = [];
-  
+
   // Validate input
   if (!lastPeriod || count <= 0) {
     console.warn(
       'generateFuturePeriods: Invalid input parameters detected.',
       'Expected lastPeriod (non-empty string) and count (positive number).',
       'Received:',
-      { 
-        lastPeriod: lastPeriod ?? 'undefined', 
+      {
+        lastPeriod: lastPeriod ?? 'undefined',
         lastPeriodType: typeof lastPeriod,
         count,
         countType: typeof count,
-        granularity 
+        granularity,
       }
     );
     return [];
   }
-  
+
   // Parse the last period based on granularity
   let date: Date | null = null;
-  
+
   try {
     switch (granularity) {
       case 'daily': {
         // Expect format: YYYY-MM-DD or ISO string
         // Handle both ISO and simple date formats
-        const dateStr = lastPeriod.includes('T') ? lastPeriod.split('T')[0] : lastPeriod;
+        const dateStr = lastPeriod.includes('T')
+          ? lastPeriod.split('T')[0]
+          : lastPeriod;
         date = new Date(dateStr + 'T00:00:00.000Z');
         break;
       }
@@ -137,21 +139,34 @@ function generateFuturePeriods(
       default:
         date = new Date(lastPeriod);
     }
-    
+
     // Validate date
     if (!date || isNaN(date.getTime())) {
-      console.error('Invalid date parsed from:', lastPeriod, 'for granularity:', granularity, 'resulted in:', date);
+      console.error(
+        'Invalid date parsed from:',
+        lastPeriod,
+        'for granularity:',
+        granularity,
+        'resulted in:',
+        date
+      );
       return [];
     }
   } catch (error) {
-    console.error('Error parsing date:', lastPeriod, 'for granularity:', granularity, error);
+    console.error(
+      'Error parsing date:',
+      lastPeriod,
+      'for granularity:',
+      granularity,
+      error
+    );
     return [];
   }
-  
+
   for (let i = 1; i <= count; i++) {
     try {
       let futureDate: Date;
-      
+
       switch (granularity) {
         case 'daily': {
           futureDate = new Date(date);
@@ -165,7 +180,10 @@ function generateFuturePeriods(
           futureDate = new Date(date);
           futureDate.setUTCMonth(date.getUTCMonth() + i);
           if (!isNaN(futureDate.getTime())) {
-            const monthStr = String(futureDate.getUTCMonth() + 1).padStart(2, '0');
+            const monthStr = String(futureDate.getUTCMonth() + 1).padStart(
+              2,
+              '0'
+            );
             periods.push(`${futureDate.getUTCFullYear()}-${monthStr}`);
           }
           break;
@@ -180,10 +198,16 @@ function generateFuturePeriods(
         }
       }
     } catch (error) {
-      console.error('Error generating future period:', i, 'from', lastPeriod, error);
+      console.error(
+        'Error generating future period:',
+        i,
+        'from',
+        lastPeriod,
+        error
+      );
     }
   }
-  
+
   return periods;
 }
 
@@ -196,10 +220,12 @@ export function forecastMovingAverage(
   windowSize: number = 3,
   granularity: 'daily' | 'monthly' | 'yearly' = 'monthly'
 ): ForecastResult {
-  const sortedEntries = Object.entries(historicalData).sort(([a], [b]) => a.localeCompare(b));
+  const sortedEntries = Object.entries(historicalData).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   const periods = sortedEntries.map(([key]) => key);
   const values = sortedEntries.map(([, value]) => value);
-  
+
   // Validate we have data
   if (periods.length === 0 || values.length === 0) {
     return {
@@ -209,7 +235,7 @@ export function forecastMovingAverage(
       trend: 'stable',
     };
   }
-  
+
   if (values.length < windowSize) {
     return {
       forecast: sortedEntries.map(([period, value]) => ({
@@ -223,24 +249,29 @@ export function forecastMovingAverage(
       trend: 'stable',
     };
   }
-  
+
   // Calculate moving average for historical data
   const sma = calculateSMA(values, windowSize);
-  
+
   // Calculate accuracy using last few points
   const testSize = Math.min(periodsAhead, Math.floor(values.length * 0.2));
   const testActual = values.slice(-testSize);
   const testPredicted = sma.slice(-testSize);
   const accuracy = Math.max(0, 100 - calculateMAPE(testActual, testPredicted));
-  
+
   // Forecast future values
   const lastAverage = sma[sma.length - 1];
-  const recentTrend = values.slice(-3).reduce((sum, val, idx, arr) => {
-    if (idx === 0) return 0;
-    return sum + (val - arr[idx - 1]);
-  }, 0) / 2;
-  
-  const futurePeriods = generateFuturePeriods(periods[periods.length - 1], periodsAhead, granularity);
+  const recentTrend =
+    values.slice(-3).reduce((sum, val, idx, arr) => {
+      if (idx === 0) return 0;
+      return sum + (val - arr[idx - 1]);
+    }, 0) / 2;
+
+  const futurePeriods = generateFuturePeriods(
+    periods[periods.length - 1],
+    periodsAhead,
+    granularity
+  );
   const forecast: ForecastPoint[] = [
     ...sortedEntries.map(([period, value]) => ({
       period,
@@ -249,11 +280,11 @@ export function forecastMovingAverage(
       isForecast: false,
     })),
   ];
-  
+
   futurePeriods.forEach((period, index) => {
     const predictedValue = Math.max(0, lastAverage + recentTrend * (index + 1));
     const uncertainty = predictedValue * (0.1 + index * 0.05); // Increasing uncertainty
-    
+
     forecast.push({
       period,
       value: predictedValue,
@@ -264,10 +295,11 @@ export function forecastMovingAverage(
       confidence: Math.max(50, accuracy - index * 10),
     });
   });
-  
+
   // Determine trend
-  const trend = recentTrend > 2 ? 'increasing' : recentTrend < -2 ? 'decreasing' : 'stable';
-  
+  const trend =
+    recentTrend > 2 ? 'increasing' : recentTrend < -2 ? 'decreasing' : 'stable';
+
   return {
     forecast,
     accuracy,
@@ -284,10 +316,12 @@ export function forecastLinearRegression(
   periodsAhead: number = 3,
   granularity: 'daily' | 'monthly' | 'yearly' = 'monthly'
 ): ForecastResult {
-  const sortedEntries = Object.entries(historicalData).sort(([a], [b]) => a.localeCompare(b));
+  const sortedEntries = Object.entries(historicalData).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   const periods = sortedEntries.map(([key]) => key);
   const values = sortedEntries.map(([, value]) => value);
-  
+
   // Validate we have data
   if (periods.length === 0 || values.length === 0) {
     return {
@@ -297,24 +331,31 @@ export function forecastLinearRegression(
       trend: 'stable',
     };
   }
-  
+
   if (values.length < 3) {
     return forecastMovingAverage(historicalData, periodsAhead, 2, granularity);
   }
-  
+
   // Prepare data for regression (x = index, y = value)
-  const regressionData: [number, number][] = values.map((value, index) => [index, value]);
-  
+  const regressionData: [number, number][] = values.map((value, index) => [
+    index,
+    value,
+  ]);
+
   // Perform linear regression
   const result = regression.linear(regressionData);
   const { equation, r2 } = result;
-  
+
   // Calculate predictions for historical data
   const predicted = values.map((_, index) => equation[0] * index + equation[1]);
   const accuracy = Math.max(0, 100 - calculateMAPE(values, predicted));
-  
+
   // Generate forecast
-  const futurePeriods = generateFuturePeriods(periods[periods.length - 1], periodsAhead, granularity);
+  const futurePeriods = generateFuturePeriods(
+    periods[periods.length - 1],
+    periodsAhead,
+    granularity
+  );
   const forecast: ForecastPoint[] = [
     ...sortedEntries.map(([period, value]) => ({
       period,
@@ -323,12 +364,12 @@ export function forecastLinearRegression(
       isForecast: false,
     })),
   ];
-  
+
   futurePeriods.forEach((period, index) => {
     const x = values.length + index;
     const predictedValue = Math.max(0, equation[0] * x + equation[1]);
     const uncertainty = predictedValue * (0.15 + index * 0.05);
-    
+
     forecast.push({
       period,
       value: predictedValue,
@@ -339,10 +380,15 @@ export function forecastLinearRegression(
       confidence: Math.max(50, accuracy - index * 10),
     });
   });
-  
+
   // Determine trend from slope
-  const trend = equation[0] > 0.5 ? 'increasing' : equation[0] < -0.5 ? 'decreasing' : 'stable';
-  
+  const trend =
+    equation[0] > 0.5
+      ? 'increasing'
+      : equation[0] < -0.5
+        ? 'decreasing'
+        : 'stable';
+
   return {
     forecast,
     accuracy: Math.round(r2 * 100),
@@ -360,10 +406,12 @@ export function forecastExponentialSmoothing(
   alpha: number = 0.3,
   granularity: 'daily' | 'monthly' | 'yearly' = 'monthly'
 ): ForecastResult {
-  const sortedEntries = Object.entries(historicalData).sort(([a], [b]) => a.localeCompare(b));
+  const sortedEntries = Object.entries(historicalData).sort(([a], [b]) =>
+    a.localeCompare(b)
+  );
   const periods = sortedEntries.map(([key]) => key);
   const values = sortedEntries.map(([, value]) => value);
-  
+
   // Validate we have data
   if (periods.length === 0 || values.length === 0) {
     return {
@@ -373,21 +421,25 @@ export function forecastExponentialSmoothing(
       trend: 'stable',
     };
   }
-  
+
   if (values.length < 2) {
     return forecastMovingAverage(historicalData, periodsAhead, 2, granularity);
   }
-  
+
   // Calculate EMA for historical data
   const ema = calculateEMA(values, alpha);
-  
+
   // Calculate accuracy
   const accuracy = Math.max(0, 100 - calculateMAPE(values, ema));
-  
+
   // Forecast future values
   const lastEMA = ema[ema.length - 1];
-  const futurePeriods = generateFuturePeriods(periods[periods.length - 1], periodsAhead, granularity);
-  
+  const futurePeriods = generateFuturePeriods(
+    periods[periods.length - 1],
+    periodsAhead,
+    granularity
+  );
+
   const forecast: ForecastPoint[] = [
     ...sortedEntries.map(([period, value]) => ({
       period,
@@ -396,11 +448,11 @@ export function forecastExponentialSmoothing(
       isForecast: false,
     })),
   ];
-  
+
   let currentForecast = lastEMA;
   futurePeriods.forEach((period, index) => {
     const uncertainty = currentForecast * (0.12 + index * 0.04);
-    
+
     forecast.push({
       period,
       value: Math.max(0, currentForecast),
@@ -410,20 +462,22 @@ export function forecastExponentialSmoothing(
       upperBound: currentForecast + uncertainty,
       confidence: Math.max(50, accuracy - index * 10),
     });
-    
+
     // For exponential smoothing, next forecast is same as current
     currentForecast = currentForecast;
   });
-  
+
   // Determine trend from recent values
   const recentValues = values.slice(-3);
-  const avgChange = recentValues.reduce((sum, val, idx, arr) => {
-    if (idx === 0) return 0;
-    return sum + (val - arr[idx - 1]);
-  }, 0) / 2;
-  
-  const trend = avgChange > 1 ? 'increasing' : avgChange < -1 ? 'decreasing' : 'stable';
-  
+  const avgChange =
+    recentValues.reduce((sum, val, idx, arr) => {
+      if (idx === 0) return 0;
+      return sum + (val - arr[idx - 1]);
+    }, 0) / 2;
+
+  const trend =
+    avgChange > 1 ? 'increasing' : avgChange < -1 ? 'decreasing' : 'stable';
+
   return {
     forecast,
     accuracy,
@@ -441,23 +495,35 @@ export function autoForecast(
   granularity: 'daily' | 'monthly' | 'yearly' = 'monthly'
 ): ForecastResult {
   const values = Object.values(historicalData);
-  
+
   // Use linear regression if there's a clear trend
   const firstHalf = values.slice(0, Math.floor(values.length / 2));
   const secondHalf = values.slice(Math.floor(values.length / 2));
-  const firstAvg = firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
-  const secondAvg = secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
+  const firstAvg =
+    firstHalf.reduce((sum, val) => sum + val, 0) / firstHalf.length;
+  const secondAvg =
+    secondHalf.reduce((sum, val) => sum + val, 0) / secondHalf.length;
   const trendStrength = Math.abs((secondAvg - firstAvg) / firstAvg);
-  
+
   if (trendStrength > 0.2 && values.length >= 6) {
     return forecastLinearRegression(historicalData, periodsAhead, granularity);
   }
-  
+
   // Use exponential smoothing for stable or slowly changing data
   if (values.length >= 4) {
-    return forecastExponentialSmoothing(historicalData, periodsAhead, 0.3, granularity);
+    return forecastExponentialSmoothing(
+      historicalData,
+      periodsAhead,
+      0.3,
+      granularity
+    );
   }
-  
+
   // Fallback to moving average
-  return forecastMovingAverage(historicalData, periodsAhead, Math.min(3, values.length), granularity);
+  return forecastMovingAverage(
+    historicalData,
+    periodsAhead,
+    Math.min(3, values.length),
+    granularity
+  );
 }

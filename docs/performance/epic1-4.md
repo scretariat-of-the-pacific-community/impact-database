@@ -2,8 +2,8 @@
 
 ## Key Optimizations Implemented
 1. **Lean home dashboard data**: `/` now calls `imageApi.search` with `limit=60` and sorting metadata instead of fetching the entire catalog, reducing the initial payload (`src/app/page.tsx`).
-2. **Image virtualization-friendly layouts**:  
-   - Admin queue, review workflow, and user tables now use `next/image` with native lazy loading to optimize thumbnails (`src/components/CurationQueue.tsx`, `ReviewWorkflow.tsx`, `UserManagement.tsx`).  
+2. **Image virtualization-friendly layouts**:
+   - Admin queue, review workflow, and user tables now use `next/image` with native lazy loading to optimize thumbnails (`src/components/CurationQueue.tsx`, `ReviewWorkflow.tsx`, `UserManagement.tsx`).
    - Gallery page uses client-side pagination (24 cards per page) to avoid rendering hundreds of cards at once (`src/app/images/page.tsx`).
 3. **Search pagination**: `/search` adds API-backed pagination (page + limit) with summary + controls so we only pull 24 results per request and keep the DOM light (`src/app/search/page.tsx`).
 4. **Map already lazily loaded**: the `map` route and the search map view continue to use `next/dynamic(..., { ssr: false })` to defer the Leaflet bundle until needed.

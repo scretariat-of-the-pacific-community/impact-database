@@ -107,7 +107,7 @@ FROM roles r
 CROSS JOIN permissions p
 WHERE r.name = 'senior_reviewer'
 AND p.name IN (
-    'review:read', 'review:create', 'review:update', 'review:approve', 
+    'review:read', 'review:create', 'review:update', 'review:approve',
     'review:reject', 'review:assign', 'review:flag',
     'metadata:read', 'metadata:update',
     'audit:view', 'notification:send'
@@ -150,7 +150,7 @@ ON CONFLICT DO NOTHING;
 -- Create default admin user
 -- Password: "admin123" (hashed with bcrypt, cost=12)
 INSERT INTO users (id, email, username, full_name, hashed_password, role_id, is_active, is_verified)
-SELECT 
+SELECT
     gen_random_uuid(),
     'admin@impactdb.local',
     'admin',
@@ -165,7 +165,7 @@ ON CONFLICT (username) DO NOTHING;
 
 -- Create development user
 INSERT INTO users (id, email, username, full_name, role_id, is_active, is_verified)
-SELECT 
+SELECT
     gen_random_uuid(),
     'dev@example.com',
     'dev_user',

@@ -26,22 +26,22 @@ echo
 for image_path in "${!images[@]}"; do
     # Extract hazard type and location
     IFS=':' read -r hazard_type location <<< "${images[$image_path]}"
-    
+
     echo "Uploading $(basename "$image_path")..."
     echo "  - Hazard Type: $hazard_type"
     echo "  - Location: $location"
-    
+
     # Upload the image
     response=$(curl -s -X POST "http://localhost:8000/api/images/" \
         -F "file=@$image_path" \
         -F "hazard_type=$hazard_type" \
         -F "location=$location")
-    
+
     # Check if upload was successful
     if echo "$response" | grep -q "Upload successful"; then
         echo "  ✓ Upload successful"
         ((success_count++))
-        
+
         # Extract and display filename
         filename=$(echo "$response" | grep -o '"filename":"[^"]*"' | cut -d'"' -f4)
         echo "  - Stored as: $filename"

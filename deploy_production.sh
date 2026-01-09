@@ -169,13 +169,13 @@ RETRY_INTERVAL=5
 for i in $(seq 1 $MAX_RETRIES); do
     HEALTHY=$(docker compose -f "$COMPOSE_FILE" -f "$PROD_COMPOSE_FILE" ps --format json 2>/dev/null | grep -c '"healthy"' || echo "0")
     TOTAL=$(docker compose -f "$COMPOSE_FILE" -f "$PROD_COMPOSE_FILE" ps --format json 2>/dev/null | wc -l || echo "0")
-    
+
     # Simple health check via curl
     if curl -s http://localhost:8000/health | grep -q "ok"; then
         echo -e "${GREEN}  ✓ API is healthy${NC}"
         break
     fi
-    
+
     echo -e "  Waiting for services... (attempt $i/$MAX_RETRIES)"
     sleep $RETRY_INTERVAL
 done

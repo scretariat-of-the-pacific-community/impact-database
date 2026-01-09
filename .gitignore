@@ -1,8 +1,17 @@
 frontend/node_modules
 node_modules
 .venv
+
+# SECURITY: Never commit environment files with secrets
 .env
+.env.local
+.env.development
+.env.staging
+.env.production
+.env.*.local
+
 secrets/
+.cache/
 
 # Test files and scripts
 test_*.py
@@ -34,4 +43,3 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
-

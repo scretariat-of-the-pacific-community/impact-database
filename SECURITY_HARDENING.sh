@@ -1,6 +1,6 @@
 #!/bin/bash
 # Security Hardening Script - Remove Sensitive Files from Git History
-# 
+#
 # WARNING: This script rewrites git history. All team members must re-clone.
 # Run this ONLY after coordinating with your team and backing up the repository.
 
@@ -27,7 +27,7 @@ echo "-------------------------------------------------------------"
 # Check if git-filter-repo is available
 if ! command -v git-filter-repo &> /dev/null; then
     echo "git-filter-repo not found. Installing..."
-    
+
     # Try pip install
     if command -v pip3 &> /dev/null; then
         pip3 install --user git-filter-repo

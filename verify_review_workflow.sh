@@ -41,7 +41,7 @@ api_call() {
     local method=$1
     local endpoint=$2
     local data=$3
-    
+
     if [ -z "$data" ]; then
         curl -s -X $method "${BASE_URL}${endpoint}" \
             -H "Authorization: Bearer ${ADMIN_TOKEN}" \
@@ -149,8 +149,8 @@ echo -e "${YELLOW}Phase 4: Create Review Item${NC}"
 echo -n "Test 6: Create test image metadata... "
 TEST_IMAGE_ID=$(uuidgen)
 IMAGE_INSERT=$(docker compose exec -T postgis_db psql -U postgres -d impact_db -c \
-    "INSERT INTO image_metadata (id, filename, file_size, upload_date, datetime, geometry, hazard_type, status, data_license, source_type, uploader_id) 
-     VALUES ('${TEST_IMAGE_ID}', 'test_review_image.jpg', 1024, NOW(), NOW(), ST_SetSRID(ST_MakePoint(174.776,-41.289), 4326), 'flood', 'pending', 'CC BY 4.0', 'upload', 'admin') 
+    "INSERT INTO image_metadata (id, filename, file_size, upload_date, datetime, geometry, hazard_type, status, data_license, source_type, uploader_id)
+     VALUES ('${TEST_IMAGE_ID}', 'test_review_image.jpg', 1024, NOW(), NOW(), ST_SetSRID(ST_MakePoint(174.776,-41.289), 4326), 'flood', 'pending', 'CC BY 4.0', 'upload', 'admin')
      RETURNING id;" 2>&1 | grep -v "INSERT")
 
 if echo "$IMAGE_INSERT" | grep -q "${TEST_IMAGE_ID}"; then
@@ -197,7 +197,7 @@ fi
 if [ ! -z "$TEST_REVIEW_ITEM_ID" ]; then
     echo -n "Test 9: Get specific review item... "
     GET_RESPONSE=$(api_call GET "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}")
-    
+
     if echo "$GET_RESPONSE" | grep -q "\"id\":\"${TEST_REVIEW_ITEM_ID}\""; then
         print_test_result 0 "Get endpoint working"
     else
@@ -237,29 +237,29 @@ if [ ! -z "$TEST_REVIEW_ITEM_ID" ] && [ ! -z "$TEST_USER_ID" ]; then
     echo -n "Test 12: Assign review to user... "
     ASSIGN_RESPONSE=$(api_call POST "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/assign" \
         "{\"assigned_to_id\":\"${TEST_USER_ID}\",\"reason\":\"manual\",\"notes\":\"Test assignment\"}")
-    
+
     if echo "$ASSIGN_RESPONSE" | grep -q "\"assigned_to_id\""; then
         print_test_result 0 "Review assigned successfully"
     else
         print_test_result 1 "Assignment failed" "$ASSIGN_RESPONSE"
     fi
-    
+
     # Test 13: Get assignment history
     echo -n "Test 13: Get assignment history... "
     HISTORY_RESPONSE=$(api_call GET "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/assignments")
-    
+
     if echo "$HISTORY_RESPONSE" | grep -q '\['; then
         print_test_result 0 "Assignment history retrieved"
         echo "   History: $HISTORY_RESPONSE"
     else
         print_test_result 1 "Failed to get assignment history" "$HISTORY_RESPONSE"
     fi
-    
+
     # Test 14: Unassign review
     echo -n "Test 14: Unassign review... "
     UNASSIGN_RESPONSE=$(api_call POST "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/unassign" \
         "{\"notes\":\"Test unassignment\"}")
-    
+
     if echo "$UNASSIGN_RESPONSE" | grep -q '"assigned_to_id":null'; then
         print_test_result 0 "Review unassigned successfully"
     else
@@ -279,18 +279,18 @@ if [ ! -z "$TEST_REVIEW_ITEM_ID" ]; then
     echo -n "Test 15: Change status to under_review... "
     STATUS_RESPONSE=$(api_call PATCH "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/status" \
         "{\"status\":\"under_review\",\"notes\":\"Starting review\"}")
-    
+
     if echo "$STATUS_RESPONSE" | grep -q '"status":"under_review"'; then
         print_test_result 0 "Status changed to under_review"
     else
         print_test_result 1 "Status change failed" "$STATUS_RESPONSE"
     fi
-    
+
     # Test 16: Change status to approved
     echo -n "Test 16: Change status to approved... "
     STATUS_RESPONSE=$(api_call PATCH "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/status" \
         "{\"status\":\"approved\",\"notes\":\"Looks good\"}")
-    
+
     if echo "$STATUS_RESPONSE" | grep -q '"status":"approved"'; then
         print_test_result 0 "Status changed to approved"
     else
@@ -310,17 +310,17 @@ if [ ! -z "$TEST_REVIEW_ITEM_ID" ]; then
     echo -n "Test 17: Flag review item... "
     FLAG_RESPONSE=$(api_call POST "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/flag" \
         "{\"flagged_reason\":\"This needs special attention for testing purposes\"}")
-    
+
     if echo "$FLAG_RESPONSE" | grep -q '"is_flagged":true'; then
         print_test_result 0 "Review item flagged"
     else
         print_test_result 1 "Flagging failed" "$FLAG_RESPONSE"
     fi
-    
+
     # Test 18: Unflag review item
     echo -n "Test 18: Unflag review item... "
     UNFLAG_RESPONSE=$(api_call DELETE "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/flag")
-    
+
     if echo "$UNFLAG_RESPONSE" | grep -q '"is_flagged":false'; then
         print_test_result 0 "Review item unflagged"
     else
@@ -339,12 +339,12 @@ if [ ! -z "$TEST_REVIEW_ITEM_ID" ]; then
     # Test 19: Get audit trail
     echo -n "Test 19: Get audit trail... "
     AUDIT_RESPONSE=$(api_call GET "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}/audit-trail")
-    
+
     if echo "$AUDIT_RESPONSE" | grep -q '\['; then
         print_test_result 0 "Audit trail retrieved"
         AUDIT_COUNT=$(echo "$AUDIT_RESPONSE" | grep -o '"action"' | wc -l)
         echo "   Found ${AUDIT_COUNT} audit entries"
-        
+
         # Check for specific audit actions
         if echo "$AUDIT_RESPONSE" | grep -q '"action":"created"'; then
             echo -e "   ${GREEN}✓${NC} Contains 'created' action"
@@ -358,12 +358,12 @@ if [ ! -z "$TEST_REVIEW_ITEM_ID" ]; then
     else
         print_test_result 1 "Failed to get audit trail" "$AUDIT_RESPONSE"
     fi
-    
+
     # Test 20: Verify audit trail in database
     echo -n "Test 20: Verify audit trail in database... "
     AUDIT_DB_COUNT=$(docker compose exec -T postgis_db psql -U postgres -d impact_db -t -c \
         "SELECT COUNT(*) FROM review_audit_trail WHERE review_item_id = '${TEST_REVIEW_ITEM_ID}';" | xargs)
-    
+
     if [ "$AUDIT_DB_COUNT" -gt 0 ]; then
         print_test_result 0 "Audit trail stored in database (${AUDIT_DB_COUNT} entries)"
     else
@@ -383,7 +383,7 @@ if [ ! -z "$TEST_REVIEW_ITEM_ID" ]; then
     echo -n "Test 21: Update review item priority... "
     UPDATE_RESPONSE=$(api_call PATCH "/api/v1/review-items/${TEST_REVIEW_ITEM_ID}" \
         "{\"priority\":\"urgent\",\"notes\":\"Updated notes\"}")
-    
+
     if echo "$UPDATE_RESPONSE" | grep -q '"priority":"urgent"'; then
         print_test_result 0 "Review item updated"
     else

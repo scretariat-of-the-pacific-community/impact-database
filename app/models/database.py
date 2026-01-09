@@ -8,9 +8,10 @@ from sqlalchemy import (
     JSON,
     Boolean,
     SmallInteger,
+    ForeignKey,
     func,
 )
-from sqlalchemy.orm import declarative_base, sessionmaker, object_session
+from sqlalchemy.orm import declarative_base, sessionmaker, object_session, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.hybrid import hybrid_property
 from geoalchemy2 import Geometry
@@ -90,6 +91,13 @@ class ImageMetadata(Base):
     camera_model = Column(String(100), nullable=True)  # Camera model
     camera_bearing = Column(Float, nullable=True)  # GPS image direction in degrees
     exif_metadata = Column(JSON, nullable=True)  # Full EXIF data as JSON
+
+    # TODO: Before/After image pairing and featured stories - awaiting DB migration
+    # before_image_id = Column(UUID(as_uuid=True), ForeignKey("image_metadata.id"), nullable=True)
+    # before_image = relationship("ImageMetadata", remote_side="ImageMetadata.id", foreign_keys=[before_image_id])
+    # is_featured = Column(Boolean, default=False, nullable=False)
+    # featured_priority = Column(SmallInteger, default=0, nullable=True)
+    # featured_description = Column(Text, nullable=True)
 
     # Original filename, kept for reference
     filename = Column(String, nullable=True)

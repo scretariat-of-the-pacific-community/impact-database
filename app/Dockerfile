@@ -1,17 +1,78 @@
-# This Dockerfile sets up a Python 3.11 application environment using the slim base image.
-# It configures the working directory to /app and sets PYTHONPATH for module resolution.
-# System dependencies required for building Python packages (including PostgreSQL support) are installed.
-# The requirements.txt file is copied and Python dependencies are installed.
-# Finally, the application source code is copied into the container.
+# Multi-stage build for Python FastAPI backend
+# Stage 1: Builder
+FROM python:3.11-slim AS builder
 
-FROM python:3.11-slim
+WORKDIR /app
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PIP_NO_CACHE_DIR=1
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir --upgrade pip && \
+    pip install --user --no-cache-dir -r requirements.txt
+
+# Stage 2: Runner (production)
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    postgresql-client \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy application code
+COPY . .
+
+# Make scripts executable
+RUN chmod +x /app/entrypoint.sh && \
+    chmod +x /app/*.sh || true
+
+# Create uploads directory with proper permissions
+RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
+
+# Switch to non-root user for runtime (commented out for now due to permission issues)
+# USER appuser
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+EXPOSE 8000
+
+ENTRYPOINT ["/app/entrypoint.sh"]
+
+# Stage 3: Development
+FROM python:3.11-slim AS development
 
 WORKDIR /app
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Install system dependencies for building Python packages
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
@@ -21,22 +82,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
 COPY . .
 
-# Make scripts executable
 RUN chmod +x /app/entrypoint.sh && \
-    chmod +x /app/*.sh
+    chmod +x /app/*.sh || true
 
-# Create uploads directory
 RUN mkdir -p /app/uploads
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 

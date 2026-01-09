@@ -1,7 +1,14 @@
 'use client';
 
 import { useState, useMemo, memo } from 'react';
-import { CalendarDays, MapPin, Search, SlidersHorizontal, X, ChevronDown } from 'lucide-react';
+import {
+  CalendarDays,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  X,
+  ChevronDown,
+} from 'lucide-react';
 import { Card, Tag, Select } from '@/components/design-system';
 import { trackFilterApplied } from '@/lib/analytics';
 import { sanitizeText } from '@/lib/sanitize';
@@ -61,7 +68,7 @@ export default function ImageFilters({
 
   const toggleHazardType = (hazard: string) => {
     const newHazardTypes = filters.hazardTypes.includes(hazard)
-      ? filters.hazardTypes.filter(h => h !== hazard)
+      ? filters.hazardTypes.filter((h) => h !== hazard)
       : [...filters.hazardTypes, hazard];
     updateFilters({ hazardTypes: newHazardTypes });
     trackFilterApplied('hazard', hazard, newHazardTypes.length);
@@ -69,7 +76,7 @@ export default function ImageFilters({
 
   const toggleCountry = (country: string) => {
     const newCountries = filters.countries.includes(country)
-      ? filters.countries.filter(c => c !== country)
+      ? filters.countries.filter((c) => c !== country)
       : [...filters.countries, country];
     updateFilters({ countries: newCountries });
     trackFilterApplied('country', country, newCountries.length);
@@ -98,13 +105,20 @@ export default function ImageFilters({
   }, [filters]);
 
   return (
-    <Card variant="surface" padding="none" className="divide-y divide-white/10 bg-white/5 backdrop-blur border border-white/10">
+    <Card
+      variant="surface"
+      padding="none"
+      className="divide-y divide-white/10 bg-white/5 backdrop-blur border border-white/10"
+    >
       {/* Main Search Bar */}
       <div className="p-4 border-b border-white/10">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-5 h-5" />
           <input
+            id="filter-search"
+            name="filter-search"
             type="text"
+            autoComplete="off"
             className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-pacific-500 focus:border-transparent"
             placeholder="Search by title, filename, location, description..."
             value={filters.searchTerm}
@@ -148,8 +162,12 @@ export default function ImageFilters({
                         className="w-4 h-4 text-pacific-600 border-white/20 rounded focus:ring-pacific-500 bg-white/5"
                       />
                       <span className="ml-3 text-sm flex items-center text-white">
-                        <span className="mr-2">{HAZARD_ICONS[hazard] || '⚠️'}</span>
-                        <span className="capitalize">{sanitizeText(hazard)}</span>
+                        <span className="mr-2">
+                          {HAZARD_ICONS[hazard] || '⚠️'}
+                        </span>
+                        <span className="capitalize">
+                          {sanitizeText(hazard)}
+                        </span>
                       </span>
                     </label>
                   ))}
@@ -190,7 +208,9 @@ export default function ImageFilters({
                         onChange={() => toggleCountry(country)}
                         className="w-4 h-4 text-pacific-600 border-white/20 rounded focus:ring-pacific-500 bg-white/5"
                       />
-                      <span className="ml-3 text-sm text-white">{getCountryName(country)}</span>
+                      <span className="ml-3 text-sm text-white">
+                        {getCountryName(country)}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -234,18 +254,25 @@ export default function ImageFilters({
                 <input
                   type="date"
                   value={filters.dateRange.start || ''}
-                  onChange={(e) => updateFilters({
-                    dateRange: { ...filters.dateRange, start: e.target.value }
-                  })}
+                  onChange={(e) =>
+                    updateFilters({
+                      dateRange: {
+                        ...filters.dateRange,
+                        start: e.target.value,
+                      },
+                    })
+                  }
                   className="w-full px-3 py-2 bg-white/5 border border-white/20 rounded-md text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-pacific-500 text-sm"
                   placeholder="Start date"
                 />
                 <input
                   type="date"
                   value={filters.dateRange.end || ''}
-                  onChange={(e) => updateFilters({
-                    dateRange: { ...filters.dateRange, end: e.target.value }
-                  })}
+                  onChange={(e) =>
+                    updateFilters({
+                      dateRange: { ...filters.dateRange, end: e.target.value },
+                    })
+                  }
                   className="w-full px-3 py-2 bg-white/5 border border-white/20 rounded-md text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-pacific-500 text-sm"
                   placeholder="End date"
                 />
@@ -257,7 +284,11 @@ export default function ImageFilters({
               <Select
                 label="Sort By"
                 value={filters.sortBy}
-                onChange={(e) => updateFilters({ sortBy: e.target.value as FilterState['sortBy'] })}
+                onChange={(e) =>
+                  updateFilters({
+                    sortBy: e.target.value as FilterState['sortBy'],
+                  })
+                }
                 variant="dark"
                 size="sm"
               >
@@ -273,7 +304,11 @@ export default function ImageFilters({
               <Select
                 label="Sort Order"
                 value={filters.sortOrder}
-                onChange={(e) => updateFilters({ sortOrder: e.target.value as FilterState['sortOrder'] })}
+                onChange={(e) =>
+                  updateFilters({
+                    sortOrder: e.target.value as FilterState['sortOrder'],
+                  })
+                }
                 variant="dark"
                 size="sm"
               >
@@ -321,7 +356,8 @@ export default function ImageFilters({
                 onRemove={() => updateFilters({ dateRange: {} })}
                 removableLabel="Clear date range filter"
               >
-                {filters.dateRange.start || 'Any'} – {filters.dateRange.end || 'Any'}
+                {filters.dateRange.start || 'Any'} –{' '}
+                {filters.dateRange.end || 'Any'}
               </Tag>
             )}
           </div>
@@ -332,7 +368,8 @@ export default function ImageFilters({
       <div className="px-4 py-3 bg-white/5 border-t border-white/10 rounded-b-lg">
         <div className="flex items-center justify-between text-sm text-white/60">
           <span>
-            Showing <span className="font-medium text-white">{filteredCount}</span> of{' '}
+            Showing{' '}
+            <span className="font-medium text-white">{filteredCount}</span> of{' '}
             <span className="font-medium text-white">{totalImages}</span> images
           </span>
           {hasActiveFilters && (

@@ -49,7 +49,7 @@ if [ -f "hazard_test_images/flood_1.jpg" ]; then
       -F "access_constraints=Public" \
       -F "security_classification=Unclassified" \
       -F "additional_keywords=[\"tropical cyclone\", \"infrastructure damage\", \"commercial district\"]")
-    
+
     if echo "$upload_response" | jq -e '.filename' > /dev/null 2>&1; then
         echo "✅ ISO-compliant upload successful"
         echo "Uploaded file:" $(echo "$upload_response" | jq -r '.filename')

@@ -481,7 +481,7 @@ async def update_image_metadata(
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(get_current_user_enhanced),
 ):
-    """Update image metadata with validation and version tracking."""
+    """Update image metadata with validation and version tracking. Only the uploader or an admin can edit."""
     try:
         if "metadata:update" not in current_user.permissions:
             raise HTTPException(
@@ -492,6 +492,16 @@ async def update_image_metadata(
 
         if not image:
             raise HTTPException(status_code=404, detail="Image not found")
+
+        # Check if user is the uploader or an admin
+        is_admin = current_user.role in ["admin", "superadmin"]
+        is_uploader = str(image.uploader_id) == str(current_user.id)
+        
+        if not is_admin and not is_uploader:
+            raise HTTPException(
+                status_code=403,
+                detail="Only the image uploader or an administrator can edit this image"
+            )
 
         # Track changes for version history
         changes: List[Dict[str, Any]] = []

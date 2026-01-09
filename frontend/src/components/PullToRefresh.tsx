@@ -45,7 +45,7 @@ export default function PullToRefresh({
     if (pullDistance >= threshold && !isRefreshing) {
       setIsRefreshing(true);
       controls.start({ rotate: 360 });
-      
+
       try {
         await onRefresh();
       } finally {
@@ -61,7 +61,9 @@ export default function PullToRefresh({
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchstart', handleTouchStart, {
+      passive: true,
+    });
     document.addEventListener('touchmove', handleTouchMove, { passive: false });
     document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
@@ -89,7 +91,11 @@ export default function PullToRefresh({
         <div className="rounded-full border border-white/20 bg-deep-900/90 p-3 backdrop-blur-xl">
           <motion.div
             animate={controls}
-            transition={{ duration: 1, ease: 'linear', repeat: isRefreshing ? Infinity : 0 }}
+            transition={{
+              duration: 1,
+              ease: 'linear',
+              repeat: isRefreshing ? Infinity : 0,
+            }}
             style={{ scale }}
           >
             <RefreshCw

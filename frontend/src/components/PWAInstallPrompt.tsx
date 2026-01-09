@@ -14,7 +14,8 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 export default function PWAInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function PWAInstallPrompt() {
     // Check if user has already dismissed or installed
     const dismissed = localStorage.getItem('pwa-prompt-dismissed');
     const installed = localStorage.getItem('pwa-installed');
-    
+
     if (dismissed || installed) {
       return;
     }
@@ -44,7 +45,7 @@ export default function PWAInstallPrompt() {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      
+
       // Show custom prompt after a delay
       setTimeout(() => {
         setShowPrompt(true);
@@ -62,7 +63,10 @@ export default function PWAInstallPrompt() {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener(
+        'beforeinstallprompt',
+        handleBeforeInstallPrompt
+      );
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
@@ -111,7 +115,8 @@ export default function PWAInstallPrompt() {
             <h3 className="font-semibold text-gray-900">Install App</h3>
           </div>
           <p className="text-sm text-gray-600">
-            Install Pacific Impact Atlas for quick access and offline support. Perfect for field work.
+            Install Pacific Impact Atlas for quick access and offline support.
+            Perfect for field work.
           </p>
         </div>
 

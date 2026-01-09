@@ -1,8 +1,8 @@
 # Epic 2.4 – Security & Hardening Review
 
-**Date:** November 7, 2025  
-**Epic:** Phase 2 – Product-grade (Design, i18n, Monitoring, Security)  
-**Status:** ✅ **COMPLETE (95%)**  
+**Date:** November 7, 2025
+**Epic:** Phase 2 – Product-grade (Design, i18n, Monitoring, Security)
+**Status:** ✅ **COMPLETE (95%)**
 **Grade:** **A (Excellent Implementation with Minor Enhancements Needed)**
 
 ---
@@ -11,12 +11,12 @@
 
 Epic 2.4 has been **comprehensively implemented** with production-grade security measures suitable for government and disaster agency deployments. The implementation includes:
 
-✅ **Comprehensive security headers** via Next.js configuration  
-✅ **XSS protection** with DOMPurify sanitization  
-✅ **Secure authentication** with OAuth2/OIDC + PKCE  
-✅ **Token management** with Secure+SameSite cookies  
-✅ **Error monitoring** with Sentry integration  
-✅ **Content Security Policy (CSP)** with strict directives  
+✅ **Comprehensive security headers** via Next.js configuration
+✅ **XSS protection** with DOMPurify sanitization
+✅ **Secure authentication** with OAuth2/OIDC + PKCE
+✅ **Token management** with Secure+SameSite cookies
+✅ **Error monitoring** with Sentry integration
+✅ **Content Security Policy (CSP)** with strict directives
 ✅ **Documentation** with security checklist
 
 **Overall Assessment:** This implementation exceeds baseline security requirements for government/disaster management applications. The 5% deduction is for future enhancements (full HttpOnly backend cookies, rate limiting UI).
@@ -131,8 +131,8 @@ export const sanitizeRichText = (value?: string | null): string => {
 const safeTitle = sanitizeText(image.title);
 const safeAbstract = sanitizeText(image.abstract || 'No description available');
 const safeLocation = sanitizeText(
-  image.latitude && image.longitude 
-    ? `${image.latitude.toFixed(2)}, ${image.longitude.toFixed(2)}` 
+  image.latitude && image.longitude
+    ? `${image.latitude.toFixed(2)}, ${image.longitude.toFixed(2)}`
     : 'No location'
 );
 ```
@@ -186,7 +186,7 @@ const authConfig = {
 // Generate PKCE challenge
 async function generatePKCE() {
   const codeVerifier = generateRandomString(128);
-  const digest = await crypto.subtle.digest('SHA-256', 
+  const digest = await crypto.subtle.digest('SHA-256',
     new TextEncoder().encode(codeVerifier)
   );
   const codeChallenge = base64URLEncode(digest);
@@ -201,7 +201,7 @@ async function generatePKCE() {
 function storeSession(session: AuthSession): void {
   // 1. LocalStorage (for offline access & client-side checks)
   localStorage.setItem('ocean_portal_session', JSON.stringify(session));
-  
+
   // 2. Secure Cookie (for future backend validation)
   setAuthCookie(session.access_token);
 }
@@ -240,13 +240,13 @@ export const sanitizeReturnUrl = (value?: string | null): string => {
     if (value.startsWith('/')) {
       return value;
     }
-    
+
     // Or same-origin absolute URLs
     const parsed = new URL(value, window.location.origin);
     if (parsed.origin !== window.location.origin) {
       return '/';  // Reject external URLs
     }
-    
+
     return parsed.pathname + parsed.search + parsed.hash;
   } catch {
     return '/';
@@ -271,16 +271,16 @@ import * as Sentry from '@sentry/nextjs';
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
-  
+
   // Performance monitoring
   tracesSampleRate: 0.1,  // 10% of transactions
-  
+
   // Session replay
   replaysSessionSampleRate: 0.01,   // 1% of sessions
   replaysOnErrorSampleRate: 1.0,    // 100% of errors
-  
+
   enabled: Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN),
-  
+
   integrations: [
     Sentry.browserTracingIntegration(),
     Sentry.replayIntegration({
@@ -367,12 +367,12 @@ class SecuritySettings(BaseModel):
     ALGORITHM: str = Field(default="HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15, ge=5, le=60)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, ge=1, le=30)
-    
+
     # Session Security
     SESSION_SECURE: bool = Field(default=True)  # Require HTTPS
     SESSION_SAMESITE: str = Field(default="strict")
     SESSION_HTTPONLY: bool = Field(default=True)
-    
+
     # Rate Limiting
     RATE_LIMIT_REQUESTS: int = Field(default=100)
     RATE_LIMIT_WINDOW: int = Field(default=60)
@@ -428,22 +428,22 @@ app.add_middleware(
 ```markdown
 ## Page-Level Checklist
 
-1. **Headers**: Ensure new pages don't require CSP relaxations; 
+1. **Headers**: Ensure new pages don't require CSP relaxations;
    document rationale if needed.
 
-2. **User content**: Pass every API string through `sanitizeText` 
+2. **User content**: Pass every API string through `sanitizeText`
    before rendering. Never use `dangerouslySetInnerHTML` without DOMPurify.
 
-3. **External resources**: Load via Next's pipeline or add to CSP. 
+3. **External resources**: Load via Next's pipeline or add to CSP.
    Prefer HTTPS.
 
-4. **Auth redirects**: Run return URLs through `sanitizeReturnUrl` 
+4. **Auth redirects**: Run return URLs through `sanitizeReturnUrl`
    before storing/redirecting.
 
-5. **Sensitive data**: Never log tokens/emails to analytics/Sentry. 
+5. **Sensitive data**: Never log tokens/emails to analytics/Sentry.
    Use correlation IDs.
 
-6. **Forms/uploads**: Validate client-side but assume backend 
+6. **Forms/uploads**: Validate client-side but assume backend
    re-validates. Don't leak stack traces.
 ```
 
@@ -594,7 +594,7 @@ if (remaining < 10) {
 
 **Recommended Enhancement:**
 ```html
-<link 
+<link
   href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap"
   rel="stylesheet"
   integrity="sha384-..."
@@ -718,7 +718,7 @@ https://observatory.mozilla.org/analyze/your-domain.com
 | Documentation | 10/10 | 10% | 1.0 |
 | Compliance | 95% | 5% | 0.048 |
 
-**Total Score:** 9.2/10 ≈ **95%**  
+**Total Score:** 9.2/10 ≈ **95%**
 **Letter Grade:** **A (Excellent)**
 
 ---
@@ -780,7 +780,7 @@ The 5% deduction is for future enhancements (HttpOnly cookies, CSP tightening) t
 
 ---
 
-**Reviewed by:** GitHub Copilot  
-**Review Date:** November 7, 2025  
-**Next Review:** After production deployment and penetration testing  
+**Reviewed by:** GitHub Copilot
+**Review Date:** November 7, 2025
+**Next Review:** After production deployment and penetration testing
 **Status:** **APPROVED FOR PRODUCTION**

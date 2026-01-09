@@ -1,30 +1,30 @@
 <svg width="800" height="600" viewBox="0 0 800 600" fill="none" xmlns="http://www.w3.org/2000/svg">
   <rect width="800" height="600" fill="#F3F4F6"/>
   <rect x="50" y="50" width="700" height="500" fill="#E5E7EB" stroke="#D1D5DB" stroke-width="2"/>
-  
+
   <!-- Mountain landscape -->
   <path d="M50 400L200 200L350 300L500 150L650 250L750 200V550H50V400Z" fill="#9CA3AF"/>
   <path d="M50 450L150 300L300 350L450 200L600 300L750 250V550H50V450Z" fill="#6B7280"/>
-  
+
   <!-- Sun -->
   <circle cx="650" cy="150" r="40" fill="#FDE047"/>
-  
+
   <!-- Clouds -->
   <ellipse cx="200" cy="120" rx="60" ry="25" fill="#F9FAFB"/>
   <ellipse cx="180" cy="110" rx="40" ry="20" fill="#F9FAFB"/>
   <ellipse cx="220" cy="110" rx="50" ry="25" fill="#F9FAFB"/>
-  
+
   <ellipse cx="500" cy="100" rx="70" ry="30" fill="#F9FAFB"/>
   <ellipse cx="470" cy="90" rx="45" ry="25" fill="#F9FAFB"/>
   <ellipse cx="530" cy="90" rx="55" ry="30" fill="#F9FAFB"/>
-  
+
   <!-- Trees -->
   <path d="M100 400L120 350L140 400Z" fill="#16A34A"/>
   <rect x="115" y="400" width="10" height="30" fill="#92400E"/>
-  
+
   <path d="M300 350L325 290L350 350Z" fill="#16A34A"/>
   <rect x="318" y="350" width="14" height="40" fill="#92400E"/>
-  
+
   <!-- Camera icon in center -->
   <g transform="translate(375, 275)">
     <rect x="0" y="10" width="50" height="35" rx="5" fill="#374151"/>
@@ -33,7 +33,7 @@
     <circle cx="25" cy="27.5" r="8" fill="#9CA3AF"/>
     <rect x="38" y="18" width="6" height="3" rx="1" fill="#9CA3AF"/>
   </g>
-  
+
   <!-- Text -->
   <text x="400" y="380" text-anchor="middle" fill="#6B7280" font-family="system-ui, sans-serif" font-size="18" font-weight="500">
     Image not available

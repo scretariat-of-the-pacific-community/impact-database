@@ -205,7 +205,7 @@ Failed tests (3) - **Not implementation issues:**
 
 # Result:
 # - Status changed to "approved"
-# - Audit log: action="STATUS_CHANGE", 
+# - Audit log: action="STATUS_CHANGE",
 #   change_summary={"status": {"old": "pending_review", "new": "approved"}},
 #   review_notes="Verified location..."
 # - Original uploader can no longer edit or delete

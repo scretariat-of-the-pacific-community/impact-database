@@ -1,7 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { MapContainer, TileLayer, CircleMarker, Tooltip as LeafletTooltip } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Tooltip as LeafletTooltip,
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
   Area,
@@ -43,32 +48,144 @@ interface HazardDrilldownItem {
 
 const hazardCategories: Record<string, HazardDrilldownItem[]> = {
   Flood: [
-    { id: 'f1', title: 'Coastal surge assessment', region: 'Fiji', uploads: 16, views: 820, citations: 12 },
-    { id: 'f2', title: 'River delta watch', region: 'Bangladesh', uploads: 12, views: 560, citations: 8 },
-    { id: 'f3', title: 'Urban flash flood audit', region: 'Philippines', uploads: 9, views: 420, citations: 5 },
+    {
+      id: 'f1',
+      title: 'Coastal surge assessment',
+      region: 'Fiji',
+      uploads: 16,
+      views: 820,
+      citations: 12,
+    },
+    {
+      id: 'f2',
+      title: 'River delta watch',
+      region: 'Bangladesh',
+      uploads: 12,
+      views: 560,
+      citations: 8,
+    },
+    {
+      id: 'f3',
+      title: 'Urban flash flood audit',
+      region: 'Philippines',
+      uploads: 9,
+      views: 420,
+      citations: 5,
+    },
   ],
   Cyclone: [
-    { id: 'c1', title: 'Typhoon path imagery', region: 'Philippines', uploads: 8, views: 640, citations: 11 },
-    { id: 'c2', title: 'Cyclone Harold rebuild', region: 'Vanuatu', uploads: 7, views: 320, citations: 6 },
+    {
+      id: 'c1',
+      title: 'Typhoon path imagery',
+      region: 'Philippines',
+      uploads: 8,
+      views: 640,
+      citations: 11,
+    },
+    {
+      id: 'c2',
+      title: 'Cyclone Harold rebuild',
+      region: 'Vanuatu',
+      uploads: 7,
+      views: 320,
+      citations: 6,
+    },
   ],
   Wildfire: [
-    { id: 'w1', title: 'Forest edge patrol', region: 'Indonesia', uploads: 6, views: 410, citations: 4 },
-    { id: 'w2', title: 'Peatland hotspot study', region: 'Malaysia', uploads: 5, views: 260, citations: 3 },
+    {
+      id: 'w1',
+      title: 'Forest edge patrol',
+      region: 'Indonesia',
+      uploads: 6,
+      views: 410,
+      citations: 4,
+    },
+    {
+      id: 'w2',
+      title: 'Peatland hotspot study',
+      region: 'Malaysia',
+      uploads: 5,
+      views: 260,
+      citations: 3,
+    },
   ],
   Heatwave: [
-    { id: 'h1', title: 'Urban heat mapping', region: 'Australia', uploads: 10, views: 500, citations: 7 },
+    {
+      id: 'h1',
+      title: 'Urban heat mapping',
+      region: 'Australia',
+      uploads: 10,
+      views: 500,
+      citations: 7,
+    },
   ],
 };
 
 const uploadLocations: UploadLocation[] = [
-  { id: 'loc-1', label: 'Suva', latitude: -18.1248, longitude: 178.4501, hazard: 'Cyclone', uploads: 12 },
-  { id: 'loc-2', label: 'Manila', latitude: 14.5995, longitude: 120.9842, hazard: 'Flood', uploads: 22 },
-  { id: 'loc-3', label: 'Jakarta', latitude: -6.2088, longitude: 106.8456, hazard: 'Flood', uploads: 18 },
-  { id: 'loc-4', label: 'Kuala Lumpur', latitude: 3.139, longitude: 101.6869, hazard: 'Heatwave', uploads: 11 },
-  { id: 'loc-5', label: 'Port Vila', latitude: -17.7333, longitude: 168.3273, hazard: 'Cyclone', uploads: 8 },
-  { id: 'loc-6', label: 'Palembang', latitude: -2.9761, longitude: 104.7754, hazard: 'Wildfire', uploads: 9 },
-  { id: 'loc-7', label: 'Cebu', latitude: 10.3157, longitude: 123.8854, hazard: 'Flood', uploads: 14 },
-  { id: 'loc-8', label: 'Sydney', latitude: -33.8688, longitude: 151.2093, hazard: 'Heatwave', uploads: 6 },
+  {
+    id: 'loc-1',
+    label: 'Suva',
+    latitude: -18.1248,
+    longitude: 178.4501,
+    hazard: 'Cyclone',
+    uploads: 12,
+  },
+  {
+    id: 'loc-2',
+    label: 'Manila',
+    latitude: 14.5995,
+    longitude: 120.9842,
+    hazard: 'Flood',
+    uploads: 22,
+  },
+  {
+    id: 'loc-3',
+    label: 'Jakarta',
+    latitude: -6.2088,
+    longitude: 106.8456,
+    hazard: 'Flood',
+    uploads: 18,
+  },
+  {
+    id: 'loc-4',
+    label: 'Kuala Lumpur',
+    latitude: 3.139,
+    longitude: 101.6869,
+    hazard: 'Heatwave',
+    uploads: 11,
+  },
+  {
+    id: 'loc-5',
+    label: 'Port Vila',
+    latitude: -17.7333,
+    longitude: 168.3273,
+    hazard: 'Cyclone',
+    uploads: 8,
+  },
+  {
+    id: 'loc-6',
+    label: 'Palembang',
+    latitude: -2.9761,
+    longitude: 104.7754,
+    hazard: 'Wildfire',
+    uploads: 9,
+  },
+  {
+    id: 'loc-7',
+    label: 'Cebu',
+    latitude: 10.3157,
+    longitude: 123.8854,
+    hazard: 'Flood',
+    uploads: 14,
+  },
+  {
+    id: 'loc-8',
+    label: 'Sydney',
+    latitude: -33.8688,
+    longitude: 151.2093,
+    hazard: 'Heatwave',
+    uploads: 6,
+  },
 ];
 
 export function generateTimelineSeries(weeks: number = 14) {
@@ -143,7 +260,8 @@ const rollingAverage = (data: typeof timelineSeries, windowSize: number) =>
   data.map((point, index) => {
     const windowStart = Math.max(0, index - windowSize + 1);
     const window = data.slice(windowStart, index + 1);
-    const avgUploads = window.reduce((sum, item) => sum + item.uploads, 0) / window.length;
+    const avgUploads =
+      window.reduce((sum, item) => sum + item.uploads, 0) / window.length;
     return { ...point, rolling: Number(avgUploads.toFixed(2)) };
   });
 
@@ -159,40 +277,42 @@ function downloadFile(content: string, filename: string, type: string) {
 
 /**
  * Escape a value for CSV according to RFC 4180 and mitigate CSV injection attacks.
- * 
+ *
  * CSV Injection Prevention:
  * Values starting with formula characters (=, +, -, @, \t, \r) are prefixed
  * with a single quote to prevent execution in spreadsheet applications.
- * 
+ *
  * ⚠️ WARNING: Users should be cautious when opening exported CSV files.
  * Always inspect data before enabling macros or formulas in spreadsheet apps.
- * 
+ *
  * For additional security, consider opening CSV files in plain text editors first.
  */
 function escapeCsvValue(value: string | number): string {
   let str = String(value);
-  
+
   // Prevent CSV injection by prefixing formula-like values
   // This protects against attacks where malicious formulas are embedded in data
   if (/^[=+\-@\t\r]/.test(str)) {
     str = `'${str}`;
   }
-  
+
   // Escape double quotes per RFC 4180
   str = str.replace(/"/g, '""');
-  
+
   // Wrap in quotes if contains special characters
   if (/[",\n\r]/.test(str)) {
     str = `"${str}"`;
   }
-  
+
   return str;
 }
 
 export function formatCsv(rows: Record<string, string | number>[]) {
   if (!rows.length) return '';
   const headers = Object.keys(rows[0]);
-  const csvRows = rows.map((row) => headers.map((header) => escapeCsvValue(row[header])).join(','));
+  const csvRows = rows.map((row) =>
+    headers.map((header) => escapeCsvValue(row[header])).join(',')
+  );
   return [headers.join(','), ...csvRows].join('\n');
 }
 
@@ -204,10 +324,13 @@ export default function UserAnalytics() {
         name,
         value: items.reduce((sum, item) => sum + item.uploads, 0),
       })),
-    [],
+    []
   );
 
-  const timelineWithRolling = useMemo(() => rollingAverage(timelineSeries, 7), []);
+  const timelineWithRolling = useMemo(
+    () => rollingAverage(timelineSeries, 7),
+    []
+  );
 
   const totals = useMemo(() => {
     const uploads = timelineSeries.reduce((sum, item) => sum + item.uploads, 0);
@@ -215,7 +338,12 @@ export default function UserAnalytics() {
     const citations = Object.values(hazardCategories)
       .flat()
       .reduce((sum, item) => sum + item.citations, 0);
-    return { uploads, views, averageViews: Math.round(views / uploads), citations };
+    return {
+      uploads,
+      views,
+      averageViews: Math.round(views / uploads),
+      citations,
+    };
   }, []);
 
   const calendarWeeks = useMemo(() => {
@@ -226,7 +354,11 @@ export default function UserAnalytics() {
 
     for (let d = new Date(startDate); d <= today; d.setDate(d.getDate() + 1)) {
       const key = format(d, 'yyyy-MM-dd');
-      currentWeek.push({ date: new Date(d), key, count: contributionCalendar[key] || 0 });
+      currentWeek.push({
+        date: new Date(d),
+        key,
+        count: contributionCalendar[key] || 0,
+      });
       if (d.getDay() === 6) {
         weeks.push(currentWeek);
         currentWeek = [];
@@ -239,10 +371,13 @@ export default function UserAnalytics() {
   const hazardLegend = useMemo(
     () =>
       pieData.reduce(
-        (acc, item, index) => ({ ...acc, [item.name]: hazardPalette[index % hazardPalette.length] }),
-        {} as Record<string, string>,
+        (acc, item, index) => ({
+          ...acc,
+          [item.name]: hazardPalette[index % hazardPalette.length],
+        }),
+        {} as Record<string, string>
       ),
-    [pieData],
+    [pieData]
   );
 
   const exportJson = () => {
@@ -253,11 +388,19 @@ export default function UserAnalytics() {
       popularImages,
       benchmark: communityBenchmark,
     };
-    downloadFile(JSON.stringify(payload, null, 2), 'user-analytics.json', 'application/json');
+    downloadFile(
+      JSON.stringify(payload, null, 2),
+      'user-analytics.json',
+      'application/json'
+    );
   };
 
   const exportCsv = () => {
-    const rows = timelineSeries.map((row) => ({ date: row.date, uploads: row.uploads, views: row.views }));
+    const rows = timelineSeries.map((row) => ({
+      date: row.date,
+      uploads: row.uploads,
+      views: row.views,
+    }));
     downloadFile(formatCsv(rows), 'user-uploads.csv', 'text/csv');
   };
 
@@ -265,9 +408,16 @@ export default function UserAnalytics() {
     <div className="mx-auto max-w-7xl space-y-8 p-6">
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900 to-slate-800 p-6 shadow-lg">
         <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">User analytics</p>
-          <h1 className="text-3xl font-semibold text-white">Performance overview</h1>
-          <p className="text-slate-300">Geospatial coverage, hazard mix, timelines, and peer benchmarking in one dashboard.</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+            User analytics
+          </p>
+          <h1 className="text-3xl font-semibold text-white">
+            Performance overview
+          </h1>
+          <p className="text-slate-300">
+            Geospatial coverage, hazard mix, timelines, and peer benchmarking in
+            one dashboard.
+          </p>
         </div>
         <div className="flex gap-3">
           <button
@@ -291,15 +441,25 @@ export default function UserAnalytics() {
         <div className="lg:col-span-3 rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
           <div className="flex items-center justify-between gap-2 pb-3">
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Geographic coverage</p>
-              <h2 className="text-xl font-semibold text-white">Uploads map & heat intensity</h2>
+              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+                Geographic coverage
+              </p>
+              <h2 className="text-xl font-semibold text-white">
+                Uploads map & heat intensity
+              </h2>
             </div>
             <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-1 text-xs text-white">
-              <MapPin className="h-4 w-4 text-emerald-300" /> {uploadLocations.length} locations mapped
+              <MapPin className="h-4 w-4 text-emerald-300" />{' '}
+              {uploadLocations.length} locations mapped
             </div>
           </div>
           <div className="h-[420px] overflow-hidden rounded-xl border border-white/5">
-            <MapContainer center={[-2.8, 135.9]} zoom={3} scrollWheelZoom={true} className="h-full w-full">
+            <MapContainer
+              center={[-2.8, 135.9]}
+              zoom={3}
+              scrollWheelZoom={true}
+              className="h-full w-full"
+            >
               <TileLayer
                 attribution="&copy; OpenStreetMap contributors"
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -333,13 +493,24 @@ export default function UserAnalytics() {
           <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Hazard mix</p>
-                <h2 className="text-xl font-semibold text-white">Distribution & drill-down</h2>
+                <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+                  Hazard mix
+                </p>
+                <h2 className="text-xl font-semibold text-white">
+                  Distribution & drill-down
+                </h2>
               </div>
-              <div className="rounded-full bg-white/5 px-3 py-1 text-xs text-white">Click a slice to drill down</div>
+              <div className="rounded-full bg-white/5 px-3 py-1 text-xs text-white">
+                Click a slice to drill down
+              </div>
             </div>
             <div className="h-72" style={{ minHeight: '288px' }}>
-              <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={200}>
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+                minWidth={100}
+                minHeight={200}
+              >
                 <PieChart>
                   <Pie
                     data={pieData}
@@ -376,7 +547,11 @@ export default function UserAnalytics() {
               <div className="flex items-center justify-between text-sm text-white">
                 <span className="font-medium">{selectedHazard} details</span>
                 <span className="text-white/70">
-                  {hazardCategories[selectedHazard]?.reduce((sum, item) => sum + item.uploads, 0) || 0} uploads
+                  {hazardCategories[selectedHazard]?.reduce(
+                    (sum, item) => sum + item.uploads,
+                    0
+                  ) || 0}{' '}
+                  uploads
                 </span>
               </div>
               <div className="space-y-2">
@@ -390,9 +565,15 @@ export default function UserAnalytics() {
                       <p className="text-xs text-white/60">{item.region}</p>
                     </div>
                     <div className="flex gap-4 text-xs text-white/80">
-                      <span className="flex items-center gap-1"><TrendingUp className="h-4 w-4" /> {item.views}</span>
-                      <span className="flex items-center gap-1"><Gauge className="h-4 w-4" /> {item.citations} citations</span>
-                      <span className="rounded-full bg-white/10 px-2 py-0.5">{item.uploads} uploads</span>
+                      <span className="flex items-center gap-1">
+                        <TrendingUp className="h-4 w-4" /> {item.views}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Gauge className="h-4 w-4" /> {item.citations} citations
+                      </span>
+                      <span className="rounded-full bg-white/10 px-2 py-0.5">
+                        {item.uploads} uploads
+                      </span>
                     </div>
                   </div>
                 ))}
@@ -409,12 +590,16 @@ export default function UserAnalytics() {
             <div className="rounded-xl border border-white/10 bg-slate-900/80 p-3 text-white">
               <p className="text-xs text-white/60">Total citations</p>
               <p className="text-2xl font-semibold">{totals.citations}</p>
-              <p className="text-xs text-emerald-300">Peer recognition rising</p>
+              <p className="text-xs text-emerald-300">
+                Peer recognition rising
+              </p>
             </div>
             <div className="rounded-xl border border-white/10 bg-slate-900/80 p-3 text-white">
               <p className="text-xs text-white/60">Most popular</p>
               <p className="text-2xl font-semibold">{popularImages[0].views}</p>
-              <p className="text-xs text-emerald-300">{popularImages[0].title}</p>
+              <p className="text-xs text-emerald-300">
+                {popularImages[0].title}
+              </p>
             </div>
           </div>
         </div>
@@ -424,36 +609,76 @@ export default function UserAnalytics() {
         <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
           <div className="flex items-center justify-between pb-3">
             <div>
-              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Timeline</p>
-              <h2 className="text-xl font-semibold text-white">Uploads with 7-day rolling average</h2>
+              <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+                Timeline
+              </p>
+              <h2 className="text-xl font-semibold text-white">
+                Uploads with 7-day rolling average
+              </h2>
             </div>
             <div className="rounded-full bg-white/5 px-3 py-1 text-xs text-white">
               {totals.uploads} uploads · {totals.views} views
             </div>
           </div>
           <div className="h-80" style={{ minHeight: '320px' }}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={200}>
-              <AreaChart data={timelineWithRolling} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={100}
+              minHeight={200}
+            >
+              <AreaChart
+                data={timelineWithRolling}
+                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              >
                 <defs>
                   <linearGradient id="colorUploads" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.8} />
                     <stop offset="95%" stopColor="#22d3ee" stopOpacity={0.1} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="date" tickFormatter={(value) => format(new Date(value), 'MMM d')} stroke="rgba(255,255,255,0.6)" />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.1)"
+                />
+                <XAxis
+                  dataKey="date"
+                  tickFormatter={(value) => format(new Date(value), 'MMM d')}
+                  stroke="rgba(255,255,255,0.6)"
+                />
                 <YAxis stroke="rgba(255,255,255,0.6)" />
-                <RechartsTooltip labelFormatter={(value) => format(new Date(value), 'MMM d, yyyy')} />
-                <Area type="monotone" dataKey="uploads" stroke="#22d3ee" fillOpacity={1} fill="url(#colorUploads)" />
-                <Line type="monotone" dataKey="rolling" stroke="#a855f7" strokeWidth={2} dot={false} name="7d avg" />
+                <RechartsTooltip
+                  labelFormatter={(value) =>
+                    format(new Date(value), 'MMM d, yyyy')
+                  }
+                />
+                <Area
+                  type="monotone"
+                  dataKey="uploads"
+                  stroke="#22d3ee"
+                  fillOpacity={1}
+                  fill="url(#colorUploads)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="rolling"
+                  stroke="#a855f7"
+                  strokeWidth={2}
+                  dot={false}
+                  name="7d avg"
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Impact leaderboard</p>
-          <h2 className="text-xl font-semibold text-white">Most popular images</h2>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+            Impact leaderboard
+          </p>
+          <h2 className="text-xl font-semibold text-white">
+            Most popular images
+          </h2>
           <div className="mt-3 space-y-3">
             {popularImages.map((image, index) => (
               <div
@@ -466,10 +691,14 @@ export default function UserAnalytics() {
                   </div>
                   <div>
                     <p className="font-semibold">{image.title}</p>
-                    <p className="text-xs text-white/60">{image.citations} citations</p>
+                    <p className="text-xs text-white/60">
+                      {image.citations} citations
+                    </p>
                   </div>
                 </div>
-                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-sm text-emerald-200">{image.views} views</span>
+                <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-sm text-emerald-200">
+                  {image.views} views
+                </span>
               </div>
             ))}
           </div>
@@ -478,26 +707,55 @@ export default function UserAnalytics() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Benchmarking</p>
-          <h2 className="text-xl font-semibold text-white">You vs. community average</h2>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+            Benchmarking
+          </p>
+          <h2 className="text-xl font-semibold text-white">
+            You vs. community average
+          </h2>
           <div className="h-64" style={{ minHeight: '256px' }}>
-            <ResponsiveContainer width="100%" height="100%" minWidth={100} minHeight={150}>
-              <BarChart data={communityBenchmark} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={100}
+              minHeight={150}
+            >
+              <BarChart
+                data={communityBenchmark}
+                margin={{ top: 20, right: 10, left: 0, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="rgba(255,255,255,0.1)"
+                />
                 <XAxis dataKey="metric" stroke="rgba(255,255,255,0.6)" />
                 <YAxis stroke="rgba(255,255,255,0.6)" />
                 <Legend />
                 <RechartsTooltip />
-                <Bar dataKey="user" name="You" fill="#22c55e" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="community" name="Community" fill="#38bdf8" radius={[6, 6, 0, 0]} />
+                <Bar
+                  dataKey="user"
+                  name="You"
+                  fill="#22c55e"
+                  radius={[6, 6, 0, 0]}
+                />
+                <Bar
+                  dataKey="community"
+                  name="Community"
+                  fill="#38bdf8"
+                  radius={[6, 6, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-slate-900/80 p-4 shadow-lg">
-          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">Contribution cadence</p>
-          <h2 className="text-xl font-semibold text-white">Monthly calendar heatmap</h2>
+          <p className="text-sm uppercase tracking-[0.2em] text-slate-400">
+            Contribution cadence
+          </p>
+          <h2 className="text-xl font-semibold text-white">
+            Monthly calendar heatmap
+          </h2>
           <div className="mt-4 overflow-x-auto">
             <div className="flex gap-1">
               {calendarWeeks.map((week, weekIndex) => (
@@ -507,7 +765,7 @@ export default function UserAnalytics() {
                       key={day.key}
                       className={clsx(
                         'h-4 w-4 rounded-sm border border-white/5 transition',
-                        getColorForIntensity(day.count),
+                        getColorForIntensity(day.count)
                       )}
                       title={`${format(day.date, 'MMM d')}: ${day.count} uploads`}
                       aria-label={`${format(day.date, 'MMMM d')}: ${day.count} uploads`}
@@ -519,9 +777,21 @@ export default function UserAnalytics() {
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/70">
             <span className="text-white">Legend:</span>
-            {[0, MINIMAL_ACTIVITY_THRESHOLD, LOW_ACTIVITY_THRESHOLD, MEDIUM_ACTIVITY_THRESHOLD, HIGH_ACTIVITY_THRESHOLD, VERY_HIGH_ACTIVITY_THRESHOLD].map((value) => (
+            {[
+              0,
+              MINIMAL_ACTIVITY_THRESHOLD,
+              LOW_ACTIVITY_THRESHOLD,
+              MEDIUM_ACTIVITY_THRESHOLD,
+              HIGH_ACTIVITY_THRESHOLD,
+              VERY_HIGH_ACTIVITY_THRESHOLD,
+            ].map((value) => (
               <div key={value} className="flex items-center gap-1">
-                <div className={clsx('h-4 w-4 rounded-sm border border-white/5', getColorForIntensity(value))} />
+                <div
+                  className={clsx(
+                    'h-4 w-4 rounded-sm border border-white/5',
+                    getColorForIntensity(value)
+                  )}
+                />
                 <span>{value}+ uploads</span>
               </div>
             ))}

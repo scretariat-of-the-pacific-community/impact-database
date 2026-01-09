@@ -223,7 +223,7 @@ Create `/etc/caddy/Caddyfile`:
 ```caddy
 yourdomain.com www.yourdomain.com {
     # Automatic HTTPS with Let's Encrypt
-    
+
     # Security headers
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
@@ -548,6 +548,6 @@ nmap --script ssl-enum-ciphers -p 443 yourdomain.com  # Check ciphers
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** December 18, 2025  
+**Document Version:** 1.0
+**Last Updated:** December 18, 2025
 **Maintained By:** DevOps Team

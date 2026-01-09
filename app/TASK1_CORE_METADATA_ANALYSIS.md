@@ -211,14 +211,14 @@ The auto-generated migration will likely need manual edits:
    # In the upgrade() function:
    # 1. Add new id column as nullable first
    op.add_column('image_metadata', sa.Column('id', UUID(), nullable=True))
-   
+
    # 2. Populate id with UUIDs
    op.execute('UPDATE image_metadata SET id = gen_random_uuid()')
-   
+
    # 3. Make id non-nullable and set as primary key
    op.alter_column('image_metadata', 'id', nullable=False)
    op.create_primary_key('image_metadata_pkey', 'image_metadata', ['id'])
-   
+
    # 4. Keep filename as a regular column
    ```
 
@@ -226,7 +226,7 @@ The auto-generated migration will likely need manual edits:
    ```python
    # For existing records, set defaults
    op.execute("""
-       UPDATE image_metadata 
+       UPDATE image_metadata
        SET status = 'approved',  -- Or 'pending_review' if you want to re-review
            data_license = 'https://creativecommons.org/licenses/by/4.0/',
            source_type = 'citizen',  -- Or infer from existing data

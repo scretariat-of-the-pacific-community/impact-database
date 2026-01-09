@@ -84,9 +84,12 @@ interface APIToken {
   usage_count: number;
 }
 
-const glassCard = 'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
-const glassInput = 'rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/20';
-const glassTextarea = 'rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/20 resize-none';
+const glassCard =
+  'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
+const glassInput =
+  'rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/20';
+const glassTextarea =
+  'rounded-xl border border-white/20 bg-white/5 px-4 py-2.5 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/20 resize-none';
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -157,11 +160,13 @@ export default function SettingsPage() {
   }, [showDeleteConfirm]);
 
   // Fetch user settings
-  const { data: settings, isLoading: settingsLoading } = useQuery<UserSettings>({
-    queryKey: ['user-settings'],
-    queryFn: () => imageApi.userSettings(),
-    enabled: !authLoading && isAuthenticated,
-  });
+  const { data: settings, isLoading: settingsLoading } = useQuery<UserSettings>(
+    {
+      queryKey: ['user-settings'],
+      queryFn: () => imageApi.userSettings(),
+      enabled: !authLoading && isAuthenticated,
+    }
+  );
 
   // Fetch storage quota
   const { data: storageQuota } = useQuery<StorageQuota>({
@@ -181,11 +186,30 @@ export default function SettingsPage() {
   const [formData, setFormData] = useState<UserSettings>(
     settings || {
       profile: { avatar_url: '', bio: '', location: '', organization: '' },
-      privacy: { public_profile: true, hide_stats: false, anonymous_contributions: false },
+      privacy: {
+        public_profile: true,
+        hide_stats: false,
+        anonymous_contributions: false,
+      },
       notifications: {
-        email: { uploads: true, reviews: true, comments: true, achievements: false },
-        in_app: { uploads: true, reviews: true, comments: true, achievements: true },
-        push: { uploads: false, reviews: false, comments: false, achievements: false },
+        email: {
+          uploads: true,
+          reviews: true,
+          comments: true,
+          achievements: false,
+        },
+        in_app: {
+          uploads: true,
+          reviews: true,
+          comments: true,
+          achievements: true,
+        },
+        push: {
+          uploads: false,
+          reviews: false,
+          comments: false,
+          achievements: false,
+        },
       },
       default_metadata: { tags: [] },
     }
@@ -226,7 +250,9 @@ export default function SettingsPage() {
     },
   });
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0];
     if (file) {
       try {
@@ -236,7 +262,9 @@ export default function SettingsPage() {
           profile: { ...formData.profile, avatar_url: result.url },
         });
         // Auto-save avatar update
-        updateSettingsMutation.mutate({ profile: { ...formData.profile, avatar_url: result.url } });
+        updateSettingsMutation.mutate({
+          profile: { ...formData.profile, avatar_url: result.url },
+        });
       } catch (error) {
         console.error('Failed to upload avatar:', error);
         toast.error('Failed to upload avatar', {
@@ -269,7 +297,9 @@ export default function SettingsPage() {
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmText !== 'DELETE') {
-      toast.error('Please type DELETE to confirm account deletion.', { description: 'Confirmation text did not match.' });
+      toast.error('Please type DELETE to confirm account deletion.', {
+        description: 'Confirmation text did not match.',
+      });
       deleteConfirmInputRef.current?.focus();
       return;
     }
@@ -369,13 +399,19 @@ export default function SettingsPage() {
   const renderProfileSection = () => (
     <div className="space-y-6">
       <div>
-        <h3 className="text-xl font-semibold text-white mb-4">Profile Customization</h3>
+        <h3 className="text-xl font-semibold text-white mb-4">
+          Profile Customization
+        </h3>
         <div className="flex items-start gap-6 mb-6">
           <div className="relative">
             <div className="h-24 w-24 rounded-2xl bg-gradient-to-br from-pacific-400 to-palm-400 p-1">
               <div className="flex h-full w-full items-center justify-center rounded-xl bg-deep-950/70 overflow-hidden">
                 {formData.profile.avatar_url ? (
-                  <img src={formData.profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
+                  <img
+                    src={formData.profile.avatar_url}
+                    alt="Avatar"
+                    className="h-full w-full object-cover"
+                  />
                 ) : (
                   <User className="h-12 w-12 text-white/60" />
                 )}
@@ -397,14 +433,19 @@ export default function SettingsPage() {
           </div>
           <div className="flex-1 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Bio</label>
+              <label className="block text-sm font-medium text-white/80 mb-2">
+                Bio
+              </label>
               <textarea
                 className={glassTextarea}
                 rows={3}
                 placeholder="Tell us about yourself..."
                 value={formData.profile.bio}
                 onChange={(e) =>
-                  setFormData({ ...formData, profile: { ...formData.profile, bio: e.target.value } })
+                  setFormData({
+                    ...formData,
+                    profile: { ...formData.profile, bio: e.target.value },
+                  })
                 }
               />
             </div>
@@ -412,26 +453,51 @@ export default function SettingsPage() {
         </div>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">Location</label>
+            <label
+              htmlFor="profile-location"
+              className="block text-sm font-medium text-white/80 mb-2"
+            >
+              Location
+            </label>
             <input
+              id="profile-location"
+              name="location"
               type="text"
+              autoComplete="address-level2"
               className={glassInput}
               placeholder="City, Country"
               value={formData.profile.location}
               onChange={(e) =>
-                setFormData({ ...formData, profile: { ...formData.profile, location: e.target.value } })
+                setFormData({
+                  ...formData,
+                  profile: { ...formData.profile, location: e.target.value },
+                })
               }
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-white/80 mb-2">Organization</label>
+            <label
+              htmlFor="profile-organization"
+              className="block text-sm font-medium text-white/80 mb-2"
+            >
+              Organization
+            </label>
             <input
+              id="profile-organization"
+              name="organization"
               type="text"
+              autoComplete="organization"
               className={glassInput}
               placeholder="Your organization"
               value={formData.profile.organization}
               onChange={(e) =>
-                setFormData({ ...formData, profile: { ...formData.profile, organization: e.target.value } })
+                setFormData({
+                  ...formData,
+                  profile: {
+                    ...formData.profile,
+                    organization: e.target.value,
+                  },
+                })
               }
             />
           </div>
@@ -442,12 +508,16 @@ export default function SettingsPage() {
 
   const renderPrivacySection = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-white mb-4">Privacy Controls</h3>
+      <h3 className="text-xl font-semibold text-white mb-4">
+        Privacy Controls
+      </h3>
       <div className="space-y-4">
         <label className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition">
           <div>
             <p className="font-medium text-white">Public Profile</p>
-            <p className="text-sm text-white/60">Allow others to view your profile and contributions</p>
+            <p className="text-sm text-white/60">
+              Allow others to view your profile and contributions
+            </p>
           </div>
           <input
             type="checkbox"
@@ -459,7 +529,10 @@ export default function SettingsPage() {
             onChange={(e) =>
               setFormData({
                 ...formData,
-                privacy: { ...formData.privacy, public_profile: e.target.checked },
+                privacy: {
+                  ...formData.privacy,
+                  public_profile: e.target.checked,
+                },
               })
             }
           />
@@ -467,7 +540,9 @@ export default function SettingsPage() {
         <label className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition">
           <div>
             <p className="font-medium text-white">Hide Statistics</p>
-            <p className="text-sm text-white/60">Hide your upload count and approval rate from public view</p>
+            <p className="text-sm text-white/60">
+              Hide your upload count and approval rate from public view
+            </p>
           </div>
           <input
             type="checkbox"
@@ -477,14 +552,19 @@ export default function SettingsPage() {
             aria-checked={formData.privacy.hide_stats}
             aria-label="Hide statistics"
             onChange={(e) =>
-              setFormData({ ...formData, privacy: { ...formData.privacy, hide_stats: e.target.checked } })
+              setFormData({
+                ...formData,
+                privacy: { ...formData.privacy, hide_stats: e.target.checked },
+              })
             }
           />
         </label>
         <label className="flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition">
           <div>
             <p className="font-medium text-white">Anonymous Contributions</p>
-            <p className="text-sm text-white/60">Display your uploads without linking to your profile</p>
+            <p className="text-sm text-white/60">
+              Display your uploads without linking to your profile
+            </p>
           </div>
           <input
             type="checkbox"
@@ -496,7 +576,10 @@ export default function SettingsPage() {
             onChange={(e) =>
               setFormData({
                 ...formData,
-                privacy: { ...formData.privacy, anonymous_contributions: e.target.checked },
+                privacy: {
+                  ...formData.privacy,
+                  anonymous_contributions: e.target.checked,
+                },
               })
             }
           />
@@ -507,35 +590,48 @@ export default function SettingsPage() {
 
   const renderNotificationsSection = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-white mb-4">Notification Preferences</h3>
+      <h3 className="text-xl font-semibold text-white mb-4">
+        Notification Preferences
+      </h3>
       {(['email', 'in_app', 'push'] as const).map((type) => (
         <div key={type}>
           <h4 className="text-lg font-medium text-white/90 mb-3 capitalize">
-            {type === 'in_app' ? 'In-App' : type === 'push' ? 'Push (PWA)' : 'Email'}
+            {type === 'in_app'
+              ? 'In-App'
+              : type === 'push'
+                ? 'Push (PWA)'
+                : 'Email'}
           </h4>
           <div className="space-y-2">
-            {(['uploads', 'reviews', 'comments', 'achievements'] as const).map((event) => (
-              <label
-                key={event}
-                className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition"
-              >
-                <span className="text-sm text-white/80 capitalize">{event}</span>
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-white/20 bg-white/5 text-pacific-500 focus:ring-2 focus:ring-pacific-400/20"
-                  checked={formData.notifications[type][event]}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      notifications: {
-                        ...formData.notifications,
-                        [type]: { ...formData.notifications[type], [event]: e.target.checked },
-                      },
-                    })
-                  }
-                />
-              </label>
-            ))}
+            {(['uploads', 'reviews', 'comments', 'achievements'] as const).map(
+              (event) => (
+                <label
+                  key={event}
+                  className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10 cursor-pointer hover:bg-white/10 transition"
+                >
+                  <span className="text-sm text-white/80 capitalize">
+                    {event}
+                  </span>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-white/20 bg-white/5 text-pacific-500 focus:ring-2 focus:ring-pacific-400/20"
+                    checked={formData.notifications[type][event]}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        notifications: {
+                          ...formData.notifications,
+                          [type]: {
+                            ...formData.notifications[type],
+                            [event]: e.target.checked,
+                          },
+                        },
+                      })
+                    }
+                  />
+                </label>
+              )
+            )}
           </div>
         </div>
       ))}
@@ -544,7 +640,9 @@ export default function SettingsPage() {
 
   const renderDefaultsSection = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-white mb-4">Default Upload Metadata</h3>
+      <h3 className="text-xl font-semibold text-white mb-4">
+        Default Upload Metadata
+      </h3>
       <p className="text-white/70 text-sm mb-4">
         Set default values to pre-fill upload forms and speed up your workflow.
       </p>
@@ -558,7 +656,10 @@ export default function SettingsPage() {
             onChange={(e) =>
               setFormData({
                 ...formData,
-                default_metadata: { ...formData.default_metadata, hazard_type: e.target.value },
+                default_metadata: {
+                  ...formData.default_metadata,
+                  hazard_type: e.target.value,
+                },
               })
             }
           >
@@ -572,24 +673,43 @@ export default function SettingsPage() {
           </Select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">Default Location</label>
+          <label
+            htmlFor="default-location"
+            className="block text-sm font-medium text-white/80 mb-2"
+          >
+            Default Location
+          </label>
           <input
+            id="default-location"
+            name="default-location"
             type="text"
+            autoComplete="off"
             className={glassInput}
             placeholder="e.g., Fiji, Pacific Ocean"
             value={formData.default_metadata.location || ''}
             onChange={(e) =>
               setFormData({
                 ...formData,
-                default_metadata: { ...formData.default_metadata, location: e.target.value },
+                default_metadata: {
+                  ...formData.default_metadata,
+                  location: e.target.value,
+                },
               })
             }
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-white/80 mb-2">Default Tags (comma-separated)</label>
+          <label
+            htmlFor="default-tags"
+            className="block text-sm font-medium text-white/80 mb-2"
+          >
+            Default Tags (comma-separated)
+          </label>
           <input
+            id="default-tags"
+            name="default-tags"
             type="text"
+            autoComplete="off"
             className={glassInput}
             placeholder="e.g., field-survey, damage-assessment"
             value={formData.default_metadata.tags?.join(', ') || ''}
@@ -598,7 +718,10 @@ export default function SettingsPage() {
                 ...formData,
                 default_metadata: {
                   ...formData.default_metadata,
-                  tags: e.target.value.split(',').map((t) => t.trim()).filter(Boolean),
+                  tags: e.target.value
+                    .split(',')
+                    .map((t) => t.trim())
+                    .filter(Boolean),
                 },
               })
             }
@@ -620,31 +743,44 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between mb-2">
               <span className="text-white/80">Total Usage</span>
               <span className="text-white font-semibold">
-                {formatBytes(storageQuota.used)} / {formatBytes(storageQuota.total)}
+                {formatBytes(storageQuota.used)} /{' '}
+                {formatBytes(storageQuota.total)}
               </span>
             </div>
             <div className="h-3 rounded-full bg-white/10 overflow-hidden">
               <div
                 className={`h-full transition-all ${
-                  usagePercent > 90 ? 'bg-coral-500' : usagePercent > 70 ? 'bg-amber-500' : 'bg-pacific-500'
+                  usagePercent > 90
+                    ? 'bg-coral-500'
+                    : usagePercent > 70
+                      ? 'bg-amber-500'
+                      : 'bg-pacific-500'
                 }`}
                 style={{ width: `${usagePercent}%` }}
               />
             </div>
-            <p className="text-xs text-white/60 mt-1">{usagePercent.toFixed(1)}% used</p>
+            <p className="text-xs text-white/60 mt-1">
+              {usagePercent.toFixed(1)}% used
+            </p>
           </div>
           <div className="grid gap-3 md:grid-cols-3">
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
               <p className="text-sm text-white/60">Images</p>
-              <p className="text-lg font-semibold text-white">{formatBytes(storageQuota.by_type.images)}</p>
+              <p className="text-lg font-semibold text-white">
+                {formatBytes(storageQuota.by_type.images)}
+              </p>
             </div>
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
               <p className="text-sm text-white/60">Videos</p>
-              <p className="text-lg font-semibold text-white">{formatBytes(storageQuota.by_type.videos)}</p>
+              <p className="text-lg font-semibold text-white">
+                {formatBytes(storageQuota.by_type.videos)}
+              </p>
             </div>
             <div className="p-4 rounded-xl bg-white/5 border border-white/10">
               <p className="text-sm text-white/60">Documents</p>
-              <p className="text-lg font-semibold text-white">{formatBytes(storageQuota.by_type.documents)}</p>
+              <p className="text-lg font-semibold text-white">
+                {formatBytes(storageQuota.by_type.documents)}
+              </p>
             </div>
           </div>
         </div>
@@ -654,9 +790,12 @@ export default function SettingsPage() {
 
   const renderAPISection = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-white mb-4">API Access Management</h3>
+      <h3 className="text-xl font-semibold text-white mb-4">
+        API Access Management
+      </h3>
       <p className="text-white/70 text-sm mb-4">
-        Generate API tokens to programmatically upload images and access your data.
+        Generate API tokens to programmatically upload images and access your
+        data.
       </p>
 
       {generatedToken && (
@@ -664,11 +803,14 @@ export default function SettingsPage() {
           <div className="flex items-start gap-3">
             <CheckCircle className="h-5 w-5 text-emerald-400 mt-0.5" />
             <div className="flex-1 space-y-3">
-              <p className="font-medium text-emerald-200">Token Generated Successfully</p>
+              <p className="font-medium text-emerald-200">
+                Token Generated Successfully
+              </p>
               {!tokenRevealed ? (
                 <div className="space-y-2">
                   <p className="text-sm text-emerald-100/80">
-                    This token will be shown only once. Reveal it to copy, then it will be cleared from memory.
+                    This token will be shown only once. Reveal it to copy, then
+                    it will be cleared from memory.
                   </p>
                   <Button
                     variant="secondary"
@@ -681,7 +823,10 @@ export default function SettingsPage() {
               ) : (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-black/20 font-mono text-sm text-emerald-100">
-                    <code ref={tokenRef} className="flex-1 break-all blur-sm hover:blur-none focus:blur-none">
+                    <code
+                      ref={tokenRef}
+                      className="flex-1 break-all blur-sm hover:blur-none focus:blur-none"
+                    >
                       {generatedToken}
                     </code>
                     <Button
@@ -695,7 +840,8 @@ export default function SettingsPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-emerald-200/70">
-                    ⚠️ Do not share this token. It will disappear after you copy it.
+                    ⚠️ Do not share this token. It will disappear after you copy
+                    it.
                   </p>
                 </div>
               )}
@@ -706,7 +852,9 @@ export default function SettingsPage() {
 
       {showTokenGenerate && (
         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
-          <label className="block text-sm font-medium text-white/80 mb-2">Token Name</label>
+          <label className="block text-sm font-medium text-white/80 mb-2">
+            Token Name
+          </label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -750,7 +898,9 @@ export default function SettingsPage() {
 
       {apiTokens && apiTokens.length > 0 && (
         <div className="space-y-2">
-          <h4 className="text-sm font-medium text-white/80 mb-3">Active Tokens</h4>
+          <h4 className="text-sm font-medium text-white/80 mb-3">
+            Active Tokens
+          </h4>
           {apiTokens.map((token) => (
             <div
               key={token.id}
@@ -759,8 +909,10 @@ export default function SettingsPage() {
               <div>
                 <p className="font-medium text-white">{token.name}</p>
                 <p className="text-xs text-white/60">
-                  Created {new Date(token.created_at).toLocaleDateString()} • Used {token.usage_count} times
-                  {token.last_used && ` • Last used ${new Date(token.last_used).toLocaleDateString()}`}
+                  Created {new Date(token.created_at).toLocaleDateString()} •
+                  Used {token.usage_count} times
+                  {token.last_used &&
+                    ` • Last used ${new Date(token.last_used).toLocaleDateString()}`}
                 </p>
               </div>
               <Button
@@ -780,7 +932,9 @@ export default function SettingsPage() {
 
   const renderAccountSection = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold text-white mb-4">Account Management</h3>
+      <h3 className="text-xl font-semibold text-white mb-4">
+        Account Management
+      </h3>
       <div className="space-y-4">
         <div className="p-4 rounded-xl bg-white/5 border border-white/10">
           <div className="flex items-start gap-3 mb-4">
@@ -808,7 +962,8 @@ export default function SettingsPage() {
             <div>
               <h4 className="font-medium text-white mb-1">Export Your Data</h4>
               <p className="text-sm text-white/60 mb-3">
-                Download a copy of your profile, settings, and all your uploads in JSON format.
+                Download a copy of your profile, settings, and all your uploads
+                in JSON format.
               </p>
               <Button
                 variant="primary"
@@ -826,9 +981,15 @@ export default function SettingsPage() {
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-coral-400 mt-0.5" />
             <div className="flex-1">
-              <h4 id="delete-account-title" className="font-medium text-coral-200 mb-1">Delete Account</h4>
+              <h4
+                id="delete-account-title"
+                className="font-medium text-coral-200 mb-1"
+              >
+                Delete Account
+              </h4>
               <p className="text-sm text-coral-200/70 mb-3">
-                Permanently delete your account and all associated data. This action cannot be undone.
+                Permanently delete your account and all associated data. This
+                action cannot be undone.
               </p>
               {!showDeleteConfirm ? (
                 <Button
@@ -848,8 +1009,11 @@ export default function SettingsPage() {
                   aria-describedby="delete-account-description"
                   ref={deleteDialogRef}
                 >
-                  <p id="delete-account-description" className="text-sm font-medium text-coral-100">
-                    Are you absolutely sure? Type "DELETE" to confirm:
+                  <p
+                    id="delete-account-description"
+                    className="text-sm font-medium text-coral-100"
+                  >
+                    Are you absolutely sure? Type &quot;DELETE&quot; to confirm:
                   </p>
                   <div className="flex gap-2">
                     <label className="sr-only" htmlFor="delete-confirm-input">
@@ -894,8 +1058,12 @@ export default function SettingsPage() {
       <div className="mx-auto max-w-6xl space-y-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Settings & Preferences</h1>
-            <p className="text-white/70 mt-1">Manage your profile, privacy, and account settings</p>
+            <h1 className="text-3xl font-bold text-white">
+              Settings & Preferences
+            </h1>
+            <p className="text-white/70 mt-1">
+              Manage your profile, privacy, and account settings
+            </p>
           </div>
           <Button
             variant="secondary"
@@ -949,7 +1117,8 @@ export default function SettingsPage() {
             <div className="p-6">
               {activeSection === 'profile' && renderProfileSection()}
               {activeSection === 'privacy' && renderPrivacySection()}
-              {activeSection === 'notifications' && renderNotificationsSection()}
+              {activeSection === 'notifications' &&
+                renderNotificationsSection()}
               {activeSection === 'defaults' && renderDefaultsSection()}
               {activeSection === 'storage' && renderStorageSection()}
               {activeSection === 'api' && renderAPISection()}
@@ -964,7 +1133,9 @@ export default function SettingsPage() {
                     disabled={updateSettingsMutation.isPending}
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    {updateSettingsMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    {updateSettingsMutation.isPending
+                      ? 'Saving...'
+                      : 'Save Changes'}
                   </Button>
                   <Button
                     variant="secondary"

@@ -1,9 +1,21 @@
 'use client';
 
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Line } from 'recharts';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Line,
+} from 'recharts';
 import { motion } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
-import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import type {
+  NameType,
+  ValueType,
+} from 'recharts/types/component/DefaultTooltipContent';
 import { useMemo } from 'react';
 
 interface TimelineData {
@@ -21,12 +33,12 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
   // Calculate rolling 7-day average
   const enrichedData = useMemo(() => {
     if (data.length < 7) return data;
-    
+
     return data.map((item, index) => {
       if (index < 6) {
         return { ...item, rollingAvg: undefined };
       }
-      
+
       const last7Days = data.slice(index - 6, index + 1);
       const avg = last7Days.reduce((sum, d) => sum + d.count, 0) / 7;
       return { ...item, rollingAvg: parseFloat(avg.toFixed(2)) };
@@ -36,22 +48,26 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
   // Calculate peak date and trend insight
   const insight = useMemo(() => {
     const totalUploads = data.reduce((sum, d) => sum + d.count, 0);
-    
+
     if (totalUploads === 0) {
       return 'No uploads in the last 30 days.';
     }
-    
-    const peakDay = data.reduce((max, d) => d.count > max.count ? d : max, data[0]);
+
+    const peakDay = data.reduce(
+      (max, d) => (d.count > max.count ? d : max),
+      data[0]
+    );
     const peakDate = format(parseISO(peakDay.date), 'MMM d');
-    
+
     // Check trend after peak
-    const peakIndex = data.findIndex(d => d.date === peakDay.date);
+    const peakIndex = data.findIndex((d) => d.date === peakDay.date);
     const afterPeak = data.slice(peakIndex + 1);
-    
+
     if (afterPeak.length >= 7) {
-      const recentAvg = afterPeak.slice(-7).reduce((sum, d) => sum + d.count, 0) / 7;
+      const recentAvg =
+        afterPeak.slice(-7).reduce((sum, d) => sum + d.count, 0) / 7;
       const peakValue = peakDay.count;
-      
+
       if (recentAvg < peakValue * 0.5) {
         return `Uploads peaked on ${peakDate} (${peakDay.count}) and have declined since.`;
       } else if (recentAvg > peakValue * 0.8) {
@@ -60,7 +76,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
         return `Uploads peaked on ${peakDate} (${peakDay.count}) and have moderated since.`;
       }
     }
-    
+
     return `Uploads peaked on ${peakDate} with ${peakDay.count} submission${peakDay.count !== 1 ? 's' : ''}.`;
   }, [data]);
 
@@ -75,9 +91,9 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
   }) => {
     if (active && payload && payload.length) {
       const labelText = typeof label === 'string' ? label : String(label ?? '');
-      const dailyCount = payload.find(p => p.dataKey === 'count')?.value;
-      const rollingAvg = payload.find(p => p.dataKey === 'rollingAvg')?.value;
-      
+      const dailyCount = payload.find((p) => p.dataKey === 'count')?.value;
+      const rollingAvg = payload.find((p) => p.dataKey === 'rollingAvg')?.value;
+
       return (
         <div className="rounded-lg border border-white/20 bg-deep-900/95 p-3 shadow-xl backdrop-blur">
           <p className="font-semibold text-white">
@@ -87,9 +103,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
             Daily: {dailyCount} upload{dailyCount !== 1 ? 's' : ''}
           </p>
           {rollingAvg !== undefined && (
-            <p className="text-xs text-palm-300">
-              7-day avg: {rollingAvg}
-            </p>
+            <p className="text-xs text-palm-300">7-day avg: {rollingAvg}</p>
           )}
         </div>
       );
@@ -99,18 +113,23 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
 
   // Check if all data is zero
   const totalUploads = data.reduce((sum, d) => sum + d.count, 0);
-  
+
   if (data.length === 0) {
     return (
-      <div className={`flex h-80 flex-col items-center justify-center ${className}`}>
+      <div
+        className={`flex h-80 flex-col items-center justify-center ${className}`}
+      >
         <p className="text-sm text-white/60">No uploads in the last 30 days.</p>
       </div>
     );
   }
 
   // Determine Y-axis tick interval for integer values
-  const maxCount = Math.max(...data.map(d => d.count));
-  const yAxisTicks = maxCount <= 5 ? Array.from({ length: maxCount + 1 }, (_, i) => i) : undefined;
+  const maxCount = Math.max(...data.map((d) => d.count));
+  const yAxisTicks =
+    maxCount <= 5
+      ? Array.from({ length: maxCount + 1 }, (_, i) => i)
+      : undefined;
 
   return (
     <motion.div
@@ -119,7 +138,12 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
     >
-      <ResponsiveContainer width="100%" height={300} minWidth={100} minHeight={300}>
+      <ResponsiveContainer
+        width="100%"
+        height={300}
+        minWidth={100}
+        minHeight={300}
+      >
         <AreaChart
           data={enrichedData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -155,7 +179,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
             fill="url(#colorUploads)"
             animationDuration={1000}
           />
-          {enrichedData.some(d => d.rollingAvg !== undefined) && (
+          {enrichedData.some((d) => d.rollingAvg !== undefined) && (
             <Line
               type="monotone"
               dataKey="rollingAvg"
@@ -168,12 +192,10 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
           )}
         </AreaChart>
       </ResponsiveContainer>
-      
+
       {/* Insight Line */}
       <div className="mt-3 border-t border-white/5 pt-3">
-        <p className="text-xs text-surface-soft">
-          💡 {insight}
-        </p>
+        <p className="text-xs text-surface-soft">💡 {insight}</p>
       </div>
     </motion.div>
   );

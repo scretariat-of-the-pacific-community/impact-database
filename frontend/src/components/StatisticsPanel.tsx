@@ -32,7 +32,7 @@ interface StatCardProps {
 
 function StatCard({ label, value, description, icon, color }: StatCardProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  
+
   return (
     <div className="relative">
       <motion.div
@@ -41,9 +41,7 @@ function StatCard({ label, value, description, icon, color }: StatCardProps) {
         className={`rounded-xl border border-white/10 bg-gradient-to-br ${color} backdrop-blur p-4`}
       >
         <div className="flex items-start justify-between mb-2">
-          <div className="p-2 rounded-lg bg-white/10">
-            {icon}
-          </div>
+          <div className="p-2 rounded-lg bg-white/10">{icon}</div>
           <button
             onClick={() => setShowTooltip(!showTooltip)}
             className="p-1 hover:bg-white/10 rounded transition-colors"
@@ -52,12 +50,12 @@ function StatCard({ label, value, description, icon, color }: StatCardProps) {
             <HelpCircle className="w-4 h-4 text-white/60" />
           </button>
         </div>
-        
+
         <p className="text-xs text-white/60 mb-1">{label}</p>
         <p className="text-2xl font-bold text-white">
           {typeof value === 'number' ? value.toFixed(2) : value}
         </p>
-        
+
         {showTooltip && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
@@ -85,10 +83,14 @@ export default function StatisticsPanel({
   className = '',
 }: StatisticsPanelProps) {
   return (
-    <div className={`rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-8 ${className}`}>
+    <div
+      className={`rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-8 ${className}`}
+    >
       <div className="flex items-center gap-3 mb-6">
         <BarChart3 className="w-6 h-6 text-pacific-400" />
-        <h3 className="text-xl font-semibold text-white">Statistical Indicators</h3>
+        <h3 className="text-xl font-semibold text-white">
+          Statistical Indicators
+        </h3>
       </div>
 
       <div className="space-y-6">

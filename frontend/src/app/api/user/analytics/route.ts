@@ -6,26 +6,26 @@ export async function GET(request: NextRequest) {
     // Get token from request cookies directly
     const cookieHeader = request.headers.get('cookie') || '';
     const cookies = Object.fromEntries(
-      cookieHeader.split(';').map(c => {
+      cookieHeader.split(';').map((c) => {
         const [key, ...val] = c.trim().split('=');
         return [key, val.join('=')];
       })
     );
-    
+
     // The app uses 'ocean_portal_token' cookie name, URL-encoded
     const rawToken = cookies['ocean_portal_token'];
     const token = rawToken ? decodeURIComponent(rawToken) : null;
-    
+
     // Get query parameters
     const searchParams = request.nextUrl.searchParams;
     const days = searchParams.get('days') || '30';
-    
+
     const backendUrl = `${config.API.BASE_URL}/api/user/analytics?days=${days}`;
-    
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     } else {
@@ -38,15 +38,15 @@ export async function GET(request: NextRequest) {
         locations: [],
         views_metrics: { total: 0, average_per_upload: 0 },
         engagement_metrics: { impact_score: 0, approval_rate: 0 },
-        comparative_benchmarks: {}
+        comparative_benchmarks: {},
       });
     }
-    
+
     const response = await fetch(backendUrl, {
       method: 'GET',
       headers,
     });
-    
+
     if (!response.ok) {
       const errorData = await response.text();
       return NextResponse.json(
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         { status: response.status }
       );
     }
-    
+
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
       locations: [],
       views_metrics: { total: 0, average_per_upload: 0 },
       engagement_metrics: { impact_score: 0, approval_rate: 0 },
-      comparative_benchmarks: {}
+      comparative_benchmarks: {},
     });
   }
 }

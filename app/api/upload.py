@@ -22,6 +22,7 @@ from services.minio_client import get_minio_storage
 from services.local_storage import get_local_storage
 from models.database import get_db, ImageMetadata
 from models.audit_log import AuditLog
+from models.review_workflow import ReviewItem, ReviewStatus, ReviewPriority
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, OperationalError
 from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumbnail
@@ -413,68 +414,74 @@ async def serve_image_thumbnail(filename: str):
 
     safe_filename = os.path.basename(filename)
 
-    # Try MinIO thumbnail first
+    # Try MinIO thumbnail first (check both canonical and legacy prefixes)
     try:
         minio_storage = get_minio_storage()
         minio_client = minio_storage._get_client()
-        thumb_key = f"thumbnails/thumb_{safe_filename}"
+        canonical_thumb_key = f"thumbnails/{safe_filename}"
+        thumb_key_candidates = [
+            canonical_thumb_key,  # matches Celery-generated thumbnails
+            f"thumbnails/thumb_{safe_filename}",  # legacy prefix used by the endpoint
+        ]
 
+        for thumb_key in thumb_key_candidates:
+            try:
+                response = minio_client.get_object("impact-images", thumb_key)
+                data = response.read()
+                response.close()
+                response.release_conn()
+
+                # SECURITY: Add security headers
+                thumb_response = StreamingResponse(BytesIO(data), media_type="image/jpeg")
+                thumb_response.headers["Content-Disposition"] = (
+                    f"inline; filename=thumb_{safe_filename}"
+                )
+                thumb_response.headers["X-Content-Type-Options"] = "nosniff"
+                thumb_response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+                return thumb_response
+            except Exception:
+                continue
+
+        # Generate thumbnail on-the-fly
+        object_key = f"images/{safe_filename}"
+        response = minio_client.get_object("impact-images", object_key)
+        image_data = response.read()
+        response.close()
+        response.release_conn()
+
+        # Create thumbnail
+        img = Image.open(BytesIO(image_data))
+        img.thumbnail((300, 300), Image.Resampling.LANCZOS)
+
+        # Convert to JPEG
+        thumb_io = BytesIO()
+        if img.mode in ("RGBA", "LA", "P"):
+            img = img.convert("RGB")
+        img.save(thumb_io, "JPEG", quality=85)
+        thumb_io.seek(0)
+
+        # Save to MinIO for future requests (canonical path)
         try:
-            # Try to get existing thumbnail
-            response = minio_client.get_object("impact-images", thumb_key)
-            data = response.read()
-            response.close()
-            response.release_conn()
-
-            # SECURITY: Add security headers
-            thumb_response = StreamingResponse(BytesIO(data), media_type="image/jpeg")
-            thumb_response.headers["Content-Disposition"] = (
-                f"inline; filename=thumb_{safe_filename}"
+            minio_client.put_object(
+                "impact-images",
+                canonical_thumb_key,
+                thumb_io,
+                length=thumb_io.getbuffer().nbytes,
+                content_type="image/jpeg",
             )
-            thumb_response.headers["X-Content-Type-Options"] = "nosniff"
-            thumb_response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-            return thumb_response
-        except:
-            # Generate thumbnail on-the-fly
-            object_key = f"images/{safe_filename}"
-            response = minio_client.get_object("impact-images", object_key)
-            image_data = response.read()
-            response.close()
-            response.release_conn()
-
-            # Create thumbnail
-            img = Image.open(BytesIO(image_data))
-            img.thumbnail((300, 300), Image.Resampling.LANCZOS)
-
-            # Convert to JPEG
-            thumb_io = BytesIO()
-            if img.mode in ("RGBA", "LA", "P"):
-                img = img.convert("RGB")
-            img.save(thumb_io, "JPEG", quality=85)
+            thumb_io.seek(0)
+        except Exception as e:
+            logger.warning(f"Failed to save thumbnail to MinIO: {e}")
             thumb_io.seek(0)
 
-            # Save to MinIO for future requests
-            try:
-                minio_client.put_object(
-                    "impact-images",
-                    thumb_key,
-                    thumb_io,
-                    length=thumb_io.getbuffer().nbytes,
-                    content_type="image/jpeg",
-                )
-                thumb_io.seek(0)
-            except Exception as e:
-                logger.warning(f"Failed to save thumbnail to MinIO: {e}")
-                thumb_io.seek(0)
-
-            # SECURITY: Add security headers to generated thumbnail
-            gen_thumb_response = StreamingResponse(thumb_io, media_type="image/jpeg")
-            gen_thumb_response.headers["Content-Disposition"] = (
-                f"inline; filename=thumb_{safe_filename}"
-            )
-            gen_thumb_response.headers["X-Content-Type-Options"] = "nosniff"
-            gen_thumb_response.headers["Cache-Control"] = "public, max-age=86400"
-            return gen_thumb_response
+        # SECURITY: Add security headers to generated thumbnail
+        gen_thumb_response = StreamingResponse(thumb_io, media_type="image/jpeg")
+        gen_thumb_response.headers["Content-Disposition"] = (
+            f"inline; filename=thumb_{safe_filename}"
+        )
+        gen_thumb_response.headers["X-Content-Type-Options"] = "nosniff"
+        gen_thumb_response.headers["Cache-Control"] = "public, max-age=86400"
+        return gen_thumb_response
 
     except Exception as e:
         logger.error(f"Thumbnail generation failed for {safe_filename}: {e}")
@@ -1058,6 +1065,23 @@ async def upload_image(
 
             db.commit()
             db.refresh(image_metadata)
+
+            # AUTO-CREATE REVIEW ITEM: Add uploaded image to review queue
+            try:
+                review_item = ReviewItem(
+                    image_id=image_metadata.id,
+                    status=ReviewStatus.PENDING,
+                    priority=ReviewPriority.MEDIUM if not duplicate_flagged_for_review else ReviewPriority.HIGH,
+                    submitted_by=current_user.id,
+                    is_flagged=duplicate_flagged_for_review,
+                    is_duplicate=duplicate_flagged_for_review,
+                )
+                db.add(review_item)
+                db.commit()
+                logger.info(f"Created review item for image {image_metadata.id} (duplicate_flagged={duplicate_flagged_for_review})")
+            except Exception as review_error:
+                logger.error(f"Failed to create review item for {unique_filename}: {review_error}")
+                # Don't fail the upload if review item creation fails
 
             # Trigger achievement checks immediately after a successful upload
             try:

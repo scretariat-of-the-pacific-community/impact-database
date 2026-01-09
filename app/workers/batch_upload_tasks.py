@@ -3,8 +3,9 @@
 import logging
 import io
 import json
+import asyncio
 from typing import Dict, Any, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from celery import shared_task, group
 from sqlalchemy.orm import Session
@@ -14,22 +15,103 @@ from models.upload_batch import UploadBatch, BatchStatus
 from models.upload_failures import UploadFailureLog, FailureReason
 from services.exif_utils import extract_exif_data, get_image_hash
 from services.minio_client import get_minio_storage
+from services.websocket_manager import ws_manager
 from geoalchemy2 import WKTElement
 import uuid
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task
+def finalize_batch(results: List[Dict[str, Any]], batch_id: str):
+    """
+    Finalize batch processing after all files complete.
+    This is a Celery chord callback that runs after all parallel tasks finish.
+
+    Args:
+        results: List of results from process_single_file tasks
+        batch_id: UUID of the batch
+    """
+    db = SessionLocal()
+
+    try:
+        batch = db.query(UploadBatch).filter(UploadBatch.id == batch_id).first()
+        if not batch:
+            logger.error(f"Batch {batch_id} not found during finalization")
+            return
+
+        # Update batch with results
+        successful = [r for r in results if r.get("success")]
+        failed = [r for r in results if not r.get("success")]
+
+        batch.processed_files = len(results)
+        batch.successful_files = len(successful)
+        batch.failed_files = len(failed)
+        batch.completed_at = datetime.now(timezone.utc)
+
+        # Determine final status
+        if batch.status == BatchStatus.CANCELLED:
+            # Keep cancelled status
+            pass
+        elif len(failed) == 0:
+            batch.status = BatchStatus.COMPLETED
+        elif len(successful) == 0:
+            batch.status = BatchStatus.FAILED
+        else:
+            batch.status = BatchStatus.PARTIAL
+
+        # Store failure summary
+        if failed:
+            batch.failure_summary = [
+                {"filename": f.get("filename", "unknown"), "error": f.get("error", "unknown")}
+                for f in failed
+            ]
+
+        db.commit()
+
+        # Send WebSocket completion notification
+        try:
+            asyncio.run(_send_completion_update(batch_id, {
+                "status": batch.status.value,
+                "total_files": batch.total_files,
+                "successful_files": batch.successful_files,
+                "failed_files": batch.failed_files,
+                "completed_at": batch.completed_at.isoformat()
+            }))
+        except Exception as ws_error:
+            logger.warning(f"Failed to send WebSocket completion for batch {batch_id}: {ws_error}")
+
+        logger.info(
+            f"Batch {batch_id} finalized: {len(successful)} succeeded, {len(failed)} failed, status={batch.status.value}"
+        )
+
+    except Exception as e:
+        logger.error(f"Failed to finalize batch {batch_id}: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
+async def _send_progress_update(batch_id: str, data: dict):
+    """Helper to send WebSocket progress update."""
+    await ws_manager.send_progress_update(batch_id, data)
+
+
+async def _send_completion_update(batch_id: str, data: dict):
+    """Helper to send WebSocket completion update."""
+    await ws_manager.send_completion_update(batch_id, data)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
 def process_single_file(
-    self, batch_id: str, file_data: bytes, filename: str, metadata: Dict[str, Any], user_id: str
+    self, batch_id: str, temp_key: str, filename: str, metadata: Dict[str, Any], user_id: str
 ):
     """
     Process a single file in a batch upload.
 
     Args:
         batch_id: UUID of the batch
-        file_data: File content as bytes
+        temp_key: MinIO temporary storage key
         filename: Original filename
         metadata: Metadata for the image
         user_id: Uploader ID
@@ -38,8 +120,24 @@ def process_single_file(
         Dict with success status and image ID or error
     """
     db = SessionLocal()
+    minio_client = get_minio_storage()
+    permanent_key = None  # Track permanent storage key for cleanup
 
     try:
+        # Check if batch is cancelled before processing
+        batch = db.query(UploadBatch).filter(UploadBatch.id == batch_id).first()
+        if batch and batch.status == BatchStatus.CANCELLED:
+            logger.info(f"Skipping {filename} - batch {batch_id} is cancelled")
+            # Cleanup temp file
+            try:
+                minio_client.delete_object(temp_key)
+            except:
+                pass
+            return {"success": False, "filename": filename, "error": "Batch cancelled by user", "cancelled": True}
+
+        # Download file from temp storage
+        file_data = minio_client.get_object_content(temp_key)
+
         # Extract EXIF data
         exif_data = extract_exif_data(io.BytesIO(file_data))
 
@@ -68,12 +166,13 @@ def process_single_file(
         if not geom:
             raise ValueError("No coordinates available (neither in metadata nor EXIF)")
 
-        # Upload to storage
-        minio_client = get_minio_storage()
+        # Upload to permanent storage
+        permanent_key = object_key
         minio_client.upload_object(object_key, io.BytesIO(file_data), len(file_data))
 
         # Create database record
-        image_metadata = ImageMetadata(
+        try:
+            image_metadata = ImageMetadata(
             filename=unique_filename,
             datetime=metadata.get("datetime") or datetime.now(timezone.utc),
             hazard_type=metadata["hazard_type"],
@@ -101,9 +200,53 @@ def process_single_file(
             lineage_statement=f"Batch upload. Content hash: {get_image_hash(io.BytesIO(file_data))}",
         )
 
-        db.add(image_metadata)
-        db.commit()
-        db.refresh(image_metadata)
+            db.add(image_metadata)
+            db.commit()
+            db.refresh(image_metadata)
+        except Exception as db_error:
+            # CRITICAL: Rollback MinIO upload if DB insert fails
+            db.rollback()
+            logger.error(f"DB insert failed for {filename}, rolling back MinIO upload")
+            try:
+                minio_client.delete_object(permanent_key)
+                logger.info(f"Rolled back MinIO upload: {permanent_key}")
+            except Exception as cleanup_error:
+                logger.error(f"Failed to cleanup MinIO after DB failure: {cleanup_error}")
+            raise db_error
+
+        # Cleanup temp file
+        try:
+            minio_client.delete_object(temp_key)
+            logger.info(f"Deleted temp file: {temp_key}")
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup temp file {temp_key}: {cleanup_error}")
+
+        # Atomic increment of processed_files counter
+        try:
+            from sqlalchemy import text
+            db.execute(
+                text("UPDATE upload_batches SET processed_files = processed_files + 1 WHERE id = :id"),
+                {"id": batch_id}
+            )
+            db.commit()
+            
+            # Send WebSocket progress update
+            batch = db.query(UploadBatch).filter(UploadBatch.id == batch_id).first()
+            if batch:
+                try:
+                    asyncio.run(_send_progress_update(batch_id, {
+                        "processed_files": batch.processed_files,
+                        "total_files": batch.total_files,
+                        "successful_files": batch.successful_files,
+                        "failed_files": batch.failed_files,
+                        "progress_percent": (batch.processed_files / batch.total_files * 100) if batch.total_files > 0 else 0,
+                        "latest_file": filename
+                    }))
+                except Exception as ws_error:
+                    logger.warning(f"Failed to send WebSocket update: {ws_error}")
+                    
+        except Exception as update_error:
+            logger.warning(f"Failed to update progress counter: {update_error}")
 
         logger.info(f"Successfully processed {filename} in batch {batch_id}")
 
@@ -114,11 +257,33 @@ def process_single_file(
         error_msg = str(e)
         logger.error(f"Failed to process {filename} in batch {batch_id}: {error_msg}")
 
+        # RETRY LOGIC: Retry on transient failures
+        # Network errors, DB locks, MinIO timeouts should retry
+        transient_errors = [
+            "connection", "timeout", "temporary", "lock", "deadlock", 
+            "network", "unavailable", "refused"
+        ]
+        is_transient = any(err in error_msg.lower() for err in transient_errors)
+
+        if is_transient and self.request.retries < self.max_retries:
+            # Exponential backoff: 60s, 120s, 240s
+            countdown = 60 * (2 ** self.request.retries)
+            logger.info(f"Retrying {filename} in {countdown}s (attempt {self.request.retries + 1}/{self.max_retries})")
+            raise self.retry(exc=e, countdown=countdown)
+
+        # Final failure - cleanup temp file
+        try:
+            minio_client = get_minio_storage()
+            minio_client.delete_object(temp_key)
+            logger.info(f"Deleted temp file after failure: {temp_key}")
+        except Exception as cleanup_error:
+            logger.warning(f"Failed to cleanup temp file {temp_key}: {cleanup_error}")
+
         # Log failure
         try:
             failure_log = UploadFailureLog(
                 filename=filename,
-                file_size=len(file_data),
+                file_size=len(file_data) if 'file_data' in locals() else 0,
                 failure_reason=FailureReason.VALIDATION_ERROR,
                 error_details=error_msg,
                 uploader_id=user_id,
@@ -138,7 +303,7 @@ def process_single_file(
 def process_batch_upload(
     self,
     batch_id: str,
-    files_data: List[Dict[str, Any]],
+    temp_file_keys: List[Dict[str, str]],
     metadata_template: Dict[str, Any],
     user_id: str,
 ):
@@ -147,7 +312,7 @@ def process_batch_upload(
 
     Args:
         batch_id: UUID of the batch
-        files_data: List of dicts with 'content' (bytes) and 'filename'
+        temp_file_keys: List of dicts with 'temp_key' and 'filename'
         metadata_template: Common metadata for all files
         user_id: Uploader ID
     """
@@ -164,48 +329,27 @@ def process_batch_upload(
         batch.started_at = datetime.now(timezone.utc)
         db.commit()
 
-        # Process files using Celery group for parallel processing
-        job = group(
-            process_single_file.s(
-                batch_id=batch_id,
-                file_data=file_data["content"],
-                filename=file_data["filename"],
-                metadata=metadata_template,
-                user_id=user_id,
-            )
-            for file_data in files_data
-        )
+        # PROPER ASYNC: Use chord pattern with callback instead of blocking
+        # Group processes files in parallel, callback finalizes after all complete
+        from celery import chord
 
-        # Execute and collect results
-        result = job.apply_async()
-        results = result.get()  # Wait for all tasks to complete
-
-        # Update batch with results
-        successful = [r for r in results if r["success"]]
-        failed = [r for r in results if not r["success"]]
-
-        batch.processed_files = len(results)
-        batch.successful_files = len(successful)
-        batch.failed_files = len(failed)
-        batch.completed_at = datetime.now(timezone.utc)
-
-        # Determine final status
-        if len(failed) == 0:
-            batch.status = BatchStatus.COMPLETED
-        elif len(successful) == 0:
-            batch.status = BatchStatus.FAILED
-        else:
-            batch.status = BatchStatus.PARTIAL
-
-        # Store failure summary
-        if failed:
-            batch.failure_summary = [
-                {"filename": f["filename"], "error": f["error"]} for f in failed
+        job = chord(
+            [
+                process_single_file.s(
+                    batch_id=batch_id,
+                    temp_key=file_info["temp_key"],
+                    filename=file_info["filename"],
+                    metadata=metadata_template,
+                    user_id=user_id,
+                )
+                for file_info in temp_file_keys
             ]
+        )(finalize_batch.s(batch_id=batch_id))
 
-        db.commit()
-
-        logger.info(f"Batch {batch_id} complete: {len(successful)} succeeded, {len(failed)} failed")
+        logger.info(
+            f"Batch {batch_id} processing started with {len(temp_file_keys)} files. Parent task exiting."
+        )
+        # Parent task exits immediately - finalize_batch will run after all files complete
 
     except Exception as e:
         logger.error(f"Batch {batch_id} processing failed: {e}")

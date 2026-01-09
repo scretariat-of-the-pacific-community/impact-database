@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     // 2. Validate the schema
     // 3. Send to analytics service (e.g., Google Analytics, Mixpanel, etc.)
     // 4. Store in database if needed
-    
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[Analytics] Error:', error);

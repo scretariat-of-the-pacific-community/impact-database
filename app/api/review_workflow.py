@@ -13,6 +13,7 @@ import uuid
 import logging
 
 from models.database import get_db
+from models.database import ImageMetadata
 from api.auth_rbac import get_current_user, require_permission, EnhancedUser
 from models.review_workflow import (
     ReviewItem,
@@ -24,6 +25,7 @@ from models.review_workflow import (
     AuditAction,
 )
 from models.rbac import User
+from workers.email_tasks import send_upload_approved_email, send_upload_rejected_email
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/review-items", tags=["review-workflow"])
@@ -419,6 +421,39 @@ def change_status(
         changes={"status": {"old": old_status, "new": data.status}},
         notes=data.notes,
     )
+
+    # NOTIFICATION: Send email to uploader when status changes to APPROVED or REJECTED
+    try:
+        if data.status in [ReviewStatus.APPROVED.value, ReviewStatus.REJECTED.value]:
+            # Get image metadata and uploader info
+            image = db.query(ImageMetadata).filter(ImageMetadata.id == item.image_id).first()
+            if image:
+                uploader = db.query(User).filter(
+                    (User.id == item.submitted_by) | (User.id == image.uploader_id)
+                ).first()
+                
+                if uploader and uploader.email:
+                    image_title = image.title or image.filename or "Untitled"
+                    
+                    if data.status == ReviewStatus.APPROVED.value:
+                        send_upload_approved_email.delay(
+                            user_email=uploader.email,
+                            username=uploader.username,
+                            image_title=image_title,
+                            image_id=str(image.id),
+                        )
+                        logger.info(f"Queued approval email for {uploader.email}")
+                    elif data.status == ReviewStatus.REJECTED.value:
+                        reason = data.notes or item.reviewer_notes or "Does not meet quality guidelines"
+                        send_upload_rejected_email.delay(
+                            user_email=uploader.email,
+                            username=uploader.username,
+                            image_title=image_title,
+                            reason=reason,
+                        )
+                        logger.info(f"Queued rejection email for {uploader.email}")
+    except Exception as e:
+        logger.warning(f"Failed to queue notification email for review item {item_id}: {e}")
 
     db.commit()
     db.refresh(item)

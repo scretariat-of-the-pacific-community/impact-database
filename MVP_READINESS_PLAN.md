@@ -4,7 +4,7 @@
 
 ### What's Working:
 - ✅ Backend API (FastAPI)
-- ✅ Authentication & JWT tokens  
+- ✅ Authentication & JWT tokens
 - ✅ RBAC system (roles & permissions)
 - ✅ Review workflow (80% tests passing)
 - ✅ Database schema & migrations
@@ -47,7 +47,7 @@ curl http://localhost:3000
 ```bash
 # Option 1: Add column directly
 docker compose exec -T postgis_db psql -U postgres -d impact_db << 'EOF'
-ALTER TABLE image_metadata 
+ALTER TABLE image_metadata
 ADD COLUMN IF NOT EXISTS file_size INTEGER;
 EOF
 
@@ -233,7 +233,7 @@ docker compose ps
 
 ### Issue 1: Port conflicts
 **Symptom**: Services won't start
-**Fix**: 
+**Fix**:
 ```bash
 sudo netstat -tulpn | grep -E "3000|8000"
 # Kill conflicting processes
@@ -241,7 +241,7 @@ sudo netstat -tulpn | grep -E "3000|8000"
 
 ### Issue 2: Database connection errors
 **Symptom**: "connection refused"
-**Fix**: 
+**Fix**:
 ```bash
 docker compose restart postgis_db
 # Wait 30 seconds
@@ -250,7 +250,7 @@ docker compose restart api
 
 ### Issue 3: MinIO bucket not found
 **Symptom**: Upload fails with S3 error
-**Fix**: 
+**Fix**:
 ```bash
 # Access MinIO console: http://localhost:9020
 # Create bucket "impact-images" manually
@@ -276,7 +276,7 @@ Before claiming MVP is complete:
 **Date**: _______
 **Tester**: _______
 **Status**: [ ] PASS  [ ] FAIL
-**Notes**: 
+**Notes**:
 _________________________________
 
 **Next Actions**:

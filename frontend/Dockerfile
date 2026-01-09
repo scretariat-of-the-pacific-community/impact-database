@@ -1,4 +1,6 @@
-FROM node:20-bookworm
+# Multi-stage build for Next.js frontend
+# Stage 1: Dependencies
+FROM node:20-bookworm AS deps
 
 WORKDIR /app
 
@@ -15,18 +17,69 @@ RUN apt-get update && \
 COPY package*.json ./
 
 # Install dependencies with legacy peer deps to handle React version conflicts
-# Use npm install instead of npm ci to handle missing lock file entries
 RUN npm install --legacy-peer-deps
 
-# Copy source code
+# Stage 2: Builder
+FROM node:20-bookworm AS builder
+
+WORKDIR /app
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Expose port
+# Build args for environment variables
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_API_URL_INTERNAL
+ARG NEXT_PUBLIC_APP_NAME
+
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
+# Build the application
+RUN npm run build
+
+# Stage 3: Runner (production)
+FROM node:20-bookworm-slim AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
+
+# Copy built assets from builder
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
 EXPOSE 3000
 
-# Healthcheck disabled temporarily due to Alpine SSL issues
-# HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-#   CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-# Use development command for hot reloading in development
+CMD ["node", "server.js"]
+
+# Stage 4: Development
+FROM node:20-bookworm AS development
+
+WORKDIR /app
+
+RUN apt-get update && \
+    apt-get install -y ca-certificates curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY package*.json ./
+RUN npm install --legacy-peer-deps
+
+COPY . .
+
+EXPOSE 3000
+
 CMD ["npm", "run", "dev:host"]

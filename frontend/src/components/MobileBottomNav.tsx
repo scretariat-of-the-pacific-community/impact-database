@@ -1,24 +1,31 @@
 'use client';
 
-import { Home, Search, Upload, User, MapPin } from 'lucide-react';
+import { Home, Search, Upload, User, MapPin, Shield } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/providers/auth-provider';
 
 interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  requiresRole?: string[];
 }
 
 export default function MobileBottomNav() {
   const pathname = usePathname();
+  const { isAuthenticated, hasRole } = useAuth();
 
   const navItems: NavItem[] = [
     { href: '/', icon: Home, label: 'Home' },
     { href: '/search', icon: Search, label: 'Search' },
     { href: '/upload', icon: Upload, label: 'Upload' },
     { href: '/map', icon: MapPin, label: 'Map' },
+    // Show Admin Portal instead of Profile for admin/reviewer users
+    ...(isAuthenticated && (hasRole('admin') || hasRole('reviewer'))
+      ? [{ href: '/curation', icon: Shield, label: 'Admin' }]
+      : []),
     { href: '/profile', icon: User, label: 'Profile' },
   ];
 

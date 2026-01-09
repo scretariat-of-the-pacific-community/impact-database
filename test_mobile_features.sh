@@ -23,11 +23,11 @@ test_endpoint() {
     local name="$1"
     local url="$2"
     local expected="$3"
-    
+
     echo -n "Testing $name... "
-    
+
     response=$(curl -s "$url" || echo "")
-    
+
     if echo "$response" | grep -q "$expected"; then
         echo -e "${GREEN}✓ PASSED${NC}"
         ((PASSED++))

@@ -15,7 +15,7 @@ SELECT id, username, email FROM users WHERE username = 'kishank';
 SELECT uploader_id, COUNT(*) FROM image_metadata GROUP BY uploader_id;
 -- Result: dev-user-id = 3 uploads
 
--- Check kishank's uploads  
+-- Check kishank's uploads
 SELECT * FROM image_metadata WHERE uploader_id = 'kishank';
 -- Result: 0 rows
 
@@ -26,7 +26,7 @@ SELECT * FROM image_metadata WHERE uploader_id = '4137abd4-6c17-45fb-b94d-ce84cd
 
 ## Findings
 
-✅ **User stats query is correct**: 
+✅ **User stats query is correct**:
 ```python
 # app/api/user.py:138
 total_uploads = db.query(func.count(ImageMetadata.id)).filter(
@@ -64,19 +64,19 @@ curl -X POST http://localhost:8000/api/upload \
 
 ### 2. Check audit logs for upload attempts
 ```sql
-SELECT * FROM audit_logs 
-WHERE user_id = 'kishank' 
-  AND table_name = 'image_metadata' 
-  AND action = 'CREATE' 
-ORDER BY timestamp DESC 
+SELECT * FROM audit_logs
+WHERE user_id = 'kishank'
+  AND table_name = 'image_metadata'
+  AND action = 'CREATE'
+ORDER BY timestamp DESC
 LIMIT 10;
 ```
 
 ### 3. Check recent activity
 ```sql
-SELECT * FROM audit_logs 
-WHERE user_id = 'kishank' 
-ORDER BY timestamp DESC 
+SELECT * FROM audit_logs
+WHERE user_id = 'kishank'
+ORDER BY timestamp DESC
 LIMIT 20;
 ```
 
@@ -94,8 +94,8 @@ LIMIT 20;
 ### Option 2: Fix test data attribution
 **If test uploads should belong to kishank:**
 ```sql
-UPDATE image_metadata 
-SET uploader_id = 'kishank' 
+UPDATE image_metadata
+SET uploader_id = 'kishank'
 WHERE uploader_id = 'dev-user-id';
 ```
 

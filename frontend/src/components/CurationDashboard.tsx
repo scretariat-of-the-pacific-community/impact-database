@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { authFetch } from '@/lib/auth-utils';
+import { backendFetch } from '@/lib/auth-utils';
 import {
   ChartBarIcon,
   ClockIcon,
@@ -11,7 +11,7 @@ import {
   XCircleIcon,
   UserGroupIcon,
   DocumentTextIcon,
-  FlagIcon
+  FlagIcon,
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 
@@ -37,17 +37,64 @@ interface DashboardStats {
 const CurationDashboard: React.FC = () => {
   const [timeRange, setTimeRange] = useState('7d');
 
-  const { data: stats, isLoading, error } = useQuery<DashboardStats>({
+  const {
+    data: stats,
+    isLoading,
+    error,
+  } = useQuery<DashboardStats>({
     queryKey: ['curation-dashboard', timeRange],
     queryFn: async () => {
-      const response = await authFetch(`/api/admin/dashboard?period=${timeRange}`);
+      const response = await backendFetch(
+        `/api/admin/curation/dashboard/stats?period=${timeRange}`
+      );
       if (!response.ok) throw new Error('Failed to fetch dashboard data');
-      return response.json();
+      const raw = await response.json();
+
+      // Normalize backend payload (queue_stats/activity_stats/priority_distribution/curator_workload)
+      const queue = raw?.queue_stats || {};
+      const activity = raw?.activity_stats || {};
+
+      // Normalize curator workload: backend may return an array of { curator, assigned_items }
+      let curatorWorkload: Record<string, number> = {};
+      if (Array.isArray(raw?.curator_workload)) {
+        curatorWorkload = raw.curator_workload.reduce(
+          (acc: Record<string, number>, entry: any) => {
+            const name = entry?.curator || 'Unassigned';
+            acc[name] = entry?.assigned_items ?? 0;
+            return acc;
+          },
+          {}
+        );
+      } else if (
+        raw?.curator_workload &&
+        typeof raw.curator_workload === 'object'
+      ) {
+        curatorWorkload = raw.curator_workload;
+      }
+
+      return {
+        totalItems: queue.total_items ?? 0,
+        pendingReview: queue.pending ?? 0,
+        underReview: queue.under_review ?? 0,
+        approved: queue.approved ?? 0,
+        rejected: queue.rejected ?? 0,
+        flagged: queue.flagged ?? 0,
+        duplicates: queue.duplicates ?? 0,
+        avgReviewTime: activity.avg_queue_time_days ?? 0,
+        curatorWorkload,
+        recentActivity: raw?.recent_activity || [],
+      } as DashboardStats;
     },
-    refetchInterval: 30000 // Refresh every 30 seconds
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  const StatCard = ({ title, value, icon: Icon, color, trend }: {
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    color,
+    trend,
+  }: {
     title: string;
     value: number | string;
     icon: React.ComponentType<any>;
@@ -64,8 +111,11 @@ const CurationDashboard: React.FC = () => {
           <p className="text-sm font-medium text-gray-600">{title}</p>
           <p className="text-3xl font-bold text-gray-900">{value}</p>
           {trend !== undefined && (
-            <p className={`text-sm ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {trend >= 0 ? '+' : ''}{trend}% from last period
+            <p
+              className={`text-sm ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}
+            >
+              {trend >= 0 ? '+' : ''}
+              {trend}% from last period
             </p>
           )}
         </div>
@@ -88,8 +138,12 @@ const CurationDashboard: React.FC = () => {
         <div className="flex">
           <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
           <div className="ml-3">
-            <h3 className="text-sm font-medium text-red-800">Error loading dashboard</h3>
-            <p className="text-sm text-red-700 mt-1">Please try refreshing the page.</p>
+            <h3 className="text-sm font-medium text-red-800">
+              Error loading dashboard
+            </h3>
+            <p className="text-sm text-red-700 mt-1">
+              Please try refreshing the page.
+            </p>
           </div>
         </div>
       </div>
@@ -106,6 +160,8 @@ const CurationDashboard: React.FC = () => {
             <button
               key={period}
               onClick={() => setTimeRange(period)}
+              aria-label={`Show data for ${period}`}
+              aria-pressed={timeRange === period}
               className={`px-3 py-1 rounded-md text-sm font-medium ${
                 timeRange === period
                   ? 'bg-blue-600 text-white'
@@ -150,20 +206,41 @@ const CurationDashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Review Status Chart */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Review Status Overview</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Review Status Overview
+          </h3>
           <div className="space-y-3">
             {[
-              { label: 'Approved', value: stats?.approved || 0, color: 'green' },
+              {
+                label: 'Approved',
+                value: stats?.approved || 0,
+                color: 'green',
+              },
               { label: 'Rejected', value: stats?.rejected || 0, color: 'red' },
-              { label: 'Under Review', value: stats?.underReview || 0, color: 'yellow' },
-              { label: 'Pending', value: stats?.pendingReview || 0, color: 'gray' },
+              {
+                label: 'Under Review',
+                value: stats?.underReview || 0,
+                color: 'yellow',
+              },
+              {
+                label: 'Pending',
+                value: stats?.pendingReview || 0,
+                color: 'gray',
+              },
             ].map((item) => (
-              <div key={item.label} className="flex items-center justify-between">
+              <div
+                key={item.label}
+                className="flex items-center justify-between"
+              >
                 <div className="flex items-center">
-                  <div className={`w-3 h-3 rounded-full bg-${item.color}-500 mr-3`}></div>
+                  <div
+                    className={`w-3 h-3 rounded-full bg-${item.color}-500 mr-3`}
+                  ></div>
                   <span className="text-sm text-gray-700">{item.label}</span>
                 </div>
-                <span className="text-sm font-medium text-gray-900">{item.value}</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {item.value}
+                </span>
               </div>
             ))}
           </div>
@@ -171,29 +248,42 @@ const CurationDashboard: React.FC = () => {
 
         {/* Curator Workload */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Curator Workload</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            Curator Workload
+          </h3>
           <div className="space-y-3">
-            {Object.entries(stats?.curatorWorkload || {}).map(([curator, count]) => (
-              <div key={curator} className="flex items-center justify-between">
-                <span className="text-sm text-gray-700">{curator}</span>
-                <div className="flex items-center">
-                  <div className="w-24 bg-gray-200 rounded-full h-2 mr-3">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full"
-                      style={{ width: `${Math.min((count / 50) * 100, 100)}%` }}
-                    ></div>
+            {Object.entries(stats?.curatorWorkload || {}).map(
+              ([curator, count]) => (
+                <div
+                  key={curator}
+                  className="flex items-center justify-between"
+                >
+                  <span className="text-sm text-gray-700">{curator}</span>
+                  <div className="flex items-center">
+                    <div className="w-24 bg-gray-200 rounded-full h-2 mr-3">
+                      <div
+                        className="bg-blue-600 h-2 rounded-full"
+                        style={{
+                          width: `${Math.min((count / 50) * 100, 100)}%`,
+                        }}
+                      ></div>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {count}
+                    </span>
                   </div>
-                  <span className="text-sm font-medium text-gray-900">{count}</span>
                 </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         </div>
       </div>
 
       {/* Recent Activity */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">
+          Recent Activity
+        </h3>
         <div className="flow-root">
           <ul className="-mb-8">
             {stats?.recentActivity?.map((activity, idx) => (
@@ -214,7 +304,10 @@ const CurationDashboard: React.FC = () => {
                     <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
                       <div>
                         <p className="text-sm text-gray-900">
-                          <span className="font-medium">{activity.curator}</span> {activity.action}{' '}
+                          <span className="font-medium">
+                            {activity.curator}
+                          </span>{' '}
+                          {activity.action}{' '}
                           <span className="font-medium">{activity.item}</span>
                         </p>
                       </div>

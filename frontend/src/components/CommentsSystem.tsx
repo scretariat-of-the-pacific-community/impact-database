@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authFetch } from '@/lib/auth-utils';
+import { backendFetch } from '@/lib/auth-utils';
 import {
   ChatBubbleLeftIcon,
   PaperAirplaneIcon,
@@ -13,7 +13,7 @@ import {
   EyeIcon,
   EyeSlashIcon,
   UserIcon,
-  ClockIcon
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -46,15 +46,17 @@ interface CommentsSystemProps {
   className?: string;
 }
 
-const CommentsSystem: React.FC<CommentsSystemProps> = ({ 
-  itemId, 
-  itemType, 
-  readOnly = false, 
+const CommentsSystem: React.FC<CommentsSystemProps> = ({
+  itemId,
+  itemType,
+  readOnly = false,
   showInternal = true,
-  className = '' 
+  className = '',
 }) => {
   const [newComment, setNewComment] = useState('');
-  const [commentType, setCommentType] = useState<'internal' | 'external'>('internal');
+  const [commentType, setCommentType] = useState<'internal' | 'external'>(
+    'internal'
+  );
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editContent, setEditContent] = useState('');
@@ -64,95 +66,142 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
   const queryClient = useQueryClient();
 
   // Fetch comments
-  const { data: comments, isLoading, error } = useQuery({
+  const {
+    data: comments,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['comments', itemType, itemId, showInternal],
     queryFn: async () => {
       const params = new URLSearchParams({
         item_type: itemType,
-        show_internal: showInternal.toString(),
-        include_deleted: showDeletedComments.toString()
+        include_internal: showInternal.toString(),
+        include_deleted: showDeletedComments.toString(),
       });
 
-      const response = await authFetch(`/api/admin/curation/comments/${itemId}?${params}`);
+      const response = await backendFetch(
+        `/api/admin/curation/queue/${itemId}/comments?${params}`
+      );
       if (!response.ok) throw new Error('Failed to fetch comments');
       return response.json();
-    }
+    },
   });
 
   // Create comment mutation
   const createCommentMutation = useMutation({
-    mutationFn: async ({ content, type, parentId }: { content: string; type: string; parentId?: string }) => {
-      const response = await authFetch('/api/admin/curation/comments', {
-        method: 'POST',
-        body: JSON.stringify({
-          item_id: itemId,
-          item_type: itemType,
-          content,
-          type,
-          parent_id: parentId
-        })
-      });
+    mutationFn: async ({
+      content,
+      type,
+      parentId,
+    }: {
+      content: string;
+      type: string;
+      parentId?: string;
+    }) => {
+      const response = await backendFetch(
+        `/api/admin/curation/queue/${itemId}/comments`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            item_id: itemId,
+            item_type: itemType,
+            content,
+            type,
+            parent_id: parentId,
+          }),
+        }
+      );
       if (!response.ok) throw new Error('Failed to create comment');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', itemType, itemId] });
+      queryClient.invalidateQueries({
+        queryKey: ['comments', itemType, itemId],
+      });
       setNewComment('');
       setReplyTo(null);
-    }
+    },
   });
 
   // Update comment mutation
   const updateCommentMutation = useMutation({
-    mutationFn: async ({ commentId, content }: { commentId: string; content: string }) => {
-      const response = await authFetch(`/api/admin/curation/comments/${commentId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ content })
-      });
+    mutationFn: async ({
+      commentId,
+      content,
+    }: {
+      commentId: string;
+      content: string;
+    }) => {
+      const response = await backendFetch(
+        `/api/admin/curation/comments/${commentId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ content }),
+        }
+      );
       if (!response.ok) throw new Error('Failed to update comment');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', itemType, itemId] });
+      queryClient.invalidateQueries({
+        queryKey: ['comments', itemType, itemId],
+      });
       setEditingComment(null);
       setEditContent('');
-    }
+    },
   });
 
   // Delete comment mutation
   const deleteCommentMutation = useMutation({
     mutationFn: async (commentId: string) => {
-      const response = await authFetch(`/api/admin/curation/comments/${commentId}`, {
-        method: 'DELETE'
-      });
+      const response = await backendFetch(
+        `/api/admin/curation/comments/${commentId}`,
+        {
+          method: 'DELETE',
+        }
+      );
       if (!response.ok) throw new Error('Failed to delete comment');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', itemType, itemId] });
-    }
+      queryClient.invalidateQueries({
+        queryKey: ['comments', itemType, itemId],
+      });
+    },
   });
 
   // Flag comment mutation
   const flagCommentMutation = useMutation({
-    mutationFn: async ({ commentId, reason }: { commentId: string; reason: string }) => {
-      const response = await authFetch(`/api/admin/curation/comments/${commentId}/flag`, {
-        method: 'POST',
-        body: JSON.stringify({ reason })
-      });
+    mutationFn: async ({
+      commentId,
+      reason,
+    }: {
+      commentId: string;
+      reason: string;
+    }) => {
+      const response = await backendFetch(
+        `/api/admin/curation/comments/${commentId}/flag`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ reason }),
+        }
+      );
       if (!response.ok) throw new Error('Failed to flag comment');
       return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['comments', itemType, itemId] });
-    }
+      queryClient.invalidateQueries({
+        queryKey: ['comments', itemType, itemId],
+      });
+    },
   });
 
   // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+      textareaRef.current.style.height =
+        textareaRef.current.scrollHeight + 'px';
     }
   }, [newComment]);
 
@@ -162,7 +211,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
       createCommentMutation.mutate({
         content: newComment.trim(),
         type: commentType,
-        parentId: replyTo || undefined
+        parentId: replyTo || undefined,
       });
     }
   };
@@ -176,7 +225,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
     if (editingComment && editContent.trim()) {
       updateCommentMutation.mutate({
         commentId: editingComment,
-        content: editContent.trim()
+        content: editContent.trim(),
       });
     }
   };
@@ -207,15 +256,21 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
   };
 
   const getCommentTypeColor = (type: string) => {
-    return type === 'internal' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
+    return type === 'internal'
+      ? 'bg-blue-100 text-blue-800'
+      : 'bg-green-100 text-green-800';
   };
 
   const getRoleColor = (role: string) => {
     switch (role.toLowerCase()) {
-      case 'admin': return 'text-red-600';
-      case 'curator': return 'text-blue-600';
-      case 'contributor': return 'text-green-600';
-      default: return 'text-gray-600';
+      case 'admin':
+        return 'text-red-600';
+      case 'curator':
+        return 'text-blue-600';
+      case 'contributor':
+        return 'text-green-600';
+      default:
+        return 'text-gray-600';
     }
   };
 
@@ -226,12 +281,20 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
 
     if (diffInSeconds < 60) return 'just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-    if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    if (diffInSeconds < 86400)
+      return `${Math.floor(diffInSeconds / 3600)}h ago`;
+    if (diffInSeconds < 604800)
+      return `${Math.floor(diffInSeconds / 86400)}d ago`;
     return date.toLocaleDateString();
   };
 
-  const CommentComponent = ({ comment, depth = 0 }: { comment: Comment; depth?: number }) => {
+  const CommentComponent = ({
+    comment,
+    depth = 0,
+  }: {
+    comment: Comment;
+    depth?: number;
+  }) => {
     const [showMenu, setShowMenu] = useState(false);
     const isEditing = editingComment === comment.id;
 
@@ -245,9 +308,13 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
         animate={{ opacity: 1, y: 0 }}
         className={`relative ${depth > 0 ? 'ml-8 border-l-2 border-gray-200 pl-4' : ''}`}
       >
-        <div className={`bg-white rounded-lg border ${comment.isDeleted ? 'opacity-50' : ''} ${
-          comment.type === 'internal' && showInternal ? 'border-blue-200' : 'border-gray-200'
-        }`}>
+        <div
+          className={`bg-white rounded-lg border ${comment.isDeleted ? 'opacity-50' : ''} ${
+            comment.type === 'internal' && showInternal
+              ? 'border-blue-200'
+              : 'border-gray-200'
+          }`}
+        >
           {/* Comment Header */}
           <div className="px-4 py-3 border-b border-gray-100">
             <div className="flex items-center justify-between">
@@ -257,10 +324,14 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className={`text-sm font-medium ${getRoleColor(comment.authorRole)}`}>
+                    <span
+                      className={`text-sm font-medium ${getRoleColor(comment.authorRole)}`}
+                    >
                       {comment.authorName}
                     </span>
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCommentTypeColor(comment.type)}`}>
+                    <span
+                      className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCommentTypeColor(comment.type)}`}
+                    >
                       {comment.type}
                     </span>
                     {comment.metadata?.isEdited && (
@@ -359,8 +430,12 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                 </div>
               </div>
             ) : (
-              <p className={`text-sm ${comment.isDeleted ? 'italic text-gray-500' : 'text-gray-900'}`}>
-                {comment.isDeleted ? '[This comment has been deleted]' : comment.content}
+              <p
+                className={`text-sm ${comment.isDeleted ? 'italic text-gray-500' : 'text-gray-900'}`}
+              >
+                {comment.isDeleted
+                  ? '[This comment has been deleted]'
+                  : comment.content}
               </p>
             )}
           </div>
@@ -369,8 +444,12 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
         {/* Replies */}
         {comment.replies && comment.replies.length > 0 && (
           <div className="mt-3 space-y-3">
-            {comment.replies.map(reply => (
-              <CommentComponent key={reply.id} comment={reply} depth={depth + 1} />
+            {comment.replies.map((reply) => (
+              <CommentComponent
+                key={reply.id}
+                comment={reply}
+                depth={depth + 1}
+              />
             ))}
           </div>
         )}
@@ -402,7 +481,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
           <ChatBubbleLeftIcon className="h-5 w-5 mr-2" />
           Comments ({comments?.length || 0})
         </h3>
-        
+
         {comments?.some((c: Comment) => c.isDeleted) && (
           <button
             onClick={() => setShowDeletedComments(!showDeletedComments)}
@@ -425,7 +504,10 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
 
       {/* New Comment Form */}
       {!readOnly && (
-        <form onSubmit={handleSubmitComment} className="bg-white rounded-lg border border-gray-200 p-4">
+        <form
+          onSubmit={handleSubmitComment}
+          className="bg-white rounded-lg border border-gray-200 p-4"
+        >
           {replyTo && (
             <div className="mb-3 text-sm text-blue-600 bg-blue-50 p-2 rounded">
               Replying to comment
@@ -438,7 +520,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
               </button>
             </div>
           )}
-          
+
           <div className="space-y-3">
             <textarea
               ref={textareaRef}
@@ -449,7 +531,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
               placeholder="Add a comment..."
               disabled={createCommentMutation.isPending}
             />
-            
+
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <label className="flex items-center space-x-2">
@@ -457,7 +539,9 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                     type="radio"
                     value="internal"
                     checked={commentType === 'internal'}
-                    onChange={(e) => setCommentType(e.target.value as 'internal')}
+                    onChange={(e) =>
+                      setCommentType(e.target.value as 'internal')
+                    }
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">Internal</span>
@@ -467,20 +551,24 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                     type="radio"
                     value="external"
                     checked={commentType === 'external'}
-                    onChange={(e) => setCommentType(e.target.value as 'external')}
+                    onChange={(e) =>
+                      setCommentType(e.target.value as 'external')
+                    }
                     className="h-4 w-4 text-green-600 focus:ring-green-500"
                   />
                   <span className="text-sm text-gray-700">External</span>
                 </label>
               </div>
-              
+
               <button
                 type="submit"
                 disabled={!newComment.trim() || createCommentMutation.isPending}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 <PaperAirplaneIcon className="h-4 w-4 mr-2" />
-                {createCommentMutation.isPending ? 'Posting...' : 'Post Comment'}
+                {createCommentMutation.isPending
+                  ? 'Posting...'
+                  : 'Post Comment'}
               </button>
             </div>
           </div>
@@ -490,11 +578,13 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
       {/* Comments List */}
       <div className="space-y-4">
         <AnimatePresence>
-          {comments?.filter((comment: Comment) => !comment.parentId).map((comment: Comment) => (
-            <CommentComponent key={comment.id} comment={comment} />
-          ))}
+          {comments
+            ?.filter((comment: Comment) => !comment.parentId)
+            .map((comment: Comment) => (
+              <CommentComponent key={comment.id} comment={comment} />
+            ))}
         </AnimatePresence>
-        
+
         {(!comments || comments.length === 0) && (
           <div className="text-center text-gray-500 py-8">
             <ChatBubbleLeftIcon className="h-12 w-12 mx-auto text-gray-300 mb-3" />

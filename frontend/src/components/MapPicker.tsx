@@ -1,18 +1,34 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  useMapEvents,
+  useMap,
+} from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { MapPin, Search, X, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import {
+  MapPin,
+  Search,
+  X,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+} from 'lucide-react';
 import { Button } from '@/components/design-system';
 
 // Fix for default marker icons in Next.js
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconRetinaUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl:
+    'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
 // Custom marker icon with Pacific theme
@@ -82,10 +98,10 @@ interface MapPickerProps {
 }
 
 // Component to handle map clicks and marker placement
-function LocationMarker({ 
-  position, 
-  setPosition 
-}: { 
+function LocationMarker({
+  position,
+  setPosition,
+}: {
   position: [number, number] | null;
   setPosition: (pos: [number, number]) => void;
 }) {
@@ -103,18 +119,22 @@ function LocationMarker({
 // Component to fly to a new position
 function MapController({ center }: { center: [number, number] }) {
   const map = useMap();
-  
+
   useEffect(() => {
     map.flyTo(center, 13, {
       duration: 1.5,
       easeLinearity: 0.25,
     });
   }, [center, map]);
-  
+
   return null;
 }
 
-export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapPickerProps) {
+export default function MapPicker({
+  initialPosition,
+  onConfirm,
+  onCancel,
+}: MapPickerProps) {
   const defaultCenter: [number, number] = [-17.7334, 168.3273]; // Port Vila, Pacific center
   const [position, setPosition] = useState<[number, number] | null>(
     initialPosition || null
@@ -183,47 +203,49 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
   );
 
   // Reverse geocode a position to get place name
-  const reverseGeocode = useCallback(async (lat: number, lng: number) => {
-    setIsReverseGeocoding(true);
-    setSearchError(null);
-    
-    try {
-      const response = await fetchWithNominatim(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
-      );
-      const data: GeocodingResult = await response.json();
-      
-      // Build a human-readable place name
-      const parts = [
-        data.address.village || data.address.town || data.address.city,
-        data.address.state,
-        data.address.country,
-      ].filter(Boolean);
-      
-      const name = parts.length > 0 ? parts.join(', ') : 'Unknown location';
-      setPlaceName(name);
-      setCountryCode(data.address.country_code?.toUpperCase() || '');
-      
-    } catch (error) {
-      console.error('Reverse geocoding error:', error);
-      setPlaceName(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-      setSearchError(
-        error instanceof Error
-          ? error.message
-          : 'Could not determine place name'
-      );
-    } finally {
-      setIsReverseGeocoding(false);
-    }
-  }, [fetchWithNominatim]);
+  const reverseGeocode = useCallback(
+    async (lat: number, lng: number) => {
+      setIsReverseGeocoding(true);
+      setSearchError(null);
+
+      try {
+        const response = await fetchWithNominatim(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
+        );
+        const data: GeocodingResult = await response.json();
+
+        // Build a human-readable place name
+        const parts = [
+          data.address.village || data.address.town || data.address.city,
+          data.address.state,
+          data.address.country,
+        ].filter(Boolean);
+
+        const name = parts.length > 0 ? parts.join(', ') : 'Unknown location';
+        setPlaceName(name);
+        setCountryCode(data.address.country_code?.toUpperCase() || '');
+      } catch (error) {
+        console.error('Reverse geocoding error:', error);
+        setPlaceName(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+        setSearchError(
+          error instanceof Error
+            ? error.message
+            : 'Could not determine place name'
+        );
+      } finally {
+        setIsReverseGeocoding(false);
+      }
+    },
+    [fetchWithNominatim]
+  );
 
   // Search for a location by name
   const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
-    
+
     setIsSearching(true);
     setSearchError(null);
-    
+
     try {
       const response = await fetchWithNominatim(
         `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(
@@ -231,28 +253,30 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
         )}&format=json&addressdetails=1&limit=1`
       );
       const results: GeocodingResult[] = await response.json();
-      
+
       if (results.length === 0) {
         setSearchError('Location not found. Try a different search term.');
         return;
       }
-      
+
       const result = results[0];
-      const newPosition: [number, number] = [parseFloat(result.lat.toString()), parseFloat(result.lon.toString())];
-      
+      const newPosition: [number, number] = [
+        parseFloat(result.lat.toString()),
+        parseFloat(result.lon.toString()),
+      ];
+
       setPosition(newPosition);
       setMapCenter(newPosition);
-      
+
       // Build place name
       const parts = [
         result.address.village || result.address.town || result.address.city,
         result.address.state,
         result.address.country,
       ].filter(Boolean);
-      
+
       setPlaceName(parts.length > 0 ? parts.join(', ') : result.display_name);
       setCountryCode(result.address.country_code?.toUpperCase() || '');
-      
     } catch (error) {
       console.error('Search error:', error);
       setSearchError(
@@ -266,19 +290,25 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
   }, [searchQuery, fetchWithNominatim]);
 
   // Handle position change
-  const handlePositionChange = useCallback((newPosition: [number, number]) => {
-    setPosition(newPosition);
-    reverseGeocode(newPosition[0], newPosition[1]);
-  }, [reverseGeocode]);
+  const handlePositionChange = useCallback(
+    (newPosition: [number, number]) => {
+      setPosition(newPosition);
+      reverseGeocode(newPosition[0], newPosition[1]);
+    },
+    [reverseGeocode]
+  );
 
   // Use device location
   const useDeviceLocation = useCallback(async () => {
     const isSecureContext =
       typeof window !== 'undefined' &&
-      (window.isSecureContext || ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname));
+      (window.isSecureContext ||
+        ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname));
 
     if (!isSecureContext) {
-      setSearchError('Location access only works over HTTPS or localhost. Please switch to a secure connection or drop a pin manually.');
+      setSearchError(
+        'Location access only works over HTTPS or localhost. Please switch to a secure connection or drop a pin manually.'
+      );
       return;
     }
 
@@ -286,21 +316,28 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
       setSearchError('Geolocation not supported by your browser');
       return;
     }
-    
+
     setIsSearching(true);
     setSearchError(null);
 
     try {
       if (navigator.permissions?.query) {
-        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        const permissionStatus = await navigator.permissions.query({
+          name: 'geolocation' as PermissionName,
+        });
         if (permissionStatus.state === 'denied') {
           setIsSearching(false);
-          setSearchError('Browser blocked location sharing. Please enable permissions or drop a pin manually.');
+          setSearchError(
+            'Browser blocked location sharing. Please enable permissions or drop a pin manually.'
+          );
           return;
         }
       }
     } catch (permissionCheckError) {
-      console.warn('Unable to verify geolocation permission:', permissionCheckError);
+      console.warn(
+        'Unable to verify geolocation permission:',
+        permissionCheckError
+      );
     }
 
     const handleSuccess = (position: GeolocationPosition) => {
@@ -317,23 +354,32 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
     const handleError = (error: unknown) => {
       // Geolocation errors are expected when users deny permission or it's unavailable
       // No need to log to console as we handle it gracefully with user-friendly messages
-      
-      const blockedNames = ['SecurityError', 'NotAllowedError', 'PermissionDeniedError'];
+
+      const blockedNames = [
+        'SecurityError',
+        'NotAllowedError',
+        'PermissionDeniedError',
+      ];
       let blockedByPolicy = false;
-      
+
       if (error instanceof DOMException) {
         blockedByPolicy = blockedNames.includes(error.name);
       } else if (error && typeof error === 'object') {
         if ('code' in error) {
           const posError = error as GeolocationPositionError;
           blockedByPolicy = posError.code === 1;
-        } else if ('name' in error && typeof (error as { name?: string }).name === 'string') {
-          blockedByPolicy = blockedNames.includes((error as { name?: string }).name!);
+        } else if (
+          'name' in error &&
+          typeof (error as { name?: string }).name === 'string'
+        ) {
+          blockedByPolicy = blockedNames.includes(
+            (error as { name?: string }).name!
+          );
         }
       } else if (typeof error === 'string') {
         blockedByPolicy = blockedNames.some((name) => error.includes(name));
       }
-      
+
       setSearchError(
         blockedByPolicy
           ? 'Browser blocked location sharing. Please enable permissions or drop a pin manually.'
@@ -341,17 +387,13 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
       );
       setIsSearching(false);
     };
-    
+
     try {
-      navigator.geolocation.getCurrentPosition(
-        handleSuccess,
-        handleError,
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
-        }
-      );
+      navigator.geolocation.getCurrentPosition(handleSuccess, handleError, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0,
+      });
     } catch (syncError) {
       handleError(syncError);
     }
@@ -360,11 +402,12 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
   // Handle confirm
   const handleConfirm = useCallback(() => {
     if (!position) return;
-    
+
     onConfirm({
       lat: position[0],
       lng: position[1],
-      placeName: placeName || `${position[0].toFixed(6)}, ${position[1].toFixed(6)}`,
+      placeName:
+        placeName || `${position[0].toFixed(6)}, ${position[1].toFixed(6)}`,
       countryCode: countryCode || undefined,
     });
   }, [position, placeName, countryCode, onConfirm]);
@@ -387,8 +430,12 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
               <MapPin className="w-5 h-5 text-pacific-400" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-white">Select Location</h2>
-              <p className="text-xs text-surface-soft">Click on the map or search for a location</p>
+              <h2 className="text-lg font-semibold text-white">
+                Select Location
+              </h2>
+              <p className="text-xs text-surface-soft">
+                Click on the map or search for a location
+              </p>
             </div>
           </div>
           <button
@@ -406,7 +453,10 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-soft" />
               <input
+                id="map-search"
+                name="map-search"
                 type="text"
+                autoComplete="off"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
@@ -420,7 +470,13 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
               disabled={!searchQuery.trim() || isSearching}
               variant="secondary"
               size="md"
-              leftIcon={isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+              leftIcon={
+                isSearching ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Search className="w-4 h-4" />
+                )
+              }
             >
               Search
             </Button>
@@ -429,7 +485,13 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
               disabled={isSearching}
               variant="secondary"
               size="md"
-              leftIcon={isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+              leftIcon={
+                isSearching ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <MapPin className="w-4 h-4" />
+                )
+              }
               className="hidden sm:flex"
             >
               My Location
@@ -455,7 +517,7 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
               </div>
             </div>
           )}
-          
+
           <MapContainer
             center={mapCenter}
             zoom={10}
@@ -467,7 +529,10 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            <LocationMarker position={position} setPosition={handlePositionChange} />
+            <LocationMarker
+              position={position}
+              setPosition={handlePositionChange}
+            />
             <MapController center={mapCenter} />
           </MapContainer>
 
@@ -484,7 +549,9 @@ export default function MapPicker({ initialPosition, onConfirm, onCancel }: MapP
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white truncate">
-                    {isReverseGeocoding ? 'Locating...' : (placeName || 'Selected Location')}
+                    {isReverseGeocoding
+                      ? 'Locating...'
+                      : placeName || 'Selected Location'}
                   </p>
                   <p className="text-xs text-surface-soft mt-0.5 font-mono">
                     {position[0].toFixed(6)}, {position[1].toFixed(6)}

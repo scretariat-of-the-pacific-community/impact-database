@@ -6,19 +6,21 @@ import os
 # Add the app directory to Python path to fix import issues
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import uvicorn
-import json
 import redis
 
 from core.config import settings
+from middleware.logging import RequestLoggingMiddleware, configure_structlog, get_logger
 
 # Use simplified APIs for development
 from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds, featured
 from api import images_simple as images  # Use simple version
 from api import rbac  # Phase 0: RBAC foundation
+from api import curation  # Admin curation and review queue
+from api import admin  # Admin user management and dashboard
 
 # Enable monitoring for production observability
 from services.monitoring import setup_monitoring, monitoring_background_tasks
@@ -28,12 +30,10 @@ from services.monitoring import setup_monitoring, monitoring_background_tasks
 # from services.minio_lifecycle import setup_minio_lifecycle_and_backup
 import asyncio
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO if not settings.DEBUG else logging.DEBUG,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+# Configure structured logging early
+LOG_LEVEL = logging.DEBUG if settings.DEBUG else logging.INFO
+configure_structlog(LOG_LEVEL, force=True)
+logger = get_logger(__name__)
 
 # Create FastAPI app
 app = FastAPI(
@@ -57,9 +57,6 @@ if settings.REDIS_URL:
 # Add security middleware (order matters - add from outermost to innermost)
 # Import rate limiting middleware
 from middleware.rate_limit import RateLimitMiddleware, RedisRateLimitMiddleware
-
-# Import structured logging middleware
-from middleware.logging import RequestLoggingMiddleware
 
 # Add structured logging with request IDs (outermost - logs everything)
 app.add_middleware(
@@ -101,6 +98,15 @@ else:
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
     ]
+
+# SECURITY FIX: Add comprehensive security headers middleware
+from middleware.security_headers import SecurityHeadersMiddleware
+
+app.add_middleware(
+    SecurityHeadersMiddleware,
+    environment=settings.ENVIRONMENT,
+    enable_hsts=settings.ENVIRONMENT.lower() == "production",
+)
 
 # Add CSRF protection (before CORS)
 from middleware.csrf import CSRFMiddleware
@@ -156,12 +162,16 @@ app.include_router(rbac.router, prefix="/api/rbac", tags=["rbac"])
 # Legacy upload endpoint for backward compatibility (will be deprecated)
 app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
 
+# Batch upload endpoint for multiple files with async processing
+from api import batch_upload
+app.include_router(batch_upload.router, tags=["batch-upload"])
+
 # app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["graphql"])  # Commented out - not imported
 # app.include_router(presign.router, prefix="/api/presign", tags=["presign"])  # Commented out - not imported
 
 # Admin endpoints - protected by RBAC
-# app.include_router(curation.router, prefix="/admin/curation", tags=["admin", "curation"])  # Commented out - not imported
-# app.include_router(admin.router, prefix="/admin", tags=["admin"])  # Commented out - not imported
+app.include_router(curation.router, prefix="/api/admin/curation", tags=["admin", "curation"])
+app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 
 # API endpoints - now require authentication
 app.include_router(images.router, prefix="/api", tags=["api", "images"])
@@ -193,6 +203,36 @@ app.include_router(featured.router, prefix="/api", tags=["featured"])
 setup_monitoring(app)
 
 
+def setup_error_monitoring() -> None:
+    """Initialize Sentry when DSN is provided."""
+    if not settings.SENTRY_DSN:
+        logger.info("sentry_disabled", reason="missing_dsn")
+        return
+
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.logging import LoggingIntegration
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            environment=settings.ENVIRONMENT,
+            traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+            enable_tracing=settings.SENTRY_ENABLE_TRACING,
+            integrations=[
+                FastApiIntegration(transaction_style="endpoint"),
+                LoggingIntegration(level=logging.INFO, event_level=logging.ERROR),
+            ],
+            release=settings.VERSION,
+        )
+        logger.info("sentry_initialized", environment=settings.ENVIRONMENT)
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.warning("sentry_init_failed", error=str(exc))
+
+
+setup_error_monitoring()
+
+
 # Application startup event
 @app.on_event("startup")
 async def startup_event():
@@ -210,13 +250,17 @@ async def startup_event():
         # Start background monitoring tasks for metrics collection
         asyncio.create_task(monitoring_background_tasks())
 
-        logger.info(f"{settings.PROJECT_NAME} started successfully")
-        logger.info("STAC API available at /stac")
-        logger.info("OGC API - Records available at /ogc")
-        logger.info("Monitoring endpoints available at /health, /metrics")
+        logger.info(
+            "startup_completed",
+            project=settings.PROJECT_NAME,
+            environment=settings.ENVIRONMENT,
+            monitoring_endpoints=["/health", "/metrics"],
+        )
+        logger.info("stac_api_ready", path="/stac")
+        logger.info("ogc_api_ready", path="/ogc")
 
     except Exception as e:
-        logger.error(f"Startup error: {e}")
+        logger.error("startup_error", error=str(e), error_type=type(e).__name__)
         # Don't raise exception to allow app to start even if some features fail
 
 

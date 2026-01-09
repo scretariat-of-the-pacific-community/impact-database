@@ -3,7 +3,7 @@ import type { DivIcon, Icon, IconOptions } from 'leaflet';
 let leaflet: typeof import('leaflet') | null = null;
 let iconsConfigured = false;
 
-const ensureLeaflet = (): (typeof import('leaflet')) | null => {
+const ensureLeaflet = (): typeof import('leaflet') | null => {
   if (typeof window === 'undefined') {
     return null;
   }
@@ -16,9 +16,12 @@ const ensureLeaflet = (): (typeof import('leaflet')) | null => {
   if (!iconsConfigured && leaflet) {
     delete (leaflet.Icon.Default.prototype as any)._getIconUrl;
     leaflet.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+      iconRetinaUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+      iconUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl:
+        'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
     });
     iconsConfigured = true;
   }
@@ -26,7 +29,9 @@ const ensureLeaflet = (): (typeof import('leaflet')) | null => {
   return leaflet;
 };
 
-export const createCustomIcon = (hazardType: string): DivIcon | Icon<IconOptions> | undefined => {
+export const createCustomIcon = (
+  hazardType: string
+): DivIcon | Icon<IconOptions> | undefined => {
   const L = ensureLeaflet();
   if (!L) return undefined;
 
@@ -41,7 +46,7 @@ export const createCustomIcon = (hazardType: string): DivIcon | Icon<IconOptions
   };
 
   const color = colors[hazardType] || '#6b7280';
-  
+
   return L.divIcon({
     className: 'custom-div-icon',
     html: `
@@ -67,13 +72,21 @@ export const createCustomIcon = (hazardType: string): DivIcon | Icon<IconOptions
 
 const getHazardEmoji = (hazard: string) => {
   switch (hazard) {
-    case 'flood': return '🌊';
-    case 'cyclone': return '🌀';
-    case 'drought': return '🏜️';
-    case 'earthquake': return '🫨';
-    case 'tsunami': return '🌊';
-    case 'landslide': return '⛰️';
-    case 'wildfire': return '🔥';
-    default: return '⚠️';
+    case 'flood':
+      return '🌊';
+    case 'cyclone':
+      return '🌀';
+    case 'drought':
+      return '🏜️';
+    case 'earthquake':
+      return '🫨';
+    case 'tsunami':
+      return '🌊';
+    case 'landslide':
+      return '⛰️';
+    case 'wildfire':
+      return '🔥';
+    default:
+      return '⚠️';
   }
 };

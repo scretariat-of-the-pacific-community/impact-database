@@ -1,6 +1,6 @@
 /**
  * World-Class Interactive Tutorial System
- * 
+ *
  * Features:
  * - Progressive disclosure with context-aware tooltips
  * - Interactive checkpoints requiring user actions
@@ -27,7 +27,12 @@ interface TutorialMetrics {
 }
 
 // User role types for personalization
-export type UserRole = 'contributor' | 'curator' | 'admin' | 'viewer' | 'new_user';
+export type UserRole =
+  | 'contributor'
+  | 'curator'
+  | 'admin'
+  | 'viewer'
+  | 'new_user';
 
 // Enhanced step with validation and interactivity
 interface InteractiveStep extends DriveStep {
@@ -55,7 +60,8 @@ export const tutorialSteps = {
       element: '#search-box',
       popover: {
         title: 'Find The Signal Fast',
-        description: 'Type a hazard, place, or date. Press Enter to jump straight to the most relevant evidence.',
+        description:
+          'Type a hazard, place, or date. Press Enter to jump straight to the most relevant evidence.',
         side: 'bottom',
         align: 'start',
       },
@@ -64,7 +70,8 @@ export const tutorialSteps = {
       element: '#upload-button',
       popover: {
         title: 'Add Your Proof',
-        description: 'Drop a photo or video, we auto-extract EXIF and geo metadata. Better data means faster response.',
+        description:
+          'Drop a photo or video, we auto-extract EXIF and geo metadata. Better data means faster response.',
         side: 'bottom',
         align: 'start',
       },
@@ -73,7 +80,8 @@ export const tutorialSteps = {
       element: '#analytics-link',
       popover: {
         title: 'See Patterns, Not Noise',
-        description: 'Open analytics to spot hotspots, trends, and gaps so you know where to focus next.',
+        description:
+          'Open analytics to spot hotspots, trends, and gaps so you know where to focus next.',
         side: 'right',
         align: 'start',
       },
@@ -82,7 +90,8 @@ export const tutorialSteps = {
       element: '#map-view',
       popover: {
         title: 'Map Every Impact',
-        description: 'Pan/zoom to explore incidents. Click any marker to open the full record, metadata, and downloads.',
+        description:
+          'Pan/zoom to explore incidents. Click any marker to open the full record, metadata, and downloads.',
         side: 'top',
         align: 'center',
       },
@@ -91,7 +100,8 @@ export const tutorialSteps = {
       element: '#filter-panel',
       popover: {
         title: 'Refine With Precision',
-        description: 'Layer filters (hazard, country, date) to narrow results. Saved views keep your context for later.',
+        description:
+          'Layer filters (hazard, country, date) to narrow results. Saved views keep your context for later.',
         side: 'left',
         align: 'start',
       },
@@ -100,7 +110,8 @@ export const tutorialSteps = {
       element: '#collaboration-link',
       popover: {
         title: 'Collaborate Live',
-        description: 'Invite teammates, follow hazards/regions, and get notified when you’re @mentioned.',
+        description:
+          'Invite teammates, follow hazards/regions, and get notified when you’re @mentioned.',
         side: 'bottom',
         align: 'start',
       },
@@ -112,14 +123,16 @@ export const tutorialSteps = {
     {
       popover: {
         title: 'Upload Like A Pro',
-        description: 'Follow these steps for fast, metadata-rich submissions reviewers can approve quickly.',
+        description:
+          'Follow these steps for fast, metadata-rich submissions reviewers can approve quickly.',
       },
     },
     {
       element: '#file-upload',
       popover: {
         title: 'Drop Your File',
-        description: 'Choose an image/video. We’ll pull EXIF (location, time) automatically when present.',
+        description:
+          'Choose an image/video. We’ll pull EXIF (location, time) automatically when present.',
         side: 'bottom',
       },
     },
@@ -127,7 +140,8 @@ export const tutorialSteps = {
       element: '#hazard-type',
       popover: {
         title: 'Label The Hazard',
-        description: 'Pick the right hazard to drive accurate analytics and reviewer routing.',
+        description:
+          'Pick the right hazard to drive accurate analytics and reviewer routing.',
         side: 'right',
       },
     },
@@ -135,7 +149,8 @@ export const tutorialSteps = {
       element: '#location-fields',
       popover: {
         title: 'Confirm Location',
-        description: 'Confirm country/location. If EXIF was stripped, add coordinates manually for map accuracy.',
+        description:
+          'Confirm country/location. If EXIF was stripped, add coordinates manually for map accuracy.',
         side: 'top',
       },
     },
@@ -143,7 +158,8 @@ export const tutorialSteps = {
       element: '#datetime-picker',
       popover: {
         title: 'Date & Time',
-        description: 'When was this captured? Accurate timestamps keep timelines and alerts trustworthy.',
+        description:
+          'When was this captured? Accurate timestamps keep timelines and alerts trustworthy.',
         side: 'left',
       },
     },
@@ -151,7 +167,8 @@ export const tutorialSteps = {
       element: '#metadata-section',
       popover: {
         title: 'Context & License',
-        description: 'Add source agency, license, and tags so others can reuse confidently.',
+        description:
+          'Add source agency, license, and tags so others can reuse confidently.',
         side: 'top',
       },
     },
@@ -159,7 +176,8 @@ export const tutorialSteps = {
       element: '#submit-button',
       popover: {
         title: 'Submit For Review',
-        description: 'We queue a review and notify you. High-quality, complete metadata speeds approval.',
+        description:
+          'We queue a review and notify you. High-quality, complete metadata speeds approval.',
         side: 'top',
       },
     },
@@ -170,14 +188,16 @@ export const tutorialSteps = {
     {
       popover: {
         title: 'Analytics Dashboard',
-        description: 'Explore hotspots, gaps, and trends so you can act where it matters.',
+        description:
+          'Explore hotspots, gaps, and trends so you can act where it matters.',
       },
     },
     {
       element: '#insights-panel',
       popover: {
         title: 'Data Insights',
-        description: 'Automatically detected patterns, anomalies, and trends in hazard documentation.',
+        description:
+          'Automatically detected patterns, anomalies, and trends in hazard documentation.',
         side: 'bottom',
       },
     },
@@ -185,7 +205,8 @@ export const tutorialSteps = {
       element: '#time-series-chart',
       popover: {
         title: 'Upload Timeline',
-        description: 'Track how disaster documentation has changed over time. Switch between daily, monthly, or yearly views.',
+        description:
+          'Track how disaster documentation has changed over time. Switch between daily, monthly, or yearly views.',
         side: 'top',
       },
     },
@@ -193,7 +214,8 @@ export const tutorialSteps = {
       element: '#hazard-distribution',
       popover: {
         title: 'Hazard Types',
-        description: 'See which disasters are most common in the database: floods, cyclones, earthquakes, etc.',
+        description:
+          'See which disasters are most common in the database: floods, cyclones, earthquakes, etc.',
         side: 'left',
       },
     },
@@ -201,7 +223,8 @@ export const tutorialSteps = {
       element: '#country-distribution',
       popover: {
         title: 'Geographic Coverage',
-        description: 'View which Pacific Island nations have the most documented hazard events.',
+        description:
+          'View which Pacific Island nations have the most documented hazard events.',
         side: 'right',
       },
     },
@@ -209,7 +232,8 @@ export const tutorialSteps = {
       element: '#export-dropdown',
       popover: {
         title: 'Export Data',
-        description: 'Download analytics data in CSV or JSON format for further analysis or reporting.',
+        description:
+          'Download analytics data in CSV or JSON format for further analysis or reporting.',
         side: 'bottom',
       },
     },
@@ -217,7 +241,8 @@ export const tutorialSteps = {
       element: '#map-toggle',
       popover: {
         title: 'Map View',
-        description: 'Switch to map view to see the geographic distribution of hazard events.',
+        description:
+          'Switch to map view to see the geographic distribution of hazard events.',
         side: 'left',
       },
     },
@@ -229,7 +254,8 @@ export const tutorialSteps = {
       element: '#search-filters',
       popover: {
         title: 'Filters That Matter',
-        description: 'Stack filters to find the exact imagery you need—hazard, country, date, tags.',
+        description:
+          'Stack filters to find the exact imagery you need—hazard, country, date, tags.',
         side: 'bottom',
       },
     },
@@ -237,7 +263,8 @@ export const tutorialSteps = {
       element: '#results-grid',
       popover: {
         title: 'Results You Can Trust',
-        description: 'Browse curated results. Open any item for full metadata, location, and provenance.',
+        description:
+          'Browse curated results. Open any item for full metadata, location, and provenance.',
         side: 'top',
       },
     },
@@ -245,7 +272,8 @@ export const tutorialSteps = {
       element: '#image-preview',
       popover: {
         title: 'Verify The Details',
-        description: 'Inspect the record: location, date, hazard, coordinates, and reviewer status.',
+        description:
+          'Inspect the record: location, date, hazard, coordinates, and reviewer status.',
         side: 'left',
       },
     },
@@ -253,7 +281,8 @@ export const tutorialSteps = {
       element: '#download-button',
       popover: {
         title: 'Download & Cite',
-        description: 'Grab the asset with ISO 19115 metadata so you can cite and reuse responsibly.',
+        description:
+          'Grab the asset with ISO 19115 metadata so you can cite and reuse responsibly.',
         side: 'top',
       },
     },
@@ -346,7 +375,10 @@ export class TutorialManager {
       tours[tourName] = true;
       localStorage.setItem('tutorial_completed', JSON.stringify(tours));
     } catch {
-      localStorage.setItem('tutorial_completed', JSON.stringify({ [tourName]: true }));
+      localStorage.setItem(
+        'tutorial_completed',
+        JSON.stringify({ [tourName]: true })
+      );
     }
   }
 
@@ -404,14 +436,18 @@ export const tutorialManager = new TutorialManager();
  */
 export function useTutorial() {
   return {
-    startTour: (tourName: keyof typeof tutorialSteps, config?: Partial<Config>) => 
-      tutorialManager.startTour(tourName, config),
+    startTour: (
+      tourName: keyof typeof tutorialSteps,
+      config?: Partial<Config>
+    ) => tutorialManager.startTour(tourName, config),
     stopTour: () => tutorialManager.stopTour(),
-    isTourCompleted: (tourName: string) => tutorialManager.isTourCompleted(tourName),
-    markTourCompleted: (tourName: string) => tutorialManager.markTourCompleted(tourName),
+    isTourCompleted: (tourName: string) =>
+      tutorialManager.isTourCompleted(tourName),
+    markTourCompleted: (tourName: string) =>
+      tutorialManager.markTourCompleted(tourName),
     resetTours: () => tutorialManager.resetTours(),
     isFirstVisit: () => tutorialManager.isFirstVisit(),
-    highlight: (element: string, popover?: DriveStep['popover']) => 
+    highlight: (element: string, popover?: DriveStep['popover']) =>
       tutorialManager.highlight(element, popover),
   };
 }

@@ -50,12 +50,12 @@ for upload in uploads:
         if upload.filename:
             stat = minio_service.client.stat_object(bucket, upload.filename)
             file_size = stat.size
-            
+
             # Categorize by type
             if file_type in ['jpg', 'jpeg', 'png', 'gif']:
                 storage['images'] += file_size
             # ... etc
-        
+
         # Get thumbnail size
         if upload.thumbnail_key:
             stat = minio_service.client.stat_object(bucket, upload.thumbnail_key)

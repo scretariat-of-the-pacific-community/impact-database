@@ -1,7 +1,16 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Award, Star, Upload, CheckCircle, TrendingUp, Zap, Target, Shield } from 'lucide-react';
+import {
+  Award,
+  Star,
+  Upload,
+  CheckCircle,
+  TrendingUp,
+  Zap,
+  Target,
+  Shield,
+} from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { imageApi } from '@/lib/api';
@@ -35,7 +44,7 @@ const defaultStats: ContributorStats = {
 
 export default function GamificationBadges() {
   const { isAuthenticated, isLoading: authLoading } = useAuth();
-  
+
   // Fetch real user stats from API - only when authenticated
   const { data: stats = defaultStats, isLoading } = useQuery<ContributorStats>({
     queryKey: ['contributor-stats'],
@@ -157,10 +166,15 @@ export default function GamificationBadges() {
     <section className="mx-auto max-w-7xl py-16">
       <div className="mb-8 text-center">
         <Award className="mx-auto mb-4 h-12 w-12 text-pacific-400" />
-        <p className="text-sm uppercase tracking-wide text-white/70">Recognition</p>
-        <h2 className="mt-2 text-3xl font-semibold text-white">Contributor Achievements</h2>
+        <p className="text-sm uppercase tracking-wide text-white/70">
+          Recognition
+        </p>
+        <h2 className="mt-2 text-3xl font-semibold text-white">
+          Contributor Achievements
+        </h2>
         <p className="mx-auto mt-4 max-w-2xl text-white/70">
-          Earn badges by contributing quality disaster imagery and helping validate community uploads
+          Earn badges by contributing quality disaster imagery and helping
+          validate community uploads
         </p>
       </div>
 
@@ -185,7 +199,9 @@ export default function GamificationBadges() {
           transition={{ delay: 0.1 }}
         >
           <CheckCircle className="mb-2 h-6 w-6 text-palm-400" />
-          <p className="text-3xl font-bold text-white">{stats.reviewedImages}</p>
+          <p className="text-3xl font-bold text-white">
+            {stats.reviewedImages}
+          </p>
           <p className="text-sm text-white/70">Reviews Completed</p>
         </motion.div>
 
@@ -229,7 +245,9 @@ export default function GamificationBadges() {
             whileHover={{ scale: 1.05 }}
           >
             <div className="mb-4 flex items-start justify-between">
-              <div className={`rounded-full bg-white/10 p-3 ${badge.unlocked && 'ring-2 ring-white/20'}`}>
+              <div
+                className={`rounded-full bg-white/10 p-3 ${badge.unlocked && 'ring-2 ring-white/20'}`}
+              >
                 <badge.icon className="h-6 w-6" />
               </div>
               {badge.unlocked && (
@@ -242,22 +260,26 @@ export default function GamificationBadges() {
             <p className="mt-3 text-xs text-white/50">{badge.requirement}</p>
 
             {/* Progress Bar */}
-            {!badge.unlocked && badge.progress !== undefined && badge.maxProgress && (
-              <div className="mt-4">
-                <div className="h-2 overflow-hidden rounded-full bg-white/10">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-pacific-400 to-palm-400"
-                    initial={{ width: 0 }}
-                    whileInView={{ width: `${(badge.progress / badge.maxProgress) * 100}%` }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.05 + 0.2, duration: 0.5 }}
-                  />
+            {!badge.unlocked &&
+              badge.progress !== undefined &&
+              badge.maxProgress && (
+                <div className="mt-4">
+                  <div className="h-2 overflow-hidden rounded-full bg-white/10">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-pacific-400 to-palm-400"
+                      initial={{ width: 0 }}
+                      whileInView={{
+                        width: `${(badge.progress / badge.maxProgress) * 100}%`,
+                      }}
+                      viewport={{ once: true }}
+                      transition={{ delay: index * 0.05 + 0.2, duration: 0.5 }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-white/50">
+                    {badge.progress} / {badge.maxProgress}
+                  </p>
                 </div>
-                <p className="mt-1 text-xs text-white/50">
-                  {badge.progress} / {badge.maxProgress}
-                </p>
-              </div>
-            )}
+              )}
           </motion.div>
         ))}
       </div>
@@ -270,12 +292,18 @@ export default function GamificationBadges() {
         viewport={{ once: true }}
       >
         <Zap className="mx-auto mb-4 h-12 w-12 text-pacific-400" />
-        <h3 className="text-2xl font-semibold text-white">Start Your Impact Journey</h3>
+        <h3 className="text-2xl font-semibold text-white">
+          Start Your Impact Journey
+        </h3>
         <p className="mx-auto mt-4 max-w-2xl text-white/70">
-          Upload your first disaster image to unlock achievements and join a community of 150+ contributors
-          building climate resilience across the Pacific
+          Upload your first disaster image to unlock achievements and join a
+          community of 150+ contributors building climate resilience across the
+          Pacific
         </p>
-        <Link href="/upload" className="mt-6 inline-flex items-center gap-2 rounded-full bg-palm-600 px-8 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40">
+        <Link
+          href="/upload"
+          className="mt-6 inline-flex items-center gap-2 rounded-full bg-palm-600 px-8 py-3 font-semibold text-white shadow-lg shadow-palm-600/30 transition hover:bg-palm-500 hover:shadow-xl hover:shadow-palm-500/40"
+        >
           <Upload className="h-5 w-5" />
           Upload Image
         </Link>

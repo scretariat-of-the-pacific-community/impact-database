@@ -23,18 +23,19 @@ export interface ImageMetadata {
   upload_date: string;
   file_size?: number;
   thumbnail_url?: string;
-  
+  uploader_id?: string;
+
   // Geographic information
   latitude?: number;
   longitude?: number;
   geographic_element?: GeographicBoundingBox;
-  
+
   // Classification
   hazard_type: HazardType;
   source_agency: SourceAgency;
   topic_category: TopicCategory[];
   keywords: string[];
-  
+
   // ISO 19115 metadata
   file_identifier: string;
   language: string;
@@ -42,19 +43,19 @@ export interface ImageMetadata {
   hierarchy_level: string;
   contact: ResponsibleParty;
   date_stamp: string;
-  
+
   // Additional metadata
   purpose?: string;
   spatial_resolution?: string;
   reference_system_info: string;
   format_name: string;
   format_version?: string;
-  
+
   // Rights and constraints
   access_constraints?: string;
   use_constraints?: string;
   classification?: string;
-  
+
   // Technical metadata
   camera_info?: CameraInfo;
   processing_level?: string;
@@ -93,9 +94,9 @@ export interface CameraInfo {
 }
 
 // Enums
-export type HazardType = 
+export type HazardType =
   | 'earthquake'
-  | 'flood' 
+  | 'flood'
   | 'tsunami'
   | 'cyclone'
   | 'drought'
@@ -105,7 +106,7 @@ export type HazardType =
   | 'coastal_erosion'
   | 'other';
 
-export type SourceAgency = 
+export type SourceAgency =
   | 'usgs'
   | 'noaa'
   | 'nasa'
@@ -121,7 +122,7 @@ export type SourceAgency =
   | 'citizen'
   | 'other';
 
-export type TopicCategory = 
+export type TopicCategory =
   | 'farming'
   | 'biota'
   | 'boundaries'
@@ -148,23 +149,23 @@ export interface SearchFilters {
   hazard_type?: HazardType[];
   source_agency?: SourceAgency[];
   topic_category?: TopicCategory[];
-  
+
   // Geographic filters
   bbox?: BoundingBox;
   country?: string[];
   eez?: string[]; // Exclusive Economic Zone
-  
+
   // Temporal filters
   date_from?: string;
   date_to?: string;
   upload_date_from?: string;
   upload_date_to?: string;
-  
+
   // Technical filters
   min_resolution?: number;
   max_file_size?: number;
   format?: string[];
-  
+
   // Pagination
   page?: number;
   limit?: number;
@@ -257,7 +258,7 @@ export const HAZARD_TYPE_LABELS: Record<HazardType, string> = {
   wildfire: 'Wildfire',
   volcanic: 'Volcanic Activity',
   coastal_erosion: 'Coastal Erosion',
-  other: 'Other'
+  other: 'Other',
 };
 
 export const HAZARD_TYPES = [
@@ -287,7 +288,7 @@ export const SOURCE_AGENCY_LABELS: Record<SourceAgency, string> = {
   government: 'Government',
   private: 'Private',
   citizen: 'Citizen',
-  other: 'Other'
+  other: 'Other',
 };
 
 export const TOPIC_CATEGORY_LABELS: Record<TopicCategory, string> = {
@@ -309,7 +310,7 @@ export const TOPIC_CATEGORY_LABELS: Record<TopicCategory, string> = {
   society: 'Society',
   structure: 'Structure',
   transportation: 'Transportation',
-  utilitiesCommunication: 'Utilities/Communication'
+  utilitiesCommunication: 'Utilities/Communication',
 };
 
 // User Profile Types
@@ -344,7 +345,12 @@ export interface UserStats {
   };
 }
 
-export type UserActivityType = 'upload' | 'edit' | 'review' | 'achievement' | 'system';
+export type UserActivityType =
+  | 'upload'
+  | 'edit'
+  | 'review'
+  | 'achievement'
+  | 'system';
 
 export interface PaginationMetadata {
   total: number;

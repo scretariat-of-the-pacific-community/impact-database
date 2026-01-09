@@ -107,7 +107,7 @@ def get_stac_item(item_id: str, db: Session = Depends(get_db)):
     image = db.query(ImageMetadata).filter_by(id=item_id).first()
     if not image:
         raise HTTPException(404, "Item not found")
-    
+
     stac_item = image_to_stac_item(image, "https://api.example.com")
     return stac_item
 ```
@@ -120,9 +120,9 @@ def search_items(hazard_type: str, db: Session):
         hazard_type=hazard_type,
         status="approved"
     ).all()
-    
+
     stac_items = batch_images_to_stac_items(images, "https://api.example.com")
-    
+
     return {
         "type": "FeatureCollection",
         "features": stac_items,

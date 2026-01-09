@@ -113,6 +113,7 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
+      target: development
     ports:
       - "8000:8000"
     env_file:
@@ -156,6 +157,7 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
+      target: development
     env_file:
       - .env
     environment:
@@ -200,6 +202,7 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
+      target: development
     env_file:
       - .env
     environment:
@@ -236,6 +239,7 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
+      target: development
     ports:
       - "5555:5555"
     env_file:
@@ -264,6 +268,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: development
     ports:
       - "3000:3000"
     environment:

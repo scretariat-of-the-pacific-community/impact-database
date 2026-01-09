@@ -383,6 +383,20 @@ class Settings(BaseSettings):
         pattern=r"^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
         description="Audit logging level",
     )
+    SENTRY_DSN: Optional[str] = Field(
+        default=get_env("SENTRY_DSN"),
+        description="Sentry DSN for error and performance monitoring",
+    )
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(
+        default=float(get_env("SENTRY_TRACES_SAMPLE_RATE", "0.05")),
+        ge=0.0,
+        le=1.0,
+        description="Fraction of transactions to trace in Sentry",
+    )
+    SENTRY_ENABLE_TRACING: bool = Field(
+        default=get_env("SENTRY_ENABLE_TRACING", "true").lower() == "true",
+        description="Enable Sentry performance tracing when DSN is set",
+    )
     LOG_FAILED_LOGINS: bool = Field(
         default=get_env("LOG_FAILED_LOGINS", "true").lower() == "true",
         description="Log failed login attempts",

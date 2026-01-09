@@ -75,7 +75,7 @@ Authentication endpoints are protected with Redis-backed rate limiting:
 ### Password Requirements
 - Minimum 12 characters
 - At least one lowercase letter
-- At least one uppercase letter  
+- At least one uppercase letter
 - At least one number
 - At least one special character (`!@#$%^&*(),.?":{}|<>`)
 

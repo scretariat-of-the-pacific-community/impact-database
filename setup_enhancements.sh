@@ -56,7 +56,7 @@ echo ""
 # Check if Alembic is available
 if command -v alembic &> /dev/null || $PIP_CMD show alembic &> /dev/null; then
     echo "✓ Alembic found"
-    
+
     read -p "Run database migration now? (y/n) " -n 1 -r
     echo ""
     if [[ $REPLY =~ ^[Yy]$ ]]; then

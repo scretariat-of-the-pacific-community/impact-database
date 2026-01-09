@@ -10,7 +10,7 @@
 The Impact Database application is **80% complete** and needs 3 critical fixes to reach MVP status:
 
 1. ✅ **Start all services** (currently stopped)
-2. ✅ **Fix database schema** (add `file_size` column)  
+2. ✅ **Fix database schema** (add `file_size` column)
 3. ✅ **Verify end-to-end workflows**
 
 **Estimated time to MVP**: 1 hour

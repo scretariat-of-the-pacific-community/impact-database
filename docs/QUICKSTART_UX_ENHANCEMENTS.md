@@ -256,7 +256,7 @@ import { getQueuedUploads } from '@/lib/offline-uploads';
 
 function UploadStatus() {
   const queued = getQueuedUploads();
-  
+
   return (
     <div>
       {queued.length > 0 && (
@@ -436,7 +436,7 @@ async function handleSubmit(data: FormData) {
 ```typescript
 async function processData() {
   const loadingToast = toast.loading('Processing data...');
-  
+
   try {
     const result = await api.process();
     toast.dismiss(loadingToast);

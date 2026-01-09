@@ -12,13 +12,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Body
 from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, desc, asc, func
 from pydantic import BaseModel, Field
 
 from models.database import get_db, ImageMetadata
+from models.rbac import User, Role as DBRole
 from models.curation import (
     CurationQueue,
     CurationComment,
@@ -29,6 +30,19 @@ from models.curation import (
     Priority,
     ActionType,
 )
+from models.review_workflow import (
+    ReviewItem,
+    ReviewAssignment,
+    ReviewAuditTrail,
+    ReviewStatus,
+    ReviewPriority,
+    AssignmentReason,
+    AuditAction,
+)
+
+# Alias for clarity
+DBUser = User
+Role = DBRole
 from models.rbac import User as DBUser
 from api.auth import get_current_user, User
 from services.metadata_validation import MetadataValidator
@@ -64,6 +78,14 @@ class CurationItemResponse(BaseModel):
     image_metadata: Optional[Dict[str, Any]] = None
     comments_count: int = 0
     actions_count: int = 0
+
+
+class PaginatedCurationResponse(BaseModel):
+    items: List[CurationItemResponse]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class CurationItemUpdate(BaseModel):
@@ -169,9 +191,15 @@ def log_curation_action(
     related_item_id: str = None,
 ):
     """Log a curation action."""
+    # Ensure action_type is the enum value, not the enum member
+    if isinstance(action_type, ActionType):
+        action_type_value = action_type.value
+    else:
+        action_type_value = action_type
+    
     action = CurationAction(
         queue_item_id=queue_item_id,
-        action_type=action_type,
+        action_type=action_type_value,
         performed_by=performed_by,
         description=description,
         metadata_changes=metadata_changes,
@@ -184,7 +212,7 @@ def log_curation_action(
 
 
 # Review Queue Management
-@router.get("/queue", response_model=List[CurationItemResponse])
+@router.get("/queue", response_model=PaginatedCurationResponse)
 async def get_curation_queue(
     status: Optional[str] = Query(None, description="Filter by status"),
     priority: Optional[str] = Query(None, description="Filter by priority"),
@@ -192,19 +220,50 @@ async def get_curation_queue(
     is_flagged: Optional[bool] = Query(None, description="Filter flagged items"),
     is_duplicate: Optional[bool] = Query(None, description="Filter duplicates"),
     show_deleted: bool = Query(False, description="Include soft-deleted items"),
-    limit: int = Query(50, le=100, description="Number of items to return"),
-    offset: int = Query(0, description="Offset for pagination"),
+    show_all: bool = Query(False, description="Show all items (admin only, overrides role-based filtering)"),
+    page: int = Query(1, ge=1, description="Page number (1-indexed)"),
+    page_size: int = Query(20, ge=1, le=100, description="Items per page"),
+    # Legacy pagination support
+    limit: Optional[int] = Query(None, ge=1, le=100, description="Deprecated: use page_size"),
+    offset: Optional[int] = Query(None, ge=0, description="Deprecated: use page"),
     sort_by: str = Query("created_at", description="Sort field"),
     sort_order: str = Query("desc", description="Sort order (asc/desc)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Get curation queue with filtering and pagination."""
-    check_admin_permission(current_user)
-
+    """Get curation queue with role-based filtering and pagination.
+    
+    Role-based visibility:
+    - Admin: Sees all items (or can filter with show_all=false)
+    - Curator: Sees unassigned items + items assigned to them
+    - Contributor: Sees only their own submissions
+    
+    Returns paginated response with { items: [...], total: N } shape.
+    """
+    # Get user's role from database for permission checking
+    db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
+    if not db_user:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    user_role = db_user.role.name if db_user.role else None
+    
     query = db.query(CurationQueue)
+    
+    if user_role == 'contributor':
+        # Contributors see only their submissions
+        query = query.filter(CurationQueue.submitted_by == current_user.id)
+    elif user_role == 'curator':
+        # Curators see: unassigned items OR items assigned to them
+        if not show_all:  # Respect show_all flag for curators with admin override
+            query = query.filter(
+                or_(
+                    CurationQueue.assigned_to == None,
+                    CurationQueue.assigned_to == str(current_user.id)
+                )
+            )
+    # Admin sees everything by default (no additional filter)
 
-    # Apply filters
+    # Apply user-specified filters
     if status:
         query = query.filter(CurationQueue.status == status)
     if priority:
@@ -218,15 +277,34 @@ async def get_curation_queue(
     if not show_deleted:
         query = query.filter(CurationQueue.is_deleted == False)
 
-    # Apply sorting
-    sort_column = getattr(CurationQueue, sort_by, CurationQueue.created_at)
+    # Get total count before pagination
+    total_count = query.count()
+
+    # Apply sorting - map submittedAt to created_at for frontend compatibility
+    sort_field = sort_by
+    if sort_by == "submittedAt":
+        sort_field = "created_at"
+    
+    sort_column = getattr(CurationQueue, sort_field, CurationQueue.created_at)
     if sort_order == "desc":
         query = query.order_by(desc(sort_column))
     else:
         query = query.order_by(asc(sort_column))
 
+    # Calculate pagination - prefer page/page_size, fall back to limit/offset
+    if limit is not None or offset is not None:
+        # Legacy pagination
+        actual_limit = limit or 50
+        actual_offset = offset or 0
+        page_size = actual_limit
+        page = (actual_offset // actual_limit) + 1
+    else:
+        # Modern pagination
+        actual_offset = (page - 1) * page_size
+        actual_limit = page_size
+
     # Apply pagination
-    queue_items = query.offset(offset).limit(limit).all()
+    queue_items = query.offset(actual_offset).limit(actual_limit).all()
 
     # Build response with additional data
     response_items = []
@@ -257,7 +335,16 @@ async def get_curation_queue(
         )
         response_items.append(response_item)
 
-    return response_items
+    # Calculate total pages
+    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 0
+
+    return PaginatedCurationResponse(
+        items=response_items,
+        total=total_count,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
+    )
 
 
 @router.get("/queue/{item_id}", response_model=CurationItemResponse)
@@ -416,12 +503,14 @@ async def update_curation_item(
 @router.post("/queue/{item_id}/flag")
 async def flag_item(
     item_id: str,
-    flag_reason: str,
+    body: Dict[str, Any] = Body(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Flag an item for attention."""
     check_admin_permission(current_user)
+
+    flag_reason = body.get('reason') or body.get('flag_reason', 'No reason provided')
 
     item = db.query(CurationQueue).filter(CurationQueue.id == item_id).first()
     if not item:
@@ -611,6 +700,102 @@ async def add_comment(
     )
 
     return CommentResponse(**comment.to_dict())
+
+
+@router.put("/comments/{comment_id}", response_model=CommentResponse)
+async def update_comment(
+    comment_id: str,
+    content: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Update a comment's content."""
+    check_admin_permission(current_user)
+
+    comment = db.query(CurationComment).filter(CurationComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    # Only allow the author or admin to update
+    db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
+    if comment.author != current_user.username and (not db_user or db_user.role.name != 'admin'):
+        raise HTTPException(status_code=403, detail="Not authorized to update this comment")
+
+    comment.content = content
+    comment.updated_at = datetime.utcnow()
+    db.commit()
+
+    # Log the action
+    log_curation_action(
+        db=db,
+        queue_item_id=comment.queue_item_id,
+        action_type=ActionType.EDITED,
+        performed_by=current_user.username,
+        description="Updated comment",
+    )
+
+    return CommentResponse(**comment.to_dict())
+
+
+@router.delete("/comments/{comment_id}")
+async def delete_comment(
+    comment_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Soft delete a comment."""
+    check_admin_permission(current_user)
+
+    comment = db.query(CurationComment).filter(CurationComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    # Only allow the author or admin to delete
+    db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
+    if comment.author != current_user.username and (not db_user or db_user.role.name != 'admin'):
+        raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
+
+    comment.is_deleted = True
+    comment.deleted_at = datetime.utcnow()
+    db.commit()
+
+    # Log the action
+    log_curation_action(
+        db=db,
+        queue_item_id=comment.queue_item_id,
+        action_type=ActionType.EDITED,
+        performed_by=current_user.username,
+        description="Deleted comment",
+    )
+
+    return {"message": "Comment deleted successfully"}
+
+
+@router.post("/comments/{comment_id}/flag")
+async def flag_comment(
+    comment_id: str,
+    reason: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Flag a comment for review."""
+    check_admin_permission(current_user)
+
+    comment = db.query(CurationComment).filter(CurationComment.id == comment_id).first()
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    # Log the flag action
+    log_curation_action(
+        db=db,
+        queue_item_id=comment.queue_item_id,
+        action_type=ActionType.FLAGGED,
+        performed_by=current_user.username,
+        description=f"Flagged comment by {comment.author}",
+        notes=reason,
+    )
+
+    return {"message": "Comment flagged for review", "reason": reason}
 
 
 # Metadata Editing
@@ -1020,62 +1205,79 @@ async def download_export(
 # Dashboard and Statistics
 @router.get("/dashboard/stats")
 async def get_dashboard_stats(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    period: str = Query("30d", description="Time window: 24h, 7d, 30d, 90d"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """Get curation dashboard statistics."""
     check_admin_permission(current_user)
 
-    # Queue statistics
-    total_items = (
-        db.query(func.count(CurationQueue.id)).filter(CurationQueue.is_deleted == False).scalar()
-    )
+    # Normalize period to days (default 30)
+    def _period_to_days(value: str) -> int:
+        normalized = (value or "").lower()
+        if normalized in ("24h", "1d"):
+            return 1
+        if normalized == "7d":
+            return 7
+        if normalized in ("90d", "3m"):
+            return 90
+        return 30
+
+    days = _period_to_days(period)
+
+    # Queue statistics using CurationQueue
+    total_items = db.query(func.count(CurationQueue.id)).scalar()
 
     pending_items = (
         db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.status == CurationStatus.PENDING, CurationQueue.is_deleted == False)
+        .filter(CurationQueue.status == "pending")
         .scalar()
     )
 
     under_review_items = (
         db.query(func.count(CurationQueue.id))
-        .filter(
-            CurationQueue.status == CurationStatus.UNDER_REVIEW, CurationQueue.is_deleted == False
-        )
+        .filter(CurationQueue.status == "under_review")
         .scalar()
     )
 
     approved_items = (
         db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.status == CurationStatus.APPROVED, CurationQueue.is_deleted == False)
+        .filter(CurationQueue.status == "approved")
+        .scalar()
+    )
+    
+    rejected_items = (
+        db.query(func.count(CurationQueue.id))
+        .filter(CurationQueue.status == "rejected")
         .scalar()
     )
 
     flagged_items = (
         db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.is_flagged == True, CurationQueue.is_deleted == False)
+        .filter(CurationQueue.is_flagged == True)
         .scalar()
     )
 
     duplicate_items = (
         db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.is_duplicate == True, CurationQueue.is_deleted == False)
+        .filter(CurationQueue.is_duplicate == True)
         .scalar()
     )
 
     # Activity statistics (last 30 days)
-    thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+    window_start = datetime.utcnow() - timedelta(days=days)
 
     recent_submissions = (
         db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.created_at >= thirty_days_ago, CurationQueue.is_deleted == False)
+        .filter(CurationQueue.created_at >= window_start)
         .scalar()
     )
 
     recent_reviews = (
-        db.query(func.count(CurationAction.id))
+        db.query(func.count(CurationQueue.id))
         .filter(
-            CurationAction.action_type == ActionType.REVIEWED,
-            CurationAction.performed_at >= thirty_days_ago,
+            CurationQueue.updated_at >= window_start,
+            CurationQueue.status.in_(["approved", "rejected", "needs_changes"])
         )
         .scalar()
     )
@@ -1085,22 +1287,23 @@ async def get_dashboard_stats(
         db.query(
             func.avg(func.extract("epoch", datetime.utcnow() - CurationQueue.created_at) / 86400)
         )
-        .filter(CurationQueue.status == CurationStatus.PENDING, CurationQueue.is_deleted == False)
+        .filter(CurationQueue.status == "pending")
         .scalar()
     )
 
     return {
         "queue_stats": {
-            "total_items": total_items,
-            "pending": pending_items,
-            "under_review": under_review_items,
-            "approved": approved_items,
-            "flagged": flagged_items,
-            "duplicates": duplicate_items,
+            "total_items": total_items or 0,
+            "pending": pending_items or 0,
+            "under_review": under_review_items or 0,
+            "approved": approved_items or 0,
+            "rejected": rejected_items or 0,
+            "flagged": flagged_items or 0,
+            "duplicates": duplicate_items or 0,
         },
         "activity_stats": {
-            "recent_submissions": recent_submissions,
-            "recent_reviews": recent_reviews,
+            "recent_submissions": recent_submissions or 0,
+            "recent_reviews": recent_reviews or 0,
             "avg_queue_time_days": round(avg_queue_time or 0, 1),
         },
         "priority_distribution": await _get_priority_distribution(db),
@@ -1449,31 +1652,34 @@ def _generate_geojson_export(images: List[ImageMetadata], options: Dict[str, Any
 
 
 async def _get_priority_distribution(db: Session) -> Dict[str, int]:
-    """Get priority distribution for dashboard."""
-    from sqlalchemy import func
+    """Get priority distribution for dashboard using CurationQueue."""
+    from sqlalchemy import func, cast, String
 
+    # Cast priority enum to string to avoid enum value mismatch (DB has lowercase, enum has uppercase)
     results = (
-        db.query(CurationQueue.priority, func.count(CurationQueue.id))
-        .filter(CurationQueue.is_deleted == False)
+        db.query(cast(CurationQueue.priority, String), func.count(CurationQueue.id))
         .group_by(CurationQueue.priority)
         .all()
     )
 
-    return {priority.value: count for priority, count in results}
+    return {str(priority): count for priority, count in results}
 
 
 async def _get_curator_workload(db: Session) -> List[Dict[str, Any]]:
-    """Get curator workload for dashboard."""
-    from sqlalchemy import func
+    """Get curator workload for dashboard using CurationQueue."""
+    from sqlalchemy import func, cast
+    from sqlalchemy.dialects.postgresql import UUID
 
+    # Join with User table to get curator names
+    # Cast assigned_to (string) to UUID to match users.id type
     results = (
-        db.query(CurationQueue.assigned_to, func.count(CurationQueue.id))
+        db.query(DBUser.username, func.count(CurationQueue.id))
+        .join(CurationQueue, cast(CurationQueue.assigned_to, UUID(as_uuid=True)) == DBUser.id)
         .filter(
             CurationQueue.assigned_to.isnot(None),
-            CurationQueue.status.in_([CurationStatus.PENDING, CurationStatus.UNDER_REVIEW]),
-            CurationQueue.is_deleted == False,
+            CurationQueue.status.in_(["pending", "under_review"]),
         )
-        .group_by(CurationQueue.assigned_to)
+        .group_by(DBUser.username)
         .all()
     )
 
@@ -1512,3 +1718,185 @@ async def _process_csv_import(
         "validation_errors": ["Row 5: Invalid hazard type", "Row 12: Missing location"],
         "processing_time": "2 minutes",
     }
+
+
+# Auto-assignment helper functions
+async def _get_curator_with_lowest_workload(db: Session) -> Optional[str]:
+    """Find curator with lowest current workload for auto-assignment."""
+    from sqlalchemy import func
+    
+    # Get all curators
+    curators = (
+        db.query(DBUser)
+        .join(DBUser.role)
+        .filter(Role.name == 'curator')
+        .all()
+    )
+    
+    if not curators:
+        return None
+    
+    # Calculate workload for each curator
+    curator_workloads = []
+    for curator in curators:
+        workload = (
+            db.query(func.count(CurationQueue.id))
+            .filter(
+                CurationQueue.assigned_to == str(curator.id),
+                CurationQueue.status.in_(["pending", "under_review"])
+            )
+            .scalar() or 0
+        )
+        curator_workloads.append((str(curator.id), workload))
+    
+    # Return curator with lowest workload
+    curator_workloads.sort(key=lambda x: x[1])
+    return curator_workloads[0][0]
+
+
+async def _auto_assign_queue_item(db: Session, queue_item: CurationQueue) -> bool:
+    """Auto-assign a queue item to curator with lowest workload."""
+    if queue_item.assigned_to:
+        return False  # Already assigned
+    
+    curator_id = await _get_curator_with_lowest_workload(db)
+    if curator_id:
+        queue_item.assigned_to = curator_id
+        
+        # Create action log
+        action = CurationAction(
+            queue_item_id=queue_item.id,
+            action_type=ActionType.EDITED,
+            performed_by="system",
+            changes={"assigned_to": {"from": None, "to": curator_id}},
+            notes="Auto-assigned to curator with lowest workload"
+        )
+        db.add(action)
+        db.commit()
+        return True
+    
+    return False
+
+
+# New endpoints for workload management
+@router.post("/queue/{item_id}/claim")
+async def claim_queue_item(
+    item_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Curator claims an unassigned item for review."""
+    # Get user's role from database
+    db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
+    if not db_user or db_user.role.name not in ['curator', 'admin']:
+        raise HTTPException(status_code=403, detail="Only curators and admins can claim items")
+    
+    # Get the item
+    item = db.query(CurationQueue).filter(CurationQueue.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    
+    # Check if already assigned
+    if item.assigned_to:
+        raise HTTPException(status_code=400, detail="Item is already assigned")
+    
+    # Assign to current user
+    item.assigned_to = str(current_user.id)
+    item.updated_at = datetime.utcnow()
+    
+    # Create action log
+    action = CurationAction(
+        queue_item_id=item.id,
+        action_type=ActionType.EDITED,
+        performed_by=current_user.id,
+        changes={"assigned_to": {"from": None, "to": str(current_user.id)}},
+        notes="Curator claimed item for review"
+    )
+    db.add(action)
+    db.commit()
+    db.refresh(item)
+    
+    return {"success": True, "message": "Item claimed successfully", "item": item.to_dict()}
+
+
+@router.post("/queue/{item_id}/assign")
+async def assign_queue_item(
+    item_id: str,
+    curator_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Admin assigns an item to a specific curator."""
+    # Get user's role from database
+    db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
+    if not db_user or db_user.role.name != 'admin':
+        raise HTTPException(status_code=403, detail="Only admins can assign items")
+    
+    # Get the item
+    item = db.query(CurationQueue).filter(CurationQueue.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Queue item not found")
+    
+    # Verify curator exists and has curator role
+    curator = db.query(DBUser).filter(DBUser.id == curator_id).first()
+    if not curator:
+        raise HTTPException(status_code=404, detail="Curator not found")
+    
+    if curator.role.name not in ['curator', 'admin']:
+        raise HTTPException(status_code=400, detail="User is not a curator")
+    
+    old_assignee = item.assigned_to
+    item.assigned_to = curator_id
+    item.updated_at = datetime.utcnow()
+    
+    # Create action log
+    action = CurationAction(
+        queue_item_id=item.id,
+        action_type=ActionType.EDITED,
+        performed_by=current_user.id,
+        changes={"assigned_to": {"from": old_assignee, "to": curator_id}},
+        notes=f"Admin assigned item to curator {curator.username}"
+    )
+    db.add(action)
+    db.commit()
+    db.refresh(item)
+    
+    return {"success": True, "message": "Item assigned successfully", "item": item.to_dict()}
+
+
+@router.get("/curators")
+async def get_curators(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Get list of curators with their current workload."""
+    # All authenticated users can view curator list
+    
+    # Get all curators
+    curators = (
+        db.query(DBUser)
+        .join(DBUser.role)
+        .filter(Role.name.in_(['curator', 'admin']))
+        .all()
+    )
+    
+    curator_list = []
+    for curator in curators:
+        workload = (
+            db.query(func.count(CurationQueue.id))
+            .filter(
+                CurationQueue.assigned_to == str(curator.id),
+                CurationQueue.status.in_(["pending", "under_review"])
+            )
+            .scalar() or 0
+        )
+        
+        curator_list.append({
+            "id": str(curator.id),
+            "username": curator.username,
+            "email": curator.email,
+            "role": curator.role.name,
+            "current_workload": workload
+        })
+    
+    return curator_list

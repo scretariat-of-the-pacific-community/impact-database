@@ -8,7 +8,7 @@ This document describes the security hardening measures implemented in Week 1 of
 
 **Threat**: Sensitive credentials (SECRET_KEY, database passwords, API keys) were committed to `.env.production` and `.env.production.example` files.
 
-**Solution**: 
+**Solution**:
 - Created `SECURITY_HARDENING.sh` script using `git-filter-repo` to remove files from all git history
 - Script includes safety checks and team coordination prompts
 - Generates backup branch before destructive operation
@@ -152,17 +152,17 @@ sequenceDiagram
     participant Client
     participant API
     participant Redis
-    
+
     Client->>API: POST /api/auth/login (credentials)
     API->>Redis: Check rate limit
     Redis-->>API: OK (within limits)
     API->>API: Validate credentials
     API->>Redis: Record attempt
     API-->>Client: Set cookies (auth + CSRF)
-    
+
     Client->>API: GET /api/auth/csrf-token
     API-->>Client: CSRF token
-    
+
     Client->>API: POST /api/data (X-CSRF-Token header)
     API->>API: Validate CSRF token
     API->>API: Process request

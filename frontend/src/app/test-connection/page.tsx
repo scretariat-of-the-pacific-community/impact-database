@@ -5,12 +5,15 @@ import { toast } from 'sonner';
 
 function DevTestConnection() {
   const [backendStatus, setBackendStatus] = useState<string>('Testing...');
-  const [apiResponse, setApiResponse] = useState<Record<string, unknown> | null>(null);
+  const [apiResponse, setApiResponse] = useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
     testBackendConnection(controller.signal);
-    
+
     return () => controller.abort();
   }, []);
 
@@ -18,7 +21,7 @@ function DevTestConnection() {
     try {
       // Test basic connection
       const response = await fetch('http://localhost:8000/', {
-        signal
+        signal,
       });
       const data = await response.json();
       setBackendStatus('✅ Connected successfully!');
@@ -37,7 +40,7 @@ function DevTestConnection() {
     const controller = new AbortController();
     try {
       const response = await fetch('http://localhost:8000/search?limit=1', {
-        signal: controller.signal
+        signal: controller.signal,
       });
       const data = await response.json();
       console.log('API test response:', data);
@@ -68,7 +71,13 @@ function DevTestConnection() {
       {apiResponse && (
         <div style={{ marginBottom: '20px' }}>
           <h2>Backend Response:</h2>
-          <pre style={{ background: '#f5f5f5', padding: '10px', borderRadius: '5px' }}>
+          <pre
+            style={{
+              background: '#f5f5f5',
+              padding: '10px',
+              borderRadius: '5px',
+            }}
+          >
             {JSON.stringify(apiResponse, null, 2)}
           </pre>
         </div>
@@ -77,7 +86,11 @@ function DevTestConnection() {
       <div>
         <button
           onClick={() => testBackendConnection()}
-          style={{ marginRight: '10px', padding: '10px 20px', cursor: 'pointer' }}
+          style={{
+            marginRight: '10px',
+            padding: '10px 20px',
+            cursor: 'pointer',
+          }}
         >
           Test Connection Again
         </button>
@@ -90,7 +103,14 @@ function DevTestConnection() {
         </button>
       </div>
 
-      <div style={{ marginTop: '30px', padding: '15px', background: '#e3f2fd', borderRadius: '5px' }}>
+      <div
+        style={{
+          marginTop: '30px',
+          padding: '15px',
+          background: '#e3f2fd',
+          borderRadius: '5px',
+        }}
+      >
         <h3>Expected Results:</h3>
         <ul>
           <li>✅ Status should show Connected successfully!</li>
@@ -107,4 +127,6 @@ function Empty() {
   return null;
 }
 
-export default process.env.NODE_ENV === 'development' ? DevTestConnection : Empty;
+export default process.env.NODE_ENV === 'development'
+  ? DevTestConnection
+  : Empty;

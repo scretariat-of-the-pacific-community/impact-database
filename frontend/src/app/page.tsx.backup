@@ -118,15 +118,15 @@ export default function OceanPortalDashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Link 
-                href="/search" 
+              <Link
+                href="/search"
                 className="bg-white/10 text-white px-4 py-2 rounded-md hover:bg-white/20 flex items-center gap-2 transition-colors"
               >
                 <Search className="w-4 h-4" />
                 Search Catalog
               </Link>
-              <Link 
-                href="/upload" 
+              <Link
+                href="/upload"
                 className="bg-white text-blue-600 px-4 py-2 rounded-md hover:bg-gray-50 flex items-center gap-2 font-medium transition-colors"
               >
                 <Upload className="w-4 h-4" />
@@ -144,7 +144,7 @@ export default function OceanPortalDashboard() {
             Pacific Islands Impact Assessment Portal
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Discover, search, and analyze disaster and hazard impact images from across the Pacific Island region. 
+            Discover, search, and analyze disaster and hazard impact images from across the Pacific Island region.
             Our comprehensive database supports evidence-based decision making for resilience and adaptation planning.
           </p>
         </div>
@@ -216,8 +216,8 @@ export default function OceanPortalDashboard() {
           <div className="px-8 py-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-gray-900">Recent Additions</h2>
-              <Link 
-                href="/search?sort=newest" 
+              <Link
+                href="/search?sort=newest"
                 className="text-blue-600 hover:text-blue-700 font-medium flex items-center gap-2"
               >
                 View All
@@ -250,11 +250,11 @@ export default function OceanPortalDashboard() {
                           {image.hazard_type}
                         </Tag>
                       </div>
-                      
+
                       <p className="text-sm text-gray-600 mb-3 line-clamp-2">
                         {sanitizeText(image.abstract || image.purpose || 'No description available')}
                       </p>
-                      
+
                       <div className="flex items-center justify-between text-xs text-gray-500">
                         <div className="flex items-center">
                           <MapPin className="w-3 h-3 mr-1" />
@@ -280,8 +280,8 @@ export default function OceanPortalDashboard() {
                 <p className="text-gray-400 text-sm mt-2">
                   Start by uploading your first impact assessment image
                 </p>
-                <Link 
-                  href="/upload" 
+                <Link
+                  href="/upload"
                   className="inline-flex items-center mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
                   <Upload className="w-4 h-4 mr-2" />

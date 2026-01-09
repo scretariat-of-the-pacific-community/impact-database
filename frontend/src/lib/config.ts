@@ -1,20 +1,20 @@
 /**
  * Configuration settings for the frontend application
- * 
+ *
  * API Architecture:
  * ================
- * 
+ *
  * 1. Next.js API Routes (/api/*):
  *    - Use relative paths: '/api/admin/users', '/api/analytics'
  *    - Handled by Next.js server-side (app/api/ directory)
  *    - Work in any deployment without configuration
  *    - These routes proxy to backend using environment variables
- * 
+ *
  * 2. Direct Backend API Calls:
  *    - Use imageApi from '@/lib/api'
  *    - Configured with BASE_URL from environment variables
  *    - Example: imageApi.searchImages(), imageApi.upload()
- * 
+ *
  * Environment Variables:
  * - NEXT_PUBLIC_API_URL: External backend URL (browser access)
  * - NEXT_PUBLIC_API_URL_INTERNAL: Internal backend URL (SSR in Docker)
@@ -24,7 +24,11 @@
 const getBaseApiUrl = (): string => {
   // Server-side (SSR/SSG) in Docker: use internal service name
   if (typeof window === 'undefined') {
-    return process.env.NEXT_PUBLIC_API_URL_INTERNAL || process.env.NEXT_PUBLIC_API_URL || 'http://api:8000';
+    return (
+      process.env.NEXT_PUBLIC_API_URL_INTERNAL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      'http://api:8000'
+    );
   }
   // Client-side (browser): use external URL accessible from host and allowed by CSP
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -38,8 +42,17 @@ const config = {
   UPLOAD: {
     MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB
     ALLOWED_EXTENSIONS: [
-      '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff', '.tif', 
-      '.webp', '.avif', '.heic', '.heif'
+      '.jpg',
+      '.jpeg',
+      '.png',
+      '.gif',
+      '.bmp',
+      '.tiff',
+      '.tif',
+      '.webp',
+      '.avif',
+      '.heic',
+      '.heif',
     ],
     CHUNK_SIZE: 1024 * 1024, // 1MB chunks for large uploads
   },

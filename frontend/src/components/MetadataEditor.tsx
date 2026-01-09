@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { authFetch } from '@/lib/auth-utils';
+import { backendFetch } from '@/lib/auth-utils';
 import {
   PencilIcon,
   CheckIcon,
@@ -14,7 +14,7 @@ import {
   TagIcon,
   DocumentTextIcon,
   PhotoIcon,
-  GlobeAltIcon
+  GlobeAltIcon,
 } from '@heroicons/react/24/outline';
 import { motion } from 'framer-motion';
 import { Select } from '@/components/design-system';
@@ -38,10 +38,13 @@ const sanitizeMetadataValue = (value: unknown): unknown => {
   }
 
   if (value && typeof value === 'object') {
-    return Object.entries(value).reduce<Record<string, unknown>>((acc, [key, val]) => {
-      acc[key] = sanitizeMetadataValue(val);
-      return acc;
-    }, {});
+    return Object.entries(value).reduce<Record<string, unknown>>(
+      (acc, [key, val]) => {
+        acc[key] = sanitizeMetadataValue(val);
+        return acc;
+      },
+      {}
+    );
   }
 
   return value;
@@ -50,7 +53,14 @@ const sanitizeMetadataValue = (value: unknown): unknown => {
 interface MetadataField {
   key: string;
   label: string;
-  type: 'text' | 'textarea' | 'date' | 'number' | 'select' | 'coordinates' | 'tags';
+  type:
+    | 'text'
+    | 'textarea'
+    | 'date'
+    | 'number'
+    | 'select'
+    | 'coordinates'
+    | 'tags';
   required: boolean;
   options?: string[];
   validation?: RegExp;
@@ -70,36 +80,46 @@ const METADATA_FIELDS: MetadataField[] = [
     label: 'Title',
     type: 'text',
     required: true,
-    description: 'Brief descriptive title for the image'
+    description: 'Brief descriptive title for the image',
   },
   {
     key: 'description',
     label: 'Description',
     type: 'textarea',
     required: true,
-    description: 'Detailed description of what is shown in the image'
+    description: 'Detailed description of what is shown in the image',
   },
   {
     key: 'hazardType',
     label: 'Hazard Type',
     type: 'select',
     required: true,
-    options: ['flood', 'earthquake', 'tsunami', 'landslide', 'cyclone', 'drought', 'wildfire', 'volcanic', 'coastal_erosion'],
-    description: 'Primary type of natural hazard depicted'
+    options: [
+      'flood',
+      'earthquake',
+      'tsunami',
+      'landslide',
+      'cyclone',
+      'drought',
+      'wildfire',
+      'volcanic',
+      'coastal_erosion',
+    ],
+    description: 'Primary type of natural hazard depicted',
   },
   {
     key: 'captureDate',
     label: 'Capture Date',
     type: 'date',
     required: true,
-    description: 'Date when the image was captured'
+    description: 'Date when the image was captured',
   },
   {
     key: 'location',
     label: 'Location',
     type: 'coordinates',
     required: true,
-    description: 'Geographic coordinates and address'
+    description: 'Geographic coordinates and address',
   },
   {
     key: 'severity',
@@ -107,36 +127,50 @@ const METADATA_FIELDS: MetadataField[] = [
     type: 'select',
     required: false,
     options: ['low', 'moderate', 'high', 'extreme'],
-    description: 'Assessed severity of the impact shown'
+    description: 'Assessed severity of the impact shown',
   },
   {
     key: 'tags',
     label: 'Tags',
     type: 'tags',
     required: false,
-    description: 'Additional descriptive tags (comma-separated)'
+    description: 'Additional descriptive tags (comma-separated)',
   },
   {
     key: 'source',
     label: 'Source',
     type: 'text',
     required: false,
-    description: 'Source or origin of the image'
+    description: 'Source or origin of the image',
   },
   {
     key: 'rights',
     label: 'Rights/License',
     type: 'select',
     required: false,
-    options: ['CC BY', 'CC BY-SA', 'CC BY-NC', 'CC BY-NC-SA', 'All Rights Reserved', 'Public Domain'],
-    description: 'Copyright or license information'
-  }
+    options: [
+      'CC BY',
+      'CC BY-SA',
+      'CC BY-NC',
+      'CC BY-NC-SA',
+      'All Rights Reserved',
+      'Public Domain',
+    ],
+    description: 'Copyright or license information',
+  },
 ];
 
-const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCancel, readOnly = false }) => {
+const MetadataEditor: React.FC<MetadataEditorProps> = ({
+  imageId,
+  onSave,
+  onCancel,
+  readOnly = false,
+}) => {
   const [metadata, setMetadata] = useState<any>({});
   const [originalMetadata, setOriginalMetadata] = useState<any>({});
-  const [validationErrors, setValidationErrors] = useState<{ [key: string]: string }>({});
+  const [validationErrors, setValidationErrors] = useState<{
+    [key: string]: string;
+  }>({});
   const [hasChanges, setHasChanges] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
 
@@ -145,22 +179,25 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
   const { data: imageData, isLoading } = useQuery({
     queryKey: ['image-metadata', imageId],
     queryFn: async () => {
-      const response = await authFetch(`/api/images/${imageId}/metadata`);
+      const response = await backendFetch(`/api/images/${imageId}/metadata`);
       if (!response.ok) throw new Error('Failed to fetch metadata');
       return response.json();
     },
-    enabled: !!imageId
+    enabled: !!imageId,
   });
 
   const saveMutation = useMutation({
     mutationFn: async (updatedMetadata: any) => {
-      const response = await authFetch(`/api/admin/curation/metadata/${imageId}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          metadata: updatedMetadata,
-          change_notes: 'Metadata updated via admin interface'
-        })
-      });
+      const response = await backendFetch(
+        `/api/admin/curation/metadata/${imageId}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({
+            metadata: updatedMetadata,
+            change_notes: 'Metadata updated via admin interface',
+          }),
+        }
+      );
       if (!response.ok) throw new Error('Failed to save metadata');
       return response.json();
     },
@@ -169,7 +206,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
       setHasChanges(false);
       setOriginalMetadata(metadata);
       onSave?.(data);
-    }
+    },
   });
 
   useEffect(() => {
@@ -182,19 +219,23 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
   }, [imageData]);
 
   useEffect(() => {
-    const changed = JSON.stringify(metadata) !== JSON.stringify(originalMetadata);
+    const changed =
+      JSON.stringify(metadata) !== JSON.stringify(originalMetadata);
     setHasChanges(changed);
   }, [metadata, originalMetadata]);
 
   const validateField = (field: MetadataField, value: any): string | null => {
-    if (field.required && (!value || (typeof value === 'string' && value.trim() === ''))) {
+    if (
+      field.required &&
+      (!value || (typeof value === 'string' && value.trim() === ''))
+    ) {
       return `${field.label} is required`;
     }
-    
+
     if (field.validation && value && !field.validation.test(value)) {
       return `${field.label} format is invalid`;
     }
-    
+
     return null;
   };
 
@@ -202,7 +243,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
     const errors: { [key: string]: string } = {};
     let isValid = true;
 
-    METADATA_FIELDS.forEach(field => {
+    METADATA_FIELDS.forEach((field) => {
       const error = validateField(field, metadata[field.key]);
       if (error) {
         errors[field.key] = error;
@@ -274,7 +315,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
             aria-label={field.label}
           >
             <option value="">Select {field.label}</option>
-            {field.options?.map(option => (
+            {field.options?.map((option) => (
               <option key={option} value={option}>
                 {option.charAt(0).toUpperCase() + option.slice(1)}
               </option>
@@ -300,7 +341,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
             id={fieldId}
             type="number"
             value={value}
-            onChange={(e) => handleFieldChange(field.key, parseFloat(e.target.value))}
+            onChange={(e) =>
+              handleFieldChange(field.key, parseFloat(e.target.value))
+            }
             disabled={readOnly}
             className={baseInputClasses}
             placeholder={field.description}
@@ -317,10 +360,12 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
                 step="any"
                 placeholder="Latitude"
                 value={location.latitude || ''}
-                onChange={(e) => handleFieldChange('location', {
-                  ...location,
-                  latitude: parseFloat(e.target.value)
-                })}
+                onChange={(e) =>
+                  handleFieldChange('location', {
+                    ...location,
+                    latitude: parseFloat(e.target.value),
+                  })
+                }
                 disabled={readOnly}
                 className={baseInputClasses}
               />
@@ -329,22 +374,29 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
                 step="any"
                 placeholder="Longitude"
                 value={location.longitude || ''}
-                onChange={(e) => handleFieldChange('location', {
-                  ...location,
-                  longitude: parseFloat(e.target.value)
-                })}
+                onChange={(e) =>
+                  handleFieldChange('location', {
+                    ...location,
+                    longitude: parseFloat(e.target.value),
+                  })
+                }
                 disabled={readOnly}
                 className={baseInputClasses}
               />
             </div>
             <input
+              id={`${fieldId}-address`}
+              name="location-address"
               type="text"
+              autoComplete="street-address"
               placeholder="Address or place name"
               value={location.address || ''}
-              onChange={(e) => handleFieldChange('location', {
-                ...location,
-                address: e.target.value
-              })}
+              onChange={(e) =>
+                handleFieldChange('location', {
+                  ...location,
+                  address: e.target.value,
+                })
+              }
               disabled={readOnly}
               className={baseInputClasses}
             />
@@ -355,9 +407,16 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
         return (
           <input
             id={fieldId}
+            name="tags"
             type="text"
+            autoComplete="off"
             value={Array.isArray(value) ? value.join(', ') : value}
-            onChange={(e) => handleFieldChange(field.key, e.target.value.split(',').map(tag => tag.trim()))}
+            onChange={(e) =>
+              handleFieldChange(
+                field.key,
+                e.target.value.split(',').map((tag) => tag.trim())
+              )
+            }
             disabled={readOnly}
             className={baseInputClasses}
             placeholder="Enter tags separated by commas"
@@ -368,7 +427,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
         return (
           <input
             id={fieldId}
+            name={field.key}
             type="text"
+            autoComplete="off"
             value={value}
             onChange={(e) => handleFieldChange(field.key, e.target.value)}
             disabled={readOnly}
@@ -381,11 +442,16 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
 
   const getFieldIcon = (type: string) => {
     switch (type) {
-      case 'coordinates': return MapPinIcon;
-      case 'date': return CalendarIcon;
-      case 'tags': return TagIcon;
-      case 'textarea': return DocumentTextIcon;
-      default: return DocumentTextIcon;
+      case 'coordinates':
+        return MapPinIcon;
+      case 'date':
+        return CalendarIcon;
+      case 'tags':
+        return TagIcon;
+      case 'textarea':
+        return DocumentTextIcon;
+      default:
+        return DocumentTextIcon;
     }
   };
 
@@ -414,7 +480,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
               </span>
             )}
           </div>
-          
+
           {!readOnly && (
             <div className="flex items-center space-x-2">
               <button
@@ -444,7 +510,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
           {METADATA_FIELDS.map((field) => {
             const Icon = getFieldIcon(field.type);
             const error = showValidation ? validationErrors[field.key] : '';
-            
+
             return (
               <motion.div
                 key={field.key}
@@ -452,20 +518,25 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
                 animate={{ opacity: 1, y: 0 }}
                 className={field.type === 'textarea' ? 'md:col-span-2' : ''}
               >
-                <label htmlFor={`field-${field.key}`} className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor={`field-${field.key}`}
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   <div className="flex items-center space-x-2">
                     <Icon className="h-4 w-4 text-gray-400" />
                     <span>{field.label}</span>
                     {field.required && <span className="text-red-500">*</span>}
                   </div>
                 </label>
-                
+
                 {renderField(field)}
-                
+
                 {field.description && (
-                  <p className="mt-1 text-xs text-gray-500">{field.description}</p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    {field.description}
+                  </p>
                 )}
-                
+
                 {error && (
                   <p className="mt-1 text-xs text-red-600 flex items-center">
                     <ExclamationTriangleIcon className="h-3 w-3 mr-1" />
@@ -480,24 +551,32 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
         {/* Change History Preview */}
         {hasChanges && !readOnly && (
           <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Pending Changes</h4>
+            <h4 className="text-sm font-medium text-blue-900 mb-2">
+              Pending Changes
+            </h4>
             <div className="space-y-2">
-              {Object.keys(metadata).filter(key => 
-                JSON.stringify(metadata[key]) !== JSON.stringify(originalMetadata[key])
-              ).map(key => {
-                const field = METADATA_FIELDS.find(f => f.key === key);
-                return (
-                  <div key={key} className="text-xs text-blue-800">
-                    <span className="font-medium">{field?.label || key}:</span>
-                    <span className="text-gray-600 line-through ml-2">
-                      {JSON.stringify(originalMetadata[key])}
-                    </span>
-                    <span className="text-blue-900 ml-2">
-                      → {JSON.stringify(metadata[key])}
-                    </span>
-                  </div>
-                );
-              })}
+              {Object.keys(metadata)
+                .filter(
+                  (key) =>
+                    JSON.stringify(metadata[key]) !==
+                    JSON.stringify(originalMetadata[key])
+                )
+                .map((key) => {
+                  const field = METADATA_FIELDS.find((f) => f.key === key);
+                  return (
+                    <div key={key} className="text-xs text-blue-800">
+                      <span className="font-medium">
+                        {field?.label || key}:
+                      </span>
+                      <span className="text-gray-600 line-through ml-2">
+                        {JSON.stringify(originalMetadata[key])}
+                      </span>
+                      <span className="text-blue-900 ml-2">
+                        → {JSON.stringify(metadata[key])}
+                      </span>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}
@@ -507,12 +586,16 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({ imageId, onSave, onCanc
           <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-200">
             <div className="flex items-center">
               <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2" />
-              <h4 className="text-sm font-medium text-red-900">Please fix the following errors:</h4>
+              <h4 className="text-sm font-medium text-red-900">
+                Please fix the following errors:
+              </h4>
             </div>
             <ul className="mt-2 text-xs text-red-800 list-disc list-inside">
-              {Object.values(validationErrors).filter(Boolean).map((error, idx) => (
-                <li key={`${error}-${idx}`}>{error}</li>
-              ))}
+              {Object.values(validationErrors)
+                .filter(Boolean)
+                .map((error, idx) => (
+                  <li key={`${error}-${idx}`}>{error}</li>
+                ))}
             </ul>
           </div>
         )}

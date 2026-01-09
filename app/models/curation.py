@@ -65,8 +65,8 @@ class CurationQueue(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     image_filename = Column(String, ForeignKey("image_metadata.filename"), nullable=False)
-    status = Column(SQLEnum(CurationStatus), default=CurationStatus.PENDING, nullable=False)
-    priority = Column(SQLEnum(Priority), default=Priority.MEDIUM, nullable=False)
+    status = Column(SQLEnum(CurationStatus, native_enum=False, create_constraint=False, values_callable=lambda x: [e.value for e in x]), default=CurationStatus.PENDING, nullable=False)
+    priority = Column(SQLEnum(Priority, native_enum=False, create_constraint=False, values_callable=lambda x: [e.value for e in x]), default=Priority.MEDIUM, nullable=False)
 
     # Assignment and tracking
     assigned_to = Column(String, nullable=True)  # User ID/email of assigned curator
@@ -111,6 +111,7 @@ class CurationQueue(Base):
             "priority": self.priority.value,
             "assigned_to": self.assigned_to,
             "created_at": self.created_at.isoformat(),
+            "submittedAt": self.created_at.isoformat(),  # Alias for frontend compatibility
             "updated_at": self.updated_at.isoformat(),
             "due_date": self.due_date.isoformat() if self.due_date else None,
             "submitted_by": self.submitted_by,

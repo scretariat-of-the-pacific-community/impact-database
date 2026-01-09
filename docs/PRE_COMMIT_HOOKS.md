@@ -31,6 +31,8 @@ cd /home/kishank/impact-database
 pre-commit install
 ```
 
+> Note: Git's `core.hooksPath` is configured for Husky. Backend checks are also invoked from `frontend/.husky/pre-commit` using `fresh_venv/bin/pre-commit` with `PRE_COMMIT_HOME=.cache/pre-commit`. You can keep using that workflow instead of `pre-commit install` if you prefer not to change the hooks path.
+
 ### 3. Test hooks
 
 ```bash

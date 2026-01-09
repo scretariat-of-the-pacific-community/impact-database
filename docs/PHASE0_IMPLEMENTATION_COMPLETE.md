@@ -1,7 +1,7 @@
 # Phase 0 Implementation - RBAC Foundation Complete ✅
 
-**Date:** November 10, 2025  
-**Status:** Successfully Deployed  
+**Date:** November 10, 2025
+**Status:** Successfully Deployed
 **Scope:** Role-Based Access Control (RBAC) Foundation
 
 ---
@@ -230,7 +230,7 @@ const { data: user } = useQuery({
 5. Update ReviewWorkflow.tsx with assignment UI
 6. Add audit trail viewer tab
 
-**Timeline:** Week 3-4  
+**Timeline:** Week 3-4
 **Dependencies:** Phase 0 complete ✅
 
 ---
@@ -308,7 +308,7 @@ hash = pwd_context.hash("your_secure_password")
 ## Known Issues
 
 1. ⚠️ **Alembic Connection Issue** - Alembic cannot connect to PostgreSQL with configured DATABASE_URL. Workaround: Run SQL migrations directly via psql.
-   
+
 2. **Dev Mode Always Active** - Development mode is always active due to ENVIRONMENT=development. This is intentional for Phase 0.
 
 3. **No JWT Token Generation Yet** - Login endpoint not updated to include permissions in JWT token. Phase 1 will address this.
@@ -324,7 +324,7 @@ docker compose exec postgis_db psql -U postgres -d impact_db -c "\dt" | grep -E 
 # Check role count
 docker compose exec postgis_db psql -U postgres -d impact_db -c "SELECT COUNT(*) FROM roles;"
 
-# Check permission count  
+# Check permission count
 docker compose exec postgis_db psql -U postgres -d impact_db -c "SELECT COUNT(*) FROM permissions;"
 
 # Check users

@@ -2,8 +2,8 @@
 
 ## WCAG 2.1 AA Compliance Status
 
-**Audit Date**: Week 4 Implementation  
-**Standard**: WCAG 2.1 Level AA  
+**Audit Date**: Week 4 Implementation
+**Standard**: WCAG 2.1 Level AA
 **Scope**: Ocean Portal Frontend
 
 ---

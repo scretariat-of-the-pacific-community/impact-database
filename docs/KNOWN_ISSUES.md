@@ -12,7 +12,25 @@ This document tracks known technical limitations, compatibility issues, and work
 
 ## Frontend Issues
 
-### 1. React 18 Strict Mode + Leaflet Map Compatibility
+### 1. React 18 + Next.js 16 Compatibility Gaps
+
+**Issue**: Ecosystem support for Next.js 16 with React 18/19 is uneven, especially for libraries that rely on direct DOM access or older webpack assumptions.
+
+**Impact**:
+- Some community packages require dynamic imports or disabled SSR to avoid hydration crashes
+- Strict Mode double-invocation in development exposes side-effects in third-party code
+- Legacy tooling (Storybook 8.x) currently removed until compatibility catches up
+
+**Workarounds**:
+- Prefer dynamic imports with `ssr: false` for browser-only packages (Leaflet, mapbox-gl)
+- Keep `reactStrictMode: false` in `next.config.js` during development to avoid double-mount regressions
+- Track upstream releases before re-enabling Storybook; use on-page component smoke tests meanwhile
+
+**Status**: ⚠️ Known limitation while waiting for upstream library updates
+
+---
+
+### 2. React 18 Strict Mode + Leaflet Map Compatibility
 
 **Issue**: Leaflet maps throw "Map container is already initialized" errors in development mode with React 18.3.1 Strict Mode enabled.
 
@@ -21,7 +39,7 @@ This document tracks known technical limitations, compatibility issues, and work
 - Leaflet uses imperative initialization (`L.map()`) that doesn't work well with React's declarative model
 - When components remount, Leaflet tries to initialize the same DOM container twice
 
-**Impact**: 
+**Impact**:
 - ❌ Map components crash in development mode
 - ✅ Works correctly in production builds (Strict Mode disabled)
 
@@ -54,7 +72,7 @@ This document tracks known technical limitations, compatibility issues, and work
 
 ---
 
-### 2. Next.js 16 + Turbopack Workspace Detection
+### 3. Next.js 16 + Turbopack Workspace Detection
 
 **Issue**: Turbopack fails to detect workspace root when `turbo.root` is not explicitly configured.
 
@@ -74,7 +92,7 @@ turbo: {
 
 ---
 
-### 3. Storybook Removal (Next.js 16 Incompatibility)
+### 4. Storybook Removal (Next.js 16 Incompatibility)
 
 **Issue**: Storybook 8.x is not yet compatible with Next.js 16.0.x.
 
@@ -126,7 +144,7 @@ SQLALCHEMY_MAX_OVERFLOW = 10
 
 **Issue**: MinIO lifecycle management and backup policies are temporarily disabled.
 
-**Impact**: 
+**Impact**:
 - No automatic cleanup of old/orphaned objects
 - Manual backup required
 
@@ -180,7 +198,7 @@ REDIS_URL=redis://redis:6379/0
 
 **Issue**: File synchronization in Docker volumes can be slow on macOS/Windows.
 
-**Impact**: 
+**Impact**:
 - 2-5 second lag when editing Python files
 - Hot reload delays
 
@@ -304,5 +322,5 @@ Found a new issue? Please document it here with:
 
 ---
 
-*Last Updated: January 2025*  
+*Last Updated: January 2025*
 *Next Review: Before production deployment*

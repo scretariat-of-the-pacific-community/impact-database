@@ -6,9 +6,9 @@ We now have a baseline design system tailored to the seriousness of a disaster-m
 ## Deliverables
 1. **Design tokens via Tailwind** – `tailwind.config.ts` defines brand/ocean/danger palettes, surface colors, shadows, and typography so every component can reference the same visual language.
 2. **Design-system primitives** – Added `Button`, `Card`, `Tag`, and `FormField` components under `src/components/design-system/` with Storybook stories for visual review.
-3. **Adoption examples**  
-   - Homepage stats/navigation cards now reuse `<Card>` and `<Tag>` for consistent spacing and states.  
-   - Upload form uses `<FormField>` and the new `<Button>` for accessible, uniform inputs.  
+3. **Adoption examples**
+   - Homepage stats/navigation cards now reuse `<Card>` and `<Tag>` for consistent spacing and states.
+   - Upload form uses `<FormField>` and the new `<Button>` for accessible, uniform inputs.
    - Filter chips (search and gallery) rely on `<Tag>` for a11y-friendly removable pills.
 4. **Storybook setup** – `.storybook/` config + stories for the new primitives allow running `npm run storybook` for visual QA and documentation.
 

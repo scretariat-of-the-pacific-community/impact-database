@@ -4,12 +4,12 @@
 export const configureLeafletIcons = () => {
   // Only run on client side
   if (typeof window === 'undefined') return;
-  
+
   const L = require('leaflet');
-  
+
   // Delete the default icon to prevent conflicts
   delete (L.Icon.Default.prototype as any)._getIconUrl;
-  
+
   // Set up custom icons using emoji or create simple colored markers
   L.Icon.Default.mergeOptions({
     iconRetinaUrl: '',
@@ -25,13 +25,13 @@ export const configureLeafletIcons = () => {
 export const createHazardIcon = (hazardType: string): any => {
   // Only run on client side
   if (typeof window === 'undefined') return null;
-  
+
   const L = require('leaflet');
-  
+
   const getHazardColor = (hazard: string) => {
     const colors: Record<string, string> = {
       flood: '#3b82f6',
-      cyclone: '#8b5cf6', 
+      cyclone: '#8b5cf6',
       drought: '#eab308',
       earthquake: '#ef4444',
       tsunami: '#06b6d4',
@@ -43,14 +43,22 @@ export const createHazardIcon = (hazardType: string): any => {
 
   const getHazardIcon = (hazard: string) => {
     switch (hazard) {
-      case 'flood': return '🌊';
-      case 'cyclone': return '🌀';
-      case 'drought': return '🏜️';
-      case 'earthquake': return '🫨';
-      case 'tsunami': return '🌊';
-      case 'landslide': return '⛰️';
-      case 'wildfire': return '🔥';
-      default: return '⚠️';
+      case 'flood':
+        return '🌊';
+      case 'cyclone':
+        return '🌀';
+      case 'drought':
+        return '🏜️';
+      case 'earthquake':
+        return '🫨';
+      case 'tsunami':
+        return '🌊';
+      case 'landslide':
+        return '⛰️';
+      case 'wildfire':
+        return '🔥';
+      default:
+        return '⚠️';
     }
   };
 

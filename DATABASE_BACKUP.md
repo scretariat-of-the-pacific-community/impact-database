@@ -6,7 +6,7 @@ This guide covers automated database backup and recovery procedures for the Impa
 
 - 🔒 Data protection against hardware failures
 - 🔄 Recovery from accidental data deletion
-- 🚀 Migration to new infrastructure  
+- 🚀 Migration to new infrastructure
 - 📊 Compliance with data retention policies
 - 🧪 Creating test/staging environments
 
@@ -482,7 +482,7 @@ Implement with:
 0 2 * * 0 /path/to/backup_database.sh --s3 && \
   cp /var/backups/impact-database/latest.sql.gz /var/backups/weekly/
 
-# Monthly - keep in separate folder  
+# Monthly - keep in separate folder
 0 2 1 * * /path/to/backup_database.sh --s3 && \
   cp /var/backups/impact-database/latest.sql.gz /var/backups/monthly/
 ```
@@ -640,6 +640,6 @@ find /var/backups/impact-database -name "*.sql.gz" -mtime +1 -delete
 
 ---
 
-**Document Version:** 1.0  
-**Last Updated:** December 18, 2025  
+**Document Version:** 1.0
+**Last Updated:** December 18, 2025
 **Maintained By:** DevOps Team

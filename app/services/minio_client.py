@@ -112,6 +112,20 @@ class MinIOStorage:
             logger.error(f"Error uploading object: {e}")
             return False
 
+    def get_object_content(self, object_name: str) -> bytes:
+        """Get object content as bytes from MinIO."""
+        try:
+            client = self._get_client()
+            response = client.get_object(self.bucket_name, object_name)
+            data = response.read()
+            response.close()
+            response.release_conn()
+            logger.info(f"Retrieved object {object_name}")
+            return data
+        except S3Error as e:
+            logger.error(f"Error retrieving object: {e}")
+            raise
+
     def delete_object(self, object_name: str):
         """Delete an object from MinIO."""
         try:

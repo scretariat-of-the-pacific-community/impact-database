@@ -22,7 +22,9 @@ export default function VideoExplainer({
     <section className="mx-auto max-w-7xl py-16">
       <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/60 to-pacific-900/20 p-8 backdrop-blur">
         <div className="mb-8 text-center">
-          <p className="text-sm uppercase tracking-wide text-white/70">Learn More</p>
+          <p className="text-sm uppercase tracking-wide text-white/70">
+            Learn More
+          </p>
           <h2 className="mt-2 text-3xl font-semibold text-white">{title}</h2>
           <p className="mx-auto mt-4 max-w-2xl text-white/70">{description}</p>
         </div>
@@ -37,7 +39,7 @@ export default function VideoExplainer({
             >
               {/* Thumbnail placeholder */}
               <div className="absolute inset-0 bg-gradient-to-br from-pacific-900/40 to-deep-950/60" />
-              
+
               {/* Play button */}
               <motion.div
                 className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm transition group-hover:bg-white/30"

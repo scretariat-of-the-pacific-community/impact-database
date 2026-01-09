@@ -1,5 +1,12 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
+repo_root="$(git rev-parse --show-toplevel)"
 
-cd frontend
+cd "$repo_root/frontend" || exit 1
 npx lint-staged
+
+cd "$repo_root" || exit 1
+
+if [ -x "$repo_root/fresh_venv/bin/pre-commit" ]; then
+  PRE_COMMIT_HOME="$repo_root/.cache/pre-commit" "$repo_root/fresh_venv/bin/pre-commit" run --hook-stage commit
+else
+  echo "Skipping Python pre-commit checks (fresh_venv/bin/pre-commit not found)"
+fi

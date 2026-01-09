@@ -30,13 +30,13 @@ ALTER TABLE image_metadata ADD COLUMN exif_metadata JSONB;
 ### 2. Upgraded Geometry to 3D (PointZ)
 ```sql
 -- Convert existing 2D geometries to 3D with Z=0
-UPDATE image_metadata 
-SET geometry = ST_Force3D(geometry) 
+UPDATE image_metadata
+SET geometry = ST_Force3D(geometry)
 WHERE geometry IS NOT NULL AND ST_NDims(geometry) = 2;
 
 -- Alter column type to PointZ
-ALTER TABLE image_metadata 
-ALTER COLUMN geometry TYPE geometry(PointZ, 4326) 
+ALTER TABLE image_metadata
+ALTER COLUMN geometry TYPE geometry(PointZ, 4326)
 USING ST_Force3D(geometry);
 
 -- Recreate spatial index

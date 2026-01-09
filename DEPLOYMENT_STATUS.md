@@ -179,6 +179,6 @@ All QGIS-inspired enhancements are now live and ready to use!
 
 ---
 
-**Status:** ✅ DEPLOYMENT COMPLETE  
-**Version:** 2.0  
+**Status:** ✅ DEPLOYMENT COMPLETE
+**Version:** 2.0
 **Date:** December 19, 2024

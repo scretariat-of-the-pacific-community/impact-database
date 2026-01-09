@@ -11,7 +11,7 @@ def create_celery_app():
         "impact_database_workers",
         broker=settings.CELERY_BROKER_URL,
         backend=settings.CELERY_RESULT_BACKEND,
-        include=["workers.tasks", "workers.email_tasks"],
+        include=["workers.tasks", "workers.email_tasks", "workers.batch_upload_tasks"],
     )
 
     # Configure Celery
@@ -54,6 +54,11 @@ def create_celery_app():
             "weekly-digest-every-monday": {
                 "task": "workers.email_tasks.send_weekly_digest_all_users",
                 "schedule": crontab(hour=9, minute=0, day_of_week=1),  # Every Monday at 9 AM UTC
+            },
+            "cleanup-old-batches-daily": {
+                "task": "workers.batch_upload_tasks.cleanup_old_batches",
+                "schedule": crontab(hour=3, minute=0),  # Every day at 3 AM UTC
+                "kwargs": {"days": 30},  # Clean batches older than 30 days
             },
         },
     )

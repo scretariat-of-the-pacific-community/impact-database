@@ -14,14 +14,18 @@ services:
       resources:
         limits:
           memory: 2G
+        reservations:
+          memory: 512M
 
   redis:
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 512M
+        reservations:
+          memory: 128M
 
   minio:
     environment:
@@ -32,8 +36,14 @@ services:
       resources:
         limits:
           memory: 1G
+        reservations:
+          memory: 256M
 
   api:
+    build:
+      target: runner
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     environment:
       ENVIRONMENT: production
       DEBUG: "false"
@@ -51,13 +61,21 @@ services:
       resources:
         limits:
           memory: 1G
+        reservations:
+          memory: 256M
     logging:
       driver: "json-file"
       options:
         max-size: "50m"
         max-file: "5"
+    volumes:
+      - uploads_data:/app/uploads
 
   celery_worker:
+    build:
+      target: runner
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     environment:
       ENVIRONMENT: production
       DEBUG: "false"
@@ -66,24 +84,55 @@ services:
       resources:
         limits:
           memory: 1G
+        reservations:
+          memory: 256M
+    volumes:
+      - uploads_data:/app/uploads
 
   celery_beat:
+    build:
+      target: runner
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     environment:
       ENVIRONMENT: production
       DEBUG: "false"
     restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
 
   flower:
+    build:
+      target: runner
+      args:
+        - BUILDKIT_INLINE_CACHE=1
     restart: unless-stopped
+    volumes:
+      - uploads_data:/app/uploads
 
   frontend:
+    build:
+      target: runner
+      args:
+        - BUILDKIT_INLINE_CACHE=1
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_API_URL_INTERNAL=${NEXT_PUBLIC_API_URL_INTERNAL}
+        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
     environment:
-      # Keep NODE_ENV=development for dev server compatibility
-      # Next.js dev server requires NODE_ENV=development
-      NODE_ENV: development
+      NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL}"
+      NEXT_PUBLIC_API_URL_INTERNAL: "${NEXT_PUBLIC_API_URL_INTERNAL}"
     restart: unless-stopped
     deploy:
       resources:
         limits:
           memory: 1G
+        reservations:
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    volumes: []

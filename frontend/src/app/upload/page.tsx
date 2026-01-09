@@ -4,7 +4,18 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useForm, RegisterOptions } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
-import { Upload, ArrowLeft, X, FileImage, MapPin, Loader2 } from 'lucide-react';
+import {
+  Upload,
+  ArrowLeft,
+  X,
+  FileImage,
+  MapPin,
+  Loader2,
+  FileText,
+  Plus,
+  Trash2,
+  BarChart3,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
@@ -103,6 +114,8 @@ interface MetadataLike {
 
 // File size constants (synchronized with backend and config)
 const MAX_FILE_SIZE = config.UPLOAD.MAX_FILE_SIZE;
+const MAX_BATCH_FILES = 10; // Maximum files per batch upload
+const MAX_BATCH_SIZE = 500 * 1024 * 1024; // 500MB total batch size
 const ALLOWED_EXTENSIONS = config.UPLOAD.ALLOWED_EXTENSIONS;
 
 const humanizeFilename = (filename: string) => {
@@ -126,13 +139,16 @@ const toNumber = (value?: number | string | null) => {
   return undefined;
 };
 
-const buildGeometry = (latitude?: number | string | null, longitude?: number | string | null) => {
+const buildGeometry = (
+  latitude?: number | string | null,
+  longitude?: number | string | null
+) => {
   const lat = toNumber(latitude);
   const lon = toNumber(longitude);
   if (typeof lat === 'number' && typeof lon === 'number') {
     return {
       type: 'Point' as const,
-      coordinates: [Number(lon), Number(lat)]
+      coordinates: [Number(lon), Number(lat)],
     };
   }
   return null;
@@ -151,7 +167,10 @@ const extractKeywords = (keywords?: string | string[]) => {
     .filter(Boolean);
 };
 
-const buildApiMetadata = (metadata: MetadataLike, fileName: string): ApiUploadMetadata => {
+const buildApiMetadata = (
+  metadata: MetadataLike,
+  fileName: string
+): ApiUploadMetadata => {
   const location = metadata.location?.trim() || null;
   const country = metadata.country?.trim() || null;
   return {
@@ -159,9 +178,11 @@ const buildApiMetadata = (metadata: MetadataLike, fileName: string): ApiUploadMe
     datetime: metadata.datetime || new Date().toISOString(),
     hazard_type: metadata.hazard_type,
     event_id: metadata.event_id ?? null,
-    geometry: metadata.geometry ?? buildGeometry(metadata.latitude, metadata.longitude),
-    data_license: metadata.data_license || "https://creativecommons.org/licenses/by/4.0/",
-    source_type: metadata.source_type || "citizen",
+    geometry:
+      metadata.geometry ?? buildGeometry(metadata.latitude, metadata.longitude),
+    data_license:
+      metadata.data_license || 'https://creativecommons.org/licenses/by/4.0/',
+    source_type: metadata.source_type || 'citizen',
     positional_accuracy: metadata.positional_accuracy ?? null,
     title: metadata.title?.trim() || humanizeFilename(fileName),
     abstract: metadata.abstract?.trim() || null,
@@ -174,11 +195,119 @@ const buildApiMetadata = (metadata: MetadataLike, fileName: string): ApiUploadMe
 export default function UploadPage() {
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [batchMode, setBatchMode] = useState(false);
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
+
+  // Initialize query client before using it in useEffect
+  const queryClient = useQueryClient();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
+
+  // Real-time batch progress polling
+  const { data: batchStatus, isLoading: batchStatusLoading } = useQuery({
+    queryKey: ['batch-status', activeBatchId],
+    queryFn: async () => {
+      if (!activeBatchId) return null;
+
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/${activeBatchId}/status`,
+        {
+          credentials: 'include',
+        }
+      );
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          setActiveBatchId(null);
+          return null;
+        }
+        throw new Error('Failed to fetch batch status');
+      }
+
+      return response.json();
+    },
+    enabled: !!activeBatchId && isAuthenticated,
+    refetchInterval: (data) => {
+      if (!data || data.is_complete) {
+        return false;
+      }
+      return 2000;
+    },
+    refetchOnWindowFocus: false,
+  });
+
+  // Show completion notification when batch finishes
+  React.useEffect(() => {
+    if (batchStatus?.is_complete && activeBatchId) {
+      const { status, successful_files, failed_files, total_files } =
+        batchStatus;
+
+      if (status === 'completed') {
+        toast.success('Batch upload complete!', {
+          description: `Successfully uploaded ${successful_files} of ${total_files} images`,
+        });
+      } else if (status === 'partial') {
+        toast.warning('Batch upload partially complete', {
+          description: `${successful_files} succeeded, ${failed_files} failed`,
+        });
+      } else if (status === 'failed') {
+        toast.error('Batch upload failed', {
+          description: `All ${total_files} files failed to upload`,
+        });
+      } else if (status === 'cancelled') {
+        toast.info('Batch upload cancelled', {
+          description: 'Upload was cancelled by user',
+        });
+      }
+
+      setActiveBatchId(null);
+      queryClient.invalidateQueries({ queryKey: ['images'] });
+    }
+  }, [batchStatus?.is_complete, activeBatchId, batchStatus, queryClient]);
+
+  // Template queries
+  const { data: templatesData } = useQuery({
+    queryKey: ['batch-templates'],
+    queryFn: async () => {
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/templates`,
+        {
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) return { templates: [], total: 0 };
+      return response.json();
+    },
+    enabled: isAuthenticated,
+  });
+
+  // Analytics query
+  const { data: analyticsData } = useQuery({
+    queryKey: ['batch-analytics'],
+    queryFn: async () => {
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/analytics?days=30`,
+        {
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: isAuthenticated,
+  });
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [queuedUploads, setQueuedUploads] = useState<QueuedUploadPayload[]>([]);
   const [queueMessage, setQueueMessage] = useState<string | null>(null);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null
+  );
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [isChrome, setIsChrome] = useState(false);
   const [exifMetadata, setExifMetadata] = useState<{
@@ -187,9 +316,6 @@ export default function UploadPage() {
     altitude?: number;
     hasGPS?: boolean;
   } | null>(null);
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const refreshQueuedUploads = useCallback(async () => {
@@ -197,22 +323,38 @@ export default function UploadPage() {
       const queue = await getQueuedUploads();
       setQueuedUploads(queue);
     } catch (error) {
-      console.error('Failed to load queued uploads:', error);
+      toast.error('Could not load queued uploads', {
+        description:
+          'Offline uploads may not display until the connection stabilizes.',
+      });
     }
   }, []);
-  const { data: vocabData, isLoading, error, refetch } = useQuery({
+  const {
+    data: vocabData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['vocabularies'],
     queryFn: () => imageApi.vocabularies(),
   });
-  
+
   // Detect Chrome browser (client-side only to avoid hydration mismatch)
   React.useEffect(() => {
     const userAgent = navigator.userAgent;
     const vendor = navigator.vendor;
     setIsChrome(/Chrome/.test(userAgent) && /Google Inc/.test(vendor));
   }, []);
-  
-  const { register, handleSubmit, formState: { errors }, setValue, clearErrors, watch, getValues } = useForm<UploadForm>();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    clearErrors,
+    watch,
+    getValues,
+  } = useForm<UploadForm>();
 
   const sanitizeInputValue = useCallback(
     (value: string | null | undefined) =>
@@ -251,11 +393,15 @@ export default function UploadPage() {
       value: string | null | undefined,
       options?: SanitizeSetValueOptions
     ) => {
-      setValue(name, sanitizeInputValue(value) as UploadForm[TFieldName], options);
+      setValue(
+        name,
+        sanitizeInputValue(value) as UploadForm[TFieldName],
+        options
+      );
     },
     [sanitizeInputValue, setValue]
   );
-  
+
   // Watch coordinates for MapPicker
   const latitude = watch('latitude');
   const longitude = watch('longitude');
@@ -268,169 +414,187 @@ export default function UploadPage() {
     if (file.size < 1024) {
       return 'File size too small. Minimum size is 1KB';
     }
-    
+
     // Check file size maximum
     if (file.size > MAX_FILE_SIZE) {
       return `File size exceeds ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB limit`;
     }
-    
+
     // Check file extension
     const extension = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(extension)) {
       return `Invalid file type. Allowed: ${ALLOWED_EXTENSIONS.join(', ')}`;
     }
-    
+
     // Check for potentially dangerous filenames
     const filename = file.name.toLowerCase();
-    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+    if (
+      filename.includes('..') ||
+      filename.includes('/') ||
+      filename.includes('\\')
+    ) {
       return 'Invalid filename. Please rename your file and try again';
     }
-    
+
     return null;
   }, []);
 
   // Handle file selection
-  const handleFileSelect = useCallback(async (file: File) => {
-    const error = validateFile(file);
-    if (error) {
-      setValidationError(error);
-      setSelectedFile(null);
+  const handleFileSelect = useCallback(
+    async (file: File) => {
+      const error = validateFile(file);
+      if (error) {
+        setValidationError(error);
+        setSelectedFile(null);
+        if (previewUrl) {
+          URL.revokeObjectURL(previewUrl);
+          setPreviewUrl(null);
+        }
+        return;
+      }
+
+      // Clear any previous validation errors
+      setValidationError(null);
+      setSelectedFile(file);
+
+      // Create preview URL
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(null);
       }
-      return;
-    }
+      const newPreviewUrl = URL.createObjectURL(file);
+      setPreviewUrl(newPreviewUrl);
 
-    // Clear any previous validation errors
-    setValidationError(null);
-    setSelectedFile(file);
-    
-    // Create preview URL
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-    }
-    const newPreviewUrl = URL.createObjectURL(file);
-    setPreviewUrl(newPreviewUrl);
-    
-    // Update form
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(file);
-    setValue('file', dataTransfer.files);
-    clearErrors('file');
-    
-    const existingTitle = getValues('title');
-    if (!existingTitle || existingTitle.trim().length === 0) {
-      setSanitizedFieldValue('title', humanizeFilename(file.name));
-    }
+      // Update form
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      setValue('file', dataTransfer.files);
+      clearErrors('file');
 
-    // Extract EXIF GPS data and metadata from image
-    try {
-      // @ts-ignore - exif-js types
-      const EXIF = await import('exif-js');
-      
-      EXIF.getData(file as any, function(this: any) {
-        const metadata: any = {};
-        
-        // Extract GPS coordinates
-        // @ts-ignore
-        const lat = EXIF.getTag(this, 'GPSLatitude');
-        // @ts-ignore  
-        const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
-        // @ts-ignore
-        const lon = EXIF.getTag(this, 'GPSLongitude');
-        // @ts-ignore
-        const lonRef = EXIF.getTag(this, 'GPSLongitudeRef');
-        
-        // Extract GPS altitude
-        // @ts-ignore
-        const altitude = EXIF.getTag(this, 'GPSAltitude');
-        // @ts-ignore
-        const altitudeRef = EXIF.getTag(this, 'GPSAltitudeRef');
-        
-        // Extract camera info
-        // @ts-ignore
-        const make = EXIF.getTag(this, 'Make');
-        // @ts-ignore
-        const model = EXIF.getTag(this, 'Model');
-        
-        // Extract orientation
-        // @ts-ignore
-        const orientation = EXIF.getTag(this, 'Orientation');
-        
-        if (lat && lon) {
-          // Convert to decimal degrees
-          const convertToDecimal = (coords: number[]) => {
-            return coords[0] + coords[1] / 60 + coords[2] / 3600;
-          };
-          
-          let latitude = convertToDecimal(lat);
-          let longitude = convertToDecimal(lon);
-          
-          // Apply direction
-          if (latRef === 'S') latitude = -latitude;
-          if (lonRef === 'W') longitude = -longitude;
-          
-          // Only set if coordinates fields are empty
-          const currentLat = getValues('latitude');
-          const currentLon = getValues('longitude');
-          
-          if (!currentLat && !currentLon) {
-            setValue('latitude', latitude);
-            setValue('longitude', longitude);
-            toast.success('GPS coordinates auto-extracted', {
-              description: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+      const existingTitle = getValues('title');
+      if (!existingTitle || existingTitle.trim().length === 0) {
+        setSanitizedFieldValue('title', humanizeFilename(file.name));
+      }
+
+      // Extract EXIF GPS data and metadata from image
+      try {
+        // @ts-ignore - exif-js types
+        const EXIF = await import('exif-js');
+
+        EXIF.getData(file as any, function (this: any) {
+          const metadata: any = {};
+
+          // Extract GPS coordinates
+          // @ts-ignore
+          const lat = EXIF.getTag(this, 'GPSLatitude');
+          // @ts-ignore
+          const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
+          // @ts-ignore
+          const lon = EXIF.getTag(this, 'GPSLongitude');
+          // @ts-ignore
+          const lonRef = EXIF.getTag(this, 'GPSLongitudeRef');
+
+          // Extract GPS altitude
+          // @ts-ignore
+          const altitude = EXIF.getTag(this, 'GPSAltitude');
+          // @ts-ignore
+          const altitudeRef = EXIF.getTag(this, 'GPSAltitudeRef');
+
+          // Extract camera info
+          // @ts-ignore
+          const make = EXIF.getTag(this, 'Make');
+          // @ts-ignore
+          const model = EXIF.getTag(this, 'Model');
+
+          // Extract orientation
+          // @ts-ignore
+          const orientation = EXIF.getTag(this, 'Orientation');
+
+          if (lat && lon) {
+            // Convert to decimal degrees
+            const convertToDecimal = (coords: number[]) => {
+              return coords[0] + coords[1] / 60 + coords[2] / 3600;
+            };
+
+            let latitude = convertToDecimal(lat);
+            let longitude = convertToDecimal(lon);
+
+            // Apply direction
+            if (latRef === 'S') latitude = -latitude;
+            if (lonRef === 'W') longitude = -longitude;
+
+            // Only set if coordinates fields are empty
+            const currentLat = getValues('latitude');
+            const currentLon = getValues('longitude');
+
+            if (!currentLat && !currentLon) {
+              setValue('latitude', latitude);
+              setValue('longitude', longitude);
+              toast.success('GPS coordinates auto-extracted', {
+                description: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+              });
+            }
+
+            metadata.hasGPS = true;
+          }
+
+          // Extract and set altitude
+          if (altitude !== undefined) {
+            const altMeters =
+              typeof altitude === 'number' ? altitude : parseFloat(altitude);
+            const currentAlt = getValues('altitude');
+
+            if (!currentAlt) {
+              // Apply altitude reference (0=above sea level, 1=below)
+              const finalAlt = altitudeRef === 1 ? -altMeters : altMeters;
+              setValue('altitude', finalAlt);
+              setValue('altitude_ref', altitudeRef || 0);
+              metadata.altitude = finalAlt;
+              toast.success('Altitude auto-extracted', {
+                description: `${finalAlt.toFixed(0)}m ${altitudeRef === 1 ? 'below' : 'above'} sea level`,
+              });
+            }
+          }
+
+          // Store camera info and orientation for display
+          if (make || model) {
+            metadata.camera = `${make || ''} ${model || ''}`.trim();
+          }
+          if (orientation) {
+            metadata.orientation = orientation;
+          }
+
+          setExifMetadata(metadata);
+
+          // Show comprehensive toast notification
+          if (metadata.hasGPS || metadata.altitude || metadata.camera) {
+            const details: string[] = [];
+            if (metadata.hasGPS) details.push('GPS coordinates');
+            if (metadata.altitude)
+              details.push(`Altitude: ${metadata.altitude.toFixed(0)}m`);
+            if (metadata.camera) details.push(`Camera: ${metadata.camera}`);
+
+            toast.success('EXIF metadata extracted', {
+              description: details.join(' • '),
             });
           }
-          
-          metadata.hasGPS = true;
-        }
-        
-        // Extract and set altitude
-        if (altitude !== undefined) {
-          const altMeters = typeof altitude === 'number' ? altitude : parseFloat(altitude);
-          const currentAlt = getValues('altitude');
-          
-          if (!currentAlt) {
-            // Apply altitude reference (0=above sea level, 1=below)
-            const finalAlt = altitudeRef === 1 ? -altMeters : altMeters;
-            setValue('altitude', finalAlt);
-            setValue('altitude_ref', altitudeRef || 0);
-            metadata.altitude = finalAlt;
-            toast.success('Altitude auto-extracted', {
-              description: `${finalAlt.toFixed(0)}m ${altitudeRef === 1 ? 'below' : 'above'} sea level`
-            });
-          }
-        }
-        
-        // Store camera info and orientation for display
-        if (make || model) {
-          metadata.camera = `${make || ''} ${model || ''}`.trim();
-        }
-        if (orientation) {
-          metadata.orientation = orientation;
-        }
-        
-        setExifMetadata(metadata);
-        
-        // Show comprehensive toast notification
-        if (metadata.hasGPS || metadata.altitude || metadata.camera) {
-          const details: string[] = [];
-          if (metadata.hasGPS) details.push('GPS coordinates');
-          if (metadata.altitude) details.push(`Altitude: ${metadata.altitude.toFixed(0)}m`);
-          if (metadata.camera) details.push(`Camera: ${metadata.camera}`);
-          
-          toast.success('EXIF metadata extracted', {
-            description: details.join(' • ')
-          });
-        }
-        // No toast needed when no EXIF data - it's optional
-      });
-    } catch (error) {
-      console.warn('Could not extract EXIF data:', error);
-      // Fail silently - EXIF extraction is optional
-    }
-  }, [validateFile, previewUrl, setValue, clearErrors, getValues, setSanitizedFieldValue]);
+          // No toast needed when no EXIF data - it's optional
+        });
+      } catch (error) {
+        toast.warning('Metadata extraction unavailable', {
+          description:
+            'We could not read EXIF data from this image. You can still submit details manually.',
+        });
+      }
+    },
+    [
+      validateFile,
+      previewUrl,
+      setValue,
+      clearErrors,
+      getValues,
+      setSanitizedFieldValue,
+    ]
+  );
 
   // Remove selected file
   const removeSelectedFile = useCallback(() => {
@@ -443,6 +607,133 @@ export default function UploadPage() {
     setValue('file', {} as FileList);
   }, [previewUrl, setValue]);
 
+  // Handle multiple files for batch upload
+  const handleMultipleFiles = useCallback(
+    (files: File[]) => {
+      // Check file count limit
+      if (files.length > MAX_BATCH_FILES) {
+        toast.error('Too many files', {
+          description: `Maximum ${MAX_BATCH_FILES} files per batch. You selected ${files.length} files.`,
+        });
+        return;
+      }
+
+      const validFiles: File[] = [];
+      const errors: string[] = [];
+      let totalSize = 0;
+
+      files.forEach((file) => {
+        const validationError = validateFile(file);
+        if (!validationError) {
+          validFiles.push(file);
+          totalSize += file.size;
+        } else {
+          errors.push(`${file.name}: ${validationError}`);
+        }
+      });
+
+      // Check total batch size limit
+      if (totalSize > MAX_BATCH_SIZE) {
+        toast.error('Batch size too large', {
+          description: `Total size ${(totalSize / 1024 / 1024).toFixed(1)}MB exceeds ${MAX_BATCH_SIZE / 1024 / 1024}MB limit`,
+        });
+        return;
+      }
+
+      if (validFiles.length > 0) {
+        setSelectedFiles(validFiles);
+        setBatchMode(true);
+        setValidationError(null);
+        toast.success(`${validFiles.length} files ready for batch upload`);
+      }
+
+      if (errors.length > 0) {
+        toast.warning('Some files were skipped', {
+          description: errors.slice(0, 3).join(', '),
+        });
+      }
+    },
+    [validateFile]
+  );
+
+  // Remove file from batch
+  const removeFromBatch = useCallback((index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  // Clear batch
+  const clearBatch = useCallback(() => {
+    setSelectedFiles([]);
+    setBatchMode(false);
+    setValidationError(null);
+  }, []);
+
+  // Batch upload mutation
+  const batchUploadMutation = useMutation({
+    mutationFn: async (data: { files: File[]; metadata: any }) => {
+      const formData = new FormData();
+
+      data.files.forEach((file) => {
+        formData.append('files', file);
+      });
+
+      Object.entries(data.metadata).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          formData.append(key, String(value));
+        }
+      });
+
+      const response = await fetch(`${config.API.BASE_URL}/api/batch/create`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        // Try to parse error as JSON, fallback to text if not JSON
+        const contentType = response.headers.get('content-type');
+        let errorMessage = 'Batch upload failed';
+
+        if (contentType?.includes('application/json')) {
+          try {
+            const error = await response.json();
+            errorMessage = error.detail || errorMessage;
+          } catch (e) {
+            // JSON parse failed, use default message
+          }
+        } else {
+          // Not JSON, try to get text
+          try {
+            const text = await response.text();
+            errorMessage = text.slice(0, 200) || errorMessage; // Limit to 200 chars
+          } catch (e) {
+            // Text parse failed, use default message
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      return response.json();
+    },
+    onSuccess: (response) => {
+      toast.success('Batch upload started', {
+        description: `Processing ${response.total_files} files in background`,
+      });
+      clearBatch();
+
+      // Set active batch ID to start polling
+      setActiveBatchId(response.id);
+
+      queryClient.invalidateQueries({ queryKey: ['images'] });
+      // Don't redirect - stay on page to show progress
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Batch upload failed', { description: message });
+    },
+  });
+
   // Format file size
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return '0 Bytes';
@@ -452,18 +743,169 @@ export default function UploadPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const handleQueuedUpload = useCallback(async (payload: QueuedUploadPayload) => {
-    const file = new File([payload.fileData], payload.fileName, {
-      type: payload.fileType || 'application/octet-stream',
-    });
+  // Retry failed files mutation
+  const retryFailedMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/${batchId}/retry-failed`,
+        {
+          method: 'POST',
+          credentials: 'include',
+        }
+      );
 
-    const apiMetadata = buildApiMetadata(payload.metadata as MetadataLike, payload.fileName);
-    
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('metadata_json', JSON.stringify(apiMetadata));
-    await imageApi.upload(formData);
-  }, []);
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to retry batch');
+      }
+
+      return response.json();
+    },
+    onSuccess: (response) => {
+      toast.success('Retry started', {
+        description: `Retrying ${response.total_files} failed files`,
+      });
+      setActiveBatchId(response.id);
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Retry failed', { description: message });
+    },
+  });
+
+  // Cancel batch mutation
+  const cancelBatchMutation = useMutation({
+    mutationFn: async (batchId: string) => {
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/${batchId}/cancel`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to cancel batch');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.info('Batch cancelled');
+      setActiveBatchId(null);
+      queryClient.invalidateQueries({ queryKey: ['images'] });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Cancel failed', { description: message });
+    },
+  });
+
+  // Template mutations
+  const saveTemplateMutation = useMutation({
+    mutationFn: async (data: {
+      name: string;
+      description: string;
+      template_data: any;
+    }) => {
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/templates`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(data),
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to save template');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success('Template saved successfully');
+      queryClient.invalidateQueries({ queryKey: ['batch-templates'] });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to save template', { description: message });
+    },
+  });
+
+  const deleteTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/templates/${templateId}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to delete template');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast.success('Template deleted');
+      queryClient.invalidateQueries({ queryKey: ['batch-templates'] });
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to delete template', { description: message });
+    },
+  });
+
+  const loadTemplateMutation = useMutation({
+    mutationFn: async (templateId: string) => {
+      const response = await fetch(
+        `${config.API.BASE_URL}/api/batch/templates/${templateId}`,
+        {
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) throw new Error('Failed to load template');
+      return response.json();
+    },
+    onSuccess: (template) => {
+      // Apply template data to form
+      const data = template.template_data;
+      if (data.hazard_type) setValue('hazardType', data.hazard_type);
+      if (data.source_type) setValue('sourceType', data.source_type);
+      if (data.event_id) setValue('eventId', data.event_id);
+      if (data.title_template) setValue('titleTemplate', data.title_template);
+      if (data.abstract) setValue('abstract', data.abstract);
+      if (data.location) setValue('location', data.location);
+      if (data.country) setValue('country', data.country);
+      if (data.keywords) setValue('keywords', data.keywords);
+      toast.success(`Template "${template.name}" loaded`);
+    },
+    onError: () => {
+      toast.error('Failed to load template');
+    },
+  });
+
+  const handleQueuedUpload = useCallback(
+    async (payload: QueuedUploadPayload) => {
+      const file = new File([payload.fileData], payload.fileName, {
+        type: payload.fileType || 'application/octet-stream',
+      });
+
+      const apiMetadata = buildApiMetadata(
+        payload.metadata as MetadataLike,
+        payload.fileName
+      );
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('metadata_json', JSON.stringify(apiMetadata));
+      await imageApi.upload(formData);
+    },
+    []
+  );
 
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
@@ -480,10 +922,14 @@ export default function UploadPage() {
       const unlocked = response?.new_achievements || [];
       if (Array.isArray(unlocked) && unlocked.length > 0) {
         unlocked.forEach((achievement: any) => {
-          toast.success(`Achievement unlocked: ${achievement.name || achievement.id}`, {
-            description: achievement.description || 'You hit a new milestone!',
-            duration: 6000,
-          });
+          toast.success(
+            `Achievement unlocked: ${achievement.name || achievement.id}`,
+            {
+              description:
+                achievement.description || 'You hit a new milestone!',
+              duration: 6000,
+            }
+          );
         });
       }
       setTimeout(() => router.push('/'), 1000); // Small delay to show completion
@@ -491,9 +937,11 @@ export default function UploadPage() {
     onError: (error) => {
       setUploadProgress(0);
       trackUploadEvent('failed');
-      console.error('Upload failed:', error);
       const message = error instanceof Error ? error.message : String(error);
-      if (message.toLowerCase().includes('validate credentials') || message.includes('401')) {
+      if (
+        message.toLowerCase().includes('validate credentials') ||
+        message.includes('401')
+      ) {
         toast.error('Session expired. Please sign in to continue uploading.');
         router.push(`/auth/login?returnUrl=${encodeURIComponent(pathname)}`);
       } else {
@@ -519,7 +967,25 @@ export default function UploadPage() {
     }
 
     // Prevent double-submission
-    if (uploadMutation.isPending) {
+    if (uploadMutation.isPending || batchUploadMutation.isPending) {
+      return;
+    }
+
+    // Handle batch upload
+    if (batchMode && selectedFiles.length > 0) {
+      const metadata = {
+        hazard_type: data.hazard_type,
+        source_type: 'citizen',
+        event_id: null,
+        data_license: 'https://creativecommons.org/licenses/by/4.0/',
+        title_template: data.title,
+        abstract: data.abstract,
+        location: data.location,
+        country: data.country,
+        keywords: data.keywords,
+      };
+
+      batchUploadMutation.mutate({ files: selectedFiles, metadata });
       return;
     }
 
@@ -536,13 +1002,20 @@ export default function UploadPage() {
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       try {
         await queueUpload(apiMetadata, selectedFile);
-        setQueueMessage('Stored offline. We will sync this upload when you reconnect.');
+        setQueueMessage(
+          'Stored offline. We will sync this upload when you reconnect.'
+        );
         await refreshQueuedUploads();
         setSelectedFile(null);
         setUploadProgress(0);
       } catch (error) {
-        console.error('Failed to queue upload offline:', error);
-        setQueueMessage('We could not store this upload offline. Please try again when you are online.');
+        toast.error('Offline queue failed', {
+          description:
+            'We could not store this upload. Please retry once you are online.',
+        });
+        setQueueMessage(
+          'We could not store this upload offline. Please try again when you are online.'
+        );
       }
       return;
     }
@@ -586,9 +1059,9 @@ export default function UploadPage() {
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
@@ -597,9 +1070,14 @@ export default function UploadPage() {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileSelect(e.dataTransfer.files[0]);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 1) {
+        handleMultipleFiles(files);
+      } else {
+        handleFileSelect(files[0]);
+      }
     }
   };
 
@@ -623,14 +1101,136 @@ export default function UploadPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Batch Progress Indicator */}
+        {batchStatus && !batchStatus.is_complete && (
+          <div className="mb-6 rounded-3xl border border-pacific-500/30 bg-gradient-to-br from-pacific-900/40 to-deep-900/40 backdrop-blur p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white">
+                Batch Upload Progress
+              </h3>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-surface-soft">
+                  {batchStatus.status === 'processing'
+                    ? 'Processing...'
+                    : 'Pending...'}
+                </span>
+                {batchStatus.status === 'processing' && activeBatchId && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => cancelBatchMutation.mutate(activeBatchId)}
+                    disabled={cancelBatchMutation.isPending}
+                  >
+                    {cancelBatchMutation.isPending ? 'Cancelling...' : 'Cancel'}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-surface-soft">
+                  {batchStatus.processed_files} of {batchStatus.total_files}{' '}
+                  files processed
+                </span>
+                <span className="text-pacific-400 font-medium">
+                  {batchStatus.progress_percent.toFixed(1)}%
+                </span>
+              </div>
+
+              <div className="w-full bg-deep-800 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-gradient-to-r from-pacific-500 to-pacific-400 h-2.5 rounded-full transition-all duration-500"
+                  style={{ width: `${batchStatus.progress_percent}%` }}
+                />
+              </div>
+
+              <div className="flex gap-4 text-xs text-surface-soft">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  {batchStatus.successful_files} succeeded
+                </span>
+                {batchStatus.failed_files > 0 && (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                    {batchStatus.failed_files} failed
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Completed Batch with Failed Files - Show Retry Option */}
+        {batchStatus &&
+          batchStatus.is_complete &&
+          batchStatus.failed_files > 0 && (
+            <div className="mb-6 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-900/40 to-deep-900/40 backdrop-blur p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    Batch Completed with Errors
+                  </h3>
+                  <p className="text-sm text-surface-soft">
+                    {batchStatus.successful_files} files succeeded,{' '}
+                    {batchStatus.failed_files} files failed
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() =>
+                    activeBatchId && retryFailedMutation.mutate(activeBatchId)
+                  }
+                  disabled={retryFailedMutation.isPending}
+                  className="bg-amber-600 hover:bg-amber-700"
+                >
+                  {retryFailedMutation.isPending
+                    ? 'Starting Retry...'
+                    : 'Retry Failed Files'}
+                </Button>
+              </div>
+              {batchStatus.failure_summary &&
+                batchStatus.failure_summary.length > 0 && (
+                  <details className="mt-4">
+                    <summary className="text-sm text-surface-soft cursor-pointer hover:text-white">
+                      View failure details
+                    </summary>
+                    <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
+                      {batchStatus.failure_summary.map(
+                        (failure: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="text-xs text-red-400 bg-red-950/30 p-2 rounded"
+                          >
+                            <span className="font-medium">
+                              {failure.filename}:
+                            </span>{' '}
+                            {failure.error}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </details>
+                )}
+            </div>
+          )}
+
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {(queueMessage || queuedUploads.length > 0) && (
             <div className="rounded-2xl border border-pacific-500/30 bg-pacific-900/20 backdrop-blur p-4 text-sm text-pacific-100">
               {queueMessage && <p>{queueMessage}</p>}
               {queuedUploads.length > 0 && (
                 <div className="mt-2 flex items-center justify-between">
-                  <p>{queuedUploads.length} upload(s) waiting for connectivity.</p>
-                  <Button type="button" variant="secondary" size="sm" onClick={handleSyncQueuedUploads}>
+                  <p>
+                    {queuedUploads.length} upload(s) waiting for connectivity.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleSyncQueuedUploads}
+                  >
                     Sync now
                   </Button>
                 </div>
@@ -649,13 +1249,15 @@ export default function UploadPage() {
           {/* File Upload */}
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
             <label className="block text-sm font-medium text-surface-soft mb-2">
-              Image File *
+              Image File{selectedFiles.length > 0 ? 's' : ''} *
             </label>
-            
-            {!selectedFile ? (
+
+            {!selectedFile && selectedFiles.length === 0 ? (
               <div
                 className={`border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
-                  dragActive ? 'border-pacific-400 bg-pacific-500/10' : 'border-white/20 bg-deep-900/20'
+                  dragActive
+                    ? 'border-pacific-400 bg-pacific-500/10'
+                    : 'border-white/20 bg-deep-900/20'
                 }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
@@ -673,15 +1275,26 @@ export default function UploadPage() {
                       type="file"
                       className="sr-only"
                       accept="image/*"
+                      multiple
                       ref={fileInputRef}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileSelect(file);
+                        const files = e.target.files;
+                        if (files && files.length > 1) {
+                          handleMultipleFiles(Array.from(files));
+                        } else if (files && files[0]) {
+                          handleFileSelect(files[0]);
+                        }
                       }}
                     />
                   </label>
                   <p className="mt-1 text-xs text-surface-soft/70">
-                    {ALLOWED_EXTENSIONS.join(', ').toUpperCase()} up to {Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB
+                    {ALLOWED_EXTENSIONS.join(', ').toUpperCase()} up to{' '}
+                    {Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB per file
+                    {/* Batch limits: max {MAX_BATCH_FILES} files, {Math.round(MAX_BATCH_SIZE / 1024 / 1024)}MB total */}
+                  </p>
+                  <p className="mt-1 text-xs text-surface-soft/50">
+                    For batch uploads: Maximum {MAX_BATCH_FILES} files,{' '}
+                    {Math.round(MAX_BATCH_SIZE / 1024 / 1024)}MB total size
                   </p>
                   <div className="mt-4 flex justify-center">
                     <Button
@@ -694,7 +1307,7 @@ export default function UploadPage() {
                   </div>
                 </div>
               </div>
-            ) : (
+            ) : selectedFile ? (
               // File Selected - Show Preview
               <div className="border border-white/20 rounded-2xl p-4 bg-deep-900/20">
                 <div className="flex items-start gap-4">
@@ -716,7 +1329,7 @@ export default function UploadPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* File Info */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-white truncate">
@@ -731,7 +1344,7 @@ export default function UploadPage() {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Remove Button */}
                   <button
                     type="button"
@@ -741,7 +1354,7 @@ export default function UploadPage() {
                     <X className="w-5 h-5" />
                   </button>
                 </div>
-                
+
                 {/* Progress Bar */}
                 {uploadMutation.isPending && (
                   <div className="mt-4">
@@ -750,7 +1363,7 @@ export default function UploadPage() {
                       <span>{Math.round(uploadProgress)}%</span>
                     </div>
                     <div className="w-full bg-deep-900/40 rounded-full h-2">
-                      <div 
+                      <div
                         className="bg-pacific-500 h-2 rounded-full transition-all duration-300"
                         style={{ width: `${uploadProgress}%` }}
                       ></div>
@@ -758,21 +1371,150 @@ export default function UploadPage() {
                   </div>
                 )}
               </div>
+            ) : null}
+
+            {/* Batch Files Display */}
+            {selectedFiles.length > 0 && (
+              <div className="border border-white/20 rounded-2xl p-4 bg-deep-900/20">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-medium text-white">
+                    {selectedFiles.length} file
+                    {selectedFiles.length !== 1 ? 's' : ''} ready for batch
+                    upload
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={clearBatch}
+                    className="text-xs text-surface-soft hover:text-white transition-colors"
+                  >
+                    Clear all
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {selectedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center gap-3 p-2 rounded-lg bg-deep-900/40"
+                    >
+                      <FileImage className="w-5 h-5 text-surface-soft flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">
+                          {file.name}
+                        </p>
+                        <p className="text-xs text-surface-soft/70">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeFromBatch(index)}
+                        className="flex-shrink-0 p-1 text-surface-soft hover:text-white transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {batchUploadMutation.isPending && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm text-surface-soft mb-1">
+                      <span>Starting batch upload...</span>
+                    </div>
+                    <div className="w-full bg-deep-900/40 rounded-full h-2">
+                      <div className="bg-pacific-500 h-2 rounded-full animate-pulse"></div>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
-            
+
             {/* Validation Error Display */}
             {validationError && (
               <div className="mt-4 bg-coral-900/30 border border-coral-500/30 rounded-xl p-4">
                 <p className="text-coral-300 text-sm">{validationError}</p>
               </div>
             )}
-            
-            {errors.file && <p className="mt-1 text-sm text-coral-300">{errors.file.message}</p>}
+
+            {errors.file && (
+              <p className="mt-1 text-sm text-coral-300">
+                {errors.file.message}
+              </p>
+            )}
           </div>
+
+          {/* Template Picker & Manager - Only for batch uploads */}
+          {selectedFiles.length > 0 && templatesData?.templates?.length > 0 && (
+            <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-900/20 to-deep-900/40 backdrop-blur p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Batch Templates
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateManager(true)}
+                  className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
+                >
+                  Manage Templates
+                </button>
+              </div>
+              <div className="space-y-3">
+                <FormField label="Load Template" htmlFor="template-picker">
+                  <select
+                    id="template-picker"
+                    className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.5rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.5em 1.5em',
+                    }}
+                    value={selectedTemplateId || ''}
+                    onChange={(e) => {
+                      const templateId = e.target.value;
+                      setSelectedTemplateId(templateId || null);
+                      if (templateId) {
+                        loadTemplateMutation.mutate(templateId);
+                      }
+                    }}
+                  >
+                    <option
+                      value=""
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Select a template...
+                    </option>
+                    {templatesData.templates.map((template: any) => (
+                      <option
+                        key={template.id}
+                        value={template.id}
+                        style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                      >
+                        {template.name}{' '}
+                        {template.use_count > 0
+                          ? `(used ${template.use_count}×)`
+                          : ''}
+                      </option>
+                    ))}
+                  </select>
+                </FormField>
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateManager(true)}
+                  className="w-full px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Save Current Settings as Template
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Required Fields */}
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
-            <h3 className="text-lg font-medium text-white mb-4">Required Information</h3>
+            <h3 className="text-lg font-medium text-white mb-4">
+              Required Information
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 label="Hazard Type"
@@ -787,19 +1529,36 @@ export default function UploadPage() {
                     backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                     backgroundPosition: 'right 0.5rem center',
                     backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1.5em 1.5em'
+                    backgroundSize: '1.5em 1.5em',
                   }}
-                  {...register('hazard_type', { required: 'Hazard type is required' })}
+                  {...register('hazard_type', {
+                    required: 'Hazard type is required',
+                  })}
                   disabled={isLoading}
                 >
-                  <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
-                    {isLoading ? 'Loading hazard types...' : 'Select hazard type'}
+                  <option
+                    value=""
+                    style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                  >
+                    {isLoading
+                      ? 'Loading hazard types...'
+                      : 'Select hazard type'}
                   </option>
-                  {vocabData?.hazard_types?.map((type: { id: string; label: string; description: string }) => (
-                    <option key={type.id} value={type.id} style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
-                      {type.label}
-                    </option>
-                  ))}
+                  {vocabData?.hazard_types?.map(
+                    (type: {
+                      id: string;
+                      label: string;
+                      description: string;
+                    }) => (
+                      <option
+                        key={type.id}
+                        value={type.id}
+                        style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                      >
+                        {type.label}
+                      </option>
+                    )
+                  )}
                 </select>
               </FormField>
 
@@ -817,19 +1576,30 @@ export default function UploadPage() {
                     backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
                     backgroundPosition: 'right 0.5rem center',
                     backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1.5em 1.5em'
+                    backgroundSize: '1.5em 1.5em',
                   }}
-                  {...register('country', { required: 'Country is required for geographic analysis' })}
+                  {...register('country', {
+                    required: 'Country is required for geographic analysis',
+                  })}
                   disabled={isLoading}
                 >
-                  <option value="" style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
+                  <option
+                    value=""
+                    style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                  >
                     {isLoading ? 'Loading countries...' : 'Select country'}
                   </option>
-                  {vocabData?.countries?.map((country: { id: string; label: string }) => (
-                    <option key={country.id} value={country.id} style={{ backgroundColor: '#0c1222', color: '#ffffff' }}>
-                      {country.label}
-                    </option>
-                  ))}
+                  {vocabData?.countries?.map(
+                    (country: { id: string; label: string }) => (
+                      <option
+                        key={country.id}
+                        value={country.id}
+                        style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                      >
+                        {country.label}
+                      </option>
+                    )
+                  )}
                 </select>
               </FormField>
 
@@ -842,9 +1612,12 @@ export default function UploadPage() {
                 <input
                   id="upload-location"
                   type="text"
+                  autoComplete="off"
                   className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
                   placeholder="e.g., Port Vila, Vanuatu"
-                  {...registerSanitizedField('location', { required: 'Location is required' })}
+                  {...registerSanitizedField('location', {
+                    required: 'Location is required',
+                  })}
                 />
               </FormField>
             </div>
@@ -852,12 +1625,19 @@ export default function UploadPage() {
 
           {/* Optional Fields */}
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
-            <h3 className="text-lg font-medium text-white mb-4">Additional Information</h3>
+            <h3 className="text-lg font-medium text-white mb-4">
+              Additional Information
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField label="Title" htmlFor="upload-title" hint="Optional - we'll fill this from the filename if you leave it blank">
+              <FormField
+                label="Title"
+                htmlFor="upload-title"
+                hint="Optional - we'll fill this from the filename if you leave it blank"
+              >
                 <input
                   id="upload-title"
                   type="text"
+                  autoComplete="off"
                   className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
                   placeholder="Descriptive title for the image"
                   {...registerSanitizedField('title')}
@@ -865,13 +1645,18 @@ export default function UploadPage() {
               </FormField>
 
               <div className="md:col-span-2">
-                <FormField 
-                  label="Coordinates" 
+                <FormField
+                  label="Coordinates"
                   hint="Optional - helps locate incident on map"
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="upload-latitude" className="block text-xs text-surface-soft mb-1">Latitude</label>
+                      <label
+                        htmlFor="upload-latitude"
+                        className="block text-xs text-surface-soft mb-1"
+                      >
+                        Latitude
+                      </label>
                       <input
                         id="upload-latitude"
                         type="number"
@@ -882,7 +1667,12 @@ export default function UploadPage() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="upload-longitude" className="block text-xs text-surface-soft mb-1">Longitude</label>
+                      <label
+                        htmlFor="upload-longitude"
+                        className="block text-xs text-surface-soft mb-1"
+                      >
+                        Longitude
+                      </label>
                       <input
                         id="upload-longitude"
                         type="number"
@@ -893,11 +1683,15 @@ export default function UploadPage() {
                       />
                     </div>
                   </div>
-                  
+
                   {/* Altitude field (optional) */}
                   <div className="mt-3">
-                    <label htmlFor="upload-altitude" className="block text-xs text-surface-soft mb-1">
-                      Altitude (meters) <span className="text-surface-soft/50">• Optional</span>
+                    <label
+                      htmlFor="upload-altitude"
+                      className="block text-xs text-surface-soft mb-1"
+                    >
+                      Altitude (meters){' '}
+                      <span className="text-surface-soft/50">• Optional</span>
                     </label>
                     <input
                       id="upload-altitude"
@@ -908,87 +1702,106 @@ export default function UploadPage() {
                       {...register('altitude', { valueAsNumber: true })}
                     />
                   </div>
-                  
+
                   {/* Display extracted EXIF metadata */}
-                  {exifMetadata && (exifMetadata.camera || exifMetadata.orientation || exifMetadata.altitude) && (
-                    <div className="mt-3 p-3 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
-                      <p className="text-xs font-medium text-pacific-300 mb-2">📷 Camera Metadata</p>
-                      <div className="space-y-1">
-                        {exifMetadata.camera && (
-                          <p className="text-xs text-surface-soft">
-                            <span className="text-white">Camera:</span> {exifMetadata.camera}
-                          </p>
-                        )}
-                        {exifMetadata.orientation && (
-                          <p className="text-xs text-surface-soft">
-                            <span className="text-white">Orientation:</span> {exifMetadata.orientation}
-                          </p>
-                        )}
-                        {exifMetadata.altitude && (
-                          <p className="text-xs text-surface-soft">
-                            <span className="text-white">Altitude:</span> {exifMetadata.altitude.toFixed(1)}m
-                          </p>
-                        )}
+                  {exifMetadata &&
+                    (exifMetadata.camera ||
+                      exifMetadata.orientation ||
+                      exifMetadata.altitude) && (
+                      <div className="mt-3 p-3 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
+                        <p className="text-xs font-medium text-pacific-300 mb-2">
+                          📷 Camera Metadata
+                        </p>
+                        <div className="space-y-1">
+                          {exifMetadata.camera && (
+                            <p className="text-xs text-surface-soft">
+                              <span className="text-white">Camera:</span>{' '}
+                              {exifMetadata.camera}
+                            </p>
+                          )}
+                          {exifMetadata.orientation && (
+                            <p className="text-xs text-surface-soft">
+                              <span className="text-white">Orientation:</span>{' '}
+                              {exifMetadata.orientation}
+                            </p>
+                          )}
+                          {exifMetadata.altitude && (
+                            <p className="text-xs text-surface-soft">
+                              <span className="text-white">Altitude:</span>{' '}
+                              {exifMetadata.altitude.toFixed(1)}m
+                            </p>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  
+                    )}
+
                   {/* Chrome Location Permission Hint */}
                   {isChrome && (
                     <div className="mt-2 p-2 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
                       <p className="text-xs text-pacific-300">
-                        💡 <strong>Chrome users:</strong> If "Use My Location" doesn't work, click the lock icon in your address bar → Site settings → Allow Location
+                        💡 <strong>Chrome users:</strong> If &quot;Use My
+                        Location&quot; doesn&apos;t work, click the lock icon in
+                        your address bar → Site settings → Allow Location
                       </p>
                     </div>
                   )}
-                  
+
                   {/* Quick Action Buttons */}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={async () => {
                         // Detect Chrome browser
-                        const isChrome = typeof window !== 'undefined' && 
-                          /Chrome/.test(navigator.userAgent) && 
+                        const isChrome =
+                          typeof window !== 'undefined' &&
+                          /Chrome/.test(navigator.userAgent) &&
                           /Google Inc/.test(navigator.vendor);
-                        
+
                         const isSecureContext =
                           typeof window !== 'undefined' &&
                           (window.isSecureContext ||
-                            ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname));
-                        
+                            ['localhost', '127.0.0.1', '::1'].includes(
+                              window.location.hostname
+                            ));
+
                         if (!isSecureContext) {
                           toast.error('Secure connection required', {
-                            description: 'Location access only works over HTTPS or localhost. Please switch to a secure connection or pick a location on the map.',
+                            description:
+                              'Location access only works over HTTPS or localhost. Please switch to a secure connection or pick a location on the map.',
                           });
                           return;
                         }
-                        
+
                         if (!navigator.geolocation) {
                           toast.error('Geolocation not supported', {
-                            description: 'Your browser does not support location services.',
+                            description:
+                              'Your browser does not support location services.',
                           });
                           return;
                         }
-                        
+
                         // Check permissions API (Chrome-specific)
                         if (isChrome && 'permissions' in navigator) {
                           try {
-                            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-                            
+                            const permissionStatus =
+                              await navigator.permissions.query({
+                                name: 'geolocation' as PermissionName,
+                              });
+
                             if (permissionStatus.state === 'denied') {
                               toast.error('Location permission blocked', {
-                                description: 'Chrome has blocked location access. Click the lock icon in the address bar, go to Site Settings, and allow Location. Or use "Select on Map" instead.',
+                                description:
+                                  'Chrome has blocked location access. Click the lock icon in the address bar, go to Site Settings, and allow Location. Or use "Select on Map" instead.',
                               });
                               return;
                             }
-                            
+
                             // Permission state checked
                           } catch (e) {
                             // Could not check permissions API
                           }
                         }
-                        
+
                         toast.loading('Getting your location...');
                         navigator.geolocation.getCurrentPosition(
                           (position) => {
@@ -1002,60 +1815,68 @@ export default function UploadPage() {
                           (error) => {
                             const errorCode = error?.code;
                             const errorMessage = error?.message;
-                            
-                            console.error('Geolocation error:', {
-                              raw: error ?? 'null/undefined',
-                              code: errorCode,
-                              message: errorMessage,
-                              hasProperties: error ? Object.keys(error).length : 0
-                            });
-                            
                             toast.dismiss();
-                            
+
                             // Provide specific error messages based on error code
                             const PERMISSION_DENIED = 1;
                             const POSITION_UNAVAILABLE = 2;
                             const TIMEOUT = 3;
-                            const BLOCKED_ERROR_NAMES = ['SecurityError', 'NotAllowedError', 'PermissionDeniedError'];
-                            
+                            const BLOCKED_ERROR_NAMES = [
+                              'SecurityError',
+                              'NotAllowedError',
+                              'PermissionDeniedError',
+                            ];
+
                             let userMessage = 'Could not get your location';
                             let userDescription = '';
-                            
+
                             // Detect Chrome browser
-                            const isChrome = typeof window !== 'undefined' && 
-                              /Chrome/.test(navigator.userAgent) && 
+                            const isChrome =
+                              typeof window !== 'undefined' &&
+                              /Chrome/.test(navigator.userAgent) &&
                               /Google Inc/.test(navigator.vendor);
-                            
+
                             // Handle case where error object is null, undefined, or empty
-                            const hasValidError = error && (errorCode !== undefined || errorMessage);
-                            
+                            const hasValidError =
+                              error &&
+                              (errorCode !== undefined || errorMessage);
+
                             if (!hasValidError) {
                               // Empty or invalid error object - common in Chrome with blocked permissions
                               if (isChrome) {
-                                userDescription = 'Chrome blocked location access. To fix: Click the lock icon in the address bar → Site settings → Allow Location. Or use "Select on Map" instead.';
+                                userDescription =
+                                  'Chrome blocked location access. To fix: Click the lock icon in the address bar → Site settings → Allow Location. Or use "Select on Map" instead.';
                               } else {
-                                userDescription = 'Unable to access location. This may be due to browser settings, extensions, or security policies. Please use the "Select on Map" option instead.';
+                                userDescription =
+                                  'Unable to access location. This may be due to browser settings, extensions, or security policies. Please use the "Select on Map" option instead.';
                               }
                             } else if (errorCode !== undefined) {
                               // Standard GeolocationPositionError with code
                               switch (errorCode) {
                                 case PERMISSION_DENIED:
-                                  userDescription = 'Location permission denied. Please enable location access in your browser settings.';
+                                  userDescription =
+                                    'Location permission denied. Please enable location access in your browser settings.';
                                   break;
                                 case POSITION_UNAVAILABLE:
-                                  userDescription = 'Location information unavailable. Please try selecting location on map instead.';
+                                  userDescription =
+                                    'Location information unavailable. Please try selecting location on map instead.';
                                   break;
                                 case TIMEOUT:
-                                  userDescription = 'Location request timed out after 30 seconds. This can happen indoors or in areas with poor GPS signal. Try moving closer to a window or use "Select on Map" instead.';
+                                  userDescription =
+                                    'Location request timed out after 30 seconds. This can happen indoors or in areas with poor GPS signal. Try moving closer to a window or use "Select on Map" instead.';
                                   break;
                                 default:
-                                  userDescription = errorMessage || 'Please check your browser permissions or select location on map.';
+                                  userDescription =
+                                    errorMessage ||
+                                    'Please check your browser permissions or select location on map.';
                               }
                             } else {
                               // Other error type (e.g., network issues)
-                              userDescription = errorMessage || 'Please check your browser permissions or select location on map.';
+                              userDescription =
+                                errorMessage ||
+                                'Please check your browser permissions or select location on map.';
                             }
-                            
+
                             toast.error(userMessage, {
                               description: userDescription,
                             });
@@ -1072,7 +1893,7 @@ export default function UploadPage() {
                       <MapPin className="w-4 h-4" />
                       Use My Location
                     </button>
-                    
+
                     <button
                       type="button"
                       onClick={() => setShowMapPicker(true)}
@@ -1085,7 +1906,11 @@ export default function UploadPage() {
                 </FormField>
               </div>
 
-              <FormField label="Abstract" htmlFor="upload-abstract" className="md:col-span-2">
+              <FormField
+                label="Abstract"
+                htmlFor="upload-abstract"
+                className="md:col-span-2"
+              >
                 <textarea
                   id="upload-abstract"
                   rows={3}
@@ -1095,16 +1920,23 @@ export default function UploadPage() {
                 />
               </FormField>
 
-              <FormField label="Keywords" htmlFor="upload-keywords" hint="Comma-separated terms" className="md:col-span-2">
+              <FormField
+                label="Keywords"
+                htmlFor="upload-keywords"
+                hint="Comma-separated terms"
+                className="md:col-span-2"
+              >
                 <input
                   id="upload-keywords"
                   type="text"
+                  autoComplete="off"
                   className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
                   placeholder="Comma-separated keywords (e.g., flooding, damage, infrastructure)"
                   {...registerSanitizedField('keywords')}
                 />
                 <p className="mt-1 text-xs text-surface-soft/70">
-                  Add descriptive keywords separated by commas to help others find your image.
+                  Add descriptive keywords separated by commas to help others
+                  find your image.
                 </p>
               </FormField>
             </div>
@@ -1114,27 +1946,27 @@ export default function UploadPage() {
           {showMapPicker && (
             <MapPicker
               initialPosition={
-                latitude && longitude
-                  ? [latitude, longitude]
-                  : undefined
+                latitude && longitude ? [latitude, longitude] : undefined
               }
               onConfirm={(data) => {
                 // Set coordinates
                 setValue('latitude', data.lat);
                 setValue('longitude', data.lng);
-                
+
                 // Auto-fill location if empty
                 if (!location) {
-                  setSanitizedFieldValue('location', data.placeName, { shouldDirty: true });
+                  setSanitizedFieldValue('location', data.placeName, {
+                    shouldDirty: true,
+                  });
                 }
-                
+
                 // Auto-fill country if available and empty
                 if (data.countryCode && !country) {
                   setValue('country', data.countryCode);
                 }
-                
+
                 setShowMapPicker(false);
-                
+
                 // Show success notification
                 toast.success('Location selected', {
                   description: `${data.placeName} (${data.lat.toFixed(6)}, ${data.lng.toFixed(6)})`,
@@ -1150,10 +1982,22 @@ export default function UploadPage() {
               type="submit"
               variant="primary"
               size="lg"
-              leftIcon={!uploadMutation.isPending ? <Upload className="w-4 h-4" /> : undefined}
-              isLoading={uploadMutation.isPending}
+              leftIcon={
+                !(uploadMutation.isPending || batchUploadMutation.isPending) ? (
+                  <Upload className="w-4 h-4" />
+                ) : undefined
+              }
+              isLoading={
+                uploadMutation.isPending || batchUploadMutation.isPending
+              }
             >
-              {uploadMutation.isPending ? 'Uploading...' : 'Upload Image'}
+              {batchUploadMutation.isPending
+                ? 'Starting batch...'
+                : uploadMutation.isPending
+                  ? 'Uploading...'
+                  : batchMode && selectedFiles.length > 0
+                    ? `Upload ${selectedFiles.length} Images`
+                    : 'Upload Image'}
             </Button>
           </div>
 
@@ -1161,12 +2005,16 @@ export default function UploadPage() {
           {uploadProgress > 0 && uploadProgress < 100 && (
             <div className="bg-pacific-900/30 border border-pacific-500/30 rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-pacific-200">Uploading...</span>
-                <span className="text-sm text-pacific-300">{uploadProgress}%</span>
+                <span className="text-sm font-medium text-pacific-200">
+                  Uploading...
+                </span>
+                <span className="text-sm text-pacific-300">
+                  {uploadProgress}%
+                </span>
               </div>
               <div className="w-full bg-deep-900/40 rounded-full h-2">
-                <div 
-                  className="bg-pacific-500 h-2 rounded-full transition-all duration-300 ease-out" 
+                <div
+                  className="bg-pacific-500 h-2 rounded-full transition-all duration-300 ease-out"
                   style={{ width: `${uploadProgress}%` }}
                 ></div>
               </div>
@@ -1185,12 +2033,224 @@ export default function UploadPage() {
           {uploadMutation.isError && (
             <div className="bg-coral-900/30 border border-coral-500/30 rounded-xl p-4">
               <p className="text-coral-300">
-                Error uploading image: {uploadMutation.error?.message || 'Unknown error'}
+                Error uploading image:{' '}
+                {uploadMutation.error?.message || 'Unknown error'}
               </p>
             </div>
           )}
         </form>
+
+        {/* Analytics Display */}
+        {analyticsData && analyticsData.total_batches > 0 && (
+          <div className="mt-8 rounded-3xl border border-pacific-500/30 bg-gradient-to-br from-pacific-900/40 to-deep-900/40 backdrop-blur p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Batch Upload Analytics (Last 30 Days)
+              </h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-deep-900/40 rounded-lg p-4">
+                <div className="text-2xl font-bold text-white">
+                  {analyticsData.total_batches}
+                </div>
+                <div className="text-xs text-surface-soft mt-1">
+                  Total Batches
+                </div>
+              </div>
+              <div className="bg-deep-900/40 rounded-lg p-4">
+                <div className="text-2xl font-bold text-green-400">
+                  {analyticsData.success_rate.toFixed(1)}%
+                </div>
+                <div className="text-xs text-surface-soft mt-1">
+                  Success Rate
+                </div>
+              </div>
+              <div className="bg-deep-900/40 rounded-lg p-4">
+                <div className="text-2xl font-bold text-pacific-400">
+                  {analyticsData.total_files_processed}
+                </div>
+                <div className="text-xs text-surface-soft mt-1">
+                  Files Processed
+                </div>
+              </div>
+              <div className="bg-deep-900/40 rounded-lg p-4">
+                <div className="text-2xl font-bold text-amber-400">
+                  {analyticsData.average_processing_time_seconds.toFixed(0)}s
+                </div>
+                <div className="text-xs text-surface-soft mt-1">
+                  Avg Processing Time
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 md:grid-cols-3 gap-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                <span className="text-surface-soft">
+                  Completed: {analyticsData.completed_batches}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                <span className="text-surface-soft">
+                  Partial: {analyticsData.partial_batches}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+                <span className="text-surface-soft">
+                  Failed: {analyticsData.failed_batches}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
+
+      {/* Template Manager Dialog */}
+      {showTemplateManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-gradient-to-br from-deep-900 to-pacific-900/50 border border-white/20 rounded-3xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Batch Templates</h2>
+              <button
+                onClick={() => setShowTemplateManager(false)}
+                className="p-2 text-surface-soft hover:text-white transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Save New Template */}
+            <div className="bg-deep-900/40 rounded-2xl p-4 mb-6">
+              <h3 className="text-sm font-medium text-white mb-3">
+                Save Current Settings
+              </h3>
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Template name (e.g., Hurricane Reports)"
+                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50"
+                  id="new-template-name"
+                />
+                <input
+                  type="text"
+                  placeholder="Description (optional)"
+                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50"
+                  id="new-template-description"
+                />
+                <button
+                  onClick={() => {
+                    const name = (
+                      document.getElementById(
+                        'new-template-name'
+                      ) as HTMLInputElement
+                    )?.value;
+                    const description = (
+                      document.getElementById(
+                        'new-template-description'
+                      ) as HTMLInputElement
+                    )?.value;
+                    if (!name) {
+                      toast.error('Please enter a template name');
+                      return;
+                    }
+                    const formData = getValues();
+                    saveTemplateMutation.mutate({
+                      name,
+                      description: description || '',
+                      template_data: {
+                        hazard_type: formData.hazard_type,
+                        source_type: formData.source_type,
+                        event_id: formData.eventId,
+                        title_template: formData.titleTemplate,
+                        abstract: formData.abstract,
+                        location: formData.location,
+                        country: formData.country,
+                        keywords: formData.keywords,
+                      },
+                    });
+                    setShowTemplateManager(false);
+                  }}
+                  disabled={saveTemplateMutation.isPending}
+                  className="w-full px-4 py-2 bg-pacific-600 hover:bg-pacific-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {saveTemplateMutation.isPending
+                    ? 'Saving...'
+                    : 'Save Template'}
+                </button>
+              </div>
+            </div>
+
+            {/* Existing Templates */}
+            <div>
+              <h3 className="text-sm font-medium text-white mb-3">
+                Saved Templates
+              </h3>
+              {templatesData?.templates?.length === 0 ? (
+                <p className="text-sm text-surface-soft text-center py-8">
+                  No templates saved yet. Create your first template above!
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {templatesData?.templates?.map((template: any) => (
+                    <div
+                      key={template.id}
+                      className="bg-deep-900/40 rounded-lg p-4 flex items-start justify-between gap-4"
+                    >
+                      <div className="flex-1">
+                        <h4 className="text-white font-medium">
+                          {template.name}
+                        </h4>
+                        {template.description && (
+                          <p className="text-sm text-surface-soft/70 mt-1">
+                            {template.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-3 mt-2 text-xs text-surface-soft">
+                          <span>Used {template.use_count}×</span>
+                          {template.last_used_at && (
+                            <span>
+                              Last used:{' '}
+                              {new Date(
+                                template.last_used_at
+                              ).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            loadTemplateMutation.mutate(template.id);
+                            setShowTemplateManager(false);
+                          }}
+                          className="px-3 py-1.5 text-xs bg-pacific-600/20 hover:bg-pacific-600/30 text-pacific-400 rounded transition-colors"
+                        >
+                          Load
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (
+                              confirm(`Delete template "${template.name}"?`)
+                            ) {
+                              deleteTemplateMutation.mutate(template.id);
+                            }
+                          }}
+                          disabled={deleteTemplateMutation.isPending}
+                          className="p-1.5 text-coral-400 hover:bg-coral-900/20 rounded transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

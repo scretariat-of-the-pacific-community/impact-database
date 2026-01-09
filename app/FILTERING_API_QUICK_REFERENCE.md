@@ -253,7 +253,7 @@ curl "http://localhost:8000/api/v1/images?status=approved" | jq '.images[] | sel
 
 ### API Documentation
 
-**Interactive docs**: http://localhost:8000/docs  
+**Interactive docs**: http://localhost:8000/docs
 **ReDoc**: http://localhost:8000/redoc
 
 ### Support

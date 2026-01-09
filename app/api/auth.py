@@ -18,7 +18,33 @@ from workers.email_tasks import send_welcome_email
 
 logger = logging.getLogger(__name__)
 
-# Simple in-memory rate limiter (replace with Redis in production)
+# SECURITY FIX: Redis-backed rate limiter for persistent, distributed rate limiting
+# This replaces in-memory storage which resets on restart and doesn't work across workers
+
+def get_redis_client():
+    """Get Redis client for rate limiting"""
+    import redis
+    redis_host = os.getenv("REDIS_HOST", "localhost")
+    redis_port = int(os.getenv("REDIS_PORT", "6379"))
+    redis_db = int(os.getenv("REDIS_DB", "0"))
+    
+    try:
+        client = redis.Redis(
+            host=redis_host,
+            port=redis_port,
+            db=redis_db,
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+        )
+        # Test connection
+        client.ping()
+        return client
+    except Exception as e:
+        logger.warning(f"Redis connection failed: {e}. Falling back to in-memory rate limiting.")
+        return None
+
+# Fallback in-memory storage if Redis is unavailable
 rate_limit_storage: Dict[str, list] = defaultdict(list)
 RATE_LIMIT_WINDOW = 900  # 15 minutes (for auth endpoints)
 RATE_LIMIT_MAX_ATTEMPTS = 5  # Max attempts for auth endpoints
@@ -30,6 +56,8 @@ UPLOAD_RATE_LIMIT_MAX_ATTEMPTS = 10  # 10 uploads per hour
 
 def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int = None) -> None:
     """Check if identifier has exceeded rate limit.
+    
+    Uses Redis for persistent, distributed rate limiting. Falls back to in-memory if Redis unavailable.
 
     Args:
         identifier: IP address or username to check
@@ -47,6 +75,31 @@ def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int
         window = custom_window or RATE_LIMIT_WINDOW
         max_attempts = custom_max or RATE_LIMIT_MAX_ATTEMPTS
 
+    # Try Redis first
+    redis_client = get_redis_client()
+    if redis_client:
+        try:
+            key = f"rate_limit:{identifier}"
+            current = redis_client.get(key)
+            
+            if current and int(current) >= max_attempts:
+                ttl = redis_client.ttl(key)
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=f"Too many attempts. Please try again in {max(ttl, 0)} seconds.",
+                    headers={"Retry-After": str(max(ttl, 0))}
+                )
+            
+            # Increment counter with expiration
+            pipe = redis_client.pipeline()
+            pipe.incr(key)
+            pipe.expire(key, window)
+            pipe.execute()
+            return
+        except Exception as e:
+            logger.warning(f"Redis rate limit check failed: {e}. Using in-memory fallback.")
+    
+    # Fallback to in-memory rate limiting
     now = time.time()
     # Clean old attempts
     rate_limit_storage[identifier] = [
@@ -240,6 +293,21 @@ async def login(
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    
+    # Update last_login in admin_users table if exists
+    try:
+        from services.admin_service import AdminUser
+        admin_user = db.query(AdminUser).filter(
+            (AdminUser.username == user.username) | (AdminUser.email == user.email)
+        ).first()
+        if admin_user:
+            admin_user.last_login = datetime.utcnow()
+            admin_user.failed_login_attempts = 0
+            db.commit()
+    except Exception as e:
+        logger.warning(f"Could not update admin_users last_login: {e}")
+        # Continue with login even if admin_users update fails
+    
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires

@@ -9,7 +9,7 @@ This document details the implementation of 5 medium-priority fixes to further i
 
 **Purpose**: Improve performance by caching expensive user statistics calculations.
 
-**Location**: 
+**Location**:
 - [app/middleware/cache.py](app/middleware/cache.py) - Redis cache manager
 - [app/api/user.py](app/api/user.py#L118-L213) - Stats endpoint with caching
 
@@ -53,7 +53,7 @@ cache:user_stats:{username}
 
 **Purpose**: Provide consistent pagination information across all API endpoints.
 
-**Location**: 
+**Location**:
 - [app/utils/pagination.py](app/utils/pagination.py) - Pagination utilities
 - [app/api/user.py](app/api/user.py#L280-L320) - Activity endpoint with pagination
 
@@ -170,7 +170,7 @@ AVATAR_DIMENSIONS = (400, 400)  # Square avatars
 
 **Upload Process**:
 1. **Validate**: Check file size (max 5MB) and format (JPEG/PNG/WebP)
-2. **Process**: 
+2. **Process**:
    - Open with PIL/Pillow
    - Convert to RGB
    - Crop to square

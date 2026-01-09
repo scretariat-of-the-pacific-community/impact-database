@@ -4,6 +4,7 @@ import {
   SearchResponse,
   ImageMetadata,
   User,
+  UserRole,
   APIError,
   BoundingBox,
   VocabulariesResponse,
@@ -20,12 +21,18 @@ class APIClient {
   private isHandlingUnauthorized: boolean = false;
 
   constructor() {
-    this.baseURL = config.API.BASE_URL;
-    
+    // Lazy evaluation of BASE_URL to ensure it's called in the right context
+    this.baseURL =
+      typeof window === 'undefined'
+        ? process.env.NEXT_PUBLIC_API_URL_INTERNAL ||
+          process.env.NEXT_PUBLIC_API_URL ||
+          'http://api:8000'
+        : process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: config.API.TIMEOUT,
-      withCredentials: true,  // Send HttpOnly cookies with requests
+      withCredentials: true, // Send HttpOnly cookies with requests
       headers: {
         'Content-Type': 'application/json',
       },
@@ -89,26 +96,33 @@ class APIClient {
     if (this.isHandlingUnauthorized) {
       return;
     }
-    
+
     if (typeof window !== 'undefined') {
       this.isHandlingUnauthorized = true;
-      
+
       // Clear auth tokens
       localStorage.removeItem('authToken');
       localStorage.removeItem('ocean_portal_session');
-      document.cookie = 'ocean_portal_token=; Max-Age=0; path=/; SameSite=Strict';
-      
+      document.cookie =
+        'ocean_portal_token=; Max-Age=0; path=/; SameSite=Strict';
+
       // Dispatch custom event so auth provider can react and update React state
       window.dispatchEvent(new CustomEvent('auth:unauthorized'));
-      
+
       // Only redirect to login if not already there or on public pages
-      const publicPaths = ['/', '/auth/login', '/auth/callback', '/search', '/map'];
+      const publicPaths = [
+        '/',
+        '/auth/login',
+        '/auth/callback',
+        '/search',
+        '/map',
+      ];
       const currentPath = window.location.pathname;
-      
+
       if (!publicPaths.includes(currentPath)) {
         window.location.href = '/auth/login';
       }
-      
+
       // Reset the flag after a short delay to allow legitimate re-auth attempts
       setTimeout(() => {
         this.isHandlingUnauthorized = false;
@@ -149,26 +163,29 @@ class APIClient {
   // Search and Browse Images
   async searchImages(filters: SearchFilters = {}): Promise<SearchResponse> {
     const params = new URLSearchParams();
-    
+
     // Map frontend filters to backend parameter names
     const paramMap: Record<string, string> = {
-      'limit': 'limit',
-      'offset': 'skip',  // Backend uses 'skip' instead of 'offset'
-      'q': 'q',
-      'sort_by': 'sort_by',
-      'sort_order': 'sort_order',
-      'hazard_type': 'hazard_type',
-      'location': 'location',
-      'country': 'country'
+      limit: 'limit',
+      offset: 'skip', // Backend uses 'skip' instead of 'offset'
+      q: 'q',
+      sort_by: 'sort_by',
+      sort_order: 'sort_order',
+      hazard_type: 'hazard_type',
+      location: 'location',
+      country: 'country',
     };
-    
+
     Object.entries(filters).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
         const backendKey = paramMap[key] || key;
         if (Array.isArray(value)) {
-          value.forEach(v => params.append(backendKey, v.toString()));
+          value.forEach((v) => params.append(backendKey, v.toString()));
         } else if (typeof value === 'object' && 'west' in value) {
-          params.append('bbox', `${value.west},${value.south},${value.east},${value.north}`);
+          params.append(
+            'bbox',
+            `${value.west},${value.south},${value.east},${value.north}`
+          );
         } else {
           params.append(backendKey, value.toString());
         }
@@ -190,7 +207,9 @@ class APIClient {
   }
 
   async getImageHistory(id: string): Promise<{ history: any[] }> {
-    const response = await this.client.get(`/api/images/${encodeURIComponent(id)}/history`);
+    const response = await this.client.get(
+      `/api/images/${encodeURIComponent(id)}/history`
+    );
     return response.data;
   }
 
@@ -205,7 +224,7 @@ class APIClient {
     return features.map((f: any) => ({
       ...f.properties,
       latitude: f.geometry?.coordinates?.[1],
-      longitude: f.geometry?.coordinates?.[0]
+      longitude: f.geometry?.coordinates?.[0],
     }));
   }
 
@@ -220,19 +239,23 @@ class APIClient {
   }
 
   async getVocabularies(): Promise<VocabulariesResponse> {
-    const response: AxiosResponse<VocabulariesResponse> = await this.client.get('/api/vocabularies');
+    const response: AxiosResponse<VocabulariesResponse> =
+      await this.client.get('/api/vocabularies');
     return response.data;
   }
 
   async getUserStats(): Promise<UserStats> {
     try {
-      const response: AxiosResponse<UserStats> = await this.client.get('/api/user/stats');
+      const response: AxiosResponse<UserStats> =
+        await this.client.get('/api/user/stats');
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
         // Log warning - stats endpoint should exist in production
-        console.warn('⚠️ Stats endpoint returned 404 - using fallback data. This should not happen in production!');
-        
+        console.warn(
+          '⚠️ Stats endpoint returned 404 - using fallback data. This should not happen in production!'
+        );
+
         // Fall back to placeholder stats when the endpoint is not available yet
         return {
           name: 'Impact Responder',
@@ -254,11 +277,17 @@ class APIClient {
     }
   }
 
-  async getUserUploads(params?: { page?: number; limit?: number }): Promise<UserUpload[]> {
+  async getUserUploads(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<UserUpload[]> {
     try {
-      const response: AxiosResponse<UserUpload[]> = await this.client.get('/api/images/user/uploads', {
-        params,
-      });
+      const response: AxiosResponse<UserUpload[]> = await this.client.get(
+        '/api/images/user/uploads',
+        {
+          params,
+        }
+      );
       return response.data;
     } catch (error) {
       if (isAxiosError(error) && error.response?.status === 404) {
@@ -270,19 +299,52 @@ class APIClient {
 
   async getUserActivity(): Promise<PaginatedResponse<UserActivityEvent>> {
     try {
-      const response: AxiosResponse<PaginatedResponse<UserActivityEvent>> = await this.client.get('/api/user/activity');
+      const response: AxiosResponse<PaginatedResponse<UserActivityEvent>> =
+        await this.client.get('/api/user/activity');
       return response.data;
     } catch (error) {
-      if (isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 403)) {
-        return { events: [], pagination: { total: 0, page: 1, limit: 50, total_pages: 0, has_next: false, has_prev: false } };
+      if (
+        isAxiosError(error) &&
+        (error.response?.status === 404 || error.response?.status === 403)
+      ) {
+        return {
+          events: [],
+          pagination: {
+            total: 0,
+            page: 1,
+            limit: 50,
+            total_pages: 0,
+            has_next: false,
+            has_prev: false,
+          },
+        };
       }
       throw error;
     }
   }
 
   async getCurrentUser(): Promise<User> {
-    const response: AxiosResponse<User> = await this.client.get('/api/auth/me');
-    return response.data;
+    // Use RBAC endpoint that includes role and permissions
+    const response: AxiosResponse<any> =
+      await this.client.get('/api/rbac/auth/me');
+    const userData = response.data;
+
+    // Transform role object to roles array for frontend compatibility
+    const roles: UserRole[] = [];
+    if (userData.role?.name) {
+      roles.push(userData.role.name as UserRole);
+    }
+
+    return {
+      id: userData.id,
+      email: userData.email,
+      name: userData.full_name,
+      roles,
+      organization: userData.organization,
+      country: userData.country,
+      created_at: userData.created_at,
+      last_login: userData.last_login,
+    };
   }
 
   async updateImage(imageId: string, data: any): Promise<any> {
@@ -305,11 +367,30 @@ class APIClient {
         // Return default settings if endpoint doesn't exist yet
         return {
           profile: { avatar_url: '', bio: '', location: '', organization: '' },
-          privacy: { public_profile: true, hide_stats: false, anonymous_contributions: false },
+          privacy: {
+            public_profile: true,
+            hide_stats: false,
+            anonymous_contributions: false,
+          },
           notifications: {
-            email: { uploads: true, reviews: true, comments: true, achievements: false },
-            in_app: { uploads: true, reviews: true, comments: true, achievements: true },
-            push: { uploads: false, reviews: false, comments: false, achievements: false },
+            email: {
+              uploads: true,
+              reviews: true,
+              comments: true,
+              achievements: false,
+            },
+            in_app: {
+              uploads: true,
+              reviews: true,
+              comments: true,
+              achievements: true,
+            },
+            push: {
+              uploads: false,
+              reviews: false,
+              comments: false,
+              achievements: false,
+            },
           },
           default_metadata: { tags: [] },
         };
@@ -383,7 +464,9 @@ class APIClient {
 
   // Admin API Methods
   async getDashboardStats(period: string = '7d'): Promise<any> {
-    const response = await this.client.get(`/api/admin/dashboard?period=${period}`);
+    const response = await this.client.get(
+      `/api/admin/curation/dashboard/stats?period=${period}`
+    );
     return response.data;
   }
 
@@ -392,17 +475,24 @@ class APIClient {
     Object.entries(params).forEach(([key, value]) => {
       if (value) queryParams.append(key, value.toString());
     });
-    const response = await this.client.get(`/api/admin/curation/queue?${queryParams}`);
+    const response = await this.client.get(
+      `/api/admin/curation/queue?${queryParams}`
+    );
     return response.data;
   }
 
   async getCurationItem(itemId: string): Promise<any> {
-    const response = await this.client.get(`/api/admin/curation/queue/${itemId}`);
+    const response = await this.client.get(
+      `/api/admin/curation/queue/${itemId}`
+    );
     return response.data;
   }
 
   async updateCurationStatus(itemId: string, data: any): Promise<any> {
-    const response = await this.client.put(`/api/admin/curation/queue/${itemId}`, data);
+    const response = await this.client.put(
+      `/api/admin/curation/queue/${itemId}`,
+      data
+    );
     return response.data;
   }
 
@@ -421,7 +511,10 @@ class APIClient {
   }
 
   async updateUser(userId: string, userData: any): Promise<any> {
-    const response = await this.client.put(`/api/admin/users/${userId}`, userData);
+    const response = await this.client.put(
+      `/api/admin/users/${userId}`,
+      userData
+    );
     return response.data;
   }
 
@@ -431,7 +524,9 @@ class APIClient {
   }
 
   async unlockUser(userId: string): Promise<any> {
-    const response = await this.client.post(`/api/admin/users/${userId}/unlock`);
+    const response = await this.client.post(
+      `/api/admin/users/${userId}/unlock`
+    );
     return response.data;
   }
 
@@ -452,7 +547,7 @@ class APIClient {
 
   async startImport(formData: FormData): Promise<any> {
     const response = await this.client.post('/api/admin/imports', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
     return response.data;
   }
@@ -472,27 +567,40 @@ class APIClient {
     Object.entries(params).forEach(([key, value]) => {
       if (value) queryParams.append(key, value.toString());
     });
-    const response = await this.client.get(`/api/admin/curation/comments/${itemId}?${queryParams}`);
+    const response = await this.client.get(
+      `/api/admin/curation/comments/${itemId}?${queryParams}`
+    );
     return response.data;
   }
 
   async createComment(commentData: any): Promise<any> {
-    const response = await this.client.post('/api/admin/curation/comments', commentData);
+    const response = await this.client.post(
+      '/api/admin/curation/comments',
+      commentData
+    );
     return response.data;
   }
 
   async updateComment(commentId: string, commentData: any): Promise<any> {
-    const response = await this.client.put(`/api/admin/curation/comments/${commentId}`, commentData);
+    const response = await this.client.put(
+      `/api/admin/curation/comments/${commentId}`,
+      commentData
+    );
     return response.data;
   }
 
   async deleteComment(commentId: string): Promise<any> {
-    const response = await this.client.delete(`/api/admin/curation/comments/${commentId}`);
+    const response = await this.client.delete(
+      `/api/admin/curation/comments/${commentId}`
+    );
     return response.data;
   }
 
   async flagComment(commentId: string, reason: string): Promise<any> {
-    const response = await this.client.post(`/api/admin/curation/comments/${commentId}/flag`, { reason });
+    const response = await this.client.post(
+      `/api/admin/curation/comments/${commentId}/flag`,
+      { reason }
+    );
     return response.data;
   }
 
@@ -502,7 +610,10 @@ class APIClient {
   }
 
   async updateImageMetadata(imageId: string, metadataData: any): Promise<any> {
-    const response = await this.client.put(`/api/admin/curation/metadata/${imageId}`, metadataData);
+    const response = await this.client.put(
+      `/api/admin/curation/metadata/${imageId}`,
+      metadataData
+    );
     return response.data;
   }
 }
@@ -515,13 +626,14 @@ export const oceanPortalApi = new APIClient();
 
 // Legacy image API for backward compatibility
 export const imageApi = {
-  getAll: () => apiClient.get<ImageMetadata[]>('/api/images/list'),  // Use the new list endpoint
+  getAll: () => apiClient.get<ImageMetadata[]>('/api/images/list'), // Use the new list endpoint
   getById: (filename: string) => oceanPortalApi.getImage(filename),
-  getByHazard: (hazardType: string) => apiClient.get('/api/hazards', { params: { type: hazardType } }),
+  getByHazard: (hazardType: string) =>
+    apiClient.get('/api/hazards', { params: { type: hazardType } }),
   upload: (formData: FormData, onProgress?: (progress: number) => void) => {
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      
+
       // Setup progress tracking
       if (onProgress) {
         xhr.upload.addEventListener('progress', (e) => {
@@ -531,7 +643,7 @@ export const imageApi = {
           }
         });
       }
-      
+
       // Setup response handlers
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -546,9 +658,10 @@ export const imageApi = {
           try {
             const errorData = JSON.parse(xhr.responseText);
             if (errorData.detail) {
-              errorMessage = typeof errorData.detail === 'string' 
-                ? errorData.detail 
-                : JSON.stringify(errorData.detail);
+              errorMessage =
+                typeof errorData.detail === 'string'
+                  ? errorData.detail
+                  : JSON.stringify(errorData.detail);
             }
           } catch (e) {
             // Use status text if can't parse JSON
@@ -556,13 +669,13 @@ export const imageApi = {
           reject(new Error(`Upload failed: ${errorMessage}`));
         }
       };
-      
+
       xhr.onerror = () => reject(new Error('Upload failed: Network error'));
-      
+
       // Use cookie-based authentication (secure, XSS-proof)
       // Cookies are sent automatically with credentials, no manual Authorization header needed
       xhr.withCredentials = true;
-      
+
       // Send request
       xhr.open('POST', getApiUrl('/upload/upload'));
       xhr.send(formData);
@@ -597,8 +710,22 @@ export const imageApi = {
   },
   getFeaturedStories: async () => {
     try {
-      const response = await apiClient.get('/api/featured-stories');
-      return response.data;
+      const response = await fetch(`${BASE_URL}/api/featured-stories`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null; // Return null if endpoint doesn't exist - page will use fallback data
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error: any) {
       // Return null if endpoint doesn't exist - page will use fallback data
       if (error?.response?.status === 404) {

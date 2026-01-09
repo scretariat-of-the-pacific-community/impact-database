@@ -96,20 +96,20 @@ try:
     from services.minio_client import get_minio_storage
     import os
     import time
-    
+
     # Wait a bit for MinIO to be fully ready
     time.sleep(10)
 
     minio_client = get_minio_storage()
     bucket_name = os.getenv('MINIO_BUCKET_NAME', 'impact-images')
-    
+
     # The bucket creation is handled inside get_minio_storage()
     print(f'MinIO bucket already exists: {bucket_name}')
-        
+
 except Exception as e:
     print(f'MinIO initialization error (continuing anyway): {e}')
 "
-    
+
     # Start FastAPI server
     echo "Starting FastAPI app..."
     APP_ENV=${APP_ENV:-prod}

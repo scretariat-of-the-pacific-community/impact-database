@@ -351,7 +351,7 @@ async def get_ogc_collections(request: Request, db: Session = Depends(get_db)):
     """Get all OGC collections"""
     # Get unique hazard types with spatial/temporal extents
     hazard_query = """
-    SELECT 
+    SELECT
         hazard_type,
         COUNT(*) as record_count,
         MIN(longitude) as min_lon,
@@ -360,8 +360,8 @@ async def get_ogc_collections(request: Request, db: Session = Depends(get_db)):
         MAX(latitude) as max_lat,
         MIN(timestamp) as min_time,
         MAX(timestamp) as max_time
-    FROM image_metadata 
-    WHERE hazard_type IS NOT NULL 
+    FROM image_metadata
+    WHERE hazard_type IS NOT NULL
     GROUP BY hazard_type
     """
 
@@ -447,7 +447,7 @@ async def get_ogc_collection(collection_id: str, request: Request, db: Session =
 
     # Get collection statistics
     stats_query = """
-    SELECT 
+    SELECT
         COUNT(*) as record_count,
         MIN(longitude) as min_lon,
         MAX(longitude) as max_lon,
@@ -455,7 +455,7 @@ async def get_ogc_collection(collection_id: str, request: Request, db: Session =
         MAX(latitude) as max_lat,
         MIN(timestamp) as min_time,
         MAX(timestamp) as max_time
-    FROM image_metadata 
+    FROM image_metadata
     WHERE LOWER(hazard_type) = LOWER(:hazard_type)
     """
 

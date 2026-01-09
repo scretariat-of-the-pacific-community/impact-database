@@ -1,13 +1,13 @@
 # Upload Page & Mechanism Assessment
-**Date**: December 15, 2025  
+**Date**: December 15, 2025
 **Scope**: Comprehensive analysis of all user scenarios and edge cases
 
 ---
 
 ## Executive Summary
 
-**Status**: ⚠️ PARTIALLY FUNCTIONAL with critical gaps  
-**Risk Level**: MEDIUM-HIGH  
+**Status**: ⚠️ PARTIALLY FUNCTIONAL with critical gaps
+**Risk Level**: MEDIUM-HIGH
 **User Impact**: Several scenarios are broken or provide poor UX
 
 ### Recent Fixes
@@ -67,7 +67,7 @@
 - ❌ No map widget to pick location if GPS unavailable
 - ❌ No address geocoding to get coordinates from location name
 
-**Impact**: HIGH - Blocks valid disaster documentation use cases  
+**Impact**: HIGH - Blocks valid disaster documentation use cases
 **Affected Users**: Citizens without GPS-enabled cameras, historical archives
 
 **Required Fixes**:
@@ -185,8 +185,8 @@ content = await _read_upload_with_limit(file, max_file_size)
 **Available in UI** (from vocabularies API):
 ```json
 hazard_types: [
-  "Earthquake", "Flood", "Tsunami", "Hurricane", 
-  "Cyclone", "Tornado", "Storm Surge", "Drought", 
+  "Earthquake", "Flood", "Tsunami", "Hurricane",
+  "Cyclone", "Tornado", "Storm Surge", "Drought",
   "Wildfire", "Landslide", "Volcanic Eruption"
 ]
 ```
@@ -206,7 +206,7 @@ valid_hazard_types = ['flood', 'cyclone', 'tsunami', 'landslide']
 5. User searches for storm surge → no results!
 ```
 
-**Impact**: CRITICAL DATA LOSS  
+**Impact**: CRITICAL DATA LOSS
 **Affected**: All hazard types except flood/cyclone/tsunami/landslide
 
 **Root Cause**: Frontend and backend hazard type enums out of sync
@@ -375,7 +375,7 @@ setTimeout(() => router.push('/'), 1000);
 7. Repeat 19 more times
 ```
 
-**Time**: ~2-3 minutes per image = 40-60 minutes total  
+**Time**: ~2-3 minutes per image = 40-60 minutes total
 **Frustration**: EXTREMELY HIGH
 
 **What's Needed**:
@@ -913,7 +913,7 @@ describe('Upload Flow', () => {
 - Breaks for many real-world scenarios
 - Data quality issues undermine search/discovery
 
-**Recommendation**: 
+**Recommendation**:
 1. Fix critical issues (coordinates, hazard types, thumbnails) before production
 2. Add bulk upload for v1.1
 3. Improve mobile experience for v1.2
@@ -927,8 +927,8 @@ describe('Upload Flow', () => {
 ```typescript
 // upload/page.tsx line 242
 const validHazardTypes = ['flood', 'cyclone', 'tsunami', 'landslide'];
-const mappedHazardType = validHazardTypes.includes(data.hazard_type) 
-  ? data.hazard_type 
+const mappedHazardType = validHazardTypes.includes(data.hazard_type)
+  ? data.hazard_type
   : 'other';  // SILENT DATA LOSS!
 ```
 
@@ -967,5 +967,5 @@ db.flush()
 
 ---
 
-**Assessment Complete**  
+**Assessment Complete**
 **Next Steps**: Review with team, prioritize fixes, create tickets for critical issues

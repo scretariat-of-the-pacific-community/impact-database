@@ -12,18 +12,18 @@ import InfiniteUploadList from '@/components/profile/InfiniteUploadList';
 
 // Bottom navigation (mobile only)
 <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
-  <MobileBottomNav 
-    activeTab={activeTab} 
-    onTabChange={setActiveTab} 
-    items={PROFILE_NAV_ITEMS} 
+  <MobileBottomNav
+    activeTab={activeTab}
+    onTabChange={setActiveTab}
+    items={PROFILE_NAV_ITEMS}
   />
 </div>
 
 // Swipeable tabs (mobile only)
 <div className="block md:hidden">
-  <SwipeableTabs 
-    activeTab={activeTab} 
-    onTabChange={setActiveTab} 
+  <SwipeableTabs
+    activeTab={activeTab}
+    onTabChange={setActiveTab}
     tabs={TABS}
   >
     <div className="p-4">{content}</div>
@@ -89,28 +89,36 @@ await showLocalNotification('Test', {
 
 ## 📱 Routes
 
-| Route | Description | Mobile-Optimized |
-|-------|-------------|------------------|
-| `/profile` | User profile with stats and uploads | ✅ Yes |
-| `/profile?tab=uploads` | Upload history | ✅ Yes |
-| `/profile?tab=activity` | Activity timeline | ✅ Yes |
-| `/profile?tab=achievements` | Achievements and badges | ✅ Yes |
-| `/profile?tab=analytics` | Statistics and insights | ✅ Yes |
-| `/profile?tab=settings` | User preferences | ✅ Yes |
-| `/upload/mobile` | Camera-first upload | ✅ Mobile-only |
-| `/profile/settings` | Comprehensive settings page | ✅ Yes |
+| Route                       | Description                         | Mobile-Optimized |
+| --------------------------- | ----------------------------------- | ---------------- |
+| `/profile`                  | User profile with stats and uploads | ✅ Yes           |
+| `/profile?tab=uploads`      | Upload history                      | ✅ Yes           |
+| `/profile?tab=activity`     | Activity timeline                   | ✅ Yes           |
+| `/profile?tab=achievements` | Achievements and badges             | ✅ Yes           |
+| `/profile?tab=analytics`    | Statistics and insights             | ✅ Yes           |
+| `/profile?tab=settings`     | User preferences                    | ✅ Yes           |
+| `/upload/mobile`            | Camera-first upload                 | ✅ Mobile-only   |
+| `/profile/settings`         | Comprehensive settings page         | ✅ Yes           |
 
 ## 🎨 Responsive Breakpoints
 
 ```css
 /* Mobile: 0-767px */
-.mobile-only { display: block; }
-.desktop-only { display: none; }
+.mobile-only {
+  display: block;
+}
+.desktop-only {
+  display: none;
+}
 
 /* Desktop: 768px+ */
 @media (min-width: 768px) {
-  .mobile-only { display: none; }
-  .desktop-only { display: block; }
+  .mobile-only {
+    display: none;
+  }
+  .desktop-only {
+    display: block;
+  }
 }
 ```
 
@@ -191,12 +199,16 @@ canvas.height = video.videoHeight;
 const ctx = canvas.getContext('2d');
 ctx.drawImage(video, 0, 0);
 
-canvas.toBlob((blob) => {
-  const file = new File([blob], `capture-${Date.now()}.jpg`, {
-    type: 'image/jpeg',
-  });
-  // Upload file
-}, 'image/jpeg', 0.92);
+canvas.toBlob(
+  (blob) => {
+    const file = new File([blob], `capture-${Date.now()}.jpg`, {
+      type: 'image/jpeg',
+    });
+    // Upload file
+  },
+  'image/jpeg',
+  0.92
+);
 ```
 
 ### Get GPS Location
@@ -277,7 +289,7 @@ npx web-push generate-vapid-keys
 
 ```javascript
 // In browser console
-navigator.serviceWorker.getRegistrations().then(registrations => {
+navigator.serviceWorker.getRegistrations().then((registrations) => {
   console.log('Registered service workers:', registrations);
 });
 
@@ -289,7 +301,7 @@ navigator.serviceWorker.controller;
 
 ```javascript
 // In browser console
-indexedDB.databases().then(dbs => {
+indexedDB.databases().then((dbs) => {
   console.log('IndexedDB databases:', dbs);
 });
 
@@ -305,8 +317,8 @@ request.onsuccess = () => {
 
 ```javascript
 // In browser console
-navigator.serviceWorker.ready.then(registration => {
-  registration.pushManager.getSubscription().then(subscription => {
+navigator.serviceWorker.ready.then((registration) => {
+  registration.pushManager.getSubscription().then((subscription) => {
     console.log('Push subscription:', subscription);
   });
 });
@@ -316,10 +328,13 @@ navigator.serviceWorker.ready.then(registration => {
 
 ```javascript
 // In browser console
-navigator.storage.estimate().then(estimate => {
+navigator.storage.estimate().then((estimate) => {
   console.log('Usage:', estimate.usage);
   console.log('Quota:', estimate.quota);
-  console.log('Percentage:', (estimate.usage / estimate.quota * 100).toFixed(2) + '%');
+  console.log(
+    'Percentage:',
+    ((estimate.usage / estimate.quota) * 100).toFixed(2) + '%'
+  );
 });
 ```
 
@@ -467,6 +482,7 @@ interface SwipeableTabsProps {
 ## 📞 Support
 
 For issues or questions:
+
 1. Check browser console for errors
 2. Verify service worker is active
 3. Check IndexedDB for cached data

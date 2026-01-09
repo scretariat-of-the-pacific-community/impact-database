@@ -57,7 +57,7 @@ Added new animations:
 
 #### ErrorState
 ```tsx
-<ErrorState 
+<ErrorState
   title="Something went wrong"
   message="Error description"
   onRetry={() => refetch()}

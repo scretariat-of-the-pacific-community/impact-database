@@ -64,7 +64,7 @@ def upgrade():
     # PostgreSQL/PostGIS allows this upgrade without data loss
     op.execute(
         """
-        ALTER TABLE image_metadata 
+        ALTER TABLE image_metadata
         ALTER COLUMN geometry TYPE Geometry(PointZ, 4326)
         USING ST_Force3D(geometry)
     """
@@ -96,7 +96,7 @@ def downgrade():
     # Downgrade geometry from POINTZ to POINT (loses Z dimension)
     op.execute(
         """
-        ALTER TABLE image_metadata 
+        ALTER TABLE image_metadata
         ALTER COLUMN geometry TYPE Geometry(Point, 4326)
         USING ST_Force2D(geometry)
     """

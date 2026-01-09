@@ -14,6 +14,7 @@ All interactive elements meet WCAG 2.1 AAA guidelines for touch targets:
 - **Safe areas**: Proper padding for notched devices (iOS)
 
 **Components:**
+
 - `MobileBottomNav.tsx`: Bottom navigation with 44px touch targets
 - `InfiniteUploadList.tsx`: Touch-optimized "View" buttons
 
@@ -22,18 +23,16 @@ All interactive elements meet WCAG 2.1 AAA guidelines for touch targets:
 Navigate between profile tabs using left/right swipe gestures.
 
 **Implementation:** `SwipeableTabs.tsx`
+
 - **Swipe threshold**: 50px distance OR 500px/s velocity
 - **Spring animations**: Smooth transitions (stiffness: 300, damping: 30)
 - **Visual indicators**: Dots showing current tab position
 - **Drag elastic**: 0.2 for natural resistance feel
 
 **Usage:**
+
 ```tsx
-<SwipeableTabs 
-  activeTab={activeTab} 
-  onTabChange={handleTabSelect} 
-  tabs={TABS}
->
+<SwipeableTabs activeTab={activeTab} onTabChange={handleTabSelect} tabs={TABS}>
   <div className="p-4">{content}</div>
 </SwipeableTabs>
 ```
@@ -43,12 +42,14 @@ Navigate between profile tabs using left/right swipe gestures.
 Fixed bottom navigation for mobile devices with animated indicator.
 
 **Implementation:** `MobileBottomNav.tsx`
+
 - **Fixed positioning**: Always visible at bottom of viewport
 - **Framer Motion layoutId**: Smooth indicator animation
 - **Glass morphism**: Translucent background with backdrop blur
 - **Semantic ARIA**: Proper accessibility labels
 
 **Navigation items:**
+
 - Uploads (upload history)
 - Activity (timeline)
 - Awards (achievements)
@@ -62,18 +63,21 @@ Performance-optimized upload list with virtual scrolling.
 **Implementation:** `InfiniteUploadList.tsx`
 
 **Desktop:**
+
 - `react-window` FixedSizeList for virtualization
 - `react-virtualized-auto-sizer` for responsive sizing
 - 180px row height
 - Renders only visible items
 
 **Mobile:**
+
 - IntersectionObserver for scroll detection
 - 0.5 threshold for fetch trigger
 - Simple list rendering (no virtualization overhead)
 - Automatic pagination with `useInfiniteQuery`
 
 **Usage:**
+
 ```tsx
 <InfiniteUploadList />
 ```
@@ -85,22 +89,25 @@ Cache profile data and queue uploads for background sync.
 **Implementation:** `lib/offline-storage.ts`
 
 **Features:**
+
 - IndexedDB for persistent storage
 - 24-hour cache duration
 - Background sync for queued uploads
 - Automatic retry with exponential backoff (max 3 attempts)
 
 **Cached data:**
+
 - User stats (total uploads, approval rate, impact score)
 - Upload history (last 100 uploads)
 - Activity timeline
 
 **API:**
+
 ```typescript
-import { 
-  cacheUserStats, 
+import {
+  cacheUserStats,
   getCachedUserStats,
-  queuePendingUpload 
+  queuePendingUpload,
 } from '@/lib/offline-storage';
 
 // Cache stats
@@ -120,17 +127,19 @@ Web Push notifications for achievements and review feedback.
 **Implementation:** `lib/push-notifications.ts`
 
 **Setup:**
+
 1. Request notification permission
 2. Subscribe to push notifications
 3. Save subscription to backend
 4. Backend sends push notifications via Web Push API
 
 **API:**
+
 ```typescript
-import { 
+import {
   initializePushNotifications,
   subscribeToPushNotifications,
-  showLocalNotification 
+  showLocalNotification,
 } from '@/lib/push-notifications';
 
 // Initialize on app load
@@ -145,6 +154,7 @@ await showLocalNotification('Achievement Unlocked!', {
 ```
 
 **Notification triggers:**
+
 - New achievement unlocked
 - Upload approved/rejected
 - Review feedback received
@@ -157,6 +167,7 @@ Mobile-optimized upload flow with immediate GPS capture.
 **Implementation:** `app/upload/mobile/page.tsx`
 
 **Features:**
+
 - Camera API for direct photo capture
 - Fallback to file input for unsupported devices
 - Immediate GPS location capture on photo capture
@@ -166,6 +177,7 @@ Mobile-optimized upload flow with immediate GPS capture.
 - Offline queue for failed uploads
 
 **User flow:**
+
 1. Tap "Open Camera" or "Choose from Gallery"
 2. Capture/select image (GPS automatically captured)
 3. Fill hazard type and description
@@ -181,16 +193,19 @@ Handles offline caching, background sync, and push notifications.
 **Implementation:** `public/sw.js`
 
 **Strategies:**
+
 - **Cache-first**: Static assets, images
 - **Network-first**: API calls with cache fallback
 - **Background sync**: Queued uploads when online
 - **Push notifications**: Achievement and review alerts
 
 **Caches:**
+
 - `ocean-shell-v2`: App shell, HTML, CSS, JS
 - `ocean-data-v1`: API responses, user data
 
 **Events:**
+
 - `install`: Precache app shell assets
 - `activate`: Clean up old caches
 - `fetch`: Serve from cache or network
@@ -205,12 +220,14 @@ Handles offline caching, background sync, and push notifications.
 The profile page automatically adapts to mobile devices:
 
 **Mobile view:**
+
 - Bottom navigation (fixed position)
 - Swipeable tabs (drag to navigate)
 - Infinite scroll upload list
 - Touch-optimized buttons
 
 **Desktop view:**
+
 - Top tabs (traditional navigation)
 - Grid layout for uploads
 - Virtual scrolling for performance
@@ -227,12 +244,14 @@ Navigate to `/upload/mobile` for the camera-first experience:
 ### Offline Support
 
 **Automatic behaviors:**
+
 - Profile data cached on load (24-hour TTL)
 - Uploads queued when offline
 - Background sync when connection restored
 - Visual indicators for offline mode
 
 **Manual cache management:**
+
 ```typescript
 import { clearOfflineCache, getStorageUsage } from '@/lib/offline-storage';
 
@@ -258,33 +277,37 @@ NEXT_PUBLIC_SW_ENABLED=true
 
 ### Browser Support
 
-| Feature | Chrome | Safari | Firefox | Edge |
-|---------|--------|--------|---------|------|
-| Touch gestures | ✅ | ✅ | ✅ | ✅ |
-| Bottom nav | ✅ | ✅ | ✅ | ✅ |
-| Infinite scroll | ✅ | ✅ | ✅ | ✅ |
-| Service worker | ✅ | ✅ | ✅ | ✅ |
-| Background sync | ✅ | ❌ | ❌ | ✅ |
-| Push notifications | ✅ | ✅ (iOS 16.4+) | ✅ | ✅ |
-| Camera API | ✅ | ✅ | ✅ | ✅ |
-| GPS location | ✅ | ✅ | ✅ | ✅ |
+| Feature            | Chrome | Safari         | Firefox | Edge |
+| ------------------ | ------ | -------------- | ------- | ---- |
+| Touch gestures     | ✅     | ✅             | ✅      | ✅   |
+| Bottom nav         | ✅     | ✅             | ✅      | ✅   |
+| Infinite scroll    | ✅     | ✅             | ✅      | ✅   |
+| Service worker     | ✅     | ✅             | ✅      | ✅   |
+| Background sync    | ✅     | ❌             | ❌      | ✅   |
+| Push notifications | ✅     | ✅ (iOS 16.4+) | ✅      | ✅   |
+| Camera API         | ✅     | ✅             | ✅      | ✅   |
+| GPS location       | ✅     | ✅             | ✅      | ✅   |
 
 ### Performance Benchmarks
 
 **Virtual scrolling (1000 uploads):**
+
 - Desktop: 60fps, 50ms render time
 - Mobile: 60fps, 80ms render time
 
 **Infinite scroll (fetch next page):**
+
 - Time to fetch: ~200ms (API latency)
 - UI responsiveness: No jank, smooth scroll
 
 **Cache hit rates:**
+
 - Profile stats: 95% (24-hour cache)
 - Upload list: 90% (invalidated on new upload)
 - Activity timeline: 85% (invalidated on new activity)
 
 **Service worker cache size:**
+
 - App shell: ~2MB (HTML, CSS, JS)
 - Data cache: ~5-10MB (API responses, user data)
 - Total: ~12MB (within 50MB quota)
@@ -295,53 +318,58 @@ Track mobile feature usage:
 
 ```typescript
 // Track swipe gestures
-analytics.track('swipe_tab_navigation', { 
-  from: 'uploads', 
-  to: 'activity' 
+analytics.track('swipe_tab_navigation', {
+  from: 'uploads',
+  to: 'activity',
 });
 
 // Track camera usage
-analytics.track('camera_upload_started', { 
-  hasGPS: true 
+analytics.track('camera_upload_started', {
+  hasGPS: true,
 });
 
 // Track offline uploads
-analytics.track('offline_upload_queued', { 
+analytics.track('offline_upload_queued', {
   file_size: file.size,
-  has_metadata: true
+  has_metadata: true,
 });
 
 // Track background sync
-analytics.track('background_sync_completed', { 
+analytics.track('background_sync_completed', {
   uploads_synced: 3,
-  success_rate: 100
+  success_rate: 100,
 });
 ```
 
 ## 🐛 Troubleshooting
 
 ### Camera not working
+
 - Check browser permissions (Settings > Privacy > Camera)
 - Ensure HTTPS connection (required for Camera API)
 - Test with `navigator.mediaDevices.getUserMedia()`
 
 ### GPS not available
+
 - Check browser permissions (Settings > Privacy > Location)
 - Ensure HTTPS connection (required for Geolocation API)
 - Fallback to manual location entry
 
 ### Background sync not triggering
+
 - Background Sync API only supported in Chrome/Edge
 - Check service worker registration: `navigator.serviceWorker.ready`
 - Manually trigger sync in DevTools > Application > Service Workers
 
 ### Push notifications not received
+
 - Check notification permission: `Notification.permission`
 - Verify VAPID keys are configured
 - Test with local notification first
 - Check service worker console for errors
 
 ### Offline cache not working
+
 - Check IndexedDB quota: `navigator.storage.estimate()`
 - Clear cache and reload: `clearOfflineCache()`
 - Verify service worker is active in DevTools
@@ -349,16 +377,19 @@ analytics.track('background_sync_completed', {
 ## 🔐 Security
 
 **Permissions:**
+
 - Camera: Requested on first use, can be revoked
 - Location: Requested on first use, can be revoked
 - Notifications: Opt-in only, can be revoked
 
 **Data storage:**
+
 - IndexedDB: Client-side only, not synced to server
 - Service worker cache: Scoped to origin, isolated
 - Push subscription: Stored on backend, encrypted
 
 **Privacy:**
+
 - GPS coordinates: Optional, user-controlled
 - Upload metadata: Minimal, only what's needed
 - Cached data: Cleared on logout

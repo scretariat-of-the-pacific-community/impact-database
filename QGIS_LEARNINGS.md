@@ -6,10 +6,10 @@ Analysis of QGIS's professional-grade photo geotag import system and recommendat
 ## Current State vs QGIS
 
 ### What We're Doing Well
-✅ Basic GPS coordinate extraction (lat/lon)  
-✅ Manual coordinate override capability  
-✅ Database storage with PostGIS geometry  
-✅ EXIF datetime extraction  
+✅ Basic GPS coordinate extraction (lat/lon)
+✅ Manual coordinate override capability
+✅ Database storage with PostGIS geometry
+✅ EXIF datetime extraction
 
 ### What We're Missing
 
@@ -36,7 +36,7 @@ import exifread
 def extract_comprehensive_exif(image_path):
     with open(image_path, 'rb') as f:
         tags = exifread.process_file(f, details=True)
-    
+
     metadata = {
         # GPS Data
         'gps_latitude': parse_gps_coord(tags.get('GPS GPSLatitude')),
@@ -47,25 +47,25 @@ def extract_comprehensive_exif(image_path):
         'gps_speed': tags.get('GPS GPSSpeed'),
         'gps_datestamp': tags.get('GPS GPSDateStamp'),
         'gps_timestamp': tags.get('GPS GPSTimeStamp'),
-        
+
         # Camera Data
         'camera_make': tags.get('Image Make'),
         'camera_model': tags.get('Image Model'),
         'lens_model': tags.get('EXIF LensModel'),
-        
+
         # Image Settings
         'orientation': tags.get('Image Orientation'),
         'exposure_time': tags.get('EXIF ExposureTime'),
         'f_number': tags.get('EXIF FNumber'),
         'iso': tags.get('EXIF ISOSpeedRatings'),
         'focal_length': tags.get('EXIF FocalLength'),
-        
+
         # Timestamps (with fallback hierarchy)
         'datetime_original': tags.get('EXIF DateTimeOriginal'),
         'datetime_digitized': tags.get('EXIF DateTimeDigitized'),
         'datetime': tags.get('Image DateTime'),
     }
-    
+
     return metadata
 ```
 
@@ -87,11 +87,11 @@ if (GPSAltitudeRef == 1) {
 ### Recommendation for Impact-Database
 ```sql
 -- Upgrade geometry column to support Z dimension
-ALTER TABLE image_metadata 
+ALTER TABLE image_metadata
   ALTER COLUMN geometry TYPE geometry(PointZ, 4326);
 
 -- Add explicit altitude field for queries
-ALTER TABLE image_metadata 
+ALTER TABLE image_metadata
   ADD COLUMN altitude DOUBLE PRECISION,
   ADD COLUMN altitude_ref SMALLINT DEFAULT 0;  -- 0=above, 1=below sea level
 ```
@@ -149,7 +149,7 @@ def extract_camera_direction(gps_info: dict) -> Optional[float]:
     """Extract GPS image direction (bearing) from EXIF."""
     img_direction = gps_info.get('GPSImgDirection')
     img_direction_ref = gps_info.get('GPSImgDirectionRef', 'T')
-    
+
     if img_direction:
         # T = True North, M = Magnetic North
         bearing = float(img_direction)
@@ -160,7 +160,7 @@ def extract_camera_direction(gps_info: dict) -> Optional[float]:
     return None
 
 # Database schema addition
-ALTER TABLE image_metadata 
+ALTER TABLE image_metadata
   ADD COLUMN camera_bearing DOUBLE PRECISION,
   ADD COLUMN bearing_ref VARCHAR(1);  -- 'T' or 'M'
 ```
@@ -187,22 +187,22 @@ def extract_best_timestamp(exif_data: dict) -> Optional[datetime]:
     # Priority 1: When photo was actually taken
     if 'DateTimeOriginal' in exif_data:
         return parse_exif_datetime(exif_data['DateTimeOriginal'])
-    
+
     # Priority 2: When photo was digitized/scanned
     if 'DateTimeDigitized' in exif_data:
         return parse_exif_datetime(exif_data['DateTimeDigitized'])
-    
+
     # Priority 3: Generic datetime
     if 'DateTime' in exif_data:
         return parse_exif_datetime(exif_data['DateTime'])
-    
+
     # Priority 4: GPS timestamp (if available)
     if 'gps_datestamp' in exif_data and 'gps_timestamp' in exif_data:
         return combine_gps_datetime(
             exif_data['gps_datestamp'],
             exif_data['gps_timestamp']
         )
-    
+
     return None
 
 def parse_exif_datetime(dt_string: str) -> datetime:
@@ -222,7 +222,7 @@ Creates separate output for failed imports:
 ```python
 class UploadFailureLog(Base):
     __tablename__ = 'upload_failures'
-    
+
     id = Column(Integer, primary_key=True)
     filename = Column(String(255))
     file_size = Column(BigInteger)
@@ -279,9 +279,9 @@ async def batch_upload(
     current_user: User = Depends(get_current_user)
 ):
     """Upload multiple images with progress tracking."""
-    
+
     batch_id = str(uuid4())
-    
+
     # Create batch tracking record
     batch = UploadBatch(
         id=batch_id,
@@ -294,7 +294,7 @@ async def batch_upload(
     )
     db.add(batch)
     db.commit()
-    
+
     # Process in background
     background_tasks.add_task(
         process_batch_upload,
@@ -302,7 +302,7 @@ async def batch_upload(
         files=files,
         user_id=current_user.id
     )
-    
+
     return {
         "batch_id": batch_id,
         "status": "processing",
@@ -411,14 +411,14 @@ SUPPORTED_IMAGE_FORMATS = {
 def validate_image_format(file: UploadFile) -> bool:
     """Validate image format and extract extension."""
     mime_type = file.content_type
-    
+
     if mime_type not in SUPPORTED_IMAGE_FORMATS:
         raise HTTPException(
             400,
             f"Unsupported format: {mime_type}. "
             f"Supported formats: {', '.join(SUPPORTED_IMAGE_FORMATS.keys())}"
         )
-    
+
     # For HEIC, may need special library
     if mime_type in ['image/heic', 'image/heif']:
         try:
@@ -428,7 +428,7 @@ def validate_image_format(file: UploadFile) -> bool:
                 500,
                 "HEIC format not supported. Please install pyheif library."
             )
-    
+
     return True
 ```
 
@@ -462,14 +462,14 @@ async def enhanced_upload(
     db: Session = Depends(get_db)
 ):
     """Enhanced upload with QGIS-inspired features."""
-    
+
     # 1. Validate file format
     validate_image_format(file)
-    
+
     # 2. Extract comprehensive EXIF
     content = await file.read()
     exif = extract_comprehensive_exif(io.BytesIO(content))
-    
+
     # 3. Determine coordinates (manual > EXIF)
     if manual_coords:
         lat, lon = manual_coords['lat'], manual_coords['lon']
@@ -483,27 +483,27 @@ async def enhanced_upload(
             'NO_COORDINATES',
             'No GPS data found and no manual coordinates provided'
         )
-    
+
     # 4. Extract altitude
     altitude = None
     if exif.get('gps_altitude'):
         altitude = exif['gps_altitude']
         if exif.get('gps_altitude_ref') == 1:
             altitude = -altitude  # Below sea level
-    
+
     # 5. Get best timestamp
     timestamp = extract_best_timestamp(exif)
-    
+
     # 6. Calculate rotation
     orientation = exif.get('orientation', 1)
     rotation = get_rotation_from_exif(orientation)
-    
+
     # 7. Create geometry (with Z if altitude available)
     if altitude:
         geom = WKTElement(f'POINT Z({lon} {lat} {altitude})', srid=4326)
     else:
         geom = WKTElement(f'POINT({lon} {lat})', srid=4326)
-    
+
     # 8. Create database record with all metadata
     image = ImageMetadata(
         filename=file.filename,
@@ -518,10 +518,10 @@ async def enhanced_upload(
         coordinate_source=coord_source,
         # ... other fields
     )
-    
+
     db.add(image)
     db.commit()
-    
+
     return {
         "success": True,
         "image_id": image.id,

@@ -6,7 +6,7 @@
 /**
  * Get authentication token from secure sources
  * Priority: Cookie (httpOnly, XSS-safe) > localStorage (fallback)
- * 
+ *
  * @deprecated Direct token access - prefer using fetch with credentials: 'include'
  * @returns Auth token or null
  */
@@ -22,7 +22,7 @@ export function getAuthToken(): string | null {
     ?.split('; ')
     .find((row) => row.startsWith('ocean_portal_token='))
     ?.split('=')[1];
-  
+
   if (cookieToken) {
     return decodeURIComponent(cookieToken);
   }
@@ -35,7 +35,7 @@ export function getAuthToken(): string | null {
 /**
  * Create authenticated fetch options with credentials
  * Uses automatic cookie handling - more secure than manual Authorization headers
- * 
+ *
  * @param options - Additional fetch options
  * @returns Fetch options with authentication configured
  */
@@ -53,17 +53,38 @@ export function createAuthFetchOptions(options: RequestInit = {}): RequestInit {
 /**
  * Authenticated fetch wrapper for Next.js API routes
  * Automatically includes credentials for cookie-based auth
- * 
+ *
  * Note: Use relative paths (e.g., '/api/admin/users') for Next.js API routes.
  * These routes are handled by Next.js server and work in any deployment.
- * For direct backend API calls, use imageApi from '@/lib/api' instead.
- * 
+ * For direct backend API calls, use backendFetch instead.
+ *
  * @param url - Relative URL to Next.js API route (e.g., '/api/admin/users')
  * @param options - Fetch options
  * @returns Fetch promise
  */
-export async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
+export async function authFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
   return fetch(url, createAuthFetchOptions(options));
+}
+
+/**
+ * Authenticated fetch wrapper for direct backend API calls
+ * Automatically includes credentials and constructs full backend URL
+ *
+ * @param url - API path (e.g., '/api/admin/curation/queue')
+ * @param options - Fetch options
+ * @returns Fetch promise
+ */
+export function backendFetch(
+  url: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  // Import config inline to avoid SSR issues
+  const { config } = require('./config');
+  const fullUrl = `${config.API.BASE_URL}${url}`;
+  return fetch(fullUrl, createAuthFetchOptions(options));
 }
 
 /**
@@ -86,5 +107,6 @@ export function clearAuth(): void {
   localStorage.removeItem('ocean_portal_session');
 
   // Clear cookie (set Max-Age=0)
-  document.cookie = 'ocean_portal_token=; Max-Age=0; path=/; Secure; SameSite=Strict';
+  document.cookie =
+    'ocean_portal_token=; Max-Age=0; path=/; Secure; SameSite=Strict';
 }

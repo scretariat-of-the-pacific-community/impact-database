@@ -1,6 +1,11 @@
 'use client';
 
-import { QueryCache, QueryClient, QueryClientProvider, MutationCache } from '@tanstack/react-query';
+import {
+  QueryCache,
+  QueryClient,
+  QueryClientProvider,
+  MutationCache,
+} from '@tanstack/react-query';
 import { ReactNode, useState, useEffect } from 'react';
 import { isAxiosError } from 'axios';
 import { trackQueryError } from '@/lib/analytics';
@@ -105,7 +110,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
             }
 
             // Throttle connection/network errors to avoid console spam
-            const isConnectionError = 
+            const isConnectionError =
               normalized.message.includes('Unable to connect') ||
               normalized.message.includes('Network Error') ||
               normalized.message.includes('Failed to fetch') ||
@@ -117,7 +122,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
             if (isConnectionError) {
               const now = Date.now();
               const timeSinceLastError = now - connectionErrorTracker.lastError;
-              
+
               if (timeSinceLastError < connectionErrorTracker.THROTTLE_MS) {
                 connectionErrorTracker.count++;
                 return; // Suppress logging
@@ -133,7 +138,7 @@ export function QueryProvider({ children }: QueryProviderProps) {
               } else {
                 console.warn('Connection error:', normalized.message);
               }
-              
+
               connectionErrorTracker.lastError = now;
               trackQueryError(query?.queryHash, normalized.message);
               return;
@@ -190,11 +195,12 @@ export function QueryProvider({ children }: QueryProviderProps) {
       queryClient.cancelQueries({
         predicate: (query) => {
           const key = query.queryKey[0];
-          return typeof key === 'string' && (
-            key.includes('user') ||
-            key.includes('profile') ||
-            key.includes('contributor') ||
-            key.includes('activity')
+          return (
+            typeof key === 'string' &&
+            (key.includes('user') ||
+              key.includes('profile') ||
+              key.includes('contributor') ||
+              key.includes('activity'))
           );
         },
       });
@@ -202,11 +208,12 @@ export function QueryProvider({ children }: QueryProviderProps) {
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0];
-          return typeof key === 'string' && (
-            key.includes('user') ||
-            key.includes('profile') ||
-            key.includes('contributor') ||
-            key.includes('activity')
+          return (
+            typeof key === 'string' &&
+            (key.includes('user') ||
+              key.includes('profile') ||
+              key.includes('contributor') ||
+              key.includes('activity'))
           );
         },
       });
@@ -219,8 +226,6 @@ export function QueryProvider({ children }: QueryProviderProps) {
   }, [queryClient]);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 }

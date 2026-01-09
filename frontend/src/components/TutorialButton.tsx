@@ -6,7 +6,15 @@
 'use client';
 
 import { useState } from 'react';
-import { HelpCircle, Play, RotateCcw, TrendingUp, BarChart3, Award, CheckCircle2 } from 'lucide-react';
+import {
+  HelpCircle,
+  Play,
+  RotateCcw,
+  TrendingUp,
+  BarChart3,
+  Award,
+  CheckCircle2,
+} from 'lucide-react';
 import { useTutorial, tutorialSteps } from '@/lib/tutorial-enhanced';
 import { toast } from 'sonner';
 
@@ -17,19 +25,19 @@ interface TutorialButtonProps {
   showMenu?: boolean;
 }
 
-export default function TutorialButton({ 
-  tourName, 
+export default function TutorialButton({
+  tourName,
   variant = 'icon',
   className = '',
-  showMenu = false 
+  showMenu = false,
 }: TutorialButtonProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const tutorial = useTutorial();
-  const stats = tutorial.getStats() || { 
-    completed: 0, 
-    started: 0, 
-    interactions: 0, 
-    completedTours: [] as string[] 
+  const stats = tutorial.getStats() || {
+    completed: 0,
+    started: 0,
+    interactions: 0,
+    completedTours: [] as string[],
   };
 
   const handleStartTour = (tour?: keyof typeof tutorialSteps) => {
@@ -52,13 +60,15 @@ export default function TutorialButton({
     return (
       <div className="fixed bottom-6 right-6 z-50">
         <button
-          onClick={() => showMenu ? setMenuOpen(!menuOpen) : handleStartTour()}
+          onClick={() =>
+            showMenu ? setMenuOpen(!menuOpen) : handleStartTour()
+          }
           className={`p-4 bg-pacific-600 hover:bg-pacific-700 text-white rounded-full shadow-2xl transition-all hover:scale-110 ${className}`}
           title="Help & Tutorials"
         >
           <HelpCircle className="w-6 h-6" />
         </button>
-        
+
         {showMenu && menuOpen && (
           <div className="absolute bottom-16 right-0 w-72 bg-deep-900/95 backdrop-blur border border-white/20 rounded-xl shadow-xl overflow-hidden">
             {/* Stats Header */}
@@ -69,15 +79,21 @@ export default function TutorialButton({
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="bg-white/10 rounded-lg p-2">
-                  <div className="text-2xl font-bold text-white">{stats.completed}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.completed}
+                  </div>
                   <div className="text-xs text-white/70">Completed</div>
                 </div>
                 <div className="bg-white/10 rounded-lg p-2">
-                  <div className="text-2xl font-bold text-white">{stats.started}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.started}
+                  </div>
                   <div className="text-xs text-white/70">Started</div>
                 </div>
                 <div className="bg-white/10 rounded-lg p-2">
-                  <div className="text-2xl font-bold text-white">{stats.interactions}</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.interactions}
+                  </div>
                   <div className="text-xs text-white/70">Interactions</div>
                 </div>
               </div>
@@ -88,7 +104,7 @@ export default function TutorialButton({
               <div className="text-white/60 text-xs font-semibold uppercase tracking-wide mb-3">
                 Available Tutorials
               </div>
-              
+
               <button
                 onClick={() => handleStartTour('mainTour')}
                 className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
@@ -99,7 +115,7 @@ export default function TutorialButton({
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
                 )}
               </button>
-              
+
               <button
                 onClick={() => handleStartTour('uploadTour')}
                 className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
@@ -110,7 +126,7 @@ export default function TutorialButton({
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
                 )}
               </button>
-              
+
               <button
                 onClick={() => handleStartTour('analyticsTour')}
                 className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
@@ -121,7 +137,7 @@ export default function TutorialButton({
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
                 )}
               </button>
-              
+
               <button
                 onClick={() => handleStartTour('galleryTour')}
                 className="w-full text-left px-3 py-2.5 text-sm text-white/80 hover:bg-white/10 rounded-lg flex items-center gap-2 transition-colors group"
@@ -132,7 +148,7 @@ export default function TutorialButton({
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
                 )}
               </button>
-              
+
               <div className="pt-2 mt-2 border-t border-white/10">
                 <button
                   onClick={handleResetTours}

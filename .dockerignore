@@ -1,0 +1,98 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+*.html
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
+*.log
+*.pid
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Testing
+tests/
+test/
+*.test.*
+*.spec.*
+coverage/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+uploads/
+*.db
+*.sqlite
+fresh_venv/
+.cache/
+app_output.log
+dev.pid
+metadata.json
+
+# Scripts not needed in container
+*.sh
+!entrypoint.sh
+!*.sh
+deploy_*.sh
+setup_*.sh
+check_*.sh
+verify_*.sh
+clear_*.sh
+test_*.sh
+mvp_*.sh
+run_*.sh
+docker-*.sh
+
+# Python scripts not needed
+create_*.py
+populate_*.py
+seed_*.py
+test_*.py
+check_*.py
+
+# Deployment and config examples
+.env.*
+!.env
+docker-compose*.yml
+!docker-compose.yml
+Dockerfile
+.dockerignore

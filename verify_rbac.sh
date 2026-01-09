@@ -24,13 +24,13 @@ test_endpoint() {
     local name=$1
     local url=$2
     local expected_status=${3:-200}
-    
+
     echo -n "Testing: $name ... "
-    
+
     response=$(curl -s -w "\n%{http_code}" "$BASE_URL$url")
     http_code=$(echo "$response" | tail -n1)
     body=$(echo "$response" | sed '$d')
-    
+
     if [ "$http_code" = "$expected_status" ]; then
         echo -e "${GREEN}✓ PASS${NC} (HTTP $http_code)"
         ((TESTS_PASSED++))
@@ -48,11 +48,11 @@ test_db_query() {
     local name=$1
     local query=$2
     local expected=$3
-    
+
     echo -n "DB Check: $name ... "
-    
+
     result=$(docker compose exec -T postgis_db psql -U postgres -d impact_db -t -c "$query" 2>/dev/null | xargs)
-    
+
     if [ "$result" = "$expected" ]; then
         echo -e "${GREEN}✓ PASS${NC} ($result)"
         ((TESTS_PASSED++))
