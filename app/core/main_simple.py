@@ -3,24 +3,23 @@ Simplified FastAPI main application for local development
 This version excludes complex middleware and auth for easier startup
 """
 
-from collections import Counter
-from datetime import datetime, timedelta, timezone
 import logging
 import os
 import random
 import uuid
+from collections import Counter
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced, get_current_user_optional
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from sqlalchemy import desc, or_
-from sqlalchemy.orm import Session
-
-from api.auth_rbac import EnhancedUser, get_current_user_enhanced, get_current_user_optional
 from models.database import ImageMetadata, get_db
 from models.rbac import User as DBUser
 from models.review_workflow import ReviewItem
+from sqlalchemy import desc, or_
+from sqlalchemy.orm import Session
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -453,8 +452,9 @@ async def get_vocabularies():
 async def get_hazards(type: str = None):
     """Get hazard statistics and data."""
     try:
-        from models.database import get_db, ImageMetadata
         from typing import Optional
+
+        from models.database import ImageMetadata, get_db
 
         db = next(get_db())
         try:

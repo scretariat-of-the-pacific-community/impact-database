@@ -5,16 +5,17 @@ Cross-Site Request Forgery protection for cookie-based authentication.
 Implements double-submit cookie pattern with server-side validation.
 """
 
-import secrets
-import hmac
 import hashlib
+import hmac
 import logging
-from typing import Optional
+import secrets
 from functools import wraps
+from typing import Optional
 
-from fastapi import Request, Response, HTTPException, status
+from fastapi import HTTPException, Request, Response, status
 
 logger = logging.getLogger(__name__)
+
 
 class CSRFProtection:
     """CSRF token generation and validation."""
@@ -59,10 +60,7 @@ class CSRFProtection:
         return hmac.compare_digest(token, cookie_token)
 
     def set_csrf_cookie(
-        self,
-        response: Response,
-        request: Request,
-        token: Optional[str] = None
+        self, response: Response, request: Request, token: Optional[str] = None
     ) -> str:
         """Set CSRF token cookie in response.
 
@@ -86,7 +84,7 @@ class CSRFProtection:
             path="/",
             httponly=False,  # Must be readable by JavaScript
             secure=is_secure,
-            samesite="strict"
+            samesite="strict",
         )
 
         return token
@@ -139,8 +137,7 @@ class CSRFProtection:
         if not self.validate_token(token, cookie_token):
             logger.warning(f"CSRF validation failed for {request.url.path}")
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="CSRF validation failed"
+                status_code=status.HTTP_403_FORBIDDEN, detail="CSRF validation failed"
             )
 
         return True
@@ -156,12 +153,15 @@ def csrf_protect(csrf_protection: CSRFProtection):
             # Handler code
             pass
     """
+
     def decorator(func):
         @wraps(func)
         async def wrapper(request: Request, *args, **kwargs):
             csrf_protection.verify_csrf_token(request)
             return await func(request, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 

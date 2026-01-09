@@ -1,42 +1,43 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends, Request
-from fastapi import Path as ApiPath
-from fastapi.responses import FileResponse
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import imghdr
+import io
+import json
+import logging
 import os
 import shutil
 import tempfile
-import logging
-import io
-import imghdr
-from pathlib import Path as FilePath
 from datetime import datetime, timezone
-from typing import Optional, Dict, List
-import json
 from enum import Enum
-from pydantic import BaseModel, validator, Field, root_validator, ValidationError
+from pathlib import Path as FilePath
+from typing import Dict, List, Optional
 
-from services.exif_utils import extract_exif_data, get_image_hash
-from services.achievement_service import achievement_service
-from services.metadata_validation import validate_metadata
-from services.minio_client import get_minio_storage
-from services.local_storage import get_local_storage
-from models.database import get_db, ImageMetadata
-from models.audit_log import AuditLog
-from models.review_workflow import ReviewItem, ReviewStatus, ReviewPriority
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError, OperationalError
-from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumbnail
+from api.auth import User, get_current_user
 from api.schemas.image_schemas import (
+    DeleteResponse,
     ImageMetadataUpdate,
     ImageResponse,
-    DeleteResponse,
-    UpdateResponse,
     StatusEnum,
+    UpdateResponse,
 )
+from api.services.iso_vocabulary import generate_iso_abstract, generate_iso_title
 from core.config import settings
-from api.auth import get_current_user, User
+from fastapi import APIRouter, Depends, File, Form, HTTPException
+from fastapi import Path as ApiPath
+from fastapi import Request, UploadFile
+from fastapi.responses import FileResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from geoalchemy2 import WKTElement
-from api.services.iso_vocabulary import generate_iso_title, generate_iso_abstract
+from models.audit_log import AuditLog
+from models.database import ImageMetadata, get_db
+from models.review_workflow import ReviewItem, ReviewPriority, ReviewStatus
+from pydantic import BaseModel, Field, ValidationError, root_validator, validator
+from services.achievement_service import achievement_service
+from services.exif_utils import extract_exif_data, get_image_hash
+from services.local_storage import get_local_storage
+from services.metadata_validation import validate_metadata
+from services.minio_client import get_minio_storage
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.orm import Session
+from workers.tasks import cleanup_failed_uploads, generate_thumbnail, process_upload
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -324,8 +325,9 @@ async def serve_image(filename: str, download: bool = False):
         filename: The image filename
         download: If True, forces download with Content-Disposition: attachment
     """
-    from fastapi.responses import StreamingResponse
     from io import BytesIO
+
+    from fastapi.responses import StreamingResponse
 
     # SECURITY: Validate and sanitize filename
     if not filename or ".." in filename or "/" in filename or "\\\\" in filename:
@@ -399,8 +401,9 @@ async def serve_image(filename: str, download: bool = False):
 @router.get("/images/{filename}/thumbnail")
 async def serve_image_thumbnail(filename: str):
     """Serve thumbnail from MinIO or generate on-the-fly"""
-    from fastapi.responses import StreamingResponse
     from io import BytesIO
+
+    from fastapi.responses import StreamingResponse
     from PIL import Image
 
     # SECURITY: Validate filename
@@ -909,7 +912,7 @@ async def upload_image(
             # SECURITY: Validate EXIF GPS matches user coordinates (detect spoofing)
             if "latitude" in exif_data and "longitude" in exif_data:
                 exif_lat, exif_lon = exif_data["latitude"], exif_data["longitude"]
-                from math import radians, sin, cos, sqrt, atan2
+                from math import atan2, cos, radians, sin, sqrt
 
                 # Haversine distance in kilometers
                 R = 6371.0
@@ -1071,14 +1074,20 @@ async def upload_image(
                 review_item = ReviewItem(
                     image_id=image_metadata.id,
                     status=ReviewStatus.PENDING,
-                    priority=ReviewPriority.MEDIUM if not duplicate_flagged_for_review else ReviewPriority.HIGH,
+                    priority=(
+                        ReviewPriority.MEDIUM
+                        if not duplicate_flagged_for_review
+                        else ReviewPriority.HIGH
+                    ),
                     submitted_by=current_user.id,
                     is_flagged=duplicate_flagged_for_review,
                     is_duplicate=duplicate_flagged_for_review,
                 )
                 db.add(review_item)
                 db.commit()
-                logger.info(f"Created review item for image {image_metadata.id} (duplicate_flagged={duplicate_flagged_for_review})")
+                logger.info(
+                    f"Created review item for image {image_metadata.id} (duplicate_flagged={duplicate_flagged_for_review})"
+                )
             except Exception as review_error:
                 logger.error(f"Failed to create review item for {unique_filename}: {review_error}")
                 # Don't fail the upload if review item creation fails

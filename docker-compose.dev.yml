@@ -36,4 +36,3 @@ services:
       test: ["NONE"]
     # Add more memory for Next.js compilation
     mem_limit: 2g
-

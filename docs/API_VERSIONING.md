@@ -48,7 +48,7 @@ Development: http://localhost:8000/api
 ```
 /api/
   ├─ /auth/               # Authentication & authorization
-  ├─ /images/             # Image CRUD operations  
+  ├─ /images/             # Image CRUD operations
   ├─ /upload/             # Image upload
   ├─ /metadata/           # Metadata management
   ├─ /search/             # Search & filtering
@@ -468,7 +468,7 @@ class ImpactDBClient:
         self.base_url = f"https://api.impactdb.org/api"
         if version == "2":
             self.base_url += "/v2"
-    
+
     def get_image(self, image_id):
         if self.version == "1":
             return self._get_image_v1(image_id)
@@ -506,7 +506,7 @@ def normalize_response(data, from_version="1", to_version="2"):
     """Convert v1 response to v2 format."""
     if from_version == "1" and to_version == "2":
         return {
-            FIELD_MAPPING.get(k, k): v 
+            FIELD_MAPPING.get(k, k): v
             for k, v in data.items()
         }
     return data
@@ -522,10 +522,10 @@ def test_get_image(api_version):
     """Test image retrieval works in both API versions."""
     client = ImpactDBClient(version=api_version)
     image = client.get_image(123)
-    
+
     assert image["id"] == 123
     assert "title" in image
-    
+
     # Version-specific assertions
     if api_version == "1":
         assert "created_at" in image
@@ -566,7 +566,7 @@ from fastapi import Request
 def get_api_version(request: Request) -> str:
     """Extract API version from request path."""
     path = request.url.path
-    
+
     if path.startswith("/api/v2/"):
         return "2.0"
     elif path.startswith("/api/v1/"):
@@ -583,7 +583,7 @@ router = APIRouter()
 @router.get("/images/{image_id}")
 async def get_image(image_id: int, request: Request):
     version = get_api_version(request)
-    
+
     if version == "1.0":
         return get_image_v1(image_id)
     else:
@@ -600,18 +600,18 @@ export class APIClient {
 
   constructor(version: '1' | '2' = '1') {
     this.version = version;
-    this.baseURL = version === '2' 
-      ? '/api/v2' 
+    this.baseURL = version === '2'
+      ? '/api/v2'
       : '/api';
   }
 
   async getImage(id: number): Promise<Image> {
     const response = await fetch(`${this.baseURL}/images/${id}`);
     const data = await response.json();
-    
+
     // Transform v1 response to v2 format if needed
-    return this.version === '1' 
-      ? this.transformV1ToV2(data) 
+    return this.version === '1'
+      ? this.transformV1ToV2(data)
       : data;
   }
 }
@@ -660,5 +660,5 @@ export class APIClient {
 
 ---
 
-*Last updated: January 2026*  
+*Last updated: January 2026*
 *Next review: Q2 2026 (before v2 planning)*

@@ -541,7 +541,7 @@ services:
    ```bash
    # Backend
    DEBUG=true docker compose up api
-   
+
    # Frontend
    DEBUG=* npm run dev
    ```

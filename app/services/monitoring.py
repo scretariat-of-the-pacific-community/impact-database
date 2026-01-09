@@ -3,22 +3,21 @@ Monitoring and observability configuration for Pacific Impact Database
 Implements Prometheus metrics, health checks, and performance monitoring
 """
 
-import time
-import psutil
 import asyncio
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, Request, Response, Depends
-from starlette.middleware.base import BaseHTTPMiddleware
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-
-from middleware.logging import get_logger
-from models.database import get_db, ImageMetadata
+import psutil
 from core.config import settings
+from fastapi import Depends, FastAPI, Request, Response
+from middleware.logging import get_logger
+from models.database import ImageMetadata, get_db
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = get_logger(__name__)
 

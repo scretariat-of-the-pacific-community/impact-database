@@ -109,11 +109,11 @@
 - `app/workers/batch_upload_tasks.py` (lines 89, 120-147):
   ```python
   permanent_key = None  # Track for cleanup
-  
+
   # Upload to permanent storage
   permanent_key = object_key
   minio_client.upload_object(...)
-  
+
   # Create database record
   try:
       db.add(image_metadata)

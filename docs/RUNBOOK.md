@@ -310,8 +310,8 @@ redis-cli -h redis.example.com PING
 SELECT count(*), state FROM pg_stat_activity GROUP BY state;
 
 # Long-running queries
-SELECT pid, now() - query_start AS duration, query 
-FROM pg_stat_activity 
+SELECT pid, now() - query_start AS duration, query
+FROM pg_stat_activity
 WHERE state = 'active' AND now() - query_start > interval '1 minute';
 ```
 
@@ -498,7 +498,7 @@ aws s3 cp s3://impact-db-images-backup/uploads/image123.jpg \
 CREATE EXTENSION pg_stat_statements;
 
 -- Top 10 slowest queries
-SELECT 
+SELECT
   mean_exec_time,
   calls,
   query
@@ -507,7 +507,7 @@ ORDER BY mean_exec_time DESC
 LIMIT 10;
 
 -- Most frequent queries
-SELECT 
+SELECT
   calls,
   mean_exec_time,
   query
@@ -520,7 +520,7 @@ LIMIT 10;
 
 ```sql
 -- Find missing indexes
-SELECT 
+SELECT
   schemaname,
   tablename,
   attname,
@@ -547,7 +547,7 @@ psql -h prod-db.example.com -U postgres impact_db -c "VACUUM ANALYZE;"
 psql -h prod-db.example.com -U postgres impact_db -c "VACUUM ANALYZE images;"
 
 # Check bloat
-SELECT 
+SELECT
   schemaname,
   tablename,
   pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size,
@@ -582,7 +582,7 @@ def get_popular_activities():
     cached = redis_client.get('popular_activities')
     if cached:
         return json.loads(cached)
-    
+
     # Fetch from database
     activities = db.query(Activity).filter_by(featured=True).limit(10).all()
     redis_client.setex('popular_activities', 3600, json.dumps(activities))
@@ -613,8 +613,8 @@ const ActivityCard = React.memo(({ activity }) => {
 });
 
 // Lazy load images
-<Image 
-  src={imageUrl} 
+<Image
+  src={imageUrl}
   loading="lazy"
   placeholder="blur"
 />
@@ -802,7 +802,7 @@ REINDEX TABLE activities;
 
 ```sql
 -- Check for bloat
-SELECT 
+SELECT
   schemaname,
   tablename,
   pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) AS size
@@ -817,7 +817,7 @@ VACUUM FULL ANALYZE;
 
 ```sql
 -- Check replication lag
-SELECT 
+SELECT
   client_addr,
   state,
   sent_lsn,
@@ -828,7 +828,7 @@ SELECT
 FROM pg_stat_replication;
 
 -- Check lock contention
-SELECT 
+SELECT
   locktype,
   relation::regclass,
   mode,
@@ -837,7 +837,7 @@ FROM pg_locks
 WHERE NOT granted;
 
 -- Check cache hit ratio (should be > 99%)
-SELECT 
+SELECT
   sum(heap_blks_read) as heap_read,
   sum(heap_blks_hit) as heap_hit,
   sum(heap_blks_hit) / (sum(heap_blks_hit) + sum(heap_blks_read)) as ratio

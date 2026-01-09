@@ -113,7 +113,7 @@
 
 ## Next Steps (P1 Priority)
 
-1. **Fix async chord pattern** - Remove blocking `result.get()` 
+1. **Fix async chord pattern** - Remove blocking `result.get()`
 2. **Add cancel check in workers** - Respect BatchStatus.CANCELLED
 3. **Add real-time progress polling** - Frontend WebSocket/polling
 4. **Add MinIO cleanup on DB failure** - Rollback S3 uploads

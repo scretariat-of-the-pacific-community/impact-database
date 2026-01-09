@@ -3,11 +3,12 @@ Structured logging middleware with request IDs for tracing
 Provides comprehensive logging with context propagation
 """
 
+import logging
 import time
 import uuid
-import logging
-import structlog
 from typing import Callable
+
+import structlog
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -85,7 +86,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
     def __init__(self, app: ASGIApp, exclude_paths: list[str] = None):
         super().__init__(app)
-        self.exclude_paths = exclude_paths or ['/health', '/metrics', '/docs', '/openapi.json', '/redoc']
+        self.exclude_paths = exclude_paths or [
+            "/health",
+            "/metrics",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
+        ]
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         # Skip logging for excluded paths
@@ -93,7 +100,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # Generate or extract request ID
-        request_id = request.headers.get('X-Request-ID', str(uuid.uuid4()))
+        request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
 
         # Bind request context to logger
         structlog.contextvars.clear_contextvars()
@@ -101,7 +108,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             request_id=request_id,
             method=request.method,
             path=request.url.path,
-            client_ip=request.client.host if request.client else None
+            client_ip=request.client.host if request.client else None,
         )
 
         # Log request
@@ -111,7 +118,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             "request_started",
             method=request.method,
             path=request.url.path,
-            query_params=dict(request.query_params) if request.query_params else None
+            query_params=dict(request.query_params) if request.query_params else None,
         )
 
         # Process request
@@ -122,14 +129,14 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             duration_ms = (time.time() - start_time) * 1000
 
             # Add request ID to response headers
-            response.headers['X-Request-ID'] = request_id
-            response.headers['X-Process-Time'] = f"{duration_ms:.2f}ms"
+            response.headers["X-Request-ID"] = request_id
+            response.headers["X-Process-Time"] = f"{duration_ms:.2f}ms"
 
             # Log response
             log.info(
                 "request_completed",
                 status_code=response.status_code,
-                duration_ms=round(duration_ms, 2)
+                duration_ms=round(duration_ms, 2),
             )
 
             return response
@@ -144,7 +151,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 error=str(e),
                 error_type=type(e).__name__,
                 duration_ms=round(duration_ms, 2),
-                exc_info=True
+                exc_info=True,
             )
             raise
 
@@ -199,10 +206,4 @@ def log_error(operation: str, error: Exception, **kwargs):
         **kwargs: Additional context to log
     """
     log = get_logger()
-    log.error(
-        operation,
-        error=str(error),
-        error_type=type(error).__name__,
-        exc_info=True,
-        **kwargs
-    )
+    log.error(operation, error=str(error), error_type=type(error).__name__, exc_info=True, **kwargs)

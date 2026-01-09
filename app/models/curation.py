@@ -1,21 +1,15 @@
 """Curation workflow models for admin functionality."""
 
-from sqlalchemy import (
-    Column,
-    String,
-    Text,
-    DateTime,
-    Boolean,
-    Integer,
-    ForeignKey,
-    JSON,
-    Enum as SQLEnum,
-)
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
-import uuid
 import enum
+import uuid
+from datetime import datetime
+
+from sqlalchemy import JSON, Boolean, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
+
 from .database import Base
 
 
@@ -65,8 +59,26 @@ class CurationQueue(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     image_filename = Column(String, ForeignKey("image_metadata.filename"), nullable=False)
-    status = Column(SQLEnum(CurationStatus, native_enum=False, create_constraint=False, values_callable=lambda x: [e.value for e in x]), default=CurationStatus.PENDING, nullable=False)
-    priority = Column(SQLEnum(Priority, native_enum=False, create_constraint=False, values_callable=lambda x: [e.value for e in x]), default=Priority.MEDIUM, nullable=False)
+    status = Column(
+        SQLEnum(
+            CurationStatus,
+            native_enum=False,
+            create_constraint=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=CurationStatus.PENDING,
+        nullable=False,
+    )
+    priority = Column(
+        SQLEnum(
+            Priority,
+            native_enum=False,
+            create_constraint=False,
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=Priority.MEDIUM,
+        nullable=False,
+    )
 
     # Assignment and tracking
     assigned_to = Column(String, nullable=True)  # User ID/email of assigned curator

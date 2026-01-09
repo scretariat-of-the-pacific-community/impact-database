@@ -1,9 +1,10 @@
 """MinIO client for object storage operations."""
 
+import logging
 import os
+
 from minio import Minio
 from minio.error import S3Error
-import logging
 
 logger = logging.getLogger(__name__)
 

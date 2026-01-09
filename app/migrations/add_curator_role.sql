@@ -32,7 +32,7 @@ BEGIN
     -- 4. Add curation-specific permissions for curator
     -- Ensure these permissions exist first
     INSERT INTO permissions (name, resource, action, description)
-    VALUES 
+    VALUES
         ('curation_queue:read', 'curation_queue', 'read', 'View curation queue items'),
         ('curation_queue:claim', 'curation_queue', 'claim', 'Claim unassigned items'),
         ('curation_queue:update', 'curation_queue', 'update', 'Update queue item status'),
@@ -45,7 +45,7 @@ BEGIN
         INSERT INTO role_permissions (role_id, permission_id)
         SELECT curator_role_id, p.id
         FROM permissions p
-        WHERE p.resource = 'curation_queue' 
+        WHERE p.resource = 'curation_queue'
           AND p.action IN ('read', 'claim', 'update', 'approve', 'reject')
         ON CONFLICT DO NOTHING;
     END IF;
@@ -57,12 +57,12 @@ BEGIN
         FROM permissions p
         WHERE p.resource = 'curation_queue'
         ON CONFLICT DO NOTHING;
-        
+
         -- Admin can also assign items
         INSERT INTO permissions (name, resource, action, description)
         VALUES ('curation_queue:assign', 'curation_queue', 'assign', 'Assign items to curators')
         ON CONFLICT (name) DO NOTHING;
-        
+
         INSERT INTO role_permissions (role_id, permission_id)
         SELECT admin_role_id, p.id
         FROM permissions p
@@ -84,9 +84,9 @@ CREATE INDEX IF NOT EXISTS idx_curation_queue_unassigned ON curation_queue(creat
 COMMIT;
 
 -- Verify the changes
-SELECT r.name as role, p.resource, p.action 
-FROM role_permissions rp 
-JOIN roles r ON rp.role_id = r.id 
-JOIN permissions p ON rp.permission_id = p.id 
+SELECT r.name as role, p.resource, p.action
+FROM role_permissions rp
+JOIN roles r ON rp.role_id = r.id
+JOIN permissions p ON rp.permission_id = p.id
 WHERE r.name IN ('admin', 'curator', 'contributor')
 ORDER BY r.name, p.resource, p.action;

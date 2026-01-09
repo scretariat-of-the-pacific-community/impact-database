@@ -1,8 +1,8 @@
 # Security Audit Report - Impact Database
 
-**Date:** $(date +%Y-%m-%d)  
-**Auditor:** Security Assessment  
-**Scope:** Full application security review from attacker's perspective  
+**Date:** $(date +%Y-%m-%d)
+**Auditor:** Security Assessment
+**Scope:** Full application security review from attacker's perspective
 **Status:** 🔴 CRITICAL VULNERABILITIES IDENTIFIED
 
 ---
@@ -23,8 +23,8 @@ This security audit identified **CRITICAL** vulnerabilities that could allow att
 ## 🔴 CRITICAL Vulnerabilities
 
 ### 1. Authentication Bypass in Development Mode
-**Severity:** 🔴 CRITICAL  
-**CVSS Score:** 9.8 (Critical)  
+**Severity:** 🔴 CRITICAL
+**CVSS Score:** 9.8 (Critical)
 **File:** [app/api/auth_rbac.py](app/api/auth_rbac.py#L92-L122)
 
 #### Vulnerability Description
@@ -106,8 +106,8 @@ async def get_current_user_enhanced(
 ---
 
 ### 2. Exposed Weak Credentials in Environment File
-**Severity:** 🔴 CRITICAL  
-**CVSS Score:** 9.1 (Critical)  
+**Severity:** 🔴 CRITICAL
+**CVSS Score:** 9.1 (Critical)
 **File:** [.env](.env)
 
 #### Vulnerability Description
@@ -173,7 +173,7 @@ MINIO_ROOT_PASSWORD=$(openssl rand -base64 32)
 **4. Use environment-specific configuration:**
 ```bash
 # Development: .env.development
-# Staging: .env.staging  
+# Staging: .env.staging
 # Production: .env.production (NEVER commit)
 ```
 
@@ -187,8 +187,8 @@ MINIO_ROOT_PASSWORD=$(openssl rand -base64 32)
 ---
 
 ### 3. Wildcard CORS in Simplified API
-**Severity:** 🔴 HIGH  
-**CVSS Score:** 7.5 (High)  
+**Severity:** 🔴 HIGH
+**CVSS Score:** 7.5 (High)
 **File:** [app/core/main_simple.py](app/core/main_simple.py#L41)
 
 #### Vulnerability Description
@@ -260,8 +260,8 @@ app.add_middleware(
 ## ⚠️ HIGH Risk Vulnerabilities
 
 ### 4. In-Memory Rate Limiting (Non-Persistent)
-**Severity:** ⚠️ HIGH  
-**CVSS Score:** 6.5 (Medium-High)  
+**Severity:** ⚠️ HIGH
+**CVSS Score:** 6.5 (Medium-High)
 **File:** [app/api/auth.py](app/api/auth.py#L22-L31)
 
 #### Vulnerability Description
@@ -314,10 +314,10 @@ def check_rate_limit_redis(identifier: str, window: int = 900, max_attempts: int
     Redis-backed rate limiting that persists across restarts and workers.
     """
     key = f"rate_limit:{identifier}"
-    
+
     # Get current attempt count
     current = redis_client.get(key)
-    
+
     if current and int(current) >= max_attempts:
         # Get TTL to inform user when they can retry
         ttl = redis_client.ttl(key)
@@ -326,7 +326,7 @@ def check_rate_limit_redis(identifier: str, window: int = 900, max_attempts: int
             detail=f"Rate limit exceeded. Retry after {ttl} seconds.",
             headers={"Retry-After": str(ttl)}
         )
-    
+
     # Increment counter
     pipe = redis_client.pipeline()
     pipe.incr(key)
@@ -350,8 +350,8 @@ async def login(credentials: LoginCredentials):
 ---
 
 ### 5. Missing Security Headers
-**Severity:** ⚠️ MEDIUM  
-**CVSS Score:** 5.3 (Medium)  
+**Severity:** ⚠️ MEDIUM
+**CVSS Score:** 5.3 (Medium)
 **Files:** [app/core/main.py](app/core/main.py), [app/core/main_simple.py](app/core/main_simple.py)
 
 #### Vulnerability Description
@@ -364,7 +364,7 @@ The application is missing critical security headers:
 #### Attack Scenario - Clickjacking
 1. Attacker creates webpage with invisible iframe:
 ```html
-<iframe src="https://your-app.com/admin/delete-user/123" 
+<iframe src="https://your-app.com/admin/delete-user/123"
         style="opacity:0; position:absolute; top:0; left:0; width:100%; height:100%">
 </iframe>
 <button style="position:relative; z-index:1">Click here for free prize!</button>
@@ -391,16 +391,16 @@ from starlette.responses import Response
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        
+
         # Prevent clickjacking
         response.headers["X-Frame-Options"] = "DENY"
-        
+
         # Prevent MIME sniffing
         response.headers["X-Content-Type-Options"] = "nosniff"
-        
+
         # XSS Protection (legacy, but doesn't hurt)
         response.headers["X-XSS-Protection"] = "1; mode=block"
-        
+
         # Content Security Policy - Prevents XSS
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; "
@@ -413,23 +413,23 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "base-uri 'self'; "
             "form-action 'self'"
         )
-        
+
         # HSTS - Force HTTPS (only in production)
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = (
                 "max-age=31536000; includeSubDomains; preload"
             )
-        
+
         # Permissions Policy (formerly Feature-Policy)
         response.headers["Permissions-Policy"] = (
             "geolocation=(), "
             "microphone=(), "
             "camera=()"
         )
-        
+
         # Referrer Policy
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        
+
         return response
 
 # Add to application
@@ -441,8 +441,8 @@ app.add_middleware(SecurityHeadersMiddleware)
 ## ⚠️ MEDIUM Risk Vulnerabilities
 
 ### 6. Session Token Storage in LocalStorage
-**Severity:** ⚠️ MEDIUM  
-**CVSS Score:** 5.9 (Medium)  
+**Severity:** ⚠️ MEDIUM
+**CVSS Score:** 5.9 (Medium)
 **File:** [frontend/src/providers/auth-provider.tsx](frontend/src/providers/auth-provider.tsx#L51)
 
 #### Vulnerability Description
@@ -497,8 +497,8 @@ const cacheSessionMetadata = (session: AuthSession): void => {
 ---
 
 ### 7. JWT Secret Key Hardcoded in Development
-**Severity:** ⚠️ MEDIUM  
-**CVSS Score:** 5.3 (Medium)  
+**Severity:** ⚠️ MEDIUM
+**CVSS Score:** 5.3 (Medium)
 **File:** [.env](.env)
 
 #### Vulnerability Description
@@ -550,7 +550,7 @@ SECRET_KEY=PpnDx9KXv_YjR8mH2wT5qN3lA7cZ6bVfG4sW1kJ0iE
 ## ✅ PASS - No Vulnerabilities Found
 
 ### SQL Injection Protection ✅
-**Status:** SECURE  
+**Status:** SECURE
 **Assessment:** All database queries use **parameterized statements** with SQLAlchemy ORM or proper parameter binding.
 
 **Example (Secure):**
@@ -570,7 +570,7 @@ result = await db.execute(
 ---
 
 ### Password Hashing ✅
-**Status:** SECURE  
+**Status:** SECURE
 **Assessment:** Uses **bcrypt** with proper salting:
 
 ```python
@@ -579,7 +579,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # app/api/admin.py - Lines 726-727
 password_hash = bcrypt.hashpw(
-    (password_data.new_password + salt).encode("utf-8"), 
+    (password_data.new_password + salt).encode("utf-8"),
     bcrypt.gensalt()  # Proper salt generation
 )
 ```
@@ -587,7 +587,7 @@ password_hash = bcrypt.hashpw(
 ---
 
 ### XSS Protection ✅
-**Status:** LOW RISK  
+**Status:** LOW RISK
 **Assessment:** Only 2 instances of `innerHTML` found, both with **static content**:
 
 ```typescript

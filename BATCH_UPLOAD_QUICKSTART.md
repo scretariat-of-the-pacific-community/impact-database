@@ -151,7 +151,7 @@ ws.onopen = () => {
 
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  
+
   if (msg.type === 'connected') {
     console.log('Initial status:', msg.current_status);
   } else if (msg.type === 'progress_update') {
@@ -187,7 +187,7 @@ WHERE created_at > NOW() - INTERVAL '7 days'
 ORDER BY created_at DESC;
 
 -- Analytics query
-SELECT 
+SELECT
   status,
   COUNT(*) as count,
   AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) as avg_seconds
@@ -321,13 +321,13 @@ Access: http://localhost:5555
 
 ```sql
 -- Batch success rate
-SELECT 
+SELECT
   COUNT(*) FILTER (WHERE status = 'completed') * 100.0 / COUNT(*) as success_rate
 FROM upload_batches
 WHERE created_at > NOW() - INTERVAL '7 days';
 
 -- Average processing time
-SELECT 
+SELECT
   AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) as avg_seconds
 FROM upload_batches
 WHERE completed_at IS NOT NULL
@@ -404,6 +404,6 @@ LIMIT 10;
 
 ---
 
-**Last Updated**: January 7, 2026  
-**Version**: 2.0.0  
+**Last Updated**: January 7, 2026
+**Version**: 2.0.0
 **Status**: Production Ready ✅

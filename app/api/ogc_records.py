@@ -4,20 +4,19 @@ Provides standardized catalog access following OGC API - Records specification
 Enables discovery of metadata records and collections
 """
 
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Union
-from urllib.parse import urljoin
 import json
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urljoin
 
+from core.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import or_, func, text
+from geojson import Feature, FeatureCollection, Point, Polygon
+from models.database import ImageMetadata, get_db
 from pydantic import BaseModel, Field
-from geojson import Point, Polygon, Feature, FeatureCollection
-
-from models.database import get_db, ImageMetadata
-from core.config import settings
+from sqlalchemy import func, or_, text
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 

@@ -1,20 +1,20 @@
 """Images API endpoints for listing and browsing images."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, or_
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any, Dict, List, Optional
 
-from models.database import get_db, ImageMetadata
-from models.audit_log import AuditLog
-from api.schemas.image_schemas import ImageResponse
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced
+from api.schemas.image_schemas import ImageResponse
+from api.services.iso_vocabulary import HAZARD_TYPES
+from api.upload import create_audit_log
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from models.audit_log import AuditLog
+from models.database import ImageMetadata, get_db
 
 # Simple pagination for basic functionality
 from pydantic import BaseModel
-from api.services.iso_vocabulary import HAZARD_TYPES
-from api.upload import create_audit_log
+from sqlalchemy import desc, func, or_
+from sqlalchemy.orm import Session
 
 
 class QueryLimits:
@@ -496,11 +496,11 @@ async def update_image_metadata(
         # Check if user is the uploader or an admin
         is_admin = current_user.role in ["admin", "superadmin"]
         is_uploader = str(image.uploader_id) == str(current_user.id)
-        
+
         if not is_admin and not is_uploader:
             raise HTTPException(
                 status_code=403,
-                detail="Only the image uploader or an administrator can edit this image"
+                detail="Only the image uploader or an administrator can edit this image",
             )
 
         # Track changes for version history

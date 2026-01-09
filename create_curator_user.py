@@ -23,13 +23,13 @@ def create_curator_user():
         if not curator_role:
             print("Error: Curator role not found. Run migration first.")
             return
-        
+
         # Check if curator user already exists
         existing = db.query(User).filter(User.email == 'curator@spc.int').first()
         if existing:
             print(f"Curator user already exists: {existing.email}")
             return
-        
+
         # Create curator user
         curator_user = User(
             id=uuid.uuid4(),
@@ -40,18 +40,18 @@ def create_curator_user():
             is_active=True,
             is_verified=True
         )
-        
+
         db.add(curator_user)
         db.commit()
         db.refresh(curator_user)
-        
+
         print(f"✅ Created curator user:")
         print(f"   Email: {curator_user.email}")
         print(f"   Username: {curator_user.username}")
         print(f"   Password: curator123")
         print(f"   ID: {curator_user.id}")
         print(f"   Role: {curator_role.name}")
-        
+
     except Exception as e:
         db.rollback()
         print(f"Error creating curator user: {e}")

@@ -3,16 +3,16 @@ RBAC API Endpoints - Roles and Permissions Management
 Phase 0: Foundation endpoints for role/permission administration
 """
 
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-
-from models.database import get_db
-from models.rbac import Role, Permission, User as DBUser
-from api.auth_rbac import get_current_user, require_permission, require_role, EnhancedUser
-
 import logging
+from typing import List, Optional
+
+from api.auth_rbac import EnhancedUser, get_current_user, require_permission, require_role
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from models.database import get_db
+from models.rbac import Permission, Role
+from models.rbac import User as DBUser
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -158,9 +158,7 @@ async def list_users(
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=200, description="Items per page"),
     role: Optional[str] = Query(None, description="Filter by role name"),
-    status: Optional[str] = Query(
-        None, description="Filter by status (active, locked, inactive)"
-    ),
+    status: Optional[str] = Query(None, description="Filter by status (active, locked, inactive)"),
     search: Optional[str] = Query(None, description="Search by username or email"),
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(require_permission("user:read")),
@@ -185,14 +183,14 @@ async def list_users(
 
     if search:
         like_expr = f"%{search}%"
-        query = query.filter(
-            (DBUser.username.ilike(like_expr)) | (DBUser.email.ilike(like_expr))
-        )
+        query = query.filter((DBUser.username.ilike(like_expr)) | (DBUser.email.ilike(like_expr)))
 
     total = query.count()
 
     # Basic status counts for UI display
-    active_count = db.query(DBUser).filter(DBUser.is_active.is_(True), DBUser.is_locked.is_(False)).count()
+    active_count = (
+        db.query(DBUser).filter(DBUser.is_active.is_(True), DBUser.is_locked.is_(False)).count()
+    )
     locked_count = db.query(DBUser).filter(DBUser.is_locked.is_(True)).count()
     inactive_count = db.query(DBUser).filter(DBUser.is_active.is_(False)).count()
 

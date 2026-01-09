@@ -39,7 +39,7 @@
 
 #### **.dockerignore Files Created**
 - ✅ `/app/.dockerignore` - Backend ignores
-- ✅ `/frontend/.dockerignore` - Frontend ignores  
+- ✅ `/frontend/.dockerignore` - Frontend ignores
 - ✅ `/.dockerignore` - Root level ignores
 - 📉 Build context reduced by ~80%
 - ⚡ Build time improved by ~3x

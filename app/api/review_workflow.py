@@ -3,28 +3,27 @@ Review Workflow API - Phase 1
 Handles assignment, audit trail, and status management for review items
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, validator
-from datetime import datetime, timezone
-import uuid
 import logging
+import uuid
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 
-from models.database import get_db
-from models.database import ImageMetadata
-from api.auth_rbac import get_current_user, require_permission, EnhancedUser
+from api.auth_rbac import EnhancedUser, get_current_user, require_permission
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from models.database import ImageMetadata, get_db
+from models.rbac import User
 from models.review_workflow import (
-    ReviewItem,
-    ReviewAssignment,
-    ReviewAuditTrail,
-    ReviewStatus,
-    ReviewPriority,
     AssignmentReason,
     AuditAction,
+    ReviewAssignment,
+    ReviewAuditTrail,
+    ReviewItem,
+    ReviewPriority,
+    ReviewStatus,
 )
-from models.rbac import User
+from pydantic import BaseModel, Field, validator
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import Session
 from workers.email_tasks import send_upload_approved_email, send_upload_rejected_email
 
 logger = logging.getLogger(__name__)
@@ -428,13 +427,15 @@ def change_status(
             # Get image metadata and uploader info
             image = db.query(ImageMetadata).filter(ImageMetadata.id == item.image_id).first()
             if image:
-                uploader = db.query(User).filter(
-                    (User.id == item.submitted_by) | (User.id == image.uploader_id)
-                ).first()
-                
+                uploader = (
+                    db.query(User)
+                    .filter((User.id == item.submitted_by) | (User.id == image.uploader_id))
+                    .first()
+                )
+
                 if uploader and uploader.email:
                     image_title = image.title or image.filename or "Untitled"
-                    
+
                     if data.status == ReviewStatus.APPROVED.value:
                         send_upload_approved_email.delay(
                             user_email=uploader.email,
@@ -444,7 +445,9 @@ def change_status(
                         )
                         logger.info(f"Queued approval email for {uploader.email}")
                     elif data.status == ReviewStatus.REJECTED.value:
-                        reason = data.notes or item.reviewer_notes or "Does not meet quality guidelines"
+                        reason = (
+                            data.notes or item.reviewer_notes or "Does not meet quality guidelines"
+                        )
                         send_upload_rejected_email.delay(
                             user_email=uploader.email,
                             username=uploader.username,

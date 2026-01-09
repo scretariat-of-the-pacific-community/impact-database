@@ -1,11 +1,13 @@
 """Batch upload model for tracking multi-file upload jobs."""
 
-from sqlalchemy import Column, Integer, String, DateTime, Enum as SQLEnum, JSON
+import uuid
 from datetime import datetime, timezone
 from enum import Enum
-import uuid
 
 from models.database import Base
+from sqlalchemy import JSON, Column, DateTime
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy import Integer, String
 
 
 class BatchStatus(str, Enum):

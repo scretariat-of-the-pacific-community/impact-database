@@ -3,14 +3,13 @@ Role-Based Access Control (RBAC) Models
 Phase 0: Foundation tables for permissions, roles, and user extensions
 """
 
-from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, ForeignKey, Table
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
 
 from models.database import Base
-
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Table, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.orm import relationship
 
 # Many-to-many relationship: roles <-> permissions
 role_permissions = Table(

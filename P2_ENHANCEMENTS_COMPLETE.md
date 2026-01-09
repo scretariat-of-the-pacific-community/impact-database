@@ -12,7 +12,7 @@ All 5 P2 enhancement features have been fully implemented for the batch upload s
 - Checks rate limits before creating retry batch
 - Returns new batch ID for tracking
 
-**Frontend**: 
+**Frontend**:
 - Added `retryFailedMutation` in upload page
 - Displays "Batch Completed with Errors" card when batch has failures
 - "Retry Failed Files" button triggers retry
@@ -63,7 +63,7 @@ beat_schedule = {
 - Finalize callback sends completion via `asyncio.run(_send_completion_update())`
 - Falls back gracefully if WebSocket unavailable (warning logged)
 
-**Frontend**: 
+**Frontend**:
 - Currently uses HTTP polling (2-second interval)
 - WebSocket infrastructure ready for future integration
 - Can switch from polling to WebSocket for instant updates
@@ -88,7 +88,7 @@ beat_schedule = {
 - Track most-used templates via use_count
 - Organize by name/description
 
-**Frontend**: 
+**Frontend**:
 - API integration ready
 - Future: Template picker dropdown in upload form
 - Future: Template manager UI (list, create, edit, delete)
@@ -344,16 +344,16 @@ const ws = new WebSocket('ws://localhost:8000/api/batch/ws/{batch_id}');
 // On connect
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  
+
   if (msg.type === 'connected') {
     console.log('Connected, current status:', msg.current_status);
   }
-  
+
   if (msg.type === 'progress_update') {
     console.log('Progress:', msg.data.progress_percent + '%');
     console.log('Latest file:', msg.data.latest_file);
   }
-  
+
   if (msg.type === 'batch_complete') {
     console.log('Batch finished:', msg.data.status);
     // Connection will auto-close

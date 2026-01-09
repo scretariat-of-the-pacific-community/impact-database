@@ -1,22 +1,27 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, status, Depends, Path
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import io
+import json
+import logging
 import os
 import shutil
 import tempfile
-import logging
-import io
 from datetime import datetime
-from typing import Optional, Any, Dict
-import json
+from typing import Any, Dict, Optional
 
+from api.schemas.image_schemas import (
+    DeleteResponse,
+    ImageMetadataUpdate,
+    ImageResponse,
+    UpdateResponse,
+)
+from core.config import settings
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, UploadFile, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from models.database import ImageMetadata, get_db
 from services.exif_utils import extract_exif_data, get_image_hash
 from services.metadata_validation import validate_metadata
 from services.minio_client import minio_storage
-from models.database import get_db, ImageMetadata
 from sqlalchemy.orm import Session
-from workers.tasks import process_upload, cleanup_failed_uploads, generate_thumbnail
-from api.schemas.image_schemas import ImageMetadataUpdate, ImageResponse, DeleteResponse, UpdateResponse
-from core.config import settings
+from workers.tasks import cleanup_failed_uploads, generate_thumbnail, process_upload
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -158,26 +163,6 @@ async def update_image_metadata(
 
 
 @router.get("/images/{filename}", response_model=ImageResponse)
-                updated_iso_metadata[field] = value
-                updated_field_names.append(field)
-                iso_fields_updated = True
-
-        # Update geographic extent if lat/lon provided
-        if metadata_update.latitude is not None and metadata_update.longitude is not None:
-            updated_iso_metadata['extent'] = {
-                "geographic": {
-                    "west_bound_longitude": metadata_update.longitude,
-                    "east_bound_longitude": metadata_update.longitude,
-                    "south_bound_latitude": metadata_update.latitude,
-                    "north_bound_latitude": metadata_update.latitude
-                }
-            }
-            iso_fields_updated = True
-
-        # Add ISO metadata to update if any ISO fields were updated
-        if iso_fields_updated:
-            updated_iso_metadata['revision_date'] = datetime.utcnow().isoformat()
-            update_fields.append("iso_metadata = %s")
             update_values.append(json.dumps(updated_iso_metadata))
 
         if not update_fields:

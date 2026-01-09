@@ -5,13 +5,15 @@ Production-ready rate limiting using Redis for persistence across restarts.
 Falls back to in-memory storage if Redis is unavailable.
 """
 
-import time
 import logging
-from typing import Optional
+import time
 from collections import defaultdict
+from typing import Optional
+
 from fastapi import HTTPException, status
 
 logger = logging.getLogger(__name__)
+
 
 class RateLimiter:
     """Rate limiter with Redis backend and in-memory fallback."""
@@ -58,7 +60,7 @@ class RateLimiter:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"Too many attempts. Please try again in {window // 60} minutes.",
-                    headers={"Retry-After": str(window)}
+                    headers={"Retry-After": str(window)},
                 )
 
             # Add new attempt with current timestamp as score
@@ -80,8 +82,7 @@ class RateLimiter:
 
         # Clean old attempts
         self.memory_storage[identifier] = [
-            timestamp for timestamp in self.memory_storage[identifier]
-            if now - timestamp < window
+            timestamp for timestamp in self.memory_storage[identifier] if now - timestamp < window
         ]
 
         # Check limit
@@ -89,18 +90,13 @@ class RateLimiter:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Too many attempts. Please try again in {window // 60} minutes.",
-                headers={"Retry-After": str(window)}
+                headers={"Retry-After": str(window)},
             )
 
         # Record attempt
         self.memory_storage[identifier].append(now)
 
-    def check_rate_limit(
-        self,
-        identifier: str,
-        window: int = 900,
-        max_attempts: int = 5
-    ) -> None:
+    def check_rate_limit(self, identifier: str, window: int = 900, max_attempts: int = 5) -> None:
         """Check if identifier has exceeded rate limit.
 
         Args:
@@ -130,8 +126,8 @@ class RateLimiter:
 
 # Default rate limit configurations
 RATE_LIMITS = {
-    'auth_login': {'window': 900, 'max_attempts': 5},  # 5 attempts per 15 min
-    'auth_register': {'window': 3600, 'max_attempts': 3},  # 3 attempts per hour
-    'upload': {'window': 3600, 'max_attempts': 10},  # 10 uploads per hour
-    'api_general': {'window': 60, 'max_attempts': 100},  # 100 requests per minute
+    "auth_login": {"window": 900, "max_attempts": 5},  # 5 attempts per 15 min
+    "auth_register": {"window": 3600, "max_attempts": 3},  # 3 attempts per hour
+    "upload": {"window": 3600, "max_attempts": 10},  # 10 uploads per hour
+    "api_general": {"window": 60, "max_attempts": 100},  # 100 requests per minute
 }

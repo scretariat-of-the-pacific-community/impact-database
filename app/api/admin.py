@@ -1,22 +1,22 @@
 """Admin management API endpoints."""
 
 from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, EmailStr, Field
+from typing import Any, Dict, List, Optional
 
+from api.auth import User, get_current_user
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from models.database import get_db
+from pydantic import BaseModel, EmailStr, Field
 from services.admin_service import (
     AdminService,
     AdminUser,
-    UserRole,
     Permission,
     UserAuditLog,
+    UserRole,
     UserSession,
 )
-from api.auth import get_current_user, User
+from sqlalchemy.orm import Session
 
 router = APIRouter()
 security = HTTPBearer()
@@ -147,42 +147,42 @@ def get_client_ip(request: Request) -> str:
 def user_to_response(user: AdminUser) -> UserResponse:
     """Convert AdminUser to UserResponse with proper field mapping."""
     user_dict = user.to_dict()
-    
+
     # Split full_name into firstName and lastName
-    full_name = user_dict.get('full_name') or ''
-    name_parts = full_name.split(' ', 1) if full_name else ['', '']
-    first_name = name_parts[0] if len(name_parts) > 0 else ''
-    last_name = name_parts[1] if len(name_parts) > 1 else ''
-    
+    full_name = user_dict.get("full_name") or ""
+    name_parts = full_name.split(" ", 1) if full_name else ["", ""]
+    first_name = name_parts[0] if len(name_parts) > 0 else ""
+    last_name = name_parts[1] if len(name_parts) > 1 else ""
+
     # Get all permissions (role + custom)
     all_permissions = user._get_role_permissions()
     if user.custom_permissions:
         all_permissions.extend(user.custom_permissions)
-    
+
     return UserResponse(
-        id=user_dict['id'],
-        username=user_dict['username'],
-        email=user_dict['email'],
+        id=user_dict["id"],
+        username=user_dict["username"],
+        email=user_dict["email"],
         firstName=first_name,
         lastName=last_name,
-        full_name=user_dict.get('full_name'),
-        role=user_dict['role'],
+        full_name=user_dict.get("full_name"),
+        role=user_dict["role"],
         permissions=list(set(all_permissions)),  # Remove duplicates
-        custom_permissions=user_dict.get('custom_permissions'),
-        organization=user_dict.get('organization'),
-        isActive=user_dict['is_active'],
-        is_active=user_dict['is_active'],
-        isLocked=user_dict['is_locked'],
-        is_locked=user_dict['is_locked'],
-        lastLogin=user_dict.get('last_login'),
-        last_login=user_dict.get('last_login'),
-        createdAt=user_dict['created_at'],
-        created_at=user_dict['created_at'],
-        updated_at=user_dict['updated_at'],
+        custom_permissions=user_dict.get("custom_permissions"),
+        organization=user_dict.get("organization"),
+        isActive=user_dict["is_active"],
+        is_active=user_dict["is_active"],
+        isLocked=user_dict["is_locked"],
+        is_locked=user_dict["is_locked"],
+        lastLogin=user_dict.get("last_login"),
+        last_login=user_dict.get("last_login"),
+        createdAt=user_dict["created_at"],
+        created_at=user_dict["created_at"],
+        updated_at=user_dict["updated_at"],
         loginAttempts=user.failed_login_attempts or 0,
-        is_verified=user_dict['is_verified'],
-        position=user_dict.get('position'),
-        profilePicture=None  # TODO: Add profile picture support
+        is_verified=user_dict["is_verified"],
+        position=user_dict.get("position"),
+        profilePicture=None,  # TODO: Add profile picture support
     )
 
 
@@ -247,20 +247,20 @@ async def list_users(
 
     # Get total count
     total = query.count()
-    
+
     # Calculate offset and pagination
     offset = (page - 1) * page_size
     total_pages = (total + page_size - 1) // page_size  # Ceiling division
 
     # Get paginated users
     users = query.offset(offset).limit(page_size).all()
-    
+
     return UsersListResponse(
         users=[user_to_response(user) for user in users],
         total=total,
         page=page,
         page_size=page_size,
-        total_pages=total_pages
+        total_pages=total_pages,
     )
 
 
@@ -432,8 +432,8 @@ async def invite_user(
     admin_service: AdminService = Depends(get_admin_service),
 ):
     """Send an invitation to a new user via email."""
-    import uuid
     import secrets
+    import uuid
 
     # Check if email already exists
     existing = (
@@ -597,7 +597,7 @@ async def list_roles(admin_user: AdminUser = Depends(check_permission(Permission
         ],
         UserRole.SUPER_ADMIN: [perm.value for perm in Permission],
     }
-    
+
     return {
         "roles": [
             {

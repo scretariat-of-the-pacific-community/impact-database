@@ -3,20 +3,21 @@ Enhanced Authentication with RBAC Support (Phase 0)
 Provides permission checking and role-based access control
 """
 
-from typing import Optional, List
+import logging
 from datetime import datetime, timezone
+from typing import List, Optional
 
-from fastapi import Depends, HTTPException, status, Request
+from api.auth import ALGORITHM, SECRET_KEY
+from api.auth import User as AuthUser
+from api.auth import oauth2_scheme
+from core.config import settings
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from sqlalchemy.orm import Session
-
 from models.database import get_db
-from models.rbac import User as DBUser, Permission, Role
-from api.auth import User as AuthUser, SECRET_KEY, ALGORITHM, oauth2_scheme
-from core.config import settings
-
-import logging
+from models.rbac import Permission, Role
+from models.rbac import User as DBUser
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 

@@ -6,10 +6,11 @@ Create Date: 2025-11-10 14:00:00.000000
 
 """
 
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
-from alembic import op
 from datetime import datetime, timezone
+
+import sqlalchemy as sa
+from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "006_add_rbac_foundation"

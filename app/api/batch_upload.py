@@ -1,22 +1,30 @@
 """Batch upload API endpoints."""
 
-import logging
-from typing import List, Optional
-from datetime import datetime, timezone
-import uuid
 import io
+import logging
+import uuid
+from datetime import datetime, timezone
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, WebSocket, WebSocketDisconnect
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-
-from models.database import get_db
-from models.upload_batch import UploadBatch, BatchStatus
+from api.auth_rbac import EnhancedUser, get_current_user_enhanced
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from models.batch_template import BatchTemplateModel
-from api.auth_rbac import get_current_user_enhanced, EnhancedUser
-from workers.batch_upload_tasks import process_batch_upload
+from models.database import get_db
+from models.upload_batch import BatchStatus, UploadBatch
+from pydantic import BaseModel, Field
 from services.minio_client import get_minio_storage
 from services.websocket_manager import ws_manager
+from sqlalchemy.orm import Session
+from workers.batch_upload_tasks import process_batch_upload
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +47,7 @@ class BatchCreateRequest(BaseModel):
 
 class BatchStatusResponse(BaseModel):
     """Response model for batch status."""
+
     model_config = {"from_attributes": True}
 
     id: str
@@ -123,15 +132,19 @@ async def create_batch_upload(
         )
 
     # SECURITY: Rate limiting - check active batches per user
-    active_batches = db.query(UploadBatch).filter(
-        UploadBatch.uploader_id == current_user.id,
-        UploadBatch.status.in_([BatchStatus.PENDING, BatchStatus.PROCESSING])
-    ).count()
+    active_batches = (
+        db.query(UploadBatch)
+        .filter(
+            UploadBatch.uploader_id == current_user.id,
+            UploadBatch.status.in_([BatchStatus.PENDING, BatchStatus.PROCESSING]),
+        )
+        .count()
+    )
 
     if active_batches >= MAX_ACTIVE_BATCHES:
         raise HTTPException(
             status_code=429,
-            detail=f"Too many active batches. Maximum {MAX_ACTIVE_BATCHES} concurrent batches allowed. Please wait for existing batches to complete."
+            detail=f"Too many active batches. Maximum {MAX_ACTIVE_BATCHES} concurrent batches allowed. Please wait for existing batches to complete.",
         )
 
     # PERFORMANCE: Validate file sizes BEFORE reading into memory
@@ -139,7 +152,7 @@ async def create_batch_upload(
     for file in files:
         # Get file size without reading content
         file_size = 0
-        if hasattr(file, 'size') and file.size:
+        if hasattr(file, "size") and file.size:
             file_size = file.size
         else:
             # Fallback: seek to end to get size
@@ -150,7 +163,7 @@ async def create_batch_upload(
         if file_size > MAX_FILE_SIZE:
             raise HTTPException(
                 status_code=413,
-                detail=f"File '{file.filename}' exceeds maximum size of {MAX_FILE_SIZE // (1024*1024)}MB"
+                detail=f"File '{file.filename}' exceeds maximum size of {MAX_FILE_SIZE // (1024*1024)}MB",
             )
 
         total_size += file_size
@@ -158,7 +171,7 @@ async def create_batch_upload(
     if total_size > MAX_TOTAL_SIZE:
         raise HTTPException(
             status_code=413,
-            detail=f"Total batch size {total_size // (1024*1024)}MB exceeds maximum of {MAX_TOTAL_SIZE // (1024*1024)}MB"
+            detail=f"Total batch size {total_size // (1024*1024)}MB exceeds maximum of {MAX_TOTAL_SIZE // (1024*1024)}MB",
         )
 
     try:
@@ -189,16 +202,9 @@ async def create_batch_upload(
                 # Stream directly to MinIO without loading into memory
                 await file.seek(0)  # Ensure at start
                 file_content = await file.read()
-                minio_client.upload_object(
-                    temp_key,
-                    io.BytesIO(file_content),
-                    len(file_content)
-                )
+                minio_client.upload_object(temp_key, io.BytesIO(file_content), len(file_content))
 
-                temp_file_keys.append({
-                    "temp_key": temp_key,
-                    "filename": file.filename
-                })
+                temp_file_keys.append({"temp_key": temp_key, "filename": file.filename})
 
                 logger.info(f"Uploaded {file.filename} to temp storage: {temp_key}")
 
@@ -257,9 +263,9 @@ async def create_batch_upload(
 
 @router.get("/{batch_id}/status", response_model=BatchStatusResponse)
 def get_batch_status(
-    batch_id: str, 
-    db: Session = Depends(get_db), 
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+    batch_id: str,
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced),
 ):
     """
     Get the status of a batch upload.
@@ -340,9 +346,9 @@ def list_batches(
 
 @router.delete("/{batch_id}/cancel")
 def cancel_batch(
-    batch_id: str, 
-    db: Session = Depends(get_db), 
-    current_user: EnhancedUser = Depends(get_current_user_enhanced)
+    batch_id: str,
+    db: Session = Depends(get_db),
+    current_user: EnhancedUser = Depends(get_current_user_enhanced),
 ):
     """
     Cancel a pending or in-progress batch upload.
@@ -381,7 +387,7 @@ async def retry_failed_files(
 ):
     """
     Retry only the failed files from a batch upload.
-    
+
     Creates a new batch with only the files that failed in the original batch.
     Preserves the original metadata template.
     """
@@ -398,32 +404,35 @@ async def retry_failed_files(
     if not original_batch.is_complete:
         raise HTTPException(
             status_code=400,
-            detail="Cannot retry batch that is still processing. Wait for completion or cancel it first."
+            detail="Cannot retry batch that is still processing. Wait for completion or cancel it first.",
         )
 
     if not original_batch.failure_summary or len(original_batch.failure_summary) == 0:
         raise HTTPException(
-            status_code=400,
-            detail="No failed files to retry. All files were successful."
+            status_code=400, detail="No failed files to retry. All files were successful."
         )
 
     # Check rate limiting
     MAX_ACTIVE_BATCHES = 5
-    active_batches = db.query(UploadBatch).filter(
-        UploadBatch.uploader_id == current_user.id,
-        UploadBatch.status.in_([BatchStatus.PENDING, BatchStatus.PROCESSING])
-    ).count()
+    active_batches = (
+        db.query(UploadBatch)
+        .filter(
+            UploadBatch.uploader_id == current_user.id,
+            UploadBatch.status.in_([BatchStatus.PENDING, BatchStatus.PROCESSING]),
+        )
+        .count()
+    )
 
     if active_batches >= MAX_ACTIVE_BATCHES:
         raise HTTPException(
             status_code=429,
-            detail=f"Too many active batches. Maximum {MAX_ACTIVE_BATCHES} concurrent batches allowed."
+            detail=f"Too many active batches. Maximum {MAX_ACTIVE_BATCHES} concurrent batches allowed.",
         )
 
     # Get MinIO client to check if temp files still exist
     minio_client = get_minio_storage()
     failed_filenames = [f["filename"] for f in original_batch.failure_summary]
-    
+
     # Create new batch for retry
     new_batch_id = str(uuid.uuid4())
     new_batch = UploadBatch(
@@ -445,14 +454,11 @@ async def retry_failed_files(
     for filename in failed_filenames:
         temp_key = f"temp/batch_{batch_id}/{filename}"
         # Note: We assume files may not exist if batch is old
-        temp_file_keys.append({
-            "temp_key": temp_key,
-            "filename": filename
-        })
+        temp_file_keys.append({"temp_key": temp_key, "filename": filename})
 
     # Queue batch processing with original metadata
     from workers.batch_upload_tasks import process_batch_upload
-    
+
     process_batch_upload.delay(
         batch_id=new_batch.id,
         temp_file_keys=temp_file_keys,
@@ -488,26 +494,27 @@ def get_batch_analytics(
 ):
     """
     Get batch upload analytics for the current user.
-    
+
     Returns statistics like average processing time, success rate,
     total files processed, etc.
     """
     from datetime import timedelta
+
     from sqlalchemy import func
-    
+
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    
+
     # Get completed batches in time window
     batches = (
         db.query(UploadBatch)
         .filter(
             UploadBatch.uploader_id == current_user.id,
             UploadBatch.created_at >= cutoff,
-            UploadBatch.is_complete == True
+            UploadBatch.is_complete == True,
         )
         .all()
     )
-    
+
     if not batches:
         return {
             "total_batches": 0,
@@ -518,33 +525,33 @@ def get_batch_analytics(
             "average_processing_time_seconds": 0.0,
             "average_files_per_batch": 0.0,
             "status_breakdown": {},
-            "days": days
+            "days": days,
         }
-    
+
     # Calculate metrics
     total_batches = len(batches)
     total_files = sum(b.total_files for b in batches)
     successful_files = sum(b.successful_files for b in batches)
     failed_files = sum(b.failed_files for b in batches)
-    
+
     # Processing times (only for batches with both started_at and completed_at)
     processing_times = []
     for batch in batches:
         if batch.started_at and batch.completed_at:
             duration = (batch.completed_at - batch.started_at).total_seconds()
             processing_times.append(duration)
-    
+
     avg_processing_time = sum(processing_times) / len(processing_times) if processing_times else 0.0
-    
+
     # Success rate
     success_rate = (successful_files / total_files * 100) if total_files > 0 else 0.0
-    
+
     # Status breakdown
     status_breakdown = {}
     for batch in batches:
         status = batch.status.value
         status_breakdown[status] = status_breakdown.get(status, 0) + 1
-    
+
     return {
         "total_batches": total_batches,
         "total_files": total_files,
@@ -552,13 +559,16 @@ def get_batch_analytics(
         "failed_files": failed_files,
         "success_rate": round(success_rate, 2),
         "average_processing_time_seconds": round(avg_processing_time, 2),
-        "average_files_per_batch": round(total_files / total_batches, 2) if total_batches > 0 else 0.0,
+        "average_files_per_batch": (
+            round(total_files / total_batches, 2) if total_batches > 0 else 0.0
+        ),
         "status_breakdown": status_breakdown,
-        "days": days
+        "days": days,
     }
 
 
 # ================== Batch Templates ==================
+
 
 @router.post("/templates", response_model=BatchTemplate)
 def create_batch_template(
@@ -578,7 +588,7 @@ def create_batch_template(
         "country": template.country,
         "keywords": template.keywords,
     }
-    
+
     new_template = BatchTemplateModel(
         id=str(uuid.uuid4()),
         user_id=current_user.id,
@@ -586,18 +596,18 @@ def create_batch_template(
         template_data=template_data,
         created_at=datetime.now(timezone.utc),
     )
-    
+
     db.add(new_template)
     db.commit()
     db.refresh(new_template)
-    
+
     logger.info(f"User {current_user.id} created batch template: {template.name}")
-    
+
     return BatchTemplate(
         id=str(new_template.id),
         name=new_template.name,
         **template_data,
-        created_at=new_template.created_at
+        created_at=new_template.created_at,
     )
 
 
@@ -610,21 +620,18 @@ def list_batch_templates(
     templates = (
         db.query(BatchTemplateModel)
         .filter(BatchTemplateModel.user_id == current_user.id)
-        .order_by(BatchTemplateModel.last_used_at.desc().nullslast(), BatchTemplateModel.created_at.desc())
+        .order_by(
+            BatchTemplateModel.last_used_at.desc().nullslast(), BatchTemplateModel.created_at.desc()
+        )
         .all()
     )
-    
+
     return BatchTemplateListResponse(
         templates=[
-            BatchTemplate(
-                id=str(t.id),
-                name=t.name,
-                **t.template_data,
-                created_at=t.created_at
-            )
+            BatchTemplate(id=str(t.id), name=t.name, **t.template_data, created_at=t.created_at)
             for t in templates
         ],
-        total=len(templates)
+        total=len(templates),
     )
 
 
@@ -637,16 +644,13 @@ def get_batch_template(
     """Get a specific batch upload template."""
     template = (
         db.query(BatchTemplateModel)
-        .filter(
-            BatchTemplateModel.id == template_id,
-            BatchTemplateModel.user_id == current_user.id
-        )
+        .filter(BatchTemplateModel.id == template_id, BatchTemplateModel.user_id == current_user.id)
         .first()
     )
-    
+
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     # Update last used timestamp and increment use count
     template.last_used_at = datetime.now(timezone.utc)
     try:
@@ -655,12 +659,12 @@ def get_batch_template(
     except:
         template.use_count = "1"
     db.commit()
-    
+
     return BatchTemplate(
         id=str(template.id),
         name=template.name,
         **template.template_data,
-        created_at=template.created_at
+        created_at=template.created_at,
     )
 
 
@@ -673,92 +677,88 @@ def delete_batch_template(
     """Delete a batch upload template."""
     template = (
         db.query(BatchTemplateModel)
-        .filter(
-            BatchTemplateModel.id == template_id,
-            BatchTemplateModel.user_id == current_user.id
-        )
+        .filter(BatchTemplateModel.id == template_id, BatchTemplateModel.user_id == current_user.id)
         .first()
     )
-    
+
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    
+
     db.delete(template)
     db.commit()
-    
+
     logger.info(f"User {current_user.id} deleted batch template: {template.name}")
-    
+
     return {"message": "Template deleted", "template_id": template_id}
 
 
 @router.websocket("/ws/{batch_id}")
 async def websocket_batch_progress(
-    websocket: WebSocket,
-    batch_id: str,
-    db: Session = Depends(get_db)
+    websocket: WebSocket, batch_id: str, db: Session = Depends(get_db)
 ):
     """WebSocket endpoint for real-time batch upload progress updates.
-    
+
     Clients connect to receive live updates as files are processed.
     Messages are JSON with type: "progress_update" or "batch_complete".
     """
     try:
         # Accept connection first
         await websocket.accept()
-        
+
         # Verify batch exists
         batch = db.query(UploadBatch).filter(UploadBatch.id == batch_id).first()
         if not batch:
-            await websocket.send_json({
-                "type": "error",
-                "message": "Batch not found"
-            })
+            await websocket.send_json({"type": "error", "message": "Batch not found"})
             await websocket.close()
             return
-        
+
         # Register connection
         await ws_manager.connect(websocket, batch_id, str(batch.user_id))
-        
+
         # Send initial state
-        await websocket.send_json({
-            "type": "connected",
-            "batch_id": batch_id,
-            "current_status": {
-                "status": batch.status.value,
-                "total_files": batch.total_files,
-                "processed_files": batch.processed_files,
-                "successful_files": batch.successful_files,
-                "failed_files": batch.failed_files,
-                "progress_percent": (
-                    (batch.processed_files / batch.total_files * 100)
-                    if batch.total_files > 0 else 0
-                )
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "batch_id": batch_id,
+                "current_status": {
+                    "status": batch.status.value,
+                    "total_files": batch.total_files,
+                    "processed_files": batch.processed_files,
+                    "successful_files": batch.successful_files,
+                    "failed_files": batch.failed_files,
+                    "progress_percent": (
+                        (batch.processed_files / batch.total_files * 100)
+                        if batch.total_files > 0
+                        else 0
+                    ),
+                },
             }
-        })
-        
+        )
+
         # Keep connection alive and wait for messages
         try:
             while True:
                 # Wait for any client messages (ping/pong, etc.)
                 data = await websocket.receive_text()
-                
+
                 # Client can send "status" to request current state
                 if data == "status":
                     db.refresh(batch)
-                    await websocket.send_json({
-                        "type": "status_response",
-                        "batch_id": batch_id,
-                        "status": batch.status.value,
-                        "processed_files": batch.processed_files,
-                        "successful_files": batch.successful_files,
-                        "failed_files": batch.failed_files
-                    })
-                    
+                    await websocket.send_json(
+                        {
+                            "type": "status_response",
+                            "batch_id": batch_id,
+                            "status": batch.status.value,
+                            "processed_files": batch.processed_files,
+                            "successful_files": batch.successful_files,
+                            "failed_files": batch.failed_files,
+                        }
+                    )
+
         except WebSocketDisconnect:
             logger.info(f"WebSocket disconnected for batch {batch_id}")
-        
+
     except Exception as e:
         logger.error(f"WebSocket error for batch {batch_id}: {e}")
     finally:
         ws_manager.disconnect(websocket, batch_id)
-

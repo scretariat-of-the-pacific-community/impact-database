@@ -3,19 +3,18 @@ Simple Images API endpoint - Basic functionality for development
 """
 
 import logging
-from typing import List, Optional, Dict, Any
+from datetime import datetime, time, timezone
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import desc, asc, func, or_, case
-from geoalchemy2 import WKTElement
-from datetime import datetime, time, timezone
-
-from models.database import get_db, ImageMetadata
-from models.review_workflow import ReviewItem, ReviewStatus
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced, get_current_user_optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from geoalchemy2 import WKTElement
+from models.database import ImageMetadata, get_db
+from models.review_workflow import ReviewItem, ReviewStatus
 from pydantic import BaseModel
+from sqlalchemy import asc, case, desc, func, or_
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +106,9 @@ def _serialize_image(image: ImageMetadata) -> Dict[str, Any]:
         "purpose": getattr(image, "purpose", None),
         "hazard_type": image.hazard_type,
         "source_agency": getattr(image, "source", None) or getattr(image, "source_type", None),
-        "uploader_id": str(image.uploader_id) if hasattr(image, "uploader_id") and image.uploader_id else None,
+        "uploader_id": (
+            str(image.uploader_id) if hasattr(image, "uploader_id") and image.uploader_id else None
+        ),
         "topic_category": (
             image.topic_category
             if hasattr(image, "topic_category") and image.topic_category
@@ -202,14 +203,14 @@ async def get_images(
     try:
         # Build query with public visibility filter
         query = db.query(ImageMetadata)
-        
+
         # PUBLIC VISIBILITY: Only show approved images unless user is authenticated
         if not current_user:
             # Public access - show approved images OR images without review items (legacy/development)
             query = query.outerjoin(ReviewItem, ReviewItem.image_id == ImageMetadata.id).filter(
                 or_(
                     ReviewItem.status == ReviewStatus.APPROVED.value,
-                    ReviewItem.id == None  # Include images without review items
+                    ReviewItem.id == None,  # Include images without review items
                 )
             )
             logger.debug("Public access - filtering to approved or unreviewed images")
@@ -365,11 +366,11 @@ async def update_image_by_id(
         # Check if user is the uploader or an admin
         is_admin = current_user.role in ["admin", "superadmin"]
         is_uploader = str(image.uploader_id) == str(current_user.id)
-        
+
         if not is_admin and not is_uploader:
             raise HTTPException(
                 status_code=403,
-                detail="Only the image uploader or an administrator can edit this image"
+                detail="Only the image uploader or an administrator can edit this image",
             )
 
         updated_fields: List[str] = []
@@ -480,20 +481,20 @@ async def search_images(
     """Search images with text query, filters, and sorting."""
     try:
         query = db.query(ImageMetadata)
-        
+
         # PUBLIC VISIBILITY: Only show approved images unless user is authenticated
         if not current_user:
             # Public access - show approved images OR images without review items (legacy/development)
             query = query.outerjoin(ReviewItem, ReviewItem.image_id == ImageMetadata.id).filter(
                 or_(
                     ReviewItem.status == ReviewStatus.APPROVED.value,
-                    ReviewItem.id == None  # Include images without review items
+                    ReviewItem.id == None,  # Include images without review items
                 )
             )
             logger.debug("Public search - filtering to approved or unreviewed images")
         else:
             logger.debug(f"Authenticated search for user {current_user.id}")
-        
+
         date_field = (
             ImageMetadata.date_stamp
             if hasattr(ImageMetadata, "date_stamp")

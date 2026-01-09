@@ -1,19 +1,18 @@
-from datetime import datetime, timedelta
-from typing import Optional, Dict
-from collections import defaultdict
-
+import logging
 import os
 import secrets
-import logging
 import time
+from collections import defaultdict
+from datetime import datetime, timedelta
+from typing import Dict, Optional
 
-from fastapi import Depends, HTTPException, status, APIRouter, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
+from models.database import get_db
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from models.database import get_db
 from workers.email_tasks import send_welcome_email
 
 logger = logging.getLogger(__name__)
@@ -21,13 +20,15 @@ logger = logging.getLogger(__name__)
 # SECURITY FIX: Redis-backed rate limiter for persistent, distributed rate limiting
 # This replaces in-memory storage which resets on restart and doesn't work across workers
 
+
 def get_redis_client():
     """Get Redis client for rate limiting"""
     import redis
+
     redis_host = os.getenv("REDIS_HOST", "localhost")
     redis_port = int(os.getenv("REDIS_PORT", "6379"))
     redis_db = int(os.getenv("REDIS_DB", "0"))
-    
+
     try:
         client = redis.Redis(
             host=redis_host,
@@ -44,6 +45,7 @@ def get_redis_client():
         logger.warning(f"Redis connection failed: {e}. Falling back to in-memory rate limiting.")
         return None
 
+
 # Fallback in-memory storage if Redis is unavailable
 rate_limit_storage: Dict[str, list] = defaultdict(list)
 RATE_LIMIT_WINDOW = 900  # 15 minutes (for auth endpoints)
@@ -56,7 +58,7 @@ UPLOAD_RATE_LIMIT_MAX_ATTEMPTS = 10  # 10 uploads per hour
 
 def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int = None) -> None:
     """Check if identifier has exceeded rate limit.
-    
+
     Uses Redis for persistent, distributed rate limiting. Falls back to in-memory if Redis unavailable.
 
     Args:
@@ -81,15 +83,15 @@ def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int
         try:
             key = f"rate_limit:{identifier}"
             current = redis_client.get(key)
-            
+
             if current and int(current) >= max_attempts:
                 ttl = redis_client.ttl(key)
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=f"Too many attempts. Please try again in {max(ttl, 0)} seconds.",
-                    headers={"Retry-After": str(max(ttl, 0))}
+                    headers={"Retry-After": str(max(ttl, 0))},
                 )
-            
+
             # Increment counter with expiration
             pipe = redis_client.pipeline()
             pipe.incr(key)
@@ -98,7 +100,7 @@ def check_rate_limit(identifier: str, custom_window: int = None, custom_max: int
             return
         except Exception as e:
             logger.warning(f"Redis rate limit check failed: {e}. Using in-memory fallback.")
-    
+
     # Fallback to in-memory rate limiting
     now = time.time()
     # Clean old attempts
@@ -293,13 +295,16 @@ async def login(
             detail="Invalid credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     # Update last_login in admin_users table if exists
     try:
         from services.admin_service import AdminUser
-        admin_user = db.query(AdminUser).filter(
-            (AdminUser.username == user.username) | (AdminUser.email == user.email)
-        ).first()
+
+        admin_user = (
+            db.query(AdminUser)
+            .filter((AdminUser.username == user.username) | (AdminUser.email == user.email))
+            .first()
+        )
         if admin_user:
             admin_user.last_login = datetime.utcnow()
             admin_user.failed_login_attempts = 0
@@ -307,7 +312,7 @@ async def login(
     except Exception as e:
         logger.warning(f"Could not update admin_users last_login: {e}")
         # Continue with login even if admin_users update fails
-    
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.username}, expires_delta=access_token_expires
@@ -353,8 +358,10 @@ async def register(request: Request, register_data: RegisterRequest, db: Session
     client_ip = request.client.host if request.client else "unknown"
     check_rate_limit(f"register:{register_data.email}")
     check_rate_limit(f"register_ip:{client_ip}")
-    from models.rbac import User as DBUser, Role
     import re
+
+    from models.rbac import Role
+    from models.rbac import User as DBUser
 
     # Validate password strength
     if len(register_data.password) < 12:

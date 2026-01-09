@@ -3,20 +3,19 @@ Performance optimization module for STAC and OGC APIs
 Implements caching, spatial indexing, and pagination optimizations
 """
 
-import redis
-import json
 import hashlib
+import json
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
 from functools import wraps
+from typing import Any, Dict, List, Optional
 
-from fastapi import Request, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import Index, text, func
-from pydantic import BaseModel
-
+import redis
 from core.config import settings
-from models.database import get_db, ImageMetadata
+from fastapi import Depends, Request
+from models.database import ImageMetadata, get_db
+from pydantic import BaseModel
+from sqlalchemy import Index, func, text
+from sqlalchemy.orm import Session
 
 # Redis connection for caching
 redis_client = None

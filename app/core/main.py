@@ -1,34 +1,34 @@
 """FastAPI application entry point with enhanced security, authentication, and rate limiting."""
 
-import sys
 import os
+import sys
 
 # Add the app directory to Python path to fix import issues
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-import logging
-import uvicorn
-import redis
-
-from core.config import settings
-from middleware.logging import RequestLoggingMiddleware, configure_structlog, get_logger
-
-# Use simplified APIs for development
-from api import upload, auth, stac, ogc_records, metadata, webhooks, feeds, featured
-from api import images_simple as images  # Use simple version
-from api import rbac  # Phase 0: RBAC foundation
-from api import curation  # Admin curation and review queue
-from api import admin  # Admin user management and dashboard
-
-# Enable monitoring for production observability
-from services.monitoring import setup_monitoring, monitoring_background_tasks
 
 # Temporarily disable complex features for basic startup
 # from services.performance import initialize_performance_optimizations
 # from services.minio_lifecycle import setup_minio_lifecycle_and_backup
 import asyncio
+import logging
+
+import redis
+import uvicorn
+
+# Use simplified APIs for development
+from api import admin  # Admin user management and dashboard
+from api import curation  # Admin curation and review queue
+from api import rbac  # Phase 0: RBAC foundation
+from api import auth, featured, feeds
+from api import images_simple as images  # Use simple version
+from api import metadata, ogc_records, stac, upload, webhooks
+from core.config import settings
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from middleware.logging import RequestLoggingMiddleware, configure_structlog, get_logger
+
+# Enable monitoring for production observability
+from services.monitoring import monitoring_background_tasks, setup_monitoring
 
 # Configure structured logging early
 LOG_LEVEL = logging.DEBUG if settings.DEBUG else logging.INFO
@@ -164,6 +164,7 @@ app.include_router(upload.router, prefix="/upload", tags=["upload-legacy"])
 
 # Batch upload endpoint for multiple files with async processing
 from api import batch_upload
+
 app.include_router(batch_upload.router, tags=["batch-upload"])
 
 # app.include_router(graphql_schema.graphql_router, prefix="/graphql", tags=["graphql"])  # Commented out - not imported

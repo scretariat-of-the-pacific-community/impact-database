@@ -1,54 +1,63 @@
 """Admin curation API endpoints for review queue, metadata editing, and workflow management."""
 
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
 import csv
 import io
-import zipfile
 import json
-import xml.etree.ElementTree as ET
-from xml.dom import minidom
 import logging
+import xml.etree.ElementTree as ET
+import zipfile
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional
+from xml.dom import minidom
 
 logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks, Body
-from fastapi.responses import StreamingResponse, JSONResponse
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, asc, func
-from pydantic import BaseModel, Field
-
-from models.database import get_db, ImageMetadata
-from models.rbac import User, Role as DBRole
-from models.curation import (
-    CurationQueue,
-    CurationComment,
-    CurationAction,
-    BulkImport,
-    ExportRequest,
-    CurationStatus,
-    Priority,
-    ActionType,
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    UploadFile,
 )
+from fastapi.responses import JSONResponse, StreamingResponse
+from models.curation import (
+    ActionType,
+    BulkImport,
+    CurationAction,
+    CurationComment,
+    CurationQueue,
+    CurationStatus,
+    ExportRequest,
+    Priority,
+)
+from models.database import ImageMetadata, get_db
+from models.rbac import Role as DBRole
+from models.rbac import User
 from models.review_workflow import (
-    ReviewItem,
-    ReviewAssignment,
-    ReviewAuditTrail,
-    ReviewStatus,
-    ReviewPriority,
     AssignmentReason,
     AuditAction,
+    ReviewAssignment,
+    ReviewAuditTrail,
+    ReviewItem,
+    ReviewPriority,
+    ReviewStatus,
 )
+from pydantic import BaseModel, Field
+from sqlalchemy import and_, asc, desc, func, or_
+from sqlalchemy.orm import Session
 
 # Alias for clarity
 DBUser = User
 Role = DBRole
+from api.auth import User, get_current_user
 from models.rbac import User as DBUser
-from api.auth import get_current_user, User
 from services.metadata_validation import MetadataValidator
 from services.minio_client import get_minio_storage
-from workers.tasks import trigger_webhooks_on_approval
 from workers.email_tasks import send_upload_approved_email, send_upload_rejected_email
+from workers.tasks import trigger_webhooks_on_approval
 
 router = APIRouter()
 
@@ -196,7 +205,7 @@ def log_curation_action(
         action_type_value = action_type.value
     else:
         action_type_value = action_type
-    
+
     action = CurationAction(
         queue_item_id=queue_item_id,
         action_type=action_type_value,
@@ -220,7 +229,9 @@ async def get_curation_queue(
     is_flagged: Optional[bool] = Query(None, description="Filter flagged items"),
     is_duplicate: Optional[bool] = Query(None, description="Filter duplicates"),
     show_deleted: bool = Query(False, description="Include soft-deleted items"),
-    show_all: bool = Query(False, description="Show all items (admin only, overrides role-based filtering)"),
+    show_all: bool = Query(
+        False, description="Show all items (admin only, overrides role-based filtering)"
+    ),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     # Legacy pagination support
@@ -232,33 +243,33 @@ async def get_curation_queue(
     current_user: User = Depends(get_current_user),
 ):
     """Get curation queue with role-based filtering and pagination.
-    
+
     Role-based visibility:
     - Admin: Sees all items (or can filter with show_all=false)
     - Curator: Sees unassigned items + items assigned to them
     - Contributor: Sees only their own submissions
-    
+
     Returns paginated response with { items: [...], total: N } shape.
     """
     # Get user's role from database for permission checking
     db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
     if not db_user:
         raise HTTPException(status_code=401, detail="User not found")
-    
+
     user_role = db_user.role.name if db_user.role else None
-    
+
     query = db.query(CurationQueue)
-    
-    if user_role == 'contributor':
+
+    if user_role == "contributor":
         # Contributors see only their submissions
         query = query.filter(CurationQueue.submitted_by == current_user.id)
-    elif user_role == 'curator':
+    elif user_role == "curator":
         # Curators see: unassigned items OR items assigned to them
         if not show_all:  # Respect show_all flag for curators with admin override
             query = query.filter(
                 or_(
                     CurationQueue.assigned_to == None,
-                    CurationQueue.assigned_to == str(current_user.id)
+                    CurationQueue.assigned_to == str(current_user.id),
                 )
             )
     # Admin sees everything by default (no additional filter)
@@ -284,7 +295,7 @@ async def get_curation_queue(
     sort_field = sort_by
     if sort_by == "submittedAt":
         sort_field = "created_at"
-    
+
     sort_column = getattr(CurationQueue, sort_field, CurationQueue.created_at)
     if sort_order == "desc":
         query = query.order_by(desc(sort_column))
@@ -510,7 +521,7 @@ async def flag_item(
     """Flag an item for attention."""
     check_admin_permission(current_user)
 
-    flag_reason = body.get('reason') or body.get('flag_reason', 'No reason provided')
+    flag_reason = body.get("reason") or body.get("flag_reason", "No reason provided")
 
     item = db.query(CurationQueue).filter(CurationQueue.id == item_id).first()
     if not item:
@@ -718,7 +729,7 @@ async def update_comment(
 
     # Only allow the author or admin to update
     db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
-    if comment.author != current_user.username and (not db_user or db_user.role.name != 'admin'):
+    if comment.author != current_user.username and (not db_user or db_user.role.name != "admin"):
         raise HTTPException(status_code=403, detail="Not authorized to update this comment")
 
     comment.content = content
@@ -752,7 +763,7 @@ async def delete_comment(
 
     # Only allow the author or admin to delete
     db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
-    if comment.author != current_user.username and (not db_user or db_user.role.name != 'admin'):
+    if comment.author != current_user.username and (not db_user or db_user.role.name != "admin"):
         raise HTTPException(status_code=403, detail="Not authorized to delete this comment")
 
     comment.is_deleted = True
@@ -1229,9 +1240,7 @@ async def get_dashboard_stats(
     total_items = db.query(func.count(CurationQueue.id)).scalar()
 
     pending_items = (
-        db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.status == "pending")
-        .scalar()
+        db.query(func.count(CurationQueue.id)).filter(CurationQueue.status == "pending").scalar()
     )
 
     under_review_items = (
@@ -1241,27 +1250,19 @@ async def get_dashboard_stats(
     )
 
     approved_items = (
-        db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.status == "approved")
-        .scalar()
+        db.query(func.count(CurationQueue.id)).filter(CurationQueue.status == "approved").scalar()
     )
-    
+
     rejected_items = (
-        db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.status == "rejected")
-        .scalar()
+        db.query(func.count(CurationQueue.id)).filter(CurationQueue.status == "rejected").scalar()
     )
 
     flagged_items = (
-        db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.is_flagged == True)
-        .scalar()
+        db.query(func.count(CurationQueue.id)).filter(CurationQueue.is_flagged == True).scalar()
     )
 
     duplicate_items = (
-        db.query(func.count(CurationQueue.id))
-        .filter(CurationQueue.is_duplicate == True)
-        .scalar()
+        db.query(func.count(CurationQueue.id)).filter(CurationQueue.is_duplicate == True).scalar()
     )
 
     # Activity statistics (last 30 days)
@@ -1277,7 +1278,7 @@ async def get_dashboard_stats(
         db.query(func.count(CurationQueue.id))
         .filter(
             CurationQueue.updated_at >= window_start,
-            CurationQueue.status.in_(["approved", "rejected", "needs_changes"])
+            CurationQueue.status.in_(["approved", "rejected", "needs_changes"]),
         )
         .scalar()
     )
@@ -1653,7 +1654,7 @@ def _generate_geojson_export(images: List[ImageMetadata], options: Dict[str, Any
 
 async def _get_priority_distribution(db: Session) -> Dict[str, int]:
     """Get priority distribution for dashboard using CurationQueue."""
-    from sqlalchemy import func, cast, String
+    from sqlalchemy import String, cast, func
 
     # Cast priority enum to string to avoid enum value mismatch (DB has lowercase, enum has uppercase)
     results = (
@@ -1667,7 +1668,7 @@ async def _get_priority_distribution(db: Session) -> Dict[str, int]:
 
 async def _get_curator_workload(db: Session) -> List[Dict[str, Any]]:
     """Get curator workload for dashboard using CurationQueue."""
-    from sqlalchemy import func, cast
+    from sqlalchemy import cast, func
     from sqlalchemy.dialects.postgresql import UUID
 
     # Join with User table to get curator names
@@ -1724,18 +1725,13 @@ async def _process_csv_import(
 async def _get_curator_with_lowest_workload(db: Session) -> Optional[str]:
     """Find curator with lowest current workload for auto-assignment."""
     from sqlalchemy import func
-    
+
     # Get all curators
-    curators = (
-        db.query(DBUser)
-        .join(DBUser.role)
-        .filter(Role.name == 'curator')
-        .all()
-    )
-    
+    curators = db.query(DBUser).join(DBUser.role).filter(Role.name == "curator").all()
+
     if not curators:
         return None
-    
+
     # Calculate workload for each curator
     curator_workloads = []
     for curator in curators:
@@ -1743,12 +1739,13 @@ async def _get_curator_with_lowest_workload(db: Session) -> Optional[str]:
             db.query(func.count(CurationQueue.id))
             .filter(
                 CurationQueue.assigned_to == str(curator.id),
-                CurationQueue.status.in_(["pending", "under_review"])
+                CurationQueue.status.in_(["pending", "under_review"]),
             )
-            .scalar() or 0
+            .scalar()
+            or 0
         )
         curator_workloads.append((str(curator.id), workload))
-    
+
     # Return curator with lowest workload
     curator_workloads.sort(key=lambda x: x[1])
     return curator_workloads[0][0]
@@ -1758,23 +1755,23 @@ async def _auto_assign_queue_item(db: Session, queue_item: CurationQueue) -> boo
     """Auto-assign a queue item to curator with lowest workload."""
     if queue_item.assigned_to:
         return False  # Already assigned
-    
+
     curator_id = await _get_curator_with_lowest_workload(db)
     if curator_id:
         queue_item.assigned_to = curator_id
-        
+
         # Create action log
-        action = CurationAction(
+        log_curation_action(
+            db=db,
             queue_item_id=queue_item.id,
             action_type=ActionType.EDITED,
             performed_by="system",
-            changes={"assigned_to": {"from": None, "to": curator_id}},
-            notes="Auto-assigned to curator with lowest workload"
+            metadata_changes={"assigned_to": {"from": None, "to": curator_id}},
+            notes="Auto-assigned to curator with lowest workload",
         )
-        db.add(action)
         db.commit()
         return True
-    
+
     return False
 
 
@@ -1788,34 +1785,34 @@ async def claim_queue_item(
     """Curator claims an unassigned item for review."""
     # Get user's role from database
     db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
-    if not db_user or db_user.role.name not in ['curator', 'admin']:
+    if not db_user or db_user.role.name not in ["curator", "admin"]:
         raise HTTPException(status_code=403, detail="Only curators and admins can claim items")
-    
+
     # Get the item
     item = db.query(CurationQueue).filter(CurationQueue.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Queue item not found")
-    
+
     # Check if already assigned
     if item.assigned_to:
         raise HTTPException(status_code=400, detail="Item is already assigned")
-    
+
     # Assign to current user
     item.assigned_to = str(current_user.id)
     item.updated_at = datetime.utcnow()
-    
+
     # Create action log
-    action = CurationAction(
+    log_curation_action(
+        db=db,
         queue_item_id=item.id,
         action_type=ActionType.EDITED,
         performed_by=current_user.id,
-        changes={"assigned_to": {"from": None, "to": str(current_user.id)}},
-        notes="Curator claimed item for review"
+        metadata_changes={"assigned_to": {"from": None, "to": str(current_user.id)}},
+        notes="Curator claimed item for review",
     )
-    db.add(action)
     db.commit()
     db.refresh(item)
-    
+
     return {"success": True, "message": "Item claimed successfully", "item": item.to_dict()}
 
 
@@ -1829,38 +1826,38 @@ async def assign_queue_item(
     """Admin assigns an item to a specific curator."""
     # Get user's role from database
     db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
-    if not db_user or db_user.role.name != 'admin':
+    if not db_user or db_user.role.name != "admin":
         raise HTTPException(status_code=403, detail="Only admins can assign items")
-    
+
     # Get the item
     item = db.query(CurationQueue).filter(CurationQueue.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Queue item not found")
-    
+
     # Verify curator exists and has curator role
     curator = db.query(DBUser).filter(DBUser.id == curator_id).first()
     if not curator:
         raise HTTPException(status_code=404, detail="Curator not found")
-    
-    if curator.role.name not in ['curator', 'admin']:
+
+    if curator.role.name not in ["curator", "admin"]:
         raise HTTPException(status_code=400, detail="User is not a curator")
-    
+
     old_assignee = item.assigned_to
     item.assigned_to = curator_id
     item.updated_at = datetime.utcnow()
-    
+
     # Create action log
-    action = CurationAction(
+    log_curation_action(
+        db=db,
         queue_item_id=item.id,
         action_type=ActionType.EDITED,
         performed_by=current_user.id,
-        changes={"assigned_to": {"from": old_assignee, "to": curator_id}},
-        notes=f"Admin assigned item to curator {curator.username}"
+        metadata_changes={"assigned_to": {"from": old_assignee, "to": curator_id}},
+        notes=f"Admin assigned item to curator {curator.username}",
     )
-    db.add(action)
     db.commit()
     db.refresh(item)
-    
+
     return {"success": True, "message": "Item assigned successfully", "item": item.to_dict()}
 
 
@@ -1871,32 +1868,30 @@ async def get_curators(
 ):
     """Get list of curators with their current workload."""
     # All authenticated users can view curator list
-    
+
     # Get all curators
-    curators = (
-        db.query(DBUser)
-        .join(DBUser.role)
-        .filter(Role.name.in_(['curator', 'admin']))
-        .all()
-    )
-    
+    curators = db.query(DBUser).join(DBUser.role).filter(Role.name.in_(["curator", "admin"])).all()
+
     curator_list = []
     for curator in curators:
         workload = (
             db.query(func.count(CurationQueue.id))
             .filter(
                 CurationQueue.assigned_to == str(curator.id),
-                CurationQueue.status.in_(["pending", "under_review"])
+                CurationQueue.status.in_(["pending", "under_review"]),
             )
-            .scalar() or 0
+            .scalar()
+            or 0
         )
-        
-        curator_list.append({
-            "id": str(curator.id),
-            "username": curator.username,
-            "email": curator.email,
-            "role": curator.role.name,
-            "current_workload": workload
-        })
-    
+
+        curator_list.append(
+            {
+                "id": str(curator.id),
+                "username": curator.username,
+                "email": curator.email,
+                "role": curator.role.name,
+                "current_workload": workload,
+            }
+        )
+
     return curator_list

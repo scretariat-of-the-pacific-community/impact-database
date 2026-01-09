@@ -182,7 +182,7 @@ GET /api/admin/curation/curators
    curl -X POST http://localhost:8000/api/auth/login \
      -H "Content-Type: application/json" \
      -d '{"email":"curator@spc.int","password":"curator123"}'
-   
+
    # Get queue (should see 10 assigned + 29 unassigned = 39 total)
    curl http://localhost:8000/api/admin/curation/queue \
      -H "Cookie: ocean_portal_token=TOKEN"
@@ -199,7 +199,7 @@ GET /api/admin/curation/curators
    ```bash
    # Find unassigned item
    curl http://localhost:8000/api/admin/curation/queue?assigned_to=null
-   
+
    # Claim it
    curl -X POST http://localhost:8000/api/admin/curation/queue/{id}/claim \
      -H "Cookie: ocean_portal_token=CURATOR_TOKEN"
@@ -242,7 +242,7 @@ GET /api/admin/curation/curators
 SELECT name, display_name, level FROM roles ORDER BY level DESC;
 
 -- Check curator permissions
-SELECT r.name, p.resource, p.action 
+SELECT r.name, p.resource, p.action
 FROM role_permissions rp
 JOIN roles r ON rp.role_id = r.id
 JOIN permissions p ON rp.permission_id = p.id

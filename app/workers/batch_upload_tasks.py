@@ -1,23 +1,22 @@
 """Batch upload Celery tasks."""
 
-import logging
+import asyncio
 import io
 import json
-import asyncio
-from typing import Dict, Any, List
-from datetime import datetime, timezone, timedelta
+import logging
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List
 
-from celery import shared_task, group
-from sqlalchemy.orm import Session
-
-from models.database import SessionLocal, ImageMetadata
-from models.upload_batch import UploadBatch, BatchStatus
-from models.upload_failures import UploadFailureLog, FailureReason
+from celery import group, shared_task
+from geoalchemy2 import WKTElement
+from models.database import ImageMetadata, SessionLocal
+from models.upload_batch import BatchStatus, UploadBatch
+from models.upload_failures import FailureReason, UploadFailureLog
 from services.exif_utils import extract_exif_data, get_image_hash
 from services.minio_client import get_minio_storage
 from services.websocket_manager import ws_manager
-from geoalchemy2 import WKTElement
-import uuid
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -71,13 +70,18 @@ def finalize_batch(results: List[Dict[str, Any]], batch_id: str):
 
         # Send WebSocket completion notification
         try:
-            asyncio.run(_send_completion_update(batch_id, {
-                "status": batch.status.value,
-                "total_files": batch.total_files,
-                "successful_files": batch.successful_files,
-                "failed_files": batch.failed_files,
-                "completed_at": batch.completed_at.isoformat()
-            }))
+            asyncio.run(
+                _send_completion_update(
+                    batch_id,
+                    {
+                        "status": batch.status.value,
+                        "total_files": batch.total_files,
+                        "successful_files": batch.successful_files,
+                        "failed_files": batch.failed_files,
+                        "completed_at": batch.completed_at.isoformat(),
+                    },
+                )
+            )
         except Exception as ws_error:
             logger.warning(f"Failed to send WebSocket completion for batch {batch_id}: {ws_error}")
 
@@ -133,7 +137,12 @@ def process_single_file(
                 minio_client.delete_object(temp_key)
             except:
                 pass
-            return {"success": False, "filename": filename, "error": "Batch cancelled by user", "cancelled": True}
+            return {
+                "success": False,
+                "filename": filename,
+                "error": "Batch cancelled by user",
+                "cancelled": True,
+            }
 
         # Download file from temp storage
         file_data = minio_client.get_object_content(temp_key)
@@ -173,32 +182,32 @@ def process_single_file(
         # Create database record
         try:
             image_metadata = ImageMetadata(
-            filename=unique_filename,
-            datetime=metadata.get("datetime") or datetime.now(timezone.utc),
-            hazard_type=metadata["hazard_type"],
-            event_id=metadata.get("event_id"),
-            status="pending_review",
-            data_license=metadata.get(
-                "data_license", "https://creativecommons.org/licenses/by/4.0/"
-            ),
-            source_type=metadata["source_type"],
-            uploader_id=user_id,
-            geometry=geom,
-            altitude=altitude,
-            altitude_ref=altitude_ref,
-            orientation=exif_data.get("orientation"),
-            camera_make=exif_data.get("camera_make"),
-            camera_model=exif_data.get("camera_model"),
-            camera_bearing=exif_data.get("camera_bearing"),
-            exif_metadata=exif_data if exif_data else None,
-            resource_locator=object_key,
-            title=metadata.get("title", filename),
-            abstract=metadata.get("abstract"),
-            location=metadata.get("location"),
-            country=metadata.get("country") or exif_data.get("country_code"),
-            keywords=metadata.get("keywords"),
-            lineage_statement=f"Batch upload. Content hash: {get_image_hash(io.BytesIO(file_data))}",
-        )
+                filename=unique_filename,
+                datetime=metadata.get("datetime") or datetime.now(timezone.utc),
+                hazard_type=metadata["hazard_type"],
+                event_id=metadata.get("event_id"),
+                status="pending_review",
+                data_license=metadata.get(
+                    "data_license", "https://creativecommons.org/licenses/by/4.0/"
+                ),
+                source_type=metadata["source_type"],
+                uploader_id=user_id,
+                geometry=geom,
+                altitude=altitude,
+                altitude_ref=altitude_ref,
+                orientation=exif_data.get("orientation"),
+                camera_make=exif_data.get("camera_make"),
+                camera_model=exif_data.get("camera_model"),
+                camera_bearing=exif_data.get("camera_bearing"),
+                exif_metadata=exif_data if exif_data else None,
+                resource_locator=object_key,
+                title=metadata.get("title", filename),
+                abstract=metadata.get("abstract"),
+                location=metadata.get("location"),
+                country=metadata.get("country") or exif_data.get("country_code"),
+                keywords=metadata.get("keywords"),
+                lineage_statement=f"Batch upload. Content hash: {get_image_hash(io.BytesIO(file_data))}",
+            )
 
             db.add(image_metadata)
             db.commit()
@@ -224,27 +233,39 @@ def process_single_file(
         # Atomic increment of processed_files counter
         try:
             from sqlalchemy import text
+
             db.execute(
-                text("UPDATE upload_batches SET processed_files = processed_files + 1 WHERE id = :id"),
-                {"id": batch_id}
+                text(
+                    "UPDATE upload_batches SET processed_files = processed_files + 1 WHERE id = :id"
+                ),
+                {"id": batch_id},
             )
             db.commit()
-            
+
             # Send WebSocket progress update
             batch = db.query(UploadBatch).filter(UploadBatch.id == batch_id).first()
             if batch:
                 try:
-                    asyncio.run(_send_progress_update(batch_id, {
-                        "processed_files": batch.processed_files,
-                        "total_files": batch.total_files,
-                        "successful_files": batch.successful_files,
-                        "failed_files": batch.failed_files,
-                        "progress_percent": (batch.processed_files / batch.total_files * 100) if batch.total_files > 0 else 0,
-                        "latest_file": filename
-                    }))
+                    asyncio.run(
+                        _send_progress_update(
+                            batch_id,
+                            {
+                                "processed_files": batch.processed_files,
+                                "total_files": batch.total_files,
+                                "successful_files": batch.successful_files,
+                                "failed_files": batch.failed_files,
+                                "progress_percent": (
+                                    (batch.processed_files / batch.total_files * 100)
+                                    if batch.total_files > 0
+                                    else 0
+                                ),
+                                "latest_file": filename,
+                            },
+                        )
+                    )
                 except Exception as ws_error:
                     logger.warning(f"Failed to send WebSocket update: {ws_error}")
-                    
+
         except Exception as update_error:
             logger.warning(f"Failed to update progress counter: {update_error}")
 
@@ -260,15 +281,23 @@ def process_single_file(
         # RETRY LOGIC: Retry on transient failures
         # Network errors, DB locks, MinIO timeouts should retry
         transient_errors = [
-            "connection", "timeout", "temporary", "lock", "deadlock", 
-            "network", "unavailable", "refused"
+            "connection",
+            "timeout",
+            "temporary",
+            "lock",
+            "deadlock",
+            "network",
+            "unavailable",
+            "refused",
         ]
         is_transient = any(err in error_msg.lower() for err in transient_errors)
 
         if is_transient and self.request.retries < self.max_retries:
             # Exponential backoff: 60s, 120s, 240s
-            countdown = 60 * (2 ** self.request.retries)
-            logger.info(f"Retrying {filename} in {countdown}s (attempt {self.request.retries + 1}/{self.max_retries})")
+            countdown = 60 * (2**self.request.retries)
+            logger.info(
+                f"Retrying {filename} in {countdown}s (attempt {self.request.retries + 1}/{self.max_retries})"
+            )
             raise self.retry(exc=e, countdown=countdown)
 
         # Final failure - cleanup temp file
@@ -283,7 +312,7 @@ def process_single_file(
         try:
             failure_log = UploadFailureLog(
                 filename=filename,
-                file_size=len(file_data) if 'file_data' in locals() else 0,
+                file_size=len(file_data) if "file_data" in locals() else 0,
                 failure_reason=FailureReason.VALIDATION_ERROR,
                 error_details=error_msg,
                 uploader_id=user_id,
