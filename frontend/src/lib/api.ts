@@ -17,7 +17,7 @@ import { config, getApiUrl } from './config';
 
 class APIClient {
   private client: AxiosInstance;
-  private baseURL: string;
+  private baseURL!: string; // Definitely assigned in constructor
   private isHandlingUnauthorized: boolean = false;
 
   constructor() {
@@ -61,7 +61,12 @@ class APIClient {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          this.handleUnauthorized();
+          // Don't trigger handleUnauthorized for auth check endpoint
+          // The auth provider handles this case explicitly
+          const requestUrl = error.config?.url || '';
+          if (!requestUrl.includes('/api/rbac/auth/me')) {
+            this.handleUnauthorized();
+          }
         }
         return Promise.reject(this.formatError(error));
       }
@@ -708,30 +713,9 @@ export const imageApi = {
     const response = await apiClient.put(`/api/images/${imageId}`, data);
     return response.data;
   },
+  // Featured stories API disabled - using static curated content only
   getFeaturedStories: async () => {
-    try {
-      const response = await fetch(`${BASE_URL}/api/featured-stories`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null; // Return null if endpoint doesn't exist - page will use fallback data
-        }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      return await response.json();
-    } catch (error: any) {
-      // Return null if endpoint doesn't exist - page will use fallback data
-      if (error?.response?.status === 404) {
-        return null;
-      }
-      throw error;
-    }
+    // Return empty array - featured stories are now static only (Tonga, Fiji)
+    return [];
   },
 };

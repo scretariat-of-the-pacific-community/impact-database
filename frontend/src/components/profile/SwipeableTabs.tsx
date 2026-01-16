@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { motion, PanInfo, useAnimation } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface SwipeableTabsProps {
   activeTab: string;
@@ -10,8 +10,12 @@ interface SwipeableTabsProps {
   children: React.ReactNode;
 }
 
-export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }: SwipeableTabsProps) {
-  const controls = useAnimation();
+export default function SwipeableTabs({
+  activeTab,
+  onTabChange,
+  tabs,
+  children,
+}: SwipeableTabsProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragEnabled, setDragEnabled] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -24,7 +28,7 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
     }
   };
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
+  const handleDragEnd = (_: any, info: any) => {
     setIsDragging(false);
     const swipeThreshold = 50;
     const swipeVelocity = 500;
@@ -58,10 +62,6 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
     }
   };
 
-  useEffect(() => {
-    controls.start({ x: 0 });
-  }, [activeTab, controls]);
-
   return (
     <div className="relative overflow-hidden touch-pan-y" ref={containerRef}>
       <motion.div
@@ -73,7 +73,7 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
         onDragEnd={handleDragEnd}
         onPanEnd={() => setDragEnabled(true)}
         onDirectionLock={handleDirectionLock}
-        animate={controls}
+        animate={{ x: 0 }}
         transition={{
           type: 'spring',
           stiffness: 300,
@@ -91,7 +91,9 @@ export default function SwipeableTabs({ activeTab, onTabChange, tabs, children }
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`min-w-[44px] min-h-[44px] rounded-full transition-all flex items-center justify-center ${
-              index === currentIndex ? 'bg-white/10' : 'bg-white/5 hover:bg-white/10'
+              index === currentIndex
+                ? 'bg-white/10'
+                : 'bg-white/5 hover:bg-white/10'
             }`}
             aria-label={`Go to ${tab.label} tab`}
           />

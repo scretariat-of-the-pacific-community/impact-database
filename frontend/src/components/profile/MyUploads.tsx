@@ -11,7 +11,7 @@ import {
   Grid,
   List,
   Filter,
-  RefreshCcw,
+  RefreshCw,
   Search,
   AlertTriangle,
   Trash2,
@@ -78,7 +78,7 @@ export default function MyUploads({
 
   const filteredUploads = useMemo(() => {
     const query = filters.query.toLowerCase();
-    let data = uploads.filter((upload) => {
+    let data = uploads.filter((upload: any) => {
       const matchesQuery =
         upload.title?.toLowerCase().includes(query) ||
         upload.filename.toLowerCase().includes(query) ||
@@ -129,11 +129,11 @@ export default function MyUploads({
     if (selectedIds.size === filteredUploads.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(filteredUploads.map((upload) => upload.id)));
+      setSelectedIds(new Set(filteredUploads.map((upload: any) => upload.id)));
     }
   };
 
-  const beginEdit = (upload: UserUpload) => {
+  const beginEdit = (upload: UserUpload): any => {
     setEditingId(upload.id);
     setEditForm({
       title: upload.title || '',
@@ -149,7 +149,7 @@ export default function MyUploads({
     setEditForm({});
   };
 
-  const saveEdit = async (upload: UserUpload) => {
+  const saveEdit = async (upload: UserUpload): Promise<any> => {
     const payload: Partial<UserUpload> = {
       title: editForm.title?.trim(),
       abstract: editForm.abstract?.trim(),
@@ -226,7 +226,7 @@ export default function MyUploads({
             autoComplete="off"
             placeholder="Search uploads"
             value={filters.query}
-            onChange={(event) =>
+            onChange={(event: any) =>
               setFilters((prev) => ({ ...prev, query: event.target.value }))
             }
             className="bg-transparent text-white placeholder-white/40 focus:outline-none"
@@ -237,7 +237,7 @@ export default function MyUploads({
           <Filter className="h-4 w-4" aria-hidden="true" />
           <Select
             value={filters.hazard}
-            onChange={(event) =>
+            onChange={(event: any) =>
               setFilters((prev) => ({ ...prev, hazard: event.target.value }))
             }
             variant="dark"
@@ -257,7 +257,7 @@ export default function MyUploads({
 
         <Select
           value={filters.status}
-          onChange={(event) =>
+          onChange={(event: any) =>
             setFilters((prev) => ({ ...prev, status: event.target.value }))
           }
           variant="dark"
@@ -274,7 +274,7 @@ export default function MyUploads({
 
         <Select
           value={sortBy}
-          onChange={(event) => setSortBy(event.target.value as SortOption)}
+          onChange={(event: any) => setSortBy(event.target.value as SortOption)}
           variant="dark"
           size="sm"
           fullWidth={false}
@@ -295,7 +295,7 @@ export default function MyUploads({
           className="bg-white/10 text-white hover:bg-white/20"
           onClick={onRefresh}
         >
-          <RefreshCcw className="mr-2 h-4 w-4" />
+          <RefreshCw className="mr-2 h-4 w-4" />
           Refresh
         </Button>
         <Button
@@ -332,7 +332,7 @@ export default function MyUploads({
     </div>
   );
 
-  const renderGridCard = (upload: UserUpload) => (
+  const renderGridCard = (upload: UserUpload): any => (
     <Card key={upload.id} className={`${glassCard} border-white/5`}>
       <div className="flex items-start gap-3">
         <input
@@ -380,7 +380,7 @@ export default function MyUploads({
                     type="text"
                     autoComplete="off"
                     value={editForm.title}
-                    onChange={(event) =>
+                    onChange={(event: any) =>
                       setEditForm((prev) => ({
                         ...prev,
                         title: event.target.value,
@@ -400,7 +400,7 @@ export default function MyUploads({
                     type="text"
                     autoComplete="off"
                     value={editForm.keywords}
-                    onChange={(event) =>
+                    onChange={(event: any) =>
                       setEditForm((prev) => ({
                         ...prev,
                         keywords: event.target.value,
@@ -415,7 +415,7 @@ export default function MyUploads({
                 Description
                 <textarea
                   value={editForm.abstract}
-                  onChange={(event) =>
+                  onChange={(event: any) =>
                     setEditForm((prev) => ({
                       ...prev,
                       abstract: event.target.value,
@@ -431,7 +431,7 @@ export default function MyUploads({
                   <input
                     type="number"
                     value={editForm.latitude}
-                    onChange={(event) =>
+                    onChange={(event: any) =>
                       setEditForm((prev) => ({
                         ...prev,
                         latitude: event.target.value,
@@ -445,7 +445,7 @@ export default function MyUploads({
                   <input
                     type="number"
                     value={editForm.longitude}
-                    onChange={(event) =>
+                    onChange={(event: any) =>
                       setEditForm((prev) => ({
                         ...prev,
                         longitude: event.target.value,
@@ -515,7 +515,7 @@ export default function MyUploads({
     </Card>
   );
 
-  const renderListRow = (upload: UserUpload) => (
+  const renderListRow = (upload: UserUpload): any => (
     <tr key={upload.id} className="border-b border-white/5">
       <td className="px-4 py-3">
         <input

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { motion, useAnimation } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
 
 interface PullToRefreshProps {
@@ -18,7 +18,6 @@ export default function PullToRefresh({
   const [pullDistance, setPullDistance] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
-  const controls = useAnimation();
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
     if (window.scrollY === 0) {
@@ -44,19 +43,17 @@ export default function PullToRefresh({
   const handleTouchEnd = useCallback(async () => {
     if (pullDistance >= threshold && !isRefreshing) {
       setIsRefreshing(true);
-      controls.start({ rotate: 360 });
 
       try {
         await onRefresh();
       } finally {
         setIsRefreshing(false);
-        controls.start({ rotate: 0 });
       }
     }
 
     setPullDistance(0);
     setTouchStart(0);
-  }, [pullDistance, threshold, isRefreshing, onRefresh, controls]);
+  }, [pullDistance, threshold, isRefreshing, onRefresh]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -90,7 +87,7 @@ export default function PullToRefresh({
       >
         <div className="rounded-full border border-white/20 bg-deep-900/90 p-3 backdrop-blur-xl">
           <motion.div
-            animate={controls}
+            animate={{ rotate: isRefreshing ? 360 : 0 }}
             transition={{
               duration: 1,
               ease: 'linear',

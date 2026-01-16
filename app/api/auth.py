@@ -24,10 +24,14 @@ logger = logging.getLogger(__name__)
 def get_redis_client():
     """Get Redis client for rate limiting"""
     import redis
+    from urllib.parse import urlparse
 
-    redis_host = os.getenv("REDIS_HOST", "localhost")
-    redis_port = int(os.getenv("REDIS_PORT", "6379"))
-    redis_db = int(os.getenv("REDIS_DB", "0"))
+    # Parse REDIS_URL or fall back to individual components
+    redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+    parsed = urlparse(redis_url)
+    redis_host = parsed.hostname or os.getenv("REDIS_HOST", "redis")
+    redis_port = parsed.port or int(os.getenv("REDIS_PORT", "6379"))
+    redis_db = int(parsed.path.lstrip('/')) if parsed.path else int(os.getenv("REDIS_DB", "0"))
 
     try:
         client = redis.Redis(
@@ -296,22 +300,23 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Update last_login in admin_users table if exists
+    # Update last_login in users table
     try:
-        from services.admin_service import AdminUser
-
-        admin_user = (
-            db.query(AdminUser)
-            .filter((AdminUser.username == user.username) | (AdminUser.email == user.email))
+        from models.rbac import User as DBUser
+        from sqlalchemy import or_
+        
+        db_user = (
+            db.query(DBUser)
+            .filter(or_(DBUser.username == user.username, DBUser.email == user.username))
             .first()
         )
-        if admin_user:
-            admin_user.last_login = datetime.utcnow()
-            admin_user.failed_login_attempts = 0
+        if db_user:
+            db_user.last_login = datetime.utcnow()
             db.commit()
     except Exception as e:
-        logger.warning(f"Could not update admin_users last_login: {e}")
-        # Continue with login even if admin_users update fails
+        logger.warning(f"Could not update user last_login: {e}")
+        db.rollback()
+        # Continue with login even if update fails
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
@@ -319,19 +324,22 @@ async def login(
     )
 
     # SECURITY: Set HttpOnly cookie server-side to prevent XSS attacks
-    is_secure = request.url.scheme == "https"
+    # Check X-Forwarded-Proto header for scheme when behind proxy (CloudFlare/Nginx)
+    forwarded_proto = request.headers.get("x-forwarded-proto", "")
+    is_secure = forwarded_proto == "https" or request.url.scheme == "https"
     environment = os.getenv("ENVIRONMENT", "development").lower()
-    # Prefer strict SameSite in production; allow lax in development for local cross-origin flows
-    samesite_policy = "strict" if environment == "production" else "lax"
+    # Use 'lax' for SameSite to allow cookies with top-level navigations (needed for Nginx reverse proxy)
+    samesite_policy = "lax"
 
     response.set_cookie(
         key="ocean_portal_token",
         value=access_token,
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,  # Same as token expiration
         path="/",
+        # Don't set explicit domain - let browser use the request domain automatically
         httponly=True,  # Prevent JavaScript access
-        secure=is_secure,  # HTTPS only in production
-        samesite=samesite_policy,  # CSRF protection with dev-friendly policy
+        secure=is_secure,  # HTTPS only when accessed via HTTPS (checks X-Forwarded-Proto)
+        samesite=samesite_policy,  # CSRF protection with proxy-friendly policy
     )
 
     return {

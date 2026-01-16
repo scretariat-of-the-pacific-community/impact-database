@@ -34,7 +34,7 @@ const MapUsageTracker = dynamic(
     import('react-leaflet').then(({ useMapEvents }) => {
       return function Tracker() {
         useMapEvents({
-          moveend: (event) => {
+          moveend: (event: any) => {
             const map = event.target;
             const center = map.getCenter();
             trackMapInteraction('move', {
@@ -66,9 +66,9 @@ export default function MapPage() {
     queryFn: () => imageApi.search({ limit: 1000 }),
   });
 
-  const images = data?.images || [];
+  const images = (data as any)?.images || [];
   const imagesWithCoordinates = images.filter(
-    (img) =>
+    (img: any) =>
       typeof img.latitude === 'number' && typeof img.longitude === 'number'
   );
   const errorMessage =
@@ -84,8 +84,8 @@ export default function MapPage() {
   const missingCoordinates = Math.max(images.length - geocodedCount, 0);
   const hazardTypeCount = new Set(
     imagesWithCoordinates
-      .map((img) => img.hazard_type)
-      .filter((type): type is HazardType => Boolean(type))
+      .map((img: any) => img.hazard_type)
+      .filter((type: any): type is HazardType => Boolean(type))
   ).size;
 
   return (
@@ -156,7 +156,7 @@ export default function MapPage() {
                   />
                   <MapUsageTracker />
                   {createCustomIcon &&
-                    imagesWithCoordinates.map((image, index) => (
+                    imagesWithCoordinates.map((image: any, index: any) => (
                       <Marker
                         key={image.id}
                         position={

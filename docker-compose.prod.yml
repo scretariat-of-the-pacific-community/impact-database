@@ -18,12 +18,12 @@ services:
           memory: 512M
 
   redis:
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru --appendonly yes
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 768M
         reservations:
           memory: 128M
 
@@ -69,7 +69,9 @@ services:
         max-size: "50m"
         max-file: "5"
     volumes:
-      - uploads_data:/app/uploads
+      - uploads_data:/app/uploads:rw
+    tmpfs:
+      - /tmp:size=2G,mode=1777
 
   celery_worker:
     build:
@@ -83,11 +85,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
         reservations:
-          memory: 256M
+          memory: 512M
     volumes:
-      - uploads_data:/app/uploads
+      - uploads_data:/app/uploads:rw
+    tmpfs:
+      - /tmp:size=1G,mode=1777
 
   celery_beat:
     build:
@@ -99,7 +103,7 @@ services:
       DEBUG: "false"
     restart: unless-stopped
     volumes:
-      - uploads_data:/app/uploads
+      - uploads_data:/app/uploads:rw
 
   flower:
     build:
@@ -115,12 +119,14 @@ services:
       target: runner
       args:
         - BUILDKIT_INLINE_CACHE=1
-        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-        - NEXT_PUBLIC_API_URL_INTERNAL=${NEXT_PUBLIC_API_URL_INTERNAL}
-        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
+        - NEXT_PUBLIC_BASE_PATH=/impact-database
+        - NEXT_PUBLIC_API_URL=https://opmthredds.gem.spc.int
+        - NEXT_PUBLIC_API_URL_INTERNAL=http://api:8000
+        - NEXT_PUBLIC_APP_NAME=SPC Ocean Portal
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_BASE_PATH: "/impact-database"
       NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL}"
       NEXT_PUBLIC_API_URL_INTERNAL: "${NEXT_PUBLIC_API_URL_INTERNAL}"
     restart: unless-stopped
@@ -135,4 +141,3 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
-    volumes: []

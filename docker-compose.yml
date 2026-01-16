@@ -87,7 +87,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
 
   minio:
     image: minio/minio:latest
@@ -133,6 +133,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - MAX_FILE_SIZE=${MAX_FILE_SIZE}
       - PYTHONPATH=${PYTHONPATH}
+      - API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
     depends_on:
       postgis_db:
         condition: service_healthy
@@ -143,8 +144,10 @@ services:
     networks:
       - impact-network
     volumes:
-      - ./app:/app
-      - uploads_data:/app/uploads
+      - ./app:/app:delegated
+      - uploads_data:/app/uploads:rw
+    tmpfs:
+      - /tmp:size=2G,mode=1777
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -174,6 +177,7 @@ services:
       - DEBUG=${DEBUG}
       - SECRET_KEY=${SECRET_KEY}
       - PYTHONPATH=${PYTHONPATH}
+      - API_BASE_URL=${API_BASE_URL:-http://localhost:8000}
       - EMAIL_BACKEND=${EMAIL_BACKEND}
       - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS}
       - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
@@ -192,8 +196,10 @@ services:
     networks:
       - impact-network
     volumes:
-      - ./app:/app
-      - uploads_data:/app/uploads
+      - ./app:/app:delegated
+      - uploads_data:/app/uploads:rw
+    tmpfs:
+      - /tmp:size=1G,mode=1777
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "true"]
@@ -229,8 +235,8 @@ services:
     networks:
       - impact-network
     volumes:
-      - ./app:/app
-      - uploads_data:/app/uploads
+      - ./app:/app:delegated
+      - uploads_data:/app/uploads:rw
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "true"]
@@ -255,7 +261,7 @@ services:
     networks:
       - impact-network
     volumes:
-      - ./app:/app
+      - ./app:/app:delegated
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5555"]
@@ -270,9 +276,12 @@ services:
       dockerfile: Dockerfile
       target: development
     ports:
-      - "3000:3000"
+      - "3100:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NODE_ENV=development
+      # Enable basePath for subdirectory deployment behind reverse proxy
+      - NEXT_PUBLIC_BASE_PATH=/impact-database
+      - NEXT_PUBLIC_API_URL=https://opmthredds.gem.spc.int
       - NEXT_PUBLIC_API_URL_INTERNAL=http://api:8000
       - NEXT_PUBLIC_API_VERSION=v1
       - NEXT_PUBLIC_ENABLE_GUEST_ACCESS=true
@@ -287,25 +296,20 @@ services:
       - NEXT_PUBLIC_CACHE_TTL=300
       - NEXT_PUBLIC_SPC_SSO_ISSUER=https://sso.spc.int
       - NEXT_PUBLIC_SPC_SSO_CLIENT_ID=ocean-portal
-      - NEXT_PUBLIC_IMAGE_PROXY_URL=http://localhost:8000/api/v1/images/proxy
-      - NODE_ENV=development
+      - NEXT_PUBLIC_IMAGE_PROXY_URL=https://opmthredds.gem.spc.int/api/v1/images/proxy
       - NEXT_TELEMETRY_DISABLED=1
+      # Disable Next.js DevTools to avoid geist font 404 errors
+      - NEXT_DEVTOOLS_DISABLED=1
     depends_on:
       api:
         condition: service_healthy
     networks:
       - impact-network
     volumes:
-      - ./frontend:/app
+      - ./frontend:/app:delegated
       - /app/node_modules
       - /app/.next
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
 volumes:
   postgres_data:

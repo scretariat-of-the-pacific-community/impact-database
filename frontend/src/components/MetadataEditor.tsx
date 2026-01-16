@@ -23,18 +23,18 @@ import dompurify from 'dompurify';
 const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
 const INPUT_SANITIZE_CONFIG = {
-  ALLOWED_TAGS: [],
-  ALLOWED_ATTR: [],
+  ALLOWED_TAGS: [] as string[],
+  ALLOWED_ATTR: [] as string[],
   KEEP_CONTENT: true,
-} as const;
+};
 
 const sanitizeMetadataValue = (value: unknown): unknown => {
   if (typeof value === 'string') {
-    return DOMPurify.sanitize(value, INPUT_SANITIZE_CONFIG);
+    return DOMPurify?.sanitize(value, INPUT_SANITIZE_CONFIG) ?? value;
   }
 
   if (Array.isArray(value)) {
-    return value.map((item) => sanitizeMetadataValue(item));
+    return value.map((item: any) => sanitizeMetadataValue(item));
   }
 
   if (value && typeof value === 'object') {
@@ -201,7 +201,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
       if (!response.ok) throw new Error('Failed to save metadata');
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['image-metadata', imageId] });
       setHasChanges(false);
       setOriginalMetadata(metadata);
@@ -211,7 +211,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
 
   useEffect(() => {
     if (imageData) {
-      const meta = imageData.metadata || {};
+      const meta = (imageData as any).metadata || {};
       setMetadata(meta);
       setOriginalMetadata(meta);
       setHasChanges(false);
@@ -296,7 +296,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
           <textarea
             id={fieldId}
             value={value}
-            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => handleFieldChange(field.key, e.target.value)}
             disabled={readOnly}
             className={`${baseInputClasses} h-24 resize-none`}
             placeholder={field.description}
@@ -308,7 +310,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
           <Select
             id={fieldId}
             value={value}
-            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => handleFieldChange(field.key, e.target.value)}
             disabled={readOnly}
             variant="light"
             size="md"
@@ -329,7 +333,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
             id={fieldId}
             type="date"
             value={value ? new Date(value).toISOString().split('T')[0] : ''}
-            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => handleFieldChange(field.key, e.target.value)}
             disabled={readOnly}
             className={baseInputClasses}
           />
@@ -341,9 +347,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
             id={fieldId}
             type="number"
             value={value}
-            onChange={(e) =>
-              handleFieldChange(field.key, parseFloat(e.target.value))
-            }
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => handleFieldChange(field.key, parseFloat(e.target.value))}
             disabled={readOnly}
             className={baseInputClasses}
             placeholder={field.description}
@@ -360,7 +366,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
                 step="any"
                 placeholder="Latitude"
                 value={location.latitude || ''}
-                onChange={(e) =>
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) =>
                   handleFieldChange('location', {
                     ...location,
                     latitude: parseFloat(e.target.value),
@@ -374,7 +382,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
                 step="any"
                 placeholder="Longitude"
                 value={location.longitude || ''}
-                onChange={(e) =>
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) =>
                   handleFieldChange('location', {
                     ...location,
                     longitude: parseFloat(e.target.value),
@@ -391,7 +401,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
               autoComplete="street-address"
               placeholder="Address or place name"
               value={location.address || ''}
-              onChange={(e) =>
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) =>
                 handleFieldChange('location', {
                   ...location,
                   address: e.target.value,
@@ -411,7 +423,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
             type="text"
             autoComplete="off"
             value={Array.isArray(value) ? value.join(', ') : value}
-            onChange={(e) =>
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) =>
               handleFieldChange(
                 field.key,
                 e.target.value.split(',').map((tag) => tag.trim())
@@ -431,7 +445,9 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
             type="text"
             autoComplete="off"
             value={value}
-            onChange={(e) => handleFieldChange(field.key, e.target.value)}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => handleFieldChange(field.key, e.target.value)}
             disabled={readOnly}
             className={baseInputClasses}
             placeholder={field.description}

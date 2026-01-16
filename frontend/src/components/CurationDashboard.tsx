@@ -227,7 +227,7 @@ const CurationDashboard: React.FC = () => {
                 value: stats?.pendingReview || 0,
                 color: 'gray',
               },
-            ].map((item) => (
+            ].map((item: any) => (
               <div
                 key={item.label}
                 className="flex items-center justify-between"

@@ -61,7 +61,7 @@ export default function ImpactMetricsBar({
 
   const unspecifiedCount = useMemo(() => {
     const unspecified = data.find(
-      (d) =>
+      (d: any) =>
         d.name === 'Unspecified location' ||
         d.name === 'Unknown' ||
         d.country === 'Unspecified location'
@@ -90,7 +90,7 @@ export default function ImpactMetricsBar({
     }
 
     const knownCountries = sortedData.filter(
-      (d) => d.name !== 'Unspecified location' && d.name !== 'Unknown'
+      (d: any) => d.name !== 'Unspecified location' && d.name !== 'Unknown'
     );
 
     if (knownCountries.length === 0) {

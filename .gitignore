@@ -13,6 +13,19 @@ node_modules
 secrets/
 .cache/
 
+# SSL/TLS Certificates - Never commit private keys
+certs/
+*.key
+*.crt
+*.pem
+*.p12
+*.pfx
+ca.crt
+server.crt
+server.key
+private.key
+public.crt
+
 # Test files and scripts
 test_*.py
 create_gps_test_images.py

@@ -353,10 +353,20 @@ try:
 
     app.include_router(batch_upload_router, tags=["batch-upload"])
 
+    # Import Analytics API
+    from api.analytics import router as analytics_router
+
+    app.include_router(analytics_router, prefix="/api", tags=["analytics"])
+
     # Import Curation API for admin review workflow
     from api.curation import router as curation_router
 
     app.include_router(curation_router, prefix="/api/admin/curation", tags=["admin", "curation"])
+
+    # Import Email API for Microsoft Graph email functionality
+    from api.email import router as email_router
+    
+    app.include_router(email_router, prefix="/api", tags=["email"])
 
     # Initialize cache manager
     try:

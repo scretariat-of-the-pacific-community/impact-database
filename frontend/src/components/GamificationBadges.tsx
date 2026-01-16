@@ -52,7 +52,7 @@ export default function GamificationBadges() {
       try {
         const stats = await imageApi.userStats();
         return {
-          totalUploads: stats.uploads || 0,
+          totalUploads: (stats as any)?.uploads || 0,
           reviewedImages: 0,
           qualityScore: 0,
           streak: 0,

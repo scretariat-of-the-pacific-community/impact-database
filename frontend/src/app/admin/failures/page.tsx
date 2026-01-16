@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { withBasePath } from '@/lib/auth-utils';
 
 interface FailureStats {
   total_failures: number;
@@ -57,7 +58,7 @@ export default function UploadFailuresAdmin() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/admin/failures/stats');
+      const response = await fetch(withBasePath('/api/admin/failures/stats'));
       const data = await response.json();
       setStats(data);
     } catch (error) {
@@ -67,7 +68,9 @@ export default function UploadFailuresAdmin() {
 
   const fetchPatterns = async () => {
     try {
-      const response = await fetch('/api/admin/failures/patterns?limit=10');
+      const response = await fetch(
+        withBasePath('/api/admin/failures/patterns?limit=10')
+      );
       const data = await response.json();
       setPatterns(data.patterns);
     } catch (error) {
@@ -93,7 +96,9 @@ export default function UploadFailuresAdmin() {
         params.append('end_date', dateRange.end);
       }
 
-      const response = await fetch(`/api/admin/failures/list?${params}`);
+      const response = await fetch(
+        withBasePath(`/api/admin/failures/list?${params}`)
+      );
       const data = await response.json();
       setFailures(data.failures);
     } catch (error) {
@@ -109,9 +114,12 @@ export default function UploadFailuresAdmin() {
     }
 
     try {
-      const response = await fetch(`/api/admin/failures/cleanup?days=${days}`, {
-        method: 'DELETE',
-      });
+      const response = await fetch(
+        withBasePath(`/api/admin/failures/cleanup?days=${days}`),
+        {
+          method: 'DELETE',
+        }
+      );
       const data = await response.json();
       alert(`Deleted ${data.deleted} old failure records`);
       fetchStats();
@@ -245,7 +253,9 @@ export default function UploadFailuresAdmin() {
             </label>
             <select
               value={selectedReason}
-              onChange={(e) => setSelectedReason(e.target.value)}
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setSelectedReason(e.target.value)}
               className="w-full border border-gray-300 rounded-md shadow-sm p-2"
             >
               <option value="all">All Reasons</option>
@@ -265,9 +275,9 @@ export default function UploadFailuresAdmin() {
             <input
               type="date"
               value={dateRange.start}
-              onChange={(e) =>
-                setDateRange({ ...dateRange, start: e.target.value })
-              }
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setDateRange({ ...dateRange, start: e.target.value })}
               className="w-full border border-gray-300 rounded-md shadow-sm p-2"
             />
           </div>
@@ -279,9 +289,9 @@ export default function UploadFailuresAdmin() {
             <input
               type="date"
               value={dateRange.end}
-              onChange={(e) =>
-                setDateRange({ ...dateRange, end: e.target.value })
-              }
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setDateRange({ ...dateRange, end: e.target.value })}
               className="w-full border border-gray-300 rounded-md shadow-sm p-2"
             />
           </div>

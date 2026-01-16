@@ -147,7 +147,6 @@ export default function ProfilePage() {
     enabled: queriesEnabled,
     retry: 1,
     refetchIntervalInBackground: false,
-    retry: 1,
   });
 
   const isRefreshing = statsFetching || uploadsFetching;
@@ -576,7 +575,7 @@ export default function ProfilePage() {
                               dataKey="value"
                               stroke="none"
                             >
-                              {pieData.map((entry, index) => (
+                              {pieData.map((entry, index: any) => (
                                 <Cell
                                   key={`cell-${index}`}
                                   fill={entry.color}
@@ -668,7 +667,7 @@ export default function ProfilePage() {
               role="tablist"
               aria-label="Profile sections"
             >
-              {TABS.map((tab, index) => {
+              {TABS.map((tab, index: any) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
@@ -679,7 +678,7 @@ export default function ProfilePage() {
                     aria-selected={isActive}
                     aria-controls={`panel-${tab.id}`}
                     tabIndex={isActive ? 0 : -1}
-                    onKeyDown={(event) => handleTabKeyDown(event, index)}
+                    onKeyDown={(event: any) => handleTabKeyDown(event, index)}
                     onClick={() => handleTabSelect(tab.id)}
                     className={`flex flex-1 items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition ${
                       isActive

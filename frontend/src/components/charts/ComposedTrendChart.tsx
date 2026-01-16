@@ -83,8 +83,8 @@ export default function ComposedTrendChart({
     );
   };
 
-  const actualData = data.filter((d) => d.isActual);
-  const forecastData = data.filter((d) => d.isForecast);
+  const actualData = (data as any).filter((d: any) => d.isActual);
+  const forecastData = (data as any).filter((d: any) => d.isForecast);
   const combinedData = showForecast ? data : actualData;
 
   return (

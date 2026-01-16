@@ -61,9 +61,12 @@ const config = {
 export { config };
 
 export const getApiUrl = (path: string): string => {
-  const baseUrl = config.API.BASE_URL.replace(/\/$/, ''); // Remove trailing slash
-  const cleanPath = path.replace(/^\//, ''); // Remove leading slash
-  return `${baseUrl}/${cleanPath}`;
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+  const baseUrl = getBaseApiUrl();
+  // Ensure we don't have double slashes
+  return `${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
 };
 
 export default config;

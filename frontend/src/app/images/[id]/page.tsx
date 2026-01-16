@@ -104,9 +104,9 @@ export default function ImageDetailPage() {
 
   // Construct the image URL
   const imageUrl = image
-    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(image.filename)}`
+    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent((image as any).filename)}`
     : '';
-  const fileSizeLabel = formatFileSize(image?.file_size);
+  const fileSizeLabel = formatFileSize((image as any)?.file_size);
 
   const handleDownload = async () => {
     if (!image || !imageUrl) return;
@@ -121,7 +121,8 @@ export default function ImageDetailPage() {
       // This allows the browser to handle the download natively
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download = image.filename || `${image.id || 'image'}.jpg`;
+      link.download =
+        (image as any).filename || `${(image as any).id || 'image'}.jpg`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -178,7 +179,7 @@ export default function ImageDetailPage() {
               </button>
               <div className="text-white/20">|</div>
               <h1 className="text-xl font-semibold text-white truncate">
-                {image.title || image.filename}
+                {(image as any).title || (image as any).filename}
               </h1>
             </div>
 
@@ -222,11 +223,11 @@ export default function ImageDetailPage() {
                 {imageUrl && (
                   <Image
                     src={imageUrl}
-                    alt={image.title || image.filename}
+                    alt={(image as any).title || (image as any).filename}
                     fill
                     className="object-contain"
                     unoptimized
-                    onError={(e) => {
+                    onError={(e: any) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
                     }}
@@ -243,7 +244,7 @@ export default function ImageDetailPage() {
                   </button>
                 </div>
                 <div className="absolute bottom-4 left-4 bg-black/70 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs border border-white/10">
-                  {image.format_name}
+                  {(image as any).format_name}
                   {fileSizeLabel ? ` • ${fileSizeLabel}` : ''}
                 </div>
               </div>
@@ -296,9 +297,13 @@ export default function ImageDetailPage() {
 
               {/* Tab Content */}
               <div className="p-6">
-                {activeTab === 'overview' && <OverviewTab image={image} />}
-                {activeTab === 'metadata' && <MetadataTab image={image} />}
-                {activeTab === 'map' && <LocationTab image={image} />}
+                {activeTab === 'overview' && (
+                  <OverviewTab image={image as any} />
+                )}
+                {activeTab === 'metadata' && (
+                  <MetadataTab image={image as any} />
+                )}
+                {activeTab === 'map' && <LocationTab image={image as any} />}
               </div>
             </div>
           </div>
@@ -319,13 +324,15 @@ export default function ImageDetailPage() {
                       Hazard Type
                     </p>
                     <p className="text-sm text-surface-soft capitalize">
-                      {HAZARD_TYPE_LABELS[image.hazard_type] ||
-                        image.hazard_type}
+                      {HAZARD_TYPE_LABELS[
+                        (image as any)
+                          .hazard_type as keyof typeof HAZARD_TYPE_LABELS
+                      ] || (image as any).hazard_type}
                     </p>
                   </div>
                 </div>
 
-                {image.source_agency && (
+                {(image as any).source_agency && (
                   <div className="flex items-start space-x-3">
                     <Building className="w-5 h-5 text-pacific-400 mt-0.5" />
                     <div>
@@ -333,8 +340,10 @@ export default function ImageDetailPage() {
                         Source Agency
                       </p>
                       <p className="text-sm text-surface-soft">
-                        {SOURCE_AGENCY_LABELS[image.source_agency] ||
-                          image.source_agency}
+                        {SOURCE_AGENCY_LABELS[
+                          (image as any)
+                            .source_agency as keyof typeof SOURCE_AGENCY_LABELS
+                        ] || (image as any).source_agency}
                       </p>
                     </div>
                   </div>
@@ -347,12 +356,14 @@ export default function ImageDetailPage() {
                       Upload Date
                     </p>
                     <p className="text-sm text-surface-soft">
-                      {new Date(image.upload_date).toLocaleDateString()}
+                      {new Date(
+                        (image as any).upload_date
+                      ).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
 
-                {image.latitude && image.longitude && (
+                {(image as any).latitude && (image as any).longitude && (
                   <div className="flex items-start space-x-3">
                     <MapPin className="w-5 h-5 text-pacific-400 mt-0.5" />
                     <div>
@@ -360,14 +371,14 @@ export default function ImageDetailPage() {
                         Coordinates
                       </p>
                       <p className="text-sm text-surface-soft font-mono">
-                        {image.latitude.toFixed(6)},{' '}
-                        {image.longitude.toFixed(6)}
+                        {(image as any).latitude.toFixed(6)},{' '}
+                        {(image as any).longitude.toFixed(6)}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {(image.format_name || fileSizeLabel) && (
+                {((image as any).format_name || fileSizeLabel) && (
                   <div className="flex items-start space-x-3">
                     <FileText className="w-5 h-5 text-pacific-400 mt-0.5" />
                     <div>
@@ -375,7 +386,7 @@ export default function ImageDetailPage() {
                         File Info
                       </p>
                       <p className="text-sm text-surface-soft">
-                        {image.format_name || 'Unknown format'}
+                        {(image as any).format_name || 'Unknown format'}
                         {fileSizeLabel ? ` • ${fileSizeLabel}` : ''}
                       </p>
                     </div>
@@ -385,15 +396,15 @@ export default function ImageDetailPage() {
             </div>
 
             {/* Keywords */}
-            {image.keywords && image.keywords.length > 0 && (
+            {(image as any).keywords && (image as any).keywords.length > 0 && (
               <div className="bg-deep-900/50 rounded-2xl border border-white/10 p-6 backdrop-blur-sm">
                 <h2 className="text-lg font-semibold text-white mb-4">
                   Keywords
                 </h2>
                 <div className="flex flex-wrap gap-2">
-                  {image.keywords.map((keyword, index) => (
+                  {(image as any).keywords.map((keyword: any, index: any) => (
                     <span
-                      key={`${keyword}-${image.id}-${index}`}
+                      key={`${keyword}-${(image as any).id}-${index}`}
                       className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pacific-500/20 text-pacific-300 border border-pacific-500/30"
                     >
                       {keyword}
@@ -404,13 +415,13 @@ export default function ImageDetailPage() {
             )}
 
             {/* Contact Information */}
-            {image.contact && (
+            {(image as any).contact && (
               <div className="bg-deep-900/50 rounded-2xl border border-white/10 p-6 backdrop-blur-sm">
                 <h2 className="text-lg font-semibold text-white mb-4">
                   Contact
                 </h2>
                 <div className="space-y-4">
-                  {image.contact.organisation_name && (
+                  {(image as any).contact.organisation_name && (
                     <div className="flex items-start space-x-3">
                       <Building className="w-4 h-4 text-pacific-400 mt-0.5" />
                       <div>
@@ -418,12 +429,12 @@ export default function ImageDetailPage() {
                           Organisation
                         </p>
                         <p className="text-sm text-surface-soft">
-                          {image.contact.organisation_name}
+                          {(image as any).contact.organisation_name}
                         </p>
                       </div>
                     </div>
                   )}
-                  {image.contact.individual_name && (
+                  {(image as any).contact.individual_name && (
                     <div className="flex items-start space-x-3">
                       <User className="w-4 h-4 text-pacific-400 mt-0.5" />
                       <div>
@@ -431,21 +442,21 @@ export default function ImageDetailPage() {
                           Individual
                         </p>
                         <p className="text-sm text-surface-soft">
-                          {image.contact.individual_name}
+                          {(image as any).contact.individual_name}
                         </p>
                       </div>
                     </div>
                   )}
-                  {image.contact.contact_info?.email && (
+                  {(image as any).contact.contact_info?.email && (
                     <div className="flex items-start space-x-3">
                       <ExternalLink className="w-4 h-4 text-pacific-400 mt-0.5" />
                       <div>
                         <p className="text-sm font-medium text-white">Email</p>
                         <a
-                          href={`mailto:${image.contact.contact_info.email}`}
+                          href={`mailto:${(image as any).contact.contact_info.email}`}
                           className="text-sm text-pacific-400 hover:text-pacific-300"
                         >
-                          {image.contact.contact_info.email}
+                          {(image as any).contact.contact_info.email}
                         </a>
                       </div>
                     </div>
@@ -488,7 +499,7 @@ function OverviewTab({ image }: { image: ImageMetadata }) {
           <div className="flex flex-wrap gap-2">
             {image.topic_category.map((category) => (
               <span
-                key={`${category}-${image.id}`}
+                key={`${category}-${(image as any).id}`}
                 className="inline-flex items-center px-3 py-1 rounded-lg text-sm font-medium bg-green-500/20 text-green-300 border border-green-500/30"
               >
                 {TOPIC_CATEGORY_LABELS[category] || category}
@@ -578,7 +589,7 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
       value: image.reference_system_info,
       icon: Globe,
     },
-    { label: 'Format Name', value: image.format_name, icon: FileText },
+    { label: 'Format Name', value: (image as any).format_name, icon: FileText },
     { label: 'Format Version', value: image.format_version, icon: FileText },
     {
       label: 'Access Constraints',
@@ -666,12 +677,12 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
 function LocationTab({ image }: { image: ImageMetadata }) {
   // Call hooks before any conditional returns
   useEffect(() => {
-    if (image.latitude && image.longitude) {
+    if ((image as any).latitude && (image as any).longitude) {
       configureLeafletIcons();
     }
-  }, [image.latitude, image.longitude]);
+  }, [(image as any).latitude, (image as any).longitude]);
 
-  if (!image.latitude || !image.longitude) {
+  if (!(image as any).latitude || !(image as any).longitude) {
     return (
       <div className="text-center py-8">
         <MapPin className="w-12 h-12 text-pacific-400 mx-auto mb-4" />
@@ -699,13 +710,13 @@ function LocationTab({ image }: { image: ImageMetadata }) {
               <div>
                 <span className="font-medium text-white">Latitude:</span>
                 <span className="ml-2 font-mono text-surface-soft">
-                  {image.latitude.toFixed(6)}°
+                  {(image as any).latitude.toFixed(6)}°
                 </span>
               </div>
               <div>
                 <span className="font-medium text-white">Longitude:</span>
                 <span className="ml-2 font-mono text-surface-soft">
-                  {image.longitude.toFixed(6)}°
+                  {(image as any).longitude.toFixed(6)}°
                 </span>
               </div>
               <div>
@@ -735,7 +746,12 @@ function LocationTab({ image }: { image: ImageMetadata }) {
 
       <div className="h-64">
         <MapContainer
-          center={[image.latitude, image.longitude] as [number, number]}
+          center={
+            [(image as any).latitude, (image as any).longitude] as [
+              number,
+              number,
+            ]
+          }
           zoom={8}
           className="h-full w-full rounded-lg overflow-hidden"
         >
@@ -744,10 +760,15 @@ function LocationTab({ image }: { image: ImageMetadata }) {
             attribution="&copy; OpenStreetMap contributors"
           />
           <Marker
-            position={[image.latitude, image.longitude] as [number, number]}
-            icon={createCustomIcon(image.hazard_type)}
+            position={
+              [(image as any).latitude, (image as any).longitude] as [
+                number,
+                number,
+              ]
+            }
+            icon={createCustomIcon((image as any).hazard_type)}
           >
-            <Popup>{image.title || image.filename}</Popup>
+            <Popup>{(image as any).title || (image as any).filename}</Popup>
           </Marker>
         </MapContainer>
       </div>
@@ -755,7 +776,7 @@ function LocationTab({ image }: { image: ImageMetadata }) {
       {/* External Links */}
       <div className="flex flex-wrap gap-4">
         <a
-          href={`https://www.google.com/maps?q=${image.latitude},${image.longitude}`}
+          href={`https://www.google.com/maps?q=${(image as any).latitude},${(image as any).longitude}`}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center px-4 py-2 border border-white/20 rounded-lg text-sm font-medium text-surface-soft hover:bg-white/5 hover:text-white transition-colors"
@@ -764,7 +785,7 @@ function LocationTab({ image }: { image: ImageMetadata }) {
           View in Google Maps
         </a>
         <a
-          href={`https://www.openstreetmap.org/?mlat=${image.latitude}&mlon=${image.longitude}&zoom=15`}
+          href={`https://www.openstreetmap.org/?mlat=${(image as any).latitude}&mlon=${(image as any).longitude}&zoom=15`}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center px-4 py-2 border border-white/20 rounded-lg text-sm font-medium text-surface-soft hover:bg-white/5 hover:text-white transition-colors"

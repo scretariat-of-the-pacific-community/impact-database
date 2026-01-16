@@ -58,7 +58,8 @@ export default function KeyboardShortcutsHelp() {
   useEffect(() => {
     const handleShow = () => setIsOpen(true);
     window.addEventListener('show-keyboard-shortcuts', handleShow);
-    return () => window.removeEventListener('show-keyboard-shortcuts', handleShow);
+    return () =>
+      window.removeEventListener('show-keyboard-shortcuts', handleShow);
   }, []);
 
   useEffect(() => {
@@ -83,13 +84,15 @@ export default function KeyboardShortcutsHelp() {
     >
       <div
         className="relative w-full max-w-2xl rounded-lg bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        onClick={(e: any) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Keyboard className="h-6 w-6 text-blue-600" />
-            <h2 className="text-2xl font-bold text-gray-900">Keyboard Shortcuts</h2>
+            <h2 className="text-2xl font-bold text-gray-900">
+              Keyboard Shortcuts
+            </h2>
           </div>
           <button
             onClick={() => setIsOpen(false)}
@@ -113,7 +116,9 @@ export default function KeyboardShortcutsHelp() {
                     key={`${section.title}-${shortcut.description}`}
                     className="flex items-center justify-between rounded-lg bg-gray-50 p-3"
                   >
-                    <span className="text-sm text-gray-700">{shortcut.description}</span>
+                    <span className="text-sm text-gray-700">
+                      {shortcut.description}
+                    </span>
                     <div className="flex gap-1">
                       {shortcut.keys.map((key, keyIndex) => (
                         <kbd
@@ -134,7 +139,11 @@ export default function KeyboardShortcutsHelp() {
         {/* Footer */}
         <div className="mt-6 rounded-lg bg-blue-50 p-4">
           <p className="text-sm text-blue-800">
-            <strong>Tip:</strong> Press <kbd className="rounded border border-blue-300 bg-white px-2 py-0.5 text-xs font-semibold">?</kbd> anytime to show this help.
+            <strong>Tip:</strong> Press{' '}
+            <kbd className="rounded border border-blue-300 bg-white px-2 py-0.5 text-xs font-semibold">
+              ?
+            </kbd>{' '}
+            anytime to show this help.
           </p>
         </div>
       </div>

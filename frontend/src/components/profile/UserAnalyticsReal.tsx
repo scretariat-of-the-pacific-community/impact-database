@@ -38,6 +38,7 @@ import { format } from 'date-fns';
 import { HAZARD_TYPE_LABELS, HazardType } from '@/lib/types';
 import { Select } from '@/components/design-system';
 import { getCountryName } from '@/lib/countries';
+import { withBasePath } from '@/lib/auth-utils';
 
 const RADIAN = Math.PI / 180;
 
@@ -125,9 +126,9 @@ function rollingAverage(
   data: Array<{ date: string; uploads: number }>,
   window: number
 ) {
-  return data.map((item, index) => {
+  return (data as any).map((item: any, index: any) => {
     const start = Math.max(0, index - Math.floor(window / 2));
-    const end = Math.min(data.length, index + Math.ceil(window / 2));
+    const end = Math.min((data as any).length, index + Math.ceil(window / 2));
     const slice = data.slice(start, end);
     const avg = slice.reduce((sum, d) => sum + d.uploads, 0) / slice.length;
     return { ...item, smoothed: Math.round(avg * 10) / 10 };
@@ -181,9 +182,12 @@ export default function UserAnalyticsReal({
     queryKey: ['user-analytics', days],
     queryFn: async () => {
       // Use relative URL to go through Next.js API proxy
-      const response = await fetch(`/api/user/analytics?days=${days}`, {
-        credentials: 'include',
-      });
+      const response = await fetch(
+        withBasePath(`/api/user/analytics?days=${days}`),
+        {
+          credentials: 'include',
+        }
+      );
       if (!response.ok) throw new Error('Failed to fetch analytics');
       return response.json();
     },
@@ -220,7 +224,7 @@ export default function UserAnalyticsReal({
   const calendarData = useMemo(() => {
     if (!analyticsData?.time_series) return {};
     const calendar: Record<string, number> = {};
-    analyticsData.time_series.forEach((item) => {
+    analyticsData.time_series.forEach((item: any) => {
       calendar[item.date] = item.uploads;
     });
     return calendar;
@@ -357,7 +361,9 @@ export default function UserAnalyticsReal({
         <div className="flex gap-2">
           <Select
             value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => setDays(Number(e.target.value))}
             variant="dark"
             size="sm"
             fullWidth={false}
@@ -618,7 +624,7 @@ export default function UserAnalyticsReal({
                           dominantBaseline="middle"
                           className="text-sm"
                         >
-                          {`${name} ${(percent * 100).toFixed(0)}%`}
+                          {`${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                         </text>
                       );
                     }}
@@ -651,7 +657,7 @@ export default function UserAnalyticsReal({
             </tr>
           </thead>
           <tbody>
-            {timelineWithRolling.slice(-14).map((row) => (
+            {timelineWithRolling.slice(-14).map((row: any) => (
               <tr key={row.date}>
                 <td>{row.date}</td>
                 <td>{row.uploads}</td>
@@ -669,7 +675,7 @@ export default function UserAnalyticsReal({
             </tr>
           </thead>
           <tbody>
-            {pieData.map((item) => (
+            {pieData.map((item: any) => (
               <tr key={item.rawName}>
                 <td>{item.name}</td>
                 <td>{item.value}</td>

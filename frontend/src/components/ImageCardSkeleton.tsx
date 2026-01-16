@@ -1,5 +1,10 @@
+import { motion } from 'framer-motion';
 
-import { Skeleton } from '@/components/design-system';
+function Skeleton({ className }: { className?: string }) {
+  return (
+    <div className={`animate-pulse bg-gray-200 rounded ${className || ''}`} />
+  );
+}
 
 export function ImageGridCardSkeleton() {
   return (

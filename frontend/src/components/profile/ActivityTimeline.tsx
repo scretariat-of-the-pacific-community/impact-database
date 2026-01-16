@@ -38,7 +38,7 @@ export async function fetchUserActivity(): Promise<{ events: ActivityItem[] }> {
       return { events: [] };
     }
     return {
-      events: data.events.map((item) => ({
+      events: data.events.map((item: any) => ({
         ...item,
         timestamp: item.timestamp ?? new Date().toISOString(),
       })),
@@ -95,7 +95,9 @@ interface ActivityTimelineProps {
   isActive?: boolean;
 }
 
-export default function ActivityTimeline({ isActive = true }: ActivityTimelineProps) {
+export default function ActivityTimeline({
+  isActive = true,
+}: ActivityTimelineProps) {
   const [filter, setFilter] = useState<ActivityType | 'all'>('all');
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const storageKey = useMemo(() => deriveStorageKey(), []);
@@ -118,7 +120,11 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
     window.localStorage.setItem(storageKey, JSON.stringify([...readIds]));
   }, [readIds, storageKey]);
 
-  const { data: activityData, isLoading, error } = useQuery({
+  const {
+    data: activityData,
+    isLoading,
+    error,
+  } = useQuery({
     // Shared query key - same data used by Collaboration.tsx
     queryKey: USER_ACTIVITY_QUERY_KEY,
     queryFn: fetchUserActivity,
@@ -128,25 +134,31 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
   });
 
   // Extract events array from shared query data
-  const activities = activityData?.events ?? [];
+  const activities = (activityData as any)?.events ?? [];
 
   const sortedActivities = useMemo(
     () =>
       // Client-side sort keeps the feed chronological even if the API does not return ordered data.
-      [...activities].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
-    [activities],
+      [...activities].sort(
+        (a, b) =>
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      ),
+    [activities]
   );
 
   const filteredActivities = useMemo(
-    () => (filter === 'all' ? sortedActivities : sortedActivities.filter((item) => item.type === filter)),
-    [filter, sortedActivities],
+    () =>
+      filter === 'all'
+        ? sortedActivities
+        : sortedActivities.filter((item: any) => item.type === filter),
+    [filter, sortedActivities]
   );
 
   const unreadCount = useMemo(
     () =>
       // Count is intentionally global (not filtered) to reflect overall unread activity in the badge indicator.
-      activities.filter((item) => !readIds.has(item.id)).length,
-    [activities, readIds],
+      activities.filter((item: any) => !readIds.has(item.id)).length,
+    [activities, readIds]
   );
 
   const markAsRead = (id: string) => {
@@ -158,10 +170,10 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
   };
 
   const markAllAsRead = () => {
-    setReadIds(new Set(activities.map((item) => item.id)));
+    setReadIds(new Set(activities.map((item: any) => item.id)));
   };
 
-  const renderReviewDetails = (item: ActivityItem) => {
+  const renderReviewDetails = (item: ActivityItem): any => {
     if (item.type !== 'review') return null;
     return (
       <div className="mt-3 space-y-2 rounded-lg border border-palm-500/30 bg-palm-500/5 p-3">
@@ -169,7 +181,9 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
           <CheckCircle2 className="h-4 w-4" />
           <span>Feedback from {item.reviewer ?? 'reviewer'}</span>
         </div>
-        {item.reviewComments && <p className="text-sm text-white/80">{item.reviewComments}</p>}
+        {item.reviewComments && (
+          <p className="text-sm text-white/80">{item.reviewComments}</p>
+        )}
         {item.suggestedImprovements?.length ? (
           <ul className="space-y-1 text-sm text-white/70">
             {item.suggestedImprovements.map((tip) => (
@@ -184,7 +198,7 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
     );
   };
 
-  const renderSystemMessage = (item: ActivityItem) => {
+  const renderSystemMessage = (item: ActivityItem): any => {
     if (item.type !== 'system' || !item.systemMessage) return null;
     return (
       <div className="mt-2 rounded-lg border border-white/15 bg-white/5 p-3 text-sm text-white/80">
@@ -206,7 +220,10 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
   }
 
   return (
-    <section className="space-y-4 rounded-2xl border border-white/10 bg-deep-900/60 p-6 shadow-lg backdrop-blur" aria-label="Profile activity timeline">
+    <section
+      className="space-y-4 rounded-2xl border border-white/10 bg-deep-900/60 p-6 shadow-lg backdrop-blur"
+      aria-label="Profile activity timeline"
+    >
       <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -222,46 +239,59 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
             )}
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Activity timeline</h2>
-            <p className="text-sm text-white/70">Chronological feed of your uploads, reviews, achievements, and system updates.</p>
+            <h2 className="text-xl font-semibold text-white">
+              Activity timeline
+            </h2>
+            <p className="text-sm text-white/70">
+              Chronological feed of your uploads, reviews, achievements, and
+              system updates.
+            </p>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex flex-wrap gap-2">
-            {(Object.keys(filterLabels) as Array<ActivityType | 'all'>).map((key) => (
-              <button
-                key={key}
-                onClick={() => setFilter(key)}
-                aria-label={`Filter by ${filterLabels[key].toLowerCase()}`}
-                aria-pressed={filter === key}
-                className={clsx(
-                  'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition hover:scale-[1.01]',
-                  filter === key
-                    ? 'border-white bg-white/10 text-white'
-                    : 'border-white/10 bg-white/5 text-white/70 hover:text-white',
-                )}
-              >
-                {filterIcons[key]()}
-                {filterLabels[key]}
-              </button>
-            ))}
+            {(Object.keys(filterLabels) as Array<ActivityType | 'all'>).map(
+              (key) => (
+                <button
+                  key={key}
+                  onClick={() => setFilter(key)}
+                  aria-label={`Filter by ${filterLabels[key].toLowerCase()}`}
+                  aria-pressed={filter === key}
+                  className={clsx(
+                    'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition hover:scale-[1.01]',
+                    filter === key
+                      ? 'border-white bg-white/10 text-white'
+                      : 'border-white/10 bg-white/5 text-white/70 hover:text-white'
+                  )}
+                >
+                  {filterIcons[key]()}
+                  {filterLabels[key]}
+                </button>
+              )
+            )}
           </div>
           <button
             onClick={markAllAsRead}
             disabled={unreadCount === 0}
             aria-disabled={unreadCount === 0}
-            aria-label={unreadCount === 0 ? 'Mark all as read (no unread items)' : 'Mark all as read'}
+            aria-label={
+              unreadCount === 0
+                ? 'Mark all as read (no unread items)'
+                : 'Mark all as read'
+            }
             className={clsx(
               'flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition',
               unreadCount === 0
                 ? 'border-white/10 bg-white/5 text-white/40'
-                : 'border-white/10 bg-white/5 text-white/80 hover:border-white/30 hover:text-white',
+                : 'border-white/10 bg-white/5 text-white/80 hover:border-white/30 hover:text-white'
             )}
           >
             <CheckCircle2 className="h-4 w-4" />
             <span className="flex items-center gap-1">
               Mark all as read
-              {unreadCount === 0 && <span className="sr-only">(no unread items)</span>}
+              {unreadCount === 0 && (
+                <span className="sr-only">(no unread items)</span>
+              )}
             </span>
           </button>
         </div>
@@ -272,47 +302,59 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
           <p className="text-sm text-white/60">Loading timeline…</p>
         ) : filteredActivities.length === 0 ? (
           <p className="text-sm text-white/60">
-            {filter === 'all' ? 'No activity to show yet.' : 'No activity to show for this filter yet.'}
+            {filter === 'all'
+              ? 'No activity to show yet.'
+              : 'No activity to show for this filter yet.'}
           </p>
         ) : (
           <ol className="space-y-3" role="feed" aria-label="Activity feed">
-            {filteredActivities.map((item) => {
+            {filteredActivities.map((item: any) => {
               const isUnread = !readIds.has(item.id);
               return (
                 <li key={item.id} role="listitem">
                   <article
                     className={clsx(
                       'relative overflow-hidden rounded-xl border p-4 transition hover:border-white/30',
-                      typeStyles[item.type as ActivityType] || typeStyles.system,
+                      typeStyles[item.type as ActivityType] || typeStyles.system
                     )}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="rounded-full bg-white/10 p-2 text-white">{getIcon(item.type)}</div>
+                      <div className="rounded-full bg-white/10 p-2 text-white">
+                        {getIcon(item.type)}
+                      </div>
                       <div className="flex-1 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-base font-semibold text-white">{item.title}</h3>
-                          {item.type === 'achievement' && item.achievementBadge && (
-                            <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-100">
-                              {item.achievementBadge}
-                            </span>
-                          )}
+                          <h3 className="text-base font-semibold text-white">
+                            {item.title}
+                          </h3>
+                          {item.type === 'achievement' &&
+                            item.achievementBadge && (
+                              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-indigo-100">
+                                {item.achievementBadge}
+                              </span>
+                            )}
                           {isUnread && (
                             <span className="rounded-full bg-coral-500/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
                               Unread
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-white/80">{item.description}</p>
+                        <p className="text-sm text-white/80">
+                          {item.description}
+                        </p>
                         {renderReviewDetails(item)}
                         {renderSystemMessage(item)}
                         <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
                           <span className="inline-flex items-center gap-1">
                             <Clock3 className="h-4 w-4" />
-                            {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+                            {formatDistanceToNow(new Date(item.timestamp), {
+                              addSuffix: true,
+                            })}
                           </span>
                           {item.type === 'review' && item.reviewer && (
                             <span className="inline-flex items-center gap-1 text-palm-200">
-                              <MessageSquare className="h-4 w-4" /> Reviewed by {item.reviewer}
+                              <MessageSquare className="h-4 w-4" /> Reviewed by{' '}
+                              {item.reviewer}
                             </span>
                           )}
                         </div>
@@ -327,7 +369,9 @@ export default function ActivityTimeline({ isActive = true }: ActivityTimelinePr
                             Mark as read
                           </button>
                         ) : (
-                          <span className="text-xs text-white/50">Marked as read</span>
+                          <span className="text-xs text-white/50">
+                            Marked as read
+                          </span>
                         )}
                       </div>
                     </div>

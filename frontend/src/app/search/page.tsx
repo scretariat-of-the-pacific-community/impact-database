@@ -239,10 +239,13 @@ function SearchPageContent() {
       setIsFiltering(false);
     }
   }, [isLoading, searchResults]);
-  const images = useMemo(() => searchResults?.images || [], [searchResults]);
-  const totalResults = searchResults?.total || 0;
+  const images = useMemo(
+    () => (searchResults as any)?.images || [],
+    [searchResults]
+  );
+  const totalResults = (searchResults as any)?.total || 0;
   const totalPages =
-    searchResults?.total_pages ||
+    (searchResults as any)?.total_pages ||
     Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
   const showingFrom =
     totalResults === 0 ? 0 : (currentPage - 1) * RESULTS_PER_PAGE + 1;
@@ -391,7 +394,9 @@ function SearchPageContent() {
                 autoComplete="off"
                 placeholder="Search images by title, keywords, location..."
                 value={state.searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) => handleSearch(e.target.value)}
                 className="w-full rounded-xl border border-white/15 bg-white/5 pl-10 pr-4 py-3 text-white placeholder:text-white/50 shadow-card backdrop-blur focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
               />
             </div>
@@ -538,7 +543,11 @@ function SearchPageContent() {
                         <input
                           type="date"
                           value={state.dateFrom}
-                          onChange={(e) => {
+                          onChange={(
+                            e: React.ChangeEvent<
+                              HTMLSelectElement | HTMLInputElement
+                            >
+                          ) => {
                             const newDate = e.target.value;
                             setState((prev) => ({
                               ...prev,
@@ -566,7 +575,11 @@ function SearchPageContent() {
                         <input
                           type="date"
                           value={state.dateTo}
-                          onChange={(e) => {
+                          onChange={(
+                            e: React.ChangeEvent<
+                              HTMLSelectElement | HTMLInputElement
+                            >
+                          ) => {
                             const newDate = e.target.value;
                             setState((prev) => ({ ...prev, dateTo: newDate }));
                             setCurrentPage(1);
@@ -595,7 +608,11 @@ function SearchPageContent() {
                     <Select
                       aria-label="Sort by"
                       value={`${state.sortBy}-${state.sortOrder}`}
-                      onChange={(e) => {
+                      onChange={(
+                        e: React.ChangeEvent<
+                          HTMLSelectElement | HTMLInputElement
+                        >
+                      ) => {
                         const [sortBy, sortOrder] = e.target.value.split('-');
                         setState((prev) => ({
                           ...prev,
@@ -729,15 +746,19 @@ function SearchPageContent() {
             <div className="p-6">
               {state.viewMode === 'grid' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {Array.from({ length: RESULTS_PER_PAGE }).map((_, index) => (
-                    <ImageGridCardSkeleton key={`grid-skeleton-${index}`} />
-                  ))}
+                  {Array.from({ length: RESULTS_PER_PAGE }).map(
+                    (_, index: any) => (
+                      <ImageGridCardSkeleton key={`grid-skeleton-${index}`} />
+                    )
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {Array.from({ length: RESULTS_PER_PAGE }).map((_, index) => (
-                    <ImageListCardSkeleton key={`list-skeleton-${index}`} />
-                  ))}
+                  {Array.from({ length: RESULTS_PER_PAGE }).map(
+                    (_, index: any) => (
+                      <ImageListCardSkeleton key={`list-skeleton-${index}`} />
+                    )
+                  )}
                 </div>
               )}
             </div>
@@ -924,7 +945,7 @@ function ImageGridCard({ image }: { image: ImageMetadata }) {
               src={`${config.API.BASE_URL}${image.thumbnail_url}`}
               alt={image.title || image.filename}
               className="w-full h-full object-cover"
-              onError={(e) => {
+              onError={(e: any) => {
                 const target = e.target as HTMLImageElement;
                 target.style.display = 'none';
                 const parent = target.parentElement;
@@ -996,7 +1017,7 @@ function ImageListCard({ image }: { image: ImageMetadata }) {
                 src={`${config.API.BASE_URL}${image.thumbnail_url}`}
                 alt={image.title || image.filename}
                 className="w-full h-full object-cover"
-                onError={(e) => {
+                onError={(e: any) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
                   const parent = target.parentElement;

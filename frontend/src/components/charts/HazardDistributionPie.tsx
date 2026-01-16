@@ -1,7 +1,14 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Legend,
+  Tooltip,
+} from 'recharts';
 import { motion } from 'framer-motion';
 
 const HAZARD_COLORS: Record<string, string> = {
@@ -48,7 +55,7 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
   }, []);
 
   const { chartData, total, topHazard, insightHazard } = useMemo(() => {
-    if (!data || data.length === 0) {
+    if (!data || (data as any).length === 0) {
       return { chartData: [], total: 0, topHazard: null, insightHazard: null };
     }
 
@@ -70,7 +77,9 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
 
     if (sorted.length > MAX_SLICES) {
       const top = sorted.slice(0, MAX_SLICES);
-      const otherValue = sorted.slice(MAX_SLICES).reduce((sum, item) => sum + item.value, 0);
+      const otherValue = sorted
+        .slice(MAX_SLICES)
+        .reduce((sum, item) => sum + item.value, 0);
       if (otherValue > 0) {
         top.push({
           name: 'Other',
@@ -87,7 +96,11 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
     }));
 
     const primaryHazard =
-      chartReady.find((item) => item.name !== 'Other' && item.name !== 'Unknown') || chartReady[0] || null;
+      chartReady.find(
+        (item) => item.name !== 'Other' && item.name !== 'Unknown'
+      ) ||
+      chartReady[0] ||
+      null;
 
     return {
       chartData: chartReady,
@@ -99,9 +112,15 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
 
   if (total === 0 || chartData.length === 0) {
     return (
-      <div className={`flex h-80 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-deep-900/40 ${className}`}>
-        <p className="text-base font-semibold text-white">No hazard-tagged reports in the selected period.</p>
-        <p className="text-sm text-white/70">Upload new imagery or adjust filters to see hazard trends.</p>
+      <div
+        className={`flex h-80 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-deep-900/40 ${className}`}
+      >
+        <p className="text-base font-semibold text-white">
+          No hazard-tagged reports in the selected period.
+        </p>
+        <p className="text-sm text-white/70">
+          Upload new imagery or adjust filters to see hazard trends.
+        </p>
       </div>
     );
   }
@@ -109,7 +128,9 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
   // Don't render chart until mounted (avoid SSR issues)
   if (!isMounted) {
     return (
-      <div className={`flex h-80 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-deep-900/40 ${className}`}>
+      <div
+        className={`flex h-80 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/10 bg-deep-900/40 ${className}`}
+      >
         <div className="animate-pulse text-white/50">Loading chart...</div>
       </div>
     );
@@ -128,7 +149,8 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
         <div className="rounded-lg border border-white/10 bg-deep-900/95 p-3 text-sm shadow-xl backdrop-blur">
           <p className="font-semibold text-white">{datum.name}</p>
           <p className="text-white/80">
-            {datum.value.toLocaleString()} reports • {datum.percentage.toFixed(1)}%
+            {datum.value.toLocaleString()} reports •{' '}
+            {datum.percentage.toFixed(1)}%
           </p>
         </div>
       );
@@ -136,7 +158,11 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
     return null;
   };
 
-  const CustomLegend = ({ payload }: { payload?: Array<{ value: string; color: string }> }) => {
+  const CustomLegend = ({
+    payload,
+  }: {
+    payload?: Array<{ value: string; color: string }>;
+  }) => {
     if (!payload || payload.length === 0) return null;
     return (
       <ul className="mt-4 flex flex-wrap justify-center gap-4 text-sm text-white/80">
@@ -148,7 +174,10 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.04 }}
           >
-            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: entry.color }} />
+            <span
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: entry.color }}
+            />
             <span>{entry.value}</span>
           </motion.li>
         ))}
@@ -168,12 +197,21 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm uppercase tracking-wide text-white/60">Hazard Distribution</p>
-          <p className="text-lg font-semibold text-white">What hazards are being reported?</p>
+          <p className="text-sm uppercase tracking-wide text-white/60">
+            Hazard Distribution
+          </p>
+          <p className="text-lg font-semibold text-white">
+            What hazards are being reported?
+          </p>
         </div>
       </div>
       <div className="relative" style={{ width: '100%', height: '320px' }}>
-        <ResponsiveContainer width="100%" height={320} minWidth={100} minHeight={320}>
+        <ResponsiveContainer
+          width="100%"
+          height={320}
+          minWidth={100}
+          minHeight={320}
+        >
           <PieChart margin={{ top: 10, right: 10, bottom: 10, left: 10 }}>
             <Pie
               data={chartData as any}
@@ -198,8 +236,12 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
         </ResponsiveContainer>
 
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <p className="text-3xl font-semibold text-white">{total.toLocaleString()}</p>
-          <p className="text-xs uppercase tracking-widest text-white/60">Total reports</p>
+          <p className="text-3xl font-semibold text-white">
+            {total.toLocaleString()}
+          </p>
+          <p className="text-xs uppercase tracking-widest text-white/60">
+            Total reports
+          </p>
           {topHazard && (
             <p className="mt-2 text-sm font-medium text-white">
               Top: {topHazard.name} ({topHazard.percentage.toFixed(1)}%)
@@ -211,8 +253,8 @@ export default function HazardDistributionPie({ data, className = '' }: Props) {
       <div className="mt-4 rounded-2xl border border-white/5 bg-white/5 px-4 py-3 text-sm text-white">
         {insightHazard ? (
           <p>
-            <span className="font-semibold">{insightHazardName}</span> account for{' '}
-            {insightPercent.toFixed(1)}% of recent reports.
+            <span className="font-semibold">{insightHazardName}</span> account
+            for {insightPercent.toFixed(1)}% of recent reports.
           </p>
         ) : (
           <p>Hazard mix will appear once new reports arrive.</p>

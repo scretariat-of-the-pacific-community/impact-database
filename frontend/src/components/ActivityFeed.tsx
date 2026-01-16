@@ -25,21 +25,28 @@ export default function ActivityFeed() {
 
   const { data: recentData } = useQuery({
     queryKey: ['recent-activity'],
-    queryFn: () => imageApi.search({ limit: 10, sort_by: 'upload_date', sort_order: 'desc' }),
+    queryFn: () =>
+      imageApi.search({
+        limit: 10,
+        sort_by: 'upload_date',
+        sort_order: 'desc',
+      }),
     refetchInterval: POLL_INTERVAL,
   });
 
   useEffect(() => {
-    if (recentData?.images) {
-      const newActivities: Activity[] = recentData.images.slice(0, 5).map((img) => ({
-        id: img.id || img.filename,
-        type: 'upload', // All recent items are uploads in this context
-        title: img.title || img.filename,
-        description: `${img.hazard_type || 'Unknown'} • ${img.contact?.organisation_name || 'Location unknown'}`,
-        timestamp: img.upload_date || new Date().toISOString(),
-        user: img.contact?.organisation_name,
-        hazard_type: img.hazard_type,
-      }));
+    if ((recentData as any)?.images) {
+      const newActivities: Activity[] = (recentData as any)?.images
+        .slice(0, 5)
+        .map((img: any) => ({
+          id: img.id || img.filename,
+          type: 'upload', // All recent items are uploads in this context
+          title: img.title || img.filename,
+          description: `${img.hazard_type || 'Unknown'} • ${img.contact?.organisation_name || 'Location unknown'}`,
+          timestamp: img.upload_date || new Date().toISOString(),
+          user: img.contact?.organisation_name,
+          hazard_type: img.hazard_type,
+        }));
       setActivities(newActivities);
     }
   }, [recentData]);
@@ -123,7 +130,9 @@ export default function ActivityFeed() {
                         </p>
                       )}
                       <p className="mt-1 text-xs text-white/50">
-                        {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(activity.timestamp), {
+                          addSuffix: true,
+                        })}
                       </p>
                     </div>
                   </div>

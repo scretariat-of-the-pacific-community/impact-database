@@ -1,7 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Shield, Users, Award, TrendingUp, Globe, CheckCircle } from 'lucide-react';
+import {
+  Shield,
+  Users,
+  Award,
+  TrendingUp,
+  Globe,
+  CheckCircle,
+} from 'lucide-react';
 import Image from 'next/image';
 
 interface Partner {
@@ -74,7 +81,9 @@ export default function SocialProof() {
       {/* Trust Metrics */}
       <div className="rounded-3xl border border-white/10 bg-deep-900/40 p-8 backdrop-blur">
         <div className="mb-8 text-center">
-          <p className="text-sm uppercase tracking-wide text-white/70">Platform Standards</p>
+          <p className="text-sm uppercase tracking-wide text-white/70">
+            Platform Standards
+          </p>
           <h2 className="mt-2 text-3xl font-semibold text-white">
             Enterprise-Grade Infrastructure
           </h2>
@@ -102,7 +111,9 @@ export default function SocialProof() {
       <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur">
         <div className="mb-8 text-center">
           <Globe className="mx-auto mb-4 h-12 w-12 text-pacific-400" />
-          <h3 className="text-xl font-semibold text-white">Partner Organizations</h3>
+          <h3 className="text-xl font-semibold text-white">
+            Partner Organizations
+          </h3>
           <p className="mt-2 text-sm text-white/70">
             Collaborating to build climate resilience across the Pacific
           </p>
@@ -126,15 +137,20 @@ export default function SocialProof() {
                   width={80}
                   height={80}
                   className="object-contain p-2"
-                  onError={(e) => {
+                  onError={(e: any) => {
                     // Fallback to Globe icon if image fails to load
                     e.currentTarget.style.display = 'none';
                   }}
                 />
-                <Globe className="absolute h-10 w-10 text-white/60" style={{ display: 'none' }} />
+                <Globe
+                  className="absolute h-10 w-10 text-white/60"
+                  style={{ display: 'none' }}
+                />
               </div>
               <h4 className="font-semibold text-white">{partner.name}</h4>
-              <p className="mt-2 text-xs text-white/60">{partner.description}</p>
+              <p className="mt-2 text-xs text-white/60">
+                {partner.description}
+              </p>
               <div className="mt-3 flex items-center gap-1 text-xs text-palm-400">
                 <CheckCircle className="h-3 w-3" />
                 <span>Verified</span>

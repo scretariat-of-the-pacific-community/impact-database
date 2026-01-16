@@ -52,10 +52,12 @@ RUN chmod +x /app/entrypoint.sh && \
     chmod +x /app/*.sh || true
 
 # Create uploads directory with proper permissions
-RUN mkdir -p /app/uploads && chown -R appuser:appuser /app/uploads
+RUN mkdir -p /app/uploads && \
+    chown -R appuser:appuser /app/uploads && \
+    chown -R appuser:appuser /app
 
-# Switch to non-root user for runtime (commented out for now due to permission issues)
-# USER appuser
+# Switch to non-root user for runtime
+USER appuser
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=60s --retries=3 \

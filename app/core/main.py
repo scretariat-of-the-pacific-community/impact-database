@@ -40,8 +40,8 @@ app = FastAPI(
     title="Impact Database API",
     description="API for disaster impact image database with enhanced security",
     version="1.0.0",
-    docs_url="/docs" if settings.DEBUG else None,  # Disable docs in production
-    redoc_url="/redoc" if settings.DEBUG else None,
+    docs_url="/docs" if settings.ENABLE_API_DOCS else None,
+    redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
 )
 
 # Setup Redis connection for rate limiting
@@ -88,8 +88,8 @@ from api import user as user_api
 # Configure CORS - more restrictive in production
 if settings.ENVIRONMENT.lower() == "production":
     allowed_origins = [
-        "https://your-production-domain.com",  # Replace with actual production domain
-        "https://api.your-production-domain.com",
+        "https://opmthredds.gem.spc.int",  # Production domain
+        "https://api.opmthredds.gem.spc.int",
     ]
 else:
     allowed_origins = [
@@ -97,6 +97,7 @@ else:
         "http://localhost:3001",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
+        "https://opmthredds.gem.spc.int",  # Allow in development too
     ]
 
 # SECURITY FIX: Add comprehensive security headers middleware
@@ -122,6 +123,7 @@ app.add_middleware(
         "/api/auth/login",
         "/api/auth/register",
         "/api/auth/refresh",
+        "/api/rbac/auth/me",
         "/api/health",
         "/favicon.ico",
     ],
@@ -129,7 +131,7 @@ app.add_middleware(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=["*"] if settings.DEBUG else allowed_origins,  # Allow all origins in development
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=[

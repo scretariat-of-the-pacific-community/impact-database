@@ -124,7 +124,7 @@ function LoginPageContent() {
 
               <div className="space-y-4">
                 <form
-                  onSubmit={async (e) => {
+                  onSubmit={async (e: React.FormEvent<HTMLFormElement>) => {
                     e.preventDefault();
 
                     // Validate password strength for registration
@@ -171,7 +171,7 @@ function LoginPageContent() {
                             username: email.split('@')[0],
                             email,
                             password,
-                            full_name: email.split('@')[0],
+                            full_name: 'Name not set',
                           }
                         : { username: email, password };
 
@@ -189,7 +189,7 @@ function LoginPageContent() {
                         // Set auth cookie with Secure flag only on HTTPS
                         const isSecure = window.location.protocol === 'https:';
                         const secureFlag = isSecure ? '; Secure' : '';
-                        document.cookie = `ocean_portal_token=${encodeURIComponent(data.access_token)}; Max-Age=${7 * 24 * 60 * 60}; path=/; SameSite=Strict${secureFlag}`; // 7 days
+                        document.cookie = `ocean_portal_token=${encodeURIComponent(data.access_token)}; Max-Age=${7 * 24 * 60 * 60}; path=/; HttpOnly; SameSite=Strict${secureFlag}`; // 7 days
 
                         let currentUser = null;
                         try {
@@ -214,7 +214,10 @@ function LoginPageContent() {
                           JSON.stringify(cachedSession)
                         );
 
-                        // Force page reload to reinitialize AuthProvider
+                        // Intentionally use a full page reload instead of router.push(returnUrl)
+                        // so that the entire app (including AuthProvider and any top-level state)
+                        // is reinitialized based on the newly set auth cookie and cached session.
+                        // This bypasses Next.js's client-side router by design.
                         window.location.href = returnUrl;
                       } else {
                         // Generic error message to prevent username enumeration
@@ -257,10 +260,11 @@ function LoginPageContent() {
                     <input
                       id="email"
                       name="email"
-                      autoComplete={isRegistering ? 'email' : 'username'}
                       type={isRegistering ? 'email' : 'text'}
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                        setEmail(e.target.value)
+                      }
                       required
                       placeholder={
                         isRegistering
@@ -292,7 +296,11 @@ function LoginPageContent() {
                         }
                         type={showPassword ? 'text' : 'password'}
                         value={password}
-                        onChange={(e) => setPassword(e.target.value)}
+                        onChange={(
+                          e: React.ChangeEvent<
+                            HTMLSelectElement | HTMLInputElement
+                          >
+                        ) => setPassword(e.target.value)}
                         required
                         minLength={isRegistering ? 12 : undefined}
                         placeholder="••••••••"

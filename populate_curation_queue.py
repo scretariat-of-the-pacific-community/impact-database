@@ -24,22 +24,22 @@ def populate_curation_queue():
         print(f"Found {len(images)} images in database")
 
         # Get existing queue items
-        existing_queue = db.query(CurationQueue.image_filename).all()
-        existing_filenames = {item[0] for item in existing_queue}
-        print(f"Found {len(existing_filenames)} images already in curation queue")
+        existing_queue = db.query(CurationQueue.image_id).all()
+        existing_image_ids = {item[0] for item in existing_queue}
+        print(f"Found {len(existing_image_ids)} images already in curation queue")
 
         # Add missing images to queue
         added_count = 0
         for image in images:
-            if image.filename not in existing_filenames:
+            if image.id not in existing_image_ids:
                 queue_item = CurationQueue(
                     id=uuid.uuid4(),
-                    image_filename=image.filename,
-                    status="pending",  # Use lowercase string value
-                    priority="medium",  # Use lowercase string value
+                    image_id=image.id,
+                    status=CurationStatus.PENDING,
+                    priority=Priority.MEDIUM,
                     created_at=datetime.utcnow(),
                     updated_at=datetime.utcnow(),
-                    submitted_by=image.user_id if hasattr(image, 'user_id') else None,
+                    submitted_by=str(image.user_id) if hasattr(image, 'user_id') and image.user_id else None,
                     submission_notes="Auto-populated from existing images"
                 )
                 db.add(queue_item)
@@ -50,7 +50,7 @@ def populate_curation_queue():
 
         # Show final stats
         total_queue = db.query(CurationQueue).count()
-        pending = db.query(CurationQueue).filter(CurationQueue.status == "pending").count()
+        pending = db.query(CurationQueue).filter(CurationQueue.status == CurationStatus.PENDING).count()
         print(f"\nCuration Queue Stats:")
         print(f"  Total items: {total_queue}")
         print(f"  Pending: {pending}")

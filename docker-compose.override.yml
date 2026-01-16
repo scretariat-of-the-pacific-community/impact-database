@@ -1,6 +1,5 @@
 # Auto-loaded override file (always applied)
-# This disables healthcheck for frontend to prevent restart loops during dev
 services:
   frontend:
     healthcheck:
-      test: ["NONE"]
+      disable: true

@@ -190,7 +190,7 @@ export default function Collaboration({
     enabled: isActive,
   });
 
-  const activityEvents = activityData?.events ?? [];
+  const activityEvents = (activityData as any)?.events ?? [];
 
   // WebSocket for real-time collaboration updates (disabled - endpoint not implemented)
   // TODO: Implement /ws/collaboration endpoint in backend for real-time updates
@@ -199,7 +199,7 @@ export default function Collaboration({
   //   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
   //   const ws = new WebSocket(`${protocol}://${window.location.host}/ws/collaboration`);
   //   ws.onopen = () => ws.send('online');
-  //   ws.onmessage = (event) => {
+  //   ws.onmessage = (event: any): any => {
   //     try {
   //       const payload = JSON.parse(event.data);
   //       if (payload?.type === 'comment_created' || payload?.type === 'workspace_created') {
@@ -216,7 +216,7 @@ export default function Collaboration({
 
   useEffect(() => {
     if (serverWorkspaces && serverWorkspaces.length) {
-      const mapped: WorkspaceSummary[] = serverWorkspaces.map((ws) => ({
+      const mapped: WorkspaceSummary[] = serverWorkspaces.map((ws: any) => ({
         id: ws.id,
         name: ws.name,
         role: 'admin',
@@ -235,7 +235,7 @@ export default function Collaboration({
 
   const hazardAggregates = useMemo(() => {
     const counts = new Map<string, { count: number; sample?: UserUpload }>();
-    uploads.forEach((upload) => {
+    uploads.forEach((upload: any) => {
       const key = upload.hazard_type || 'other';
       const current = counts.get(key) || { count: 0 };
       counts.set(key, {
@@ -250,7 +250,7 @@ export default function Collaboration({
 
   const regionAggregates = useMemo(() => {
     const counts = new Map<string, { count: number; hazard?: HazardType }>();
-    uploads.forEach((upload) => {
+    uploads.forEach((upload: any) => {
       const key = upload.location || upload.country || 'Unspecified region';
       const current = counts.get(key) || { count: 0 };
       counts.set(key, {
@@ -296,7 +296,7 @@ export default function Collaboration({
 
   const workspaceSummaries: WorkspaceSummary[] = useMemo(() => {
     if (serverWorkspaces && serverWorkspaces.length > 0) {
-      return serverWorkspaces.map((ws) => ({
+      return serverWorkspaces.map((ws: any) => ({
         id: ws.id,
         name: ws.name,
         role: 'admin',
@@ -401,14 +401,14 @@ export default function Collaboration({
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('collaboration-state', JSON.stringify(next));
     }
-    queryClient.setQueryData(['collaboration-state'], next);
+    (queryClient as any).setQueryData(['collaboration-state'], next);
   };
 
   const updateCollaborationState = (
     updater: (curr: CollaborationState) => CollaborationState
   ) => {
     const current =
-      (queryClient.getQueryData([
+      ((queryClient as any).getQueryData([
         'collaboration-state',
       ]) as CollaborationState) || collaborationState;
     const next = updater(current);
@@ -418,7 +418,7 @@ export default function Collaboration({
 
   const mentionableTeammates: Mentionable[] = useMemo(() => {
     const reviewers = new Map<string, Mentionable>();
-    activityEvents.forEach((event, index) => {
+    activityEvents.forEach((event: any, index: any) => {
       if (event.reviewer) {
         const handle = event.reviewer.trim().toLowerCase().replace(/\s+/g, '.');
         reviewers.set(handle, {
@@ -443,7 +443,7 @@ export default function Collaboration({
   const collaborationFeed: ActivityEntry[] = useMemo(() => {
     const baseFeed =
       activityEvents && activityEvents.length > 0
-        ? activityEvents.slice(0, 5).map((event) => ({
+        ? activityEvents.slice(0, 5).map((event: any) => ({
             id: event.id,
             actor: event.reviewer || event.title,
             action:
@@ -484,28 +484,28 @@ export default function Collaboration({
         icon: Bell,
       })) || [];
 
-    const localNotes = (collaborationState.notes || []).map<ActivityEntry>(
-      (note) => ({
-        id: note.id,
-        actor: stats?.name || 'You',
-        action: 'shared',
-        target: note.body,
-        timestamp: relativeTimeFrom(note.createdAt),
-        icon: Target,
-      })
-    );
+    const localNotes = (
+      ((collaborationState as any).notes || []) as any[]
+    ).map<ActivityEntry>((note: any) => ({
+      id: note.id,
+      actor: stats?.name || 'You',
+      action: 'shared',
+      target: note.body,
+      timestamp: relativeTimeFrom(note.createdAt),
+      icon: Target,
+    }));
 
     return [...notificationEntries, ...localNotes, ...baseFeed].slice(0, 8);
   }, [
     activityEvents,
     stats?.name,
     stats?.organization,
-    collaborationState.notes,
+    (collaborationState as any).notes,
     notifications,
   ]);
 
   const [activeWorkspace, setActiveWorkspace] = useState<string | undefined>(
-    collaborationState.workspaces[0]?.id
+    (collaborationState as any).workspaces[0]?.id
   );
   const [note, setNote] = useState('');
   const [inviteForm, setInviteForm] = useState<{
@@ -515,27 +515,32 @@ export default function Collaboration({
   }>({
     email: '',
     role: 'editor',
-    workspaceId: collaborationState.workspaces[0]?.id || 'workspace-fallback',
+    workspaceId:
+      (collaborationState as any).workspaces[0]?.id || 'workspace-fallback',
   });
   const [inviteFeedback, setInviteFeedback] = useState<string | null>(null);
   const [noteFeedback, setNoteFeedback] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!activeWorkspace && collaborationState.workspaces[0]?.id) {
-      setActiveWorkspace(collaborationState.workspaces[0].id);
+    if (!activeWorkspace && (collaborationState as any).workspaces[0]?.id) {
+      setActiveWorkspace((collaborationState as any).workspaces[0].id);
     }
     if (
-      !collaborationState.workspaces.find(
-        (ws) => ws.id === inviteForm.workspaceId
+      !(collaborationState as any).workspaces.find(
+        (ws: any) => ws.id === inviteForm.workspaceId
       )
     ) {
       setInviteForm((prev) => ({
         ...prev,
         workspaceId:
-          collaborationState.workspaces[0]?.id || 'workspace-fallback',
+          (collaborationState as any).workspaces[0]?.id || 'workspace-fallback',
       }));
     }
-  }, [collaborationState.workspaces, activeWorkspace, inviteForm.workspaceId]);
+  }, [
+    (collaborationState as any).workspaces,
+    activeWorkspace,
+    inviteForm.workspaceId,
+  ]);
 
   const followMap = useMemo(() => {
     const serverMap =
@@ -545,8 +550,8 @@ export default function Collaboration({
       }, {}) || {};
     return Object.keys(serverMap).length
       ? serverMap
-      : collaborationState.followed;
-  }, [serverFollows, collaborationState.followed]);
+      : (collaborationState as any).followed;
+  }, [serverFollows, (collaborationState as any).followed]);
 
   const followMutation = useMutation({
     mutationFn: async (area: Followable) => {
@@ -567,7 +572,7 @@ export default function Collaboration({
       }
       return { areaId: area.id, shouldFollow };
     },
-    onSuccess: ({ areaId, shouldFollow }) => {
+    onSuccess: ({ areaId, shouldFollow }: any) => {
       updateCollaborationState((curr) => ({
         ...curr,
         followed: { ...curr.followed, [areaId]: shouldFollow },
@@ -588,7 +593,7 @@ export default function Collaboration({
       }
       return body;
     },
-    onSuccess: (body) => {
+    onSuccess: (body: any) => {
       const newNote: CollabNote = {
         id: `note-${Date.now()}`,
         body,
@@ -636,7 +641,7 @@ export default function Collaboration({
       }
       return response.json();
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (_: any, variables: any) => {
       const inviteEntry = {
         email: variables.email,
         workspaceId: variables.workspaceId,
@@ -675,7 +680,7 @@ export default function Collaboration({
       }
       return `workspace-${Date.now()}`;
     },
-    onSuccess: (workspaceId, name) => {
+    onSuccess: (workspaceId: any, name: any) => {
       const newWorkspace: WorkspaceSummary = {
         id: workspaceId,
         name,
@@ -718,7 +723,7 @@ export default function Collaboration({
     setNote(nextNote);
   };
 
-  const handleInviteSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleInviteSubmit = (event: React.FormEvent<HTMLFormElement>): any => {
     event.preventDefault();
     if (!inviteForm.email) return;
     inviteMutation.mutate(inviteForm);
@@ -827,7 +832,7 @@ export default function Collaboration({
             <Users className="h-5 w-5 text-white/60" aria-hidden="true" />
           </div>
           <div className="mt-4 space-y-4">
-            {collaborationState.workspaces.map((workspace) => {
+            {(collaborationState as any).workspaces.map((workspace: any) => {
               const isActive = workspace.id === activeWorkspace;
               return (
                 <button
@@ -850,7 +855,7 @@ export default function Collaboration({
                       </p>
                     </div>
                     <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${rolePalette[workspace.role]}`}
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${rolePalette[workspace.role as Role]}`}
                     >
                       {workspace.role}
                     </span>
@@ -883,7 +888,7 @@ export default function Collaboration({
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {workspace.permissions.map((permission) => (
+                    {workspace.permissions.map((permission: any) => (
                       <span
                         key={permission}
                         className="rounded-full border border-white/10 px-2.5 py-1 text-xs text-white/70"
@@ -962,7 +967,7 @@ export default function Collaboration({
             <textarea
               id="collab-mention-note"
               value={note}
-              onChange={(event) => setNote(event.target.value)}
+              onChange={(event: any) => setNote(event.target.value)}
               placeholder="Tag teammates with @name to request reviews or share updates..."
               className="h-28 w-full rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/40"
             />
@@ -1067,7 +1072,7 @@ export default function Collaboration({
               autoComplete="email"
               required
               value={inviteForm.email}
-              onChange={(event) =>
+              onChange={(event: any) =>
                 setInviteForm((prev) => ({
                   ...prev,
                   email: event.target.value.trim(),
@@ -1081,7 +1086,7 @@ export default function Collaboration({
                 id="collab-invite-role"
                 label="Role"
                 value={inviteForm.role}
-                onChange={(event) =>
+                onChange={(event: any) =>
                   setInviteForm((prev) => ({
                     ...prev,
                     role: event.target.value as Role,
@@ -1098,7 +1103,7 @@ export default function Collaboration({
                 id="collab-invite-workspace"
                 label="Workspace"
                 value={inviteForm.workspaceId}
-                onChange={(event) =>
+                onChange={(event: any) =>
                   setInviteForm((prev) => ({
                     ...prev,
                     workspaceId: event.target.value,
@@ -1107,11 +1112,13 @@ export default function Collaboration({
                 variant="dark"
                 size="md"
               >
-                {collaborationState.workspaces.map((workspace) => (
-                  <option key={workspace.id} value={workspace.id}>
-                    {workspace.name}
-                  </option>
-                ))}
+                {(collaborationState as any).workspaces.map(
+                  (workspace: any) => (
+                    <option key={workspace.id} value={workspace.id}>
+                      {workspace.name}
+                    </option>
+                  )
+                )}
               </Select>
             </div>
             <Button

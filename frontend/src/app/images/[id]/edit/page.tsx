@@ -139,7 +139,7 @@ export default function EditImagePage() {
   const canEdit = useMemo(() => {
     if (!image || !user) return false;
     const isAdmin = hasRole('admin');
-    const isUploader = image.uploader_id === user.id;
+    const isUploader = (image as any).uploader_id === user.id;
     return isAdmin || isUploader;
   }, [image, user, hasRole]);
 
@@ -189,7 +189,7 @@ export default function EditImagePage() {
     ) =>
       register(name, {
         ...options,
-        onChange: (event) => {
+        onChange: (event: any) => {
           const inputValue = (event.target.value ?? '') as string;
           const sanitizedValue = sanitizeInputValue(inputValue);
           if (sanitizedValue !== inputValue) {
@@ -223,23 +223,25 @@ export default function EditImagePage() {
   // Populate form with existing data
   useEffect(() => {
     if (image) {
-      setSanitizedFieldValue('title', image.title || '');
-      setSanitizedFieldValue('description', image.abstract || '');
-      setValue('hazard_type', image.hazard_type || '');
-      setValue('country', image.contact?.organisation_name || '');
-      setSanitizedFieldValue('location', image.purpose || '');
+      setSanitizedFieldValue('title', (image as any).title || '');
+      setSanitizedFieldValue('description', (image as any).abstract || '');
+      setValue('hazard_type', (image as any).hazard_type || '');
+      setValue('country', (image as any).contact?.organisation_name || '');
+      setSanitizedFieldValue('location', (image as any).purpose || '');
       setSanitizedFieldValue(
         'keywords',
-        Array.isArray(image.keywords) ? image.keywords.join(', ') : ''
+        Array.isArray((image as any).keywords)
+          ? (image as any).keywords.join(', ')
+          : ''
       );
-      setValue('latitude', image.latitude || 0);
-      setValue('longitude', image.longitude || 0);
+      setValue('latitude', (image as any).latitude || 0);
+      setValue('longitude', (image as any).longitude || 0);
 
-      if (image.keywords && Array.isArray(image.keywords)) {
+      if ((image as any).keywords && Array.isArray((image as any).keywords)) {
         setSelectedKeywords(
-          image.keywords
-            .filter((keyword): keyword is string => Boolean(keyword))
-            .map((keyword) => sanitizeInputValue(keyword))
+          (image as any).keywords
+            .filter((keyword: any): keyword is string => Boolean(keyword))
+            .map((keyword: any) => sanitizeInputValue(keyword))
         );
       }
     }
@@ -383,7 +385,7 @@ export default function EditImagePage() {
         is_draft: data.is_draft,
       });
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (_: any, variables: any) => {
       const wasDraft = variables.is_draft;
       toast.success(
         wasDraft ? 'Draft saved successfully' : 'Image updated successfully'
@@ -470,8 +472,8 @@ export default function EditImagePage() {
   }
 
   // Construct URLs - use thumbnail for preview, full image for download
-  const thumbnailUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent(image.filename)}/thumbnail`;
-  const imageUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent(image.filename)}`;
+  const thumbnailUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent((image as any).filename)}/thumbnail`;
+  const imageUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent((image as any).filename)}`;
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -548,13 +550,13 @@ export default function EditImagePage() {
               <div className="relative aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-deep-900 to-deep-950">
                 <Image
                   src={thumbnailUrl}
-                  alt={image.title || image.filename}
+                  alt={(image as any).title || (image as any).filename}
                   fill
                   className="object-contain bg-deep-900"
                   sizes="(max-width: 768px) 100vw, 50vw"
                   priority
                   unoptimized
-                  onError={(e) => {
+                  onError={(e: any) => {
                     // Fallback to full image if thumbnail fails
                     const target = e.target as HTMLImageElement;
                     target.src = imageUrl;
@@ -564,17 +566,18 @@ export default function EditImagePage() {
               <div className="mt-4 space-y-2 text-sm text-white/70">
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
-                  Uploaded: {new Date(image.upload_date).toLocaleDateString()}
+                  Uploaded:{' '}
+                  {new Date((image as any).upload_date).toLocaleDateString()}
                 </div>
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4" />
-                  Filename: {image.filename}
+                  Filename: {(image as any).filename}
                 </div>
-                {image.latitude && image.longitude && (
+                {(image as any).latitude && (image as any).longitude && (
                   <div className="flex items-center gap-2">
                     <MapPin className="h-4 w-4" />
-                    Coordinates: {image.latitude.toFixed(4)},{' '}
-                    {image.longitude.toFixed(4)}
+                    Coordinates: {(image as any).latitude.toFixed(4)},{' '}
+                    {(image as any).longitude.toFixed(4)}
                   </div>
                 )}
               </div>
@@ -789,8 +792,8 @@ export default function EditImagePage() {
                     initialPosition={
                       watchedValues.latitude && watchedValues.longitude
                         ? [watchedValues.latitude, watchedValues.longitude]
-                        : image.latitude && image.longitude
-                          ? [image.latitude, image.longitude]
+                        : (image as any).latitude && (image as any).longitude
+                          ? [(image as any).latitude, (image as any).longitude]
                           : undefined
                     }
                     onConfirm={(data) => {
@@ -828,7 +831,7 @@ export default function EditImagePage() {
                     >
                       Select country
                     </option>
-                    {vocabData?.countries?.map(
+                    {(vocabData as any)?.countries?.map(
                       (country: { id: string; label: string }) => (
                         <option
                           key={country.id}
@@ -902,7 +905,7 @@ export default function EditImagePage() {
                       autoComplete="off"
                       className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
                       placeholder="Type and press Enter to add custom keywords"
-                      onKeyDown={(e) => {
+                      onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
                           const input = e.currentTarget;

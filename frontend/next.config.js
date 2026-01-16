@@ -30,8 +30,6 @@ const createCSP = () => {
     connectSrc: [
       "'self'",
       apiOrigin,
-      'https://*.sentry.io',
-      'https://*.ingest.sentry.io',
       'https://vitals.vercel-insights.com',
       'https://nominatim.openstreetmap.org',
     ],
@@ -102,6 +100,10 @@ const getApiHostname = () => {
 };
 
 const nextConfig = {
+  // Base path for deployment under subdirectory
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
+  // Asset prefix should match basePath
+  assetPrefix: process.env.NEXT_PUBLIC_BASE_PATH || '',
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   },
@@ -157,7 +159,7 @@ const nextConfig = {
   // Enable standalone output for Docker production builds
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
   // Fix cross-origin warnings in development
-  allowedDevOrigins: ['127.0.0.1'],
+  allowedDevOrigins: ['127.0.0.1', 'opmthredds.gem.spc.int'],
   // Enable strict mode for better performance
   reactStrictMode: true,
   // Skip trailing slash redirects (moved from experimental)
@@ -168,6 +170,8 @@ const nextConfig = {
     // Disable server components HMR cache to prevent framer-motion factory issues
     serverComponentsHmrCache: false,
   },
+  // Disable Next.js DevTools in development to avoid geist font 404 errors
+  devIndicators: false,
   async headers() {
     return [
       {

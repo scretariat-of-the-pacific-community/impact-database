@@ -229,7 +229,20 @@ def extract_altitude(gps_info: Dict[str, Any]) -> Tuple[Optional[float], Optiona
         altitude_meters = convert_rational_to_float(altitude)
 
         # Get altitude reference (0=above sea level, 1=below)
-        ref_value = int(altitude_ref) if altitude_ref else 0
+        # Handle bytes, int, or string values
+        if isinstance(altitude_ref, bytes):
+            # Skip null bytes or invalid byte sequences
+            if altitude_ref == b'\x00' or not altitude_ref.strip(b'\x00'):
+                ref_value = 0
+            else:
+                try:
+                    ref_value = int(altitude_ref.decode('utf-8').strip())
+                except (ValueError, UnicodeDecodeError):
+                    ref_value = 0
+        elif altitude_ref:
+            ref_value = int(altitude_ref)
+        else:
+            ref_value = 0
 
         # Apply sign based on reference
         if ref_value == 1:

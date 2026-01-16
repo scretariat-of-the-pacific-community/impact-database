@@ -50,20 +50,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (typeof window === 'undefined') return;
 
     try {
-      // SECURITY FIX: Only store non-sensitive UI preferences in localStorage
-      // DO NOT store user IDs, emails, roles, or any authentication data
-      // Session is maintained via HttpOnly cookies set by backend
-      const safePayload = {
-        // Only cache UI preferences, not sensitive data
-        theme: session.user?.preferences?.theme || 'light',
-        language: session.user?.preferences?.language || 'en',
-        // DO NOT include: user.id, user.email, user.role, expires_at, tokens
+      // Cache user data and expiry for offline/fast load
+      // Session authentication is maintained via HttpOnly cookies set by backend
+      const safePayload: CachedSessionMetadata = {
+        user: session.user,
+        expires_at: session.expires_at,
       };
-      localStorage.setItem('ui_preferences', JSON.stringify(safePayload));
-      // Actual session is maintained by HttpOnly cookies set server-side
-      // This prevents XSS attacks from stealing session data
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(safePayload));
+      // Actual authentication is via HttpOnly cookies sent automatically by browser
     } catch (error) {
-      console.error('Failed to cache UI preferences:', error);
+      console.error('Failed to cache session metadata:', error);
     }
   };
 
@@ -104,14 +100,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setIsLoading(true);
       const cachedSession = getCachedSession();
-      const cookieToken = readCookie('ocean_portal_token');
 
-      if (!cookieToken) {
-        clearCachedSession();
-        setSession(null);
-        setUser(null);
-        return;
-      }
+      // SECURITY FIX: Don't try to read HttpOnly cookie with JavaScript
+      // Instead, always call the API which will automatically send the cookie
+      // The browser sends HttpOnly cookies automatically with fetch requests
 
       let resolvedUser = cachedSession?.user ?? null;
       let resolvedExpiry = cachedSession?.expires_at ?? 0;
@@ -120,23 +112,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? isCachedSessionExpired(cachedSession)
         : true;
 
+      // BUGFIX: Clear very old cached sessions (> 30 days) to prevent reload loops
+      if (cachedSession && cachedSession.cached_at) {
+        const cacheAge = Date.now() - cachedSession.cached_at;
+        const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+        if (cacheAge > thirtyDays) {
+          console.warn('Clearing very old cached session (>30 days)');
+          clearCachedSession();
+          setSession(null);
+          setUser(null);
+          return;
+        }
+      }
+
       if (!resolvedUser || cacheExpired) {
+        // Try to validate session by calling the API
+        // The HttpOnly cookie will be sent automatically by the browser
         try {
           resolvedUser = await oceanPortalApi.getCurrentUser();
-          resolvedExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days to match token expiration
+          resolvedExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
         } catch (error: any) {
-          // Only clear session on actual auth errors, not network errors
-          if (
-            error?.response?.status === 401 ||
-            error?.response?.status === 403
-          ) {
-            console.error(
-              'Session validation failed - authentication error:',
-              error
-            );
+          // API client transforms axios errors to APIError with 'status' property
+          const errorStatus = error?.status || error?.response?.status;
+          if (errorStatus === 401 || errorStatus === 403) {
+            console.log('Session validation failed - clearing cache');
             clearCachedSession();
             setSession(null);
             setUser(null);
+            // Stop execution, user will be cleared out
+            return;
           } else {
             // Network error or other issue - keep cached session if available
             console.warn(
@@ -146,9 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (cachedSession?.user) {
               resolvedUser = cachedSession.user;
               resolvedExpiry = cachedSession.expires_at;
+            } else {
+              // No cached user and network error, so we can't proceed
+              setSession(null);
+              setUser(null);
+              return;
             }
           }
-          return;
         }
       }
 
@@ -165,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const restoredSession: AuthSession = {
         user: resolvedUser,
-        access_token: cookieToken,
+        access_token: '', // Token is in HttpOnly cookie, not accessible to JavaScript
         expires_at: resolvedExpiry,
       };
 
@@ -193,6 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Immediately clear React state to stop any pending queries
       setUser(null);
       setSession(null);
+      setIsLoading(false); // Ensure loading state is cleared to prevent loops
       clearCachedSession();
     };
 

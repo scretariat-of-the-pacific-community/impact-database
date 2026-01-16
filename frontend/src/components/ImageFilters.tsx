@@ -122,7 +122,9 @@ export default function ImageFilters({
             className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-pacific-500 focus:border-transparent"
             placeholder="Search by title, filename, location, description..."
             value={filters.searchTerm}
-            onChange={(e) => updateFilters({ searchTerm: e.target.value })}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => updateFilters({ searchTerm: e.target.value })}
           />
         </div>
       </div>
@@ -254,7 +256,9 @@ export default function ImageFilters({
                 <input
                   type="date"
                   value={filters.dateRange.start || ''}
-                  onChange={(e) =>
+                  onChange={(
+                    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                  ) =>
                     updateFilters({
                       dateRange: {
                         ...filters.dateRange,
@@ -268,7 +272,9 @@ export default function ImageFilters({
                 <input
                   type="date"
                   value={filters.dateRange.end || ''}
-                  onChange={(e) =>
+                  onChange={(
+                    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                  ) =>
                     updateFilters({
                       dateRange: { ...filters.dateRange, end: e.target.value },
                     })
@@ -284,7 +290,9 @@ export default function ImageFilters({
               <Select
                 label="Sort By"
                 value={filters.sortBy}
-                onChange={(e) =>
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) =>
                   updateFilters({
                     sortBy: e.target.value as FilterState['sortBy'],
                   })
@@ -304,7 +312,9 @@ export default function ImageFilters({
               <Select
                 label="Sort Order"
                 value={filters.sortOrder}
-                onChange={(e) =>
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) =>
                   updateFilters({
                     sortOrder: e.target.value as FilterState['sortOrder'],
                   })

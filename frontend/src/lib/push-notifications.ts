@@ -3,6 +3,8 @@
  * Web Push API wrapper for achievement and review notifications
  */
 
+import { withBasePath } from './auth-utils';
+
 // Vapid public key - should be moved to environment variable
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
 
@@ -26,7 +28,11 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
  * Check if push notifications are supported
  */
 export function isPushNotificationSupported(): boolean {
-  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  return (
+    'serviceWorker' in navigator &&
+    'PushManager' in window &&
+    'Notification' in window
+  );
 }
 
 /**
@@ -130,9 +136,11 @@ export async function unsubscribeFromPushNotifications(): Promise<boolean> {
 /**
  * Save push subscription to backend
  */
-export async function savePushSubscription(subscription: PushSubscription): Promise<boolean> {
+export async function savePushSubscription(
+  subscription: PushSubscription
+): Promise<boolean> {
   try {
-    const response = await fetch('/api/user/push-subscription', {
+    const response = await fetch(withBasePath('/api/user/push-subscription'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -153,7 +161,7 @@ export async function savePushSubscription(subscription: PushSubscription): Prom
  */
 export async function deletePushSubscription(): Promise<boolean> {
   try {
-    const response = await fetch('/api/user/push-subscription', {
+    const response = await fetch(withBasePath('/api/user/push-subscription'), {
       method: 'DELETE',
       credentials: 'include',
     });

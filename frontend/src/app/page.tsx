@@ -260,7 +260,7 @@ const Sparkline = ({ values, color }: { values: number[]; color: string }) => {
   const range = max - min || 1;
 
   // Generate smooth curve path using quadratic bezier curves
-  const points = values.map((value, index) => {
+  const points = values.map((value, index: any) => {
     const x = (index / (values.length - 1)) * 100;
     const y = 100 - ((value - min) / range) * 80 - 10; // Add padding
     return { x, y };
@@ -468,13 +468,22 @@ const buildImageUrl = (path?: string | null) => {
 };
 
 const resolveImagePath = (image: ImageRecord) => {
-  const directUrl = (image as { image_url?: string | null }).image_url;
-  const thumbnailUrl = image.thumbnail_url || directUrl;
-  // Fallback to constructing URL from filename if no explicit URL provided
-  if (!thumbnailUrl && image.filename) {
-    return `/upload/images/${encodeURIComponent(image.filename)}`;
+  // Priority: thumbnail_url > image_url > construct from filename
+  if (image.thumbnail_url) {
+    return image.thumbnail_url;
   }
-  return thumbnailUrl;
+
+  const directUrl = (image as { image_url?: string | null }).image_url;
+  if (directUrl) {
+    return directUrl;
+  }
+
+  // Fallback: construct thumbnail URL from filename
+  if (image.filename) {
+    return `/upload/images/${encodeURIComponent(image.filename)}/thumbnail`;
+  }
+
+  return null;
 };
 
 const resolveCountry = (image: ImageRecord) => {
@@ -500,7 +509,7 @@ export default function PacificImpactAtlasDashboard() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const images = data?.images ?? [];
+  const images = (data as any)?.images ?? [];
 
   // Handle pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -513,14 +522,14 @@ export default function PacificImpactAtlasDashboard() {
 
   const stats = useMemo(() => {
     const hazardSet = new Set(
-      images.map((img) => img.hazard_type).filter(Boolean)
+      images.map((img: any) => img.hazard_type).filter(Boolean)
     );
     const orgSet = new Set(
-      images.map((img) => img.contact?.organisation_name).filter(Boolean)
+      images.map((img: any) => img.contact?.organisation_name).filter(Boolean)
     );
     // Fix: Use explicit null/undefined checks to support equator (lat=0) and prime meridian (lon=0)
     const withCoordinates = images.filter(
-      (img) =>
+      (img: any) =>
         img.latitude !== null &&
         img.latitude !== undefined &&
         img.longitude !== null &&
@@ -529,7 +538,7 @@ export default function PacificImpactAtlasDashboard() {
 
     // Prepare hazard distribution data for pie chart
     const hazardCounts = new Map<string, number>();
-    images.forEach((img) => {
+    images.forEach((img: any) => {
       const hazard = img.hazard_type || 'Unknown';
       hazardCounts.set(hazard, (hazardCounts.get(hazard) || 0) + 1);
     });
@@ -542,7 +551,7 @@ export default function PacificImpactAtlasDashboard() {
 
     // Prepare timeline data for area chart - Always generate 30 daily buckets
     const timelineCounts = new Map<string, number>();
-    images.forEach((img) => {
+    images.forEach((img: any) => {
       if (img.upload_date) {
         const date = new Date(img.upload_date).toISOString().split('T')[0];
         timelineCounts.set(date, (timelineCounts.get(date) || 0) + 1);
@@ -563,7 +572,7 @@ export default function PacificImpactAtlasDashboard() {
 
     // Prepare impact metrics for bar chart
     const countryCounts = new Map<string, number>();
-    images.forEach((img) => {
+    images.forEach((img: any) => {
       const country = resolveCountry(img) || 'Unspecified location';
       countryCounts.set(country, (countryCounts.get(country) || 0) + 1);
     });
@@ -581,7 +590,7 @@ export default function PacificImpactAtlasDashboard() {
     const recentUploads = timeline.reduce((sum, day) => sum + day.count, 0);
 
     return {
-      total: data?.total ?? images.length ?? 0,
+      total: (data as any)?.total ?? images.length ?? 0,
       hazardTypes: hazardSet.size,
       organizations: orgSet.size,
       withCoordinates,
@@ -595,14 +604,14 @@ export default function PacificImpactAtlasDashboard() {
 
   const sparklineSeries = useMemo(() => {
     const counts = new Map<string, number>();
-    images.forEach((img) => {
+    images.forEach((img: any) => {
       const key = img.hazard_type || 'Unknown';
       counts.set(key, (counts.get(key) ?? 0) + 1);
     });
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([label, value], index) => {
+      .map(([label, value], index: any) => {
         const values = Array.from({ length: 12 }, (_, i) => {
           const drift = Math.sin((i + 1) / 2) * (value * 0.2);
           return Math.max(1, value * 0.6 + drift + i * 1.5);
@@ -633,7 +642,8 @@ export default function PacificImpactAtlasDashboard() {
 
   // Prepare featured stories - prioritize static curated content, then API data
   const featuredStories = useMemo(() => {
-    // Start with static curated stories (e.g., Tonga eruption)
+    // Only show static curated stories (Tonga eruption, Fiji cyclone)
+    // API stories are disabled to maintain editorial control
     const curatedStories = staticFeaturedStories.map((story) => ({
       id: story.id,
       title: story.title,
@@ -646,42 +656,9 @@ export default function PacificImpactAtlasDashboard() {
       impact: story.impact,
     }));
 
-    // Add API stories if available (for admin-featured user uploads)
-    // Only include stories that have complete data to avoid empty cards
-    if (
-      featuredStoriesData &&
-      Array.isArray(featuredStoriesData) &&
-      featuredStoriesData.length > 0
-    ) {
-      const apiStories = featuredStoriesData
-        .filter((story: any) => {
-          // Only include stories with all required fields populated
-          return (
-            story.title?.trim() &&
-            story.description?.trim() &&
-            (story.image || story.beforeImage || story.afterImage) &&
-            story.location?.trim() &&
-            story.date &&
-            story.hazard_type?.trim()
-          );
-        })
-        .map((story: any) => ({
-          id: story.id.toString(),
-          title: story.title,
-          description: story.description,
-          beforeImage: buildImageUrl(story.beforeImage),
-          afterImage: buildImageUrl(story.afterImage),
-          image: buildImageUrl(story.image),
-          location: story.location,
-          date: story.date,
-          hazardType: story.hazard_type,
-          impact: story.impact || `${story.country || ''}`,
-        }));
-      return [...curatedStories, ...apiStories];
-    }
-
+    // Return only curated stories - no API stories
     return curatedStories;
-  }, [featuredStoriesData]);
+  }, []);
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
@@ -782,7 +759,7 @@ export default function PacificImpactAtlasDashboard() {
                   label={stat.label}
                   value={stat.value}
                   suffix={stat.suffix}
-                  loading={isLoading}
+                  loading={isLoading ?? false}
                 />
               ))}
             </div>
@@ -1005,7 +982,7 @@ export default function PacificImpactAtlasDashboard() {
                   suffix="+"
                   icon={Camera}
                   accent="from-pacific-500/20 to-pacific-500/5"
-                  loading={isLoading}
+                  loading={isLoading ?? false}
                   sparkline={sparklineSeries[0]?.values ?? undefined}
                   sparkColor={sparklineSeries[0]?.color ?? SPARKLINE_COLORS[0]}
                 />
@@ -1014,7 +991,7 @@ export default function PacificImpactAtlasDashboard() {
                   value={stats.hazardTypes}
                   icon={Compass}
                   accent="from-palm-500/20 to-palm-500/5"
-                  loading={isLoading}
+                  loading={isLoading ?? false}
                   sparkline={sparklineSeries[1]?.values ?? undefined}
                   sparkColor={sparklineSeries[1]?.color ?? SPARKLINE_COLORS[1]}
                 />
@@ -1023,7 +1000,7 @@ export default function PacificImpactAtlasDashboard() {
                   value={stats.organizations}
                   icon={Globe}
                   accent="from-coral-500/20 to-coral-500/5"
-                  loading={isLoading}
+                  loading={isLoading ?? false}
                   sparkline={sparklineSeries[2]?.values ?? undefined}
                   sparkColor={sparklineSeries[2]?.color ?? SPARKLINE_COLORS[2]}
                 />
@@ -1032,7 +1009,7 @@ export default function PacificImpactAtlasDashboard() {
                   value={stats.withCoordinates}
                   icon={MapPin}
                   accent="from-sand-500/20 to-sand-500/5"
-                  loading={isLoading}
+                  loading={isLoading ?? false}
                 />
               </div>
             )}
@@ -1042,7 +1019,7 @@ export default function PacificImpactAtlasDashboard() {
           <FeaturedStories stories={featuredStories} />
 
           <section className="mx-auto grid max-w-7xl gap-6 md:grid-cols-3">
-            {navigationCards.map((card, index) => (
+            {navigationCards.map((card, index: any) => (
               <motion.div
                 key={card.href}
                 initial={{ opacity: 0, y: 20 }}
@@ -1099,7 +1076,7 @@ export default function PacificImpactAtlasDashboard() {
               </div>
             ) : (
               <div className="mt-6 space-y-4">
-                {images.slice(0, 5).map((image, index) => {
+                {images.slice(0, 5).map((image: any, index: any) => {
                   const imageUrl = buildImageUrl(resolveImagePath(image));
                   const uploadTime = image.upload_date
                     ? new Date(image.upload_date)
@@ -1122,17 +1099,38 @@ export default function PacificImpactAtlasDashboard() {
                     >
                       {/* Thumbnail */}
                       <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-deep-900">
-                        {imageUrl ? (
+                        {image.filename ? (
                           <NextImage
-                            src={imageUrl}
+                            src={getApiUrl(
+                              `/upload/images/${encodeURIComponent(image.filename)}/thumbnail`
+                            )}
                             alt={sanitizeText(image.title || image.filename)}
                             fill
                             sizes="80px"
                             className="object-cover"
                             unoptimized
-                            onError={(e) => {
+                            onError={(e: any) => {
+                              // Fallback to full image if thumbnail fails
                               const target = e.target as HTMLImageElement;
-                              target.style.display = 'none';
+                              const fullImageUrl = getApiUrl(
+                                `/upload/images/${encodeURIComponent(image.filename)}`
+                              );
+                              if (target.src !== fullImageUrl) {
+                                target.src = fullImageUrl;
+                              } else {
+                                // Both failed, hide image
+                                target.style.display = 'none';
+                                const parent = target.parentElement;
+                                if (parent) {
+                                  const placeholder =
+                                    document.createElement('div');
+                                  placeholder.className =
+                                    'w-full h-full flex items-center justify-center';
+                                  placeholder.innerHTML =
+                                    '<svg class="w-8 h-8 text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>';
+                                  parent.appendChild(placeholder);
+                                }
+                              }
                             }}
                           />
                         ) : (
@@ -1185,7 +1183,8 @@ export default function PacificImpactAtlasDashboard() {
                     href="/search"
                     className="block mt-4 text-center py-3 rounded-lg border border-white/10 text-sm text-pacific-400 hover:bg-white/5 hover:border-pacific-500/50 transition-all"
                   >
-                    View all {(data?.total ?? images.length).toLocaleString()}{' '}
+                    View all{' '}
+                    {((data as any)?.total ?? images.length).toLocaleString()}{' '}
                     evidence submissions →
                   </Link>
                 )}

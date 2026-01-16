@@ -1,13 +1,26 @@
 const SHELL_CACHE = 'ocean-shell-v2';
-const DATA_CACHE = 'ocean-data-v1';
-const OFFLINE_URL = '/offline';
+const DATA_CACHE = 'ocean-data-v2';  // Bumped version to clear stale image metadata
+const BASE_PATH = (() => {
+  const scopePath = new URL(self.registration.scope).pathname;
+  if (scopePath === '/' || scopePath === '') {
+    return '';
+  }
+  return scopePath.endsWith('/') ? scopePath.slice(0, -1) : scopePath;
+})();
+const withBasePath = (path) => {
+  if (!BASE_PATH) return path;
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  if (path.startsWith(BASE_PATH)) return path;
+  return `${BASE_PATH}${path.startsWith('/') ? path : `/${path}`}`;
+};
+const OFFLINE_URL = withBasePath('/offline');
 const SHELL_ASSETS = [
-  '/',
+  withBasePath('/'),
   OFFLINE_URL,
-  '/manifest.json',
-  '/favicon.ico',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
+  withBasePath('/manifest.json'),
+  withBasePath('/favicon.ico'),
+  withBasePath('/icons/icon-192.svg'),
+  withBasePath('/icons/icon-512.svg'),
 ];
 
 self.addEventListener('install', (event) => {
@@ -30,7 +43,14 @@ self.addEventListener('activate', (event) => {
 
 const isApiRequest = (url) => {
   // Only intercept same-origin API requests
-  return url.origin === self.location.origin && url.pathname.startsWith('/api/');
+  return url.origin === self.location.origin && url.pathname.startsWith(withBasePath('/api/'));
+};
+
+const isNextJsInternalRequest = (url) => {
+  // Don't intercept Next.js internal routes (fonts, chunks, etc.)
+  return url.pathname.startsWith(withBasePath('/__nextjs')) || 
+         url.pathname.startsWith(withBasePath('/_next/')) ||
+         url.pathname.includes('hot-reload.js');
 };
 
 const isCacheableScheme = (url) => {
@@ -53,6 +73,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (request.method !== 'GET') {
+    return;
+  }
+
+  // Don't intercept Next.js internal routes
+  if (isNextJsInternalRequest(url)) {
     return;
   }
 
@@ -150,8 +175,8 @@ self.addEventListener('push', (event) => {
   let notification = {
     title: 'Impact Database',
     body: 'You have a new notification',
-    icon: '/icons/icon-192.svg',
-    badge: '/icons/icon-badge.svg',
+    icon: withBasePath('/icons/icon-192.svg'),
+    badge: withBasePath('/icons/icon-badge.svg'),
     tag: 'impact-notification',
     requireInteraction: false,
   };
@@ -195,7 +220,7 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   if (event.action === 'view') {
-    const urlToOpen = event.notification.data?.url || '/profile';
+    const urlToOpen = withBasePath(event.notification.data?.url || '/profile');
 
     event.waitUntil(
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
@@ -235,7 +260,7 @@ async function syncPendingUploads() {
           formData.append(key, String(value));
         }
 
-        const response = await fetch('/api/images/upload', {
+        const response = await fetch(withBasePath('/api/images/upload'), {
           method: 'POST',
           body: formData,
           credentials: 'include',
@@ -249,7 +274,7 @@ async function syncPendingUploads() {
           // Show success notification
           await self.registration.showNotification('Upload Successful', {
             body: 'Your image has been uploaded and is being reviewed.',
-            icon: '/icons/icon-192.svg',
+            icon: withBasePath('/icons/icon-192.svg'),
             tag: 'upload-success',
           });
         } else {

@@ -408,7 +408,9 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
               <div className="space-y-3">
                 <textarea
                   value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
+                  onChange={(
+                    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                  ) => setEditContent(e.target.value)}
                   className="w-full border border-gray-300 rounded-md p-3 focus:ring-blue-500 focus:border-blue-500 resize-none"
                   rows={3}
                   placeholder="Edit your comment..."
@@ -479,10 +481,10 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium text-gray-900 flex items-center">
           <ChatBubbleLeftIcon className="h-5 w-5 mr-2" />
-          Comments ({comments?.length || 0})
+          Comments ({(comments as any)?.length || 0})
         </h3>
 
-        {comments?.some((c: Comment) => c.isDeleted) && (
+        {(comments as any)?.some((c: Comment) => c.isDeleted) && (
           <button
             onClick={() => setShowDeletedComments(!showDeletedComments)}
             className="text-sm text-gray-500 hover:text-gray-700 flex items-center"
@@ -525,7 +527,9 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
             <textarea
               ref={textareaRef}
               value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setNewComment(e.target.value)}
               className="w-full border border-gray-300 rounded-md p-3 focus:ring-blue-500 focus:border-blue-500 resize-none"
               rows={3}
               placeholder="Add a comment..."
@@ -539,9 +543,9 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                     type="radio"
                     value="internal"
                     checked={commentType === 'internal'}
-                    onChange={(e) =>
-                      setCommentType(e.target.value as 'internal')
-                    }
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setCommentType(e.target.value as 'internal')}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                   />
                   <span className="text-sm text-gray-700">Internal</span>
@@ -551,9 +555,9 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                     type="radio"
                     value="external"
                     checked={commentType === 'external'}
-                    onChange={(e) =>
-                      setCommentType(e.target.value as 'external')
-                    }
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setCommentType(e.target.value as 'external')}
                     className="h-4 w-4 text-green-600 focus:ring-green-500"
                   />
                   <span className="text-sm text-gray-700">External</span>
@@ -578,14 +582,14 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
       {/* Comments List */}
       <div className="space-y-4">
         <AnimatePresence>
-          {comments
+          {(comments as any)
             ?.filter((comment: Comment) => !comment.parentId)
             .map((comment: Comment) => (
               <CommentComponent key={comment.id} comment={comment} />
             ))}
         </AnimatePresence>
 
-        {(!comments || comments.length === 0) && (
+        {(!comments || (comments as any)?.length === 0) && (
           <div className="text-center text-gray-500 py-8">
             <ChatBubbleLeftIcon className="h-12 w-12 mx-auto text-gray-300 mb-3" />
             <p>No comments yet. Be the first to comment!</p>

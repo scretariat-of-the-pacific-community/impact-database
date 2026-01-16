@@ -368,9 +368,9 @@ const BulkImportExport: React.FC = () => {
                     label="Import Type"
                     name="importType"
                     value={importType}
-                    onChange={(e) =>
-                      setImportType(e.target.value as 'zip' | 'csv')
-                    }
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setImportType(e.target.value as 'zip' | 'csv')}
                     variant="light"
                     size="md"
                   >
@@ -389,7 +389,11 @@ const BulkImportExport: React.FC = () => {
                       id="dry-run-checkbox"
                       name="dryRun"
                       checked={dryRun}
-                      onChange={(e) => setDryRun(e.target.checked)}
+                      onChange={(
+                        e: React.ChangeEvent<
+                          HTMLSelectElement | HTMLInputElement
+                        >
+                      ) => setDryRun((e.target as HTMLInputElement).checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                     <span className="text-sm font-medium text-gray-700">
@@ -445,7 +449,7 @@ const BulkImportExport: React.FC = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">
-                  {importJobs?.map((job: ImportJob) => (
+                  {(importJobs as any)?.map((job: ImportJob) => (
                     <div key={job.id} className="p-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
@@ -594,7 +598,7 @@ const BulkImportExport: React.FC = () => {
                     </div>
                   ))}
 
-                  {(!importJobs || importJobs.length === 0) && (
+                  {(!importJobs || (importJobs as any).length === 0) && (
                     <div className="p-6 text-center text-gray-500">
                       No import jobs found. Upload a file to get started.
                     </div>
@@ -626,7 +630,9 @@ const BulkImportExport: React.FC = () => {
                     label="Export Format"
                     name="exportFormat"
                     value={exportFormat}
-                    onChange={(e) => setExportFormat(e.target.value as any)}
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setExportFormat(e.target.value as any)}
                     variant="light"
                     size="md"
                   >
@@ -643,7 +649,11 @@ const BulkImportExport: React.FC = () => {
                       label="Hazard Type"
                       name="hazardType"
                       value={exportFilters.hazardType}
-                      onChange={(e) =>
+                      onChange={(
+                        e: React.ChangeEvent<
+                          HTMLSelectElement | HTMLInputElement
+                        >
+                      ) =>
                         setExportFilters({
                           ...exportFilters,
                           hazardType: e.target.value,
@@ -676,7 +686,11 @@ const BulkImportExport: React.FC = () => {
                         id="export-date-from"
                         name="dateFrom"
                         value={exportFilters.dateFrom}
-                        onChange={(e) =>
+                        onChange={(
+                          e: React.ChangeEvent<
+                            HTMLSelectElement | HTMLInputElement
+                          >
+                        ) =>
                           setExportFilters({
                             ...exportFilters,
                             dateFrom: e.target.value,
@@ -697,7 +711,11 @@ const BulkImportExport: React.FC = () => {
                         id="export-date-to"
                         name="dateTo"
                         value={exportFilters.dateTo}
-                        onChange={(e) =>
+                        onChange={(
+                          e: React.ChangeEvent<
+                            HTMLSelectElement | HTMLInputElement
+                          >
+                        ) =>
                           setExportFilters({
                             ...exportFilters,
                             dateTo: e.target.value,
@@ -713,7 +731,11 @@ const BulkImportExport: React.FC = () => {
                       label="Status"
                       name="exportStatus"
                       value={exportFilters.status}
-                      onChange={(e) =>
+                      onChange={(
+                        e: React.ChangeEvent<
+                          HTMLSelectElement | HTMLInputElement
+                        >
+                      ) =>
                         setExportFilters({
                           ...exportFilters,
                           status: e.target.value,
@@ -757,7 +779,7 @@ const BulkImportExport: React.FC = () => {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-200">
-                  {exportJobs?.map((job: ExportJob) => (
+                  {(exportJobs as any)?.map((job: ExportJob) => (
                     <div key={job.id} className="p-6">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
@@ -829,7 +851,7 @@ const BulkImportExport: React.FC = () => {
                     </div>
                   ))}
 
-                  {(!exportJobs || exportJobs.length === 0) && (
+                  {(!exportJobs || (exportJobs as any).length === 0) && (
                     <div className="p-6 text-center text-gray-500">
                       No export jobs found. Start an export to get started.
                     </div>

@@ -45,16 +45,28 @@ export default function FeaturedStories({ stories, className = '' }: Props) {
   const y1 = useTransform(scrollY, [0, 300], [0, -50]);
   const y2 = useTransform(scrollY, [0, 300], [0, 50]);
 
-  // Remove incomplete entries to avoid rendering blank cards
+  // Strict filtering to remove incomplete entries and low-quality content
   const validStories = stories.filter((story) => {
     const displayImage = getDisplayImage(story);
+
+    // Check all required fields exist and have meaningful content
+    const hasValidImage = !!displayImage;
+    const hasValidTitle = story.title?.trim() && story.title.trim().length > 10;
+    const hasValidDescription =
+      story.description?.trim() && story.description.trim().length >= 50;
+    const hasValidLocation =
+      story.location?.trim() && story.location.trim().length > 3;
+    const hasValidDate = !!story.date?.toString().trim();
+    const hasValidHazardType =
+      story.hazardType?.trim() && story.hazardType.trim().length > 3;
+
     return (
-      !!displayImage &&
-      !!story.title?.trim() &&
-      !!story.description?.trim() &&
-      !!story.location?.trim() &&
-      !!story.date?.toString().trim() &&
-      !!story.hazardType?.trim()
+      hasValidImage &&
+      hasValidTitle &&
+      hasValidDescription &&
+      hasValidLocation &&
+      hasValidDate &&
+      hasValidHazardType
     );
   });
 

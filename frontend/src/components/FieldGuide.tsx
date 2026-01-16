@@ -365,7 +365,10 @@ export default function FieldGuide({ type }: FieldGuideProps) {
                 </div>
                 <ul className="space-y-1 ml-6">
                   {section.tips.map((tip) => (
-                    <li key={`${section.title}-tip-${tip}`} className="text-gray-700 text-sm">
+                    <li
+                      key={`${section.title}-tip-${tip}`}
+                      className="text-gray-700 text-sm"
+                    >
                       • {tip}
                     </li>
                   ))}
@@ -381,8 +384,11 @@ export default function FieldGuide({ type }: FieldGuideProps) {
                   <h3 className="font-medium text-green-700">Do:</h3>
                 </div>
                 <ul className="space-y-1 ml-6">
-                  {section.dos.map((item) => (
-                    <li key={`${section.title}-do-${item}`} className="text-gray-700 text-sm">
+                  {section.dos.map((item: any) => (
+                    <li
+                      key={`${section.title}-do-${item}`}
+                      className="text-gray-700 text-sm"
+                    >
                       ✓ {item}
                     </li>
                   ))}
@@ -398,8 +404,11 @@ export default function FieldGuide({ type }: FieldGuideProps) {
                   <h3 className="font-medium text-red-700">Don&apos;t:</h3>
                 </div>
                 <ul className="space-y-1 ml-6">
-                  {section.donts.map((item) => (
-                    <li key={`${section.title}-dont-${item}`} className="text-gray-700 text-sm">
+                  {section.donts.map((item: any) => (
+                    <li
+                      key={`${section.title}-dont-${item}`}
+                      className="text-gray-700 text-sm"
+                    >
                       ✗ {item}
                     </li>
                   ))}

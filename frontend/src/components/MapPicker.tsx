@@ -458,7 +458,9 @@ export default function MapPicker({
                 type="text"
                 autoComplete="off"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search for a city, country, or landmark..."
                 className="w-full pl-10 pr-4 py-2 bg-deep-900/60 border border-white/20 rounded-lg text-white placeholder-surface-soft/50 focus:outline-none focus:ring-2 focus:ring-pacific-500 focus:border-transparent"

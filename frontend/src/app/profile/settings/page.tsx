@@ -235,7 +235,7 @@ export default function SettingsPage() {
 
   const generateTokenMutation = useMutation({
     mutationFn: (name: string) => imageApi.generateToken(name),
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setGeneratedToken(data.token);
       setTokenRevealed(false);
       refetchTokens();
@@ -441,7 +441,9 @@ export default function SettingsPage() {
                 rows={3}
                 placeholder="Tell us about yourself..."
                 value={formData.profile.bio}
-                onChange={(e) =>
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) =>
                   setFormData({
                     ...formData,
                     profile: { ...formData.profile, bio: e.target.value },
@@ -467,7 +469,9 @@ export default function SettingsPage() {
               className={glassInput}
               placeholder="City, Country"
               value={formData.profile.location}
-              onChange={(e) =>
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) =>
                 setFormData({
                   ...formData,
                   profile: { ...formData.profile, location: e.target.value },
@@ -490,7 +494,9 @@ export default function SettingsPage() {
               className={glassInput}
               placeholder="Your organization"
               value={formData.profile.organization}
-              onChange={(e) =>
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) =>
                 setFormData({
                   ...formData,
                   profile: {
@@ -526,12 +532,14 @@ export default function SettingsPage() {
             role="switch"
             aria-checked={formData.privacy.public_profile}
             aria-label="Public profile visibility"
-            onChange={(e) =>
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) =>
               setFormData({
                 ...formData,
                 privacy: {
                   ...formData.privacy,
-                  public_profile: e.target.checked,
+                  public_profile: (e.target as HTMLInputElement).checked,
                 },
               })
             }
@@ -551,10 +559,15 @@ export default function SettingsPage() {
             role="switch"
             aria-checked={formData.privacy.hide_stats}
             aria-label="Hide statistics"
-            onChange={(e) =>
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) =>
               setFormData({
                 ...formData,
-                privacy: { ...formData.privacy, hide_stats: e.target.checked },
+                privacy: {
+                  ...formData.privacy,
+                  hide_stats: (e.target as HTMLInputElement).checked,
+                },
               })
             }
           />
@@ -573,12 +586,15 @@ export default function SettingsPage() {
             role="switch"
             aria-checked={formData.privacy.anonymous_contributions}
             aria-label="Enable anonymous contributions"
-            onChange={(e) =>
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) =>
               setFormData({
                 ...formData,
                 privacy: {
                   ...formData.privacy,
-                  anonymous_contributions: e.target.checked,
+                  anonymous_contributions: (e.target as HTMLInputElement)
+                    .checked,
                 },
               })
             }
@@ -593,7 +609,7 @@ export default function SettingsPage() {
       <h3 className="text-xl font-semibold text-white mb-4">
         Notification Preferences
       </h3>
-      {(['email', 'in_app', 'push'] as const).map((type) => (
+      {(['email', 'in_app', 'push'] as const).map((type: any) => (
         <div key={type}>
           <h4 className="text-lg font-medium text-white/90 mb-3 capitalize">
             {type === 'in_app'
@@ -615,15 +631,17 @@ export default function SettingsPage() {
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-white/20 bg-white/5 text-pacific-500 focus:ring-2 focus:ring-pacific-400/20"
-                    checked={formData.notifications[type][event]}
-                    onChange={(e) =>
+                    checked={(formData.notifications as any)[type][event]}
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) =>
                       setFormData({
                         ...formData,
                         notifications: {
                           ...formData.notifications,
                           [type]: {
-                            ...formData.notifications[type],
-                            [event]: e.target.checked,
+                            ...(formData.notifications as any)[type],
+                            [event]: (e.target as HTMLInputElement).checked,
                           },
                         },
                       })
@@ -653,7 +671,9 @@ export default function SettingsPage() {
             variant="dark"
             size="md"
             value={formData.default_metadata.hazard_type || ''}
-            onChange={(e) =>
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) =>
               setFormData({
                 ...formData,
                 default_metadata: {
@@ -687,7 +707,9 @@ export default function SettingsPage() {
             className={glassInput}
             placeholder="e.g., Fiji, Pacific Ocean"
             value={formData.default_metadata.location || ''}
-            onChange={(e) =>
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) =>
               setFormData({
                 ...formData,
                 default_metadata: {
@@ -713,7 +735,9 @@ export default function SettingsPage() {
             className={glassInput}
             placeholder="e.g., field-survey, damage-assessment"
             value={formData.default_metadata.tags?.join(', ') || ''}
-            onChange={(e) =>
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) =>
               setFormData({
                 ...formData,
                 default_metadata: {
@@ -861,7 +885,9 @@ export default function SettingsPage() {
               className={`${glassInput} flex-1`}
               placeholder="e.g., Field Upload Script"
               value={newTokenName}
-              onChange={(e) => setNewTokenName(e.target.value)}
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setNewTokenName(e.target.value)}
             />
             <Button
               variant="primary"
@@ -1026,7 +1052,11 @@ export default function SettingsPage() {
                       placeholder="Type DELETE"
                       ref={deleteConfirmInputRef}
                       value={deleteConfirmText}
-                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      onChange={(
+                        e: React.ChangeEvent<
+                          HTMLSelectElement | HTMLInputElement
+                        >
+                      ) => setDeleteConfirmText(e.target.value)}
                     />
                     <Button
                       variant="secondary"

@@ -2,8 +2,8 @@
   "name": "SPC Ocean Portal – Impact Database",
   "short_name": "Ocean Portal",
   "description": "Disaster and hazard impact imagery, ready for field deployments and government response teams.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0b172a",
@@ -11,24 +11,24 @@
   "categories": ["productivity", "utilities", "news"],
   "icons": [
     {
-      "src": "/icons/icon-192.svg",
+      "src": "icons/icon-192.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.svg",
+      "src": "icons/icon-512.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
     },
     {
-      "src": "/favicon.ico",
+      "src": "favicon.ico",
       "sizes": "64x64",
       "type": "image/x-icon"
     },
     {
-      "src": "/icons/icon-144.svg",
+      "src": "icons/icon-144.svg",
       "sizes": "144x144",
       "type": "image/svg+xml",
       "purpose": "any"
@@ -37,7 +37,7 @@
   "prefer_related_applications": false,
   "screenshots": [
     {
-      "src": "/window.svg",
+      "src": "window.svg",
       "sizes": "1200x800",
       "type": "image/svg+xml",
       "label": "Search, map and analytics views"
@@ -46,12 +46,12 @@
   "shortcuts": [
     {
       "name": "Search Catalog",
-      "url": "/search",
+      "url": "search",
       "description": "Jump straight to the impact search experience"
     },
     {
       "name": "Upload Evidence",
-      "url": "/upload",
+      "url": "upload",
       "description": "Capture new imagery with metadata"
     }
   ]

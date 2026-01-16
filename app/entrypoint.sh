@@ -7,13 +7,21 @@ wait_for_tcp() {
     local host="$1"
     local port="$2"
     local label="$3"
+    local max_retries=${4:-60}  # Default 60 retries = 2 minutes
+    local retry_count=0
 
     echo "Waiting for ${label} at ${host}:${port}..."
     until (echo > /dev/tcp/"$host"/"$port") >/dev/null 2>&1; do
-        echo "${label} not ready yet, waiting..."
+        retry_count=$((retry_count + 1))
+        if [ $retry_count -ge $max_retries ]; then
+            echo "ERROR: ${label} at ${host}:${port} failed to become ready after ${max_retries} attempts"
+            return 1
+        fi
+        echo "${label} not ready yet, waiting... (${retry_count}/${max_retries})"
         sleep 2
     done
     echo "${label} is ready!"
+    return 0
 }
 
 # Default service role to 'api' if not set
@@ -27,9 +35,16 @@ if [ "$SERVICE_ROLE" = "api" ] || [ "$SERVICE_ROLE" = "worker" ] || [ "$SERVICE_
     DB_HOST=${POSTGRES_HOST:-postgis_db}
     DB_PORT=${POSTGRES_PORT:-5432}
     DB_USER=${POSTGRES_USER:-postgres}
+    MAX_DB_RETRIES=${MAX_DB_RETRIES:-60}
+    retry_count=0
 
     until pg_isready -h $DB_HOST -p $DB_PORT -U $DB_USER; do
-      echo "Database not ready yet, waiting..."
+      retry_count=$((retry_count + 1))
+      if [ $retry_count -ge $MAX_DB_RETRIES ]; then
+          echo "ERROR: Database failed to become ready after ${MAX_DB_RETRIES} attempts"
+          exit 1
+      fi
+      echo "Database not ready yet, waiting... (${retry_count}/${MAX_DB_RETRIES})"
       sleep 2
     done
     echo "Database is ready!"
@@ -49,7 +64,10 @@ PY
 )
     REDIS_HOST=${REDIS_TARGET%:*}
     REDIS_PORT=${REDIS_TARGET#*:}
-    wait_for_tcp "$REDIS_HOST" "$REDIS_PORT" "Redis"
+    if ! wait_for_tcp "$REDIS_HOST" "$REDIS_PORT" "Redis" 60; then
+        echo "ERROR: Redis connection failed"
+        exit 1
+    fi
 fi
 
 # Role-specific startup logic
@@ -77,6 +95,18 @@ except Exception as e:
 import sys
 sys.path.insert(0, '/app')
 from models.database import Base, engine
+
+# Import all models to ensure they are registered with Base.metadata
+try:
+    from models.rbac import User, Role, Permission
+except ImportError as e:
+    print(f'RBAC models import: {e}')
+
+try:
+    from services.admin_service import AdminUser, UserSession, UserAuditLog
+except ImportError as e:
+    print(f'Admin models import: {e}')
+
 try:
     Base.metadata.create_all(bind=engine, checkfirst=True)
     print('Database schema initialized successfully')
@@ -109,6 +139,10 @@ try:
 except Exception as e:
     print(f'MinIO initialization error (continuing anyway): {e}')
 "
+
+    # Populate curation queue if needed
+    echo "Checking curation queue..."
+    python /app/populate_curation_queue.py 2>&1 || echo "Note: Curation queue population encountered an issue (continuing anyway)"
 
     # Start FastAPI server
     echo "Starting FastAPI app..."

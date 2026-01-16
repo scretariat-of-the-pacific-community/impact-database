@@ -58,7 +58,7 @@ class CurationQueue(Base):
     __tablename__ = "curation_queue"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    image_filename = Column(String, ForeignKey("image_metadata.filename"), nullable=False)
+    image_id = Column(UUID(as_uuid=True), ForeignKey("image_metadata.id"), nullable=False, index=True)
     status = Column(
         SQLEnum(
             CurationStatus,
@@ -107,7 +107,7 @@ class CurationQueue(Base):
     deleted_at = Column(DateTime, nullable=True)
 
     # Relationships
-    image = relationship("ImageMetadata", foreign_keys=[image_filename])
+    image = relationship("ImageMetadata", foreign_keys=[image_id])
     comments = relationship(
         "CurationComment", back_populates="queue_item", cascade="all, delete-orphan"
     )
@@ -118,7 +118,8 @@ class CurationQueue(Base):
     def to_dict(self):
         return {
             "id": str(self.id),
-            "image_filename": self.image_filename,
+            "image_id": str(self.image_id),
+            "image_filename": self.image.filename if self.image else None,
             "status": self.status.value,
             "priority": self.priority.value,
             "assigned_to": self.assigned_to,

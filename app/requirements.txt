@@ -45,3 +45,4 @@ lxml==6.0.0
 structlog==24.4.0
 # Error monitoring
 sentry-sdk==2.20.0
+msal>=1.28.0

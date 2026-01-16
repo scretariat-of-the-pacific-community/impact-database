@@ -51,8 +51,27 @@ export function createAuthFetchOptions(options: RequestInit = {}): RequestInit {
 }
 
 /**
+ * Get the basePath for Next.js routing
+ * This is needed for deployments under a subdirectory like /impact-database/
+ */
+export function getBasePath(): string {
+  return process.env.NEXT_PUBLIC_BASE_PATH || '';
+}
+
+/**
+ * Prepend basePath to a URL for subdirectory deployments
+ * Only affects relative URLs starting with /
+ */
+export function withBasePath(url: string): string {
+  if (!url.startsWith('/')) return url;
+  const basePath = getBasePath();
+  return `${basePath}${url}`;
+}
+
+/**
  * Authenticated fetch wrapper for Next.js API routes
  * Automatically includes credentials for cookie-based auth
+ * Prepends basePath for subdirectory deployments
  *
  * Note: Use relative paths (e.g., '/api/admin/users') for Next.js API routes.
  * These routes are handled by Next.js server and work in any deployment.
@@ -66,7 +85,10 @@ export async function authFetch(
   url: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  return fetch(url, createAuthFetchOptions(options));
+  const basePath = getBasePath();
+  // Prepend basePath for relative URLs starting with /
+  const fullUrl = url.startsWith('/') ? `${basePath}${url}` : url;
+  return fetch(fullUrl, createAuthFetchOptions(options));
 }
 
 /**

@@ -35,7 +35,7 @@ export default function MobileBottomNav({
     >
       <div className="bg-deep-900/95 backdrop-blur-lg border-t border-white/10 shadow-2xl">
         <div className="flex items-center justify-around px-2 py-2">
-          {items.map((item) => {
+          {items.map((item: any) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
 

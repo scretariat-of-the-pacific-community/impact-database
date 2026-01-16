@@ -255,8 +255,8 @@ class EmailSettings(BaseModel):
 
     EMAIL_BACKEND: str = Field(
         default=get_env("EMAIL_BACKEND", "console"),
-        pattern=r"^(smtp|sendgrid|console)$",
-        description="Email backend: 'smtp', 'sendgrid', or 'console' (development)",
+        pattern=r"^(smtp|sendgrid|msgraph|console)$",
+        description="Email backend: 'smtp', 'sendgrid', 'msgraph', or 'console' (development)",
     )
     EMAIL_FROM_ADDRESS: str = Field(
         default=get_env("EMAIL_FROM_ADDRESS", "noreply@oceanportal.io"),
@@ -285,6 +285,24 @@ class EmailSettings(BaseModel):
         default=get_env("SENDGRID_API_KEY"), description="SendGrid API key"
     )
 
+    # Microsoft Graph Settings
+    MSGRAPH_TENANT_ID: Optional[str] = Field(
+        default=get_env("MSGRAPH_TENANT_ID"), description="Microsoft Graph tenant ID"
+    )
+    MSGRAPH_CLIENT_ID: Optional[str] = Field(
+        default=get_env("MSGRAPH_CLIENT_ID"), description="Microsoft Graph client ID"
+    )
+    MSGRAPH_CLIENT_SECRET: Optional[str] = Field(
+        default=get_env("MSGRAPH_CLIENT_SECRET"), description="Microsoft Graph client secret"
+    )
+    MSGRAPH_AUTHORITY_URL: Optional[str] = Field(
+        default=get_env("MSGRAPH_AUTHORITY_URL"), description="Microsoft Graph authority URL"
+    )
+    MSGRAPH_SCOPES: Optional[str] = Field(
+        default=get_env("MSGRAPH_SCOPES", "https://graph.microsoft.com/.default"),
+        description="Microsoft Graph API scopes"
+    )
+
     @model_validator(mode="after")
     def validate_email_backend(self):
         """Validate email backend configuration"""
@@ -294,6 +312,9 @@ class EmailSettings(BaseModel):
         elif self.EMAIL_BACKEND == "sendgrid":
             if not self.SENDGRID_API_KEY:
                 raise ValueError("SENDGRID_API_KEY is required when using sendgrid backend")
+        elif self.EMAIL_BACKEND == "msgraph":
+            if not all([self.MSGRAPH_TENANT_ID, self.MSGRAPH_CLIENT_ID, self.MSGRAPH_CLIENT_SECRET]):
+                raise ValueError("MSGRAPH_TENANT_ID, MSGRAPH_CLIENT_ID, and MSGRAPH_CLIENT_SECRET are required when using msgraph backend")
         return self
 
 
@@ -363,8 +384,8 @@ class Settings(BaseSettings):
 
     # API Documentation Security
     ENABLE_API_DOCS: bool = Field(
-        default=get_env("ENABLE_API_DOCS", "true").lower() == "true",
-        description="Enable API documentation endpoints",
+        default=get_env("ENABLE_API_DOCS", "false").lower() == "true",
+        description="Enable API documentation endpoints (auto-disabled in production)",
     )
 
     # Thumbnail Configuration
@@ -460,6 +481,18 @@ class Settings(BaseSettings):
     def CELERY_RESULT_BACKEND(self) -> str:
         return self.redis.REDIS_URL
 
+    @property
+    def API_BASE_URL(self) -> str:
+        """Base URL for API endpoints, used by workers/webhooks"""
+        # Check for explicit env var first
+        explicit_url = get_env("API_BASE_URL")
+        if explicit_url:
+            return explicit_url
+        # Default based on environment
+        if self.is_production:
+            return get_env("API_BASE_URL", "https://api.oceanportal.io")
+        return get_env("API_BASE_URL", "http://localhost:8000")
+
     @validator("ALLOWED_FILE_EXTENSIONS", pre=True)
     def parse_file_extensions(cls, v):
         if isinstance(v, str):
@@ -486,12 +519,13 @@ class Settings(BaseSettings):
     @field_validator("ENABLE_API_DOCS")
     @classmethod
     def disable_api_docs_in_production(cls, v, info):
-        """Warn about API docs in production"""
+        """Auto-disable API docs in production"""
         values = info.data if info.data else {}
         if values.get("ENVIRONMENT") == "production" and v:
             logger.warning(
-                "API documentation is enabled in production - consider disabling for security"
+                "API documentation automatically disabled in production for security"
             )
+            return False
         return v
 
     @field_validator("BACKEND_CORS_ORIGINS")

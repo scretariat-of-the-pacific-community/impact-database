@@ -147,14 +147,14 @@ const buildThumbnailUrl = (
 // Normalize a single item - extracted for clarity
 const normalizeItem = (item: any): CurationItem => {
   const meta = item.image_metadata || item.imageMetadata || {};
-  const filename = meta.filename || item.image_filename;
+  const filename = (meta as any).filename || item.image_filename;
   const existingMetadata =
     item?.metadata && typeof item.metadata === 'object' ? item.metadata : {};
 
   const thumbnailCandidate =
-    meta.thumbnail_url ||
-    meta.thumbnailUrl ||
-    meta.resource_locator ||
+    (meta as any).thumbnail_url ||
+    (meta as any).thumbnailUrl ||
+    (meta as any).resource_locator ||
     meta.resourceLocator ||
     item.thumbnailUrl ||
     item.thumbnail_url;
@@ -165,14 +165,14 @@ const normalizeItem = (item: any): CurationItem => {
       : undefined;
 
   const imageCandidate =
-    meta.resource_locator ||
+    (meta as any).resource_locator ||
     meta.resourceLocator ||
     meta.image_url ||
     meta.imageUrl ||
     item.image_url ||
     item.imageUrl ||
-    meta.thumbnail_url ||
-    meta.thumbnailUrl;
+    (meta as any).thumbnail_url ||
+    (meta as any).thumbnailUrl;
 
   const imageUrl =
     imageCandidate || filename
@@ -186,13 +186,13 @@ const normalizeItem = (item: any): CurationItem => {
     imageId: item.imageId || item.image_id || meta.id || filename,
     title:
       item.title ||
-      meta.title ||
-      meta.filename ||
+      (meta as any).title ||
+      (meta as any).filename ||
       item.image_filename ||
       'Untitled',
     description:
       item.description ||
-      meta.abstract ||
+      (meta as any).abstract ||
       meta.description ||
       meta.purpose ||
       'No description',
@@ -200,7 +200,7 @@ const normalizeItem = (item: any): CurationItem => {
       ...existingMetadata,
       hazardType:
         existingMetadata.hazardType ||
-        meta.hazard_type ||
+        (meta as any).hazard_type ||
         meta.hazardType ||
         'Unspecified',
     },
@@ -259,7 +259,7 @@ const CurationQueueItem = memo(function CurationQueueItem({
 }: QueueItemProps) {
   const handleClick = useCallback(() => onSelect?.(item), [onSelect, item]);
   const handleKeyDown = useCallback(
-    (event: React.KeyboardEvent) => {
+    (event: React.KeyboardEvent): any => {
       if ((event.key === 'Enter' || event.key === ' ') && onSelect) {
         event.preventDefault();
         onSelect(item);
@@ -371,7 +371,7 @@ const CurationQueueItem = memo(function CurationQueueItem({
                 {item.is_flagged && (
                   <FlagIcon
                     className="h-4 w-4 text-red-500"
-                    title={sanitizeText(item.flag_reason || 'Flagged')}
+                    aria-label={sanitizeText(item.flag_reason || 'Flagged')}
                   />
                 )}
                 {item.comments_count > 0 && (
@@ -529,8 +529,8 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
 
   // Prefetch next page for instant navigation
   useEffect(() => {
-    if (data && currentPage < Math.ceil(data.total / pageSize)) {
-      queryClient.prefetchQuery({
+    if (data && currentPage < Math.ceil((data as any).total / pageSize)) {
+      (queryClient as any).prefetchQuery({
         queryKey: [
           'curation-queue',
           { ...filters, search: debouncedSearch },
@@ -619,9 +619,11 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
       return response.json();
     },
     // Optimistic update: UI updates immediately
-    onMutate: async ({ itemId, status }) => {
-      await queryClient.cancelQueries({ queryKey: ['curation-queue'] });
-      const previousData = queryClient.getQueryData([
+    onMutate: async ({ itemId, status }: { itemId: any; status: any }) => {
+      await (queryClient as any).cancelQueries({
+        queryKey: ['curation-queue'],
+      });
+      const previousData = (queryClient as any).getQueryData([
         'curation-queue',
         { ...filters, search: debouncedSearch },
         sortBy,
@@ -630,7 +632,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
         pageSize,
       ]);
 
-      queryClient.setQueryData(
+      (queryClient as any).setQueryData(
         [
           'curation-queue',
           { ...filters, search: debouncedSearch },
@@ -651,9 +653,9 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
       );
       return { previousData };
     },
-    onError: (_, __, context) => {
+    onError: (_: any, __: any, context: any) => {
       if (context?.previousData) {
-        queryClient.setQueryData(
+        (queryClient as any).setQueryData(
           [
             'curation-queue',
             { ...filters, search: debouncedSearch },
@@ -727,7 +729,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
   );
 
   // PERFORMANCE: Virtualizer for efficient rendering of long lists
-  const items = data?.items || [];
+  const items = (data as any)?.items || [];
 
   const rowVirtualizer = useVirtualizer({
     count: items.length,
@@ -781,9 +783,9 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
               type="text"
               placeholder="Search items..."
               value={filters.search}
-              onChange={(e) =>
-                setFilters({ ...filters, search: e.target.value })
-              }
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setFilters({ ...filters, search: e.target.value })}
               className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -799,9 +801,9 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
               id="filter-status"
               name="status"
               value={filters.status}
-              onChange={(e) =>
-                setFilters({ ...filters, status: e.target.value })
-              }
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setFilters({ ...filters, status: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Statuses</option>
@@ -822,9 +824,9 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
               id="filter-priority"
               name="priority"
               value={filters.priority}
-              onChange={(e) =>
-                setFilters({ ...filters, priority: e.target.value })
-              }
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setFilters({ ...filters, priority: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Priorities</option>
@@ -843,9 +845,9 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
               id="filter-assigned"
               name="assignedTo"
               value={filters.assignedTo}
-              onChange={(e) =>
-                setFilters({ ...filters, assignedTo: e.target.value })
-              }
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setFilters({ ...filters, assignedTo: e.target.value })}
               className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900 focus:ring-blue-500 focus:border-blue-500"
             >
               <option value="">All Curators</option>
@@ -863,8 +865,13 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
               name="flagged"
               type="checkbox"
               checked={filters.flagged}
-              onChange={(e) =>
-                setFilters({ ...filters, flagged: e.target.checked })
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) =>
+                setFilters({
+                  ...filters,
+                  flagged: (e.target as HTMLInputElement).checked,
+                })
               }
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
@@ -878,7 +885,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-700">
-              {data?.total || 0} items total
+              {(data as any)?.total || 0} items total
             </span>
             <div className="flex items-center space-x-2">
               <label htmlFor="sort-by" className="sr-only">
@@ -888,7 +895,9 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
                 id="sort-by"
                 name="sortBy"
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) => setSortBy(e.target.value)}
                 className="text-sm border border-gray-300 rounded px-2 py-1"
               >
                 <option value="submittedAt">Submitted Date</option>
@@ -963,13 +972,13 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
         )}
 
         {/* Pagination */}
-        {data?.total > pageSize && (
+        {(data as any)?.total > pageSize && (
           <div className="px-6 py-4 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-700">
                 Showing {(currentPage - 1) * pageSize + 1} to{' '}
-                {Math.min(currentPage * pageSize, data.total)} of {data.total}{' '}
-                results
+                {Math.min(currentPage * pageSize, (data as any).total)} of{' '}
+                {(data as any).total} results
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -980,18 +989,21 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
                   <ChevronLeftIcon className="h-5 w-5" />
                 </button>
                 <span className="text-sm text-gray-700">
-                  Page {currentPage} of {Math.ceil(data.total / pageSize)}
+                  Page {currentPage} of{' '}
+                  {Math.ceil((data as any).total / pageSize)}
                 </span>
                 <button
                   onClick={() =>
                     setCurrentPage(
                       Math.min(
-                        Math.ceil(data.total / pageSize),
+                        Math.ceil((data as any).total / pageSize),
                         currentPage + 1
                       )
                     )
                   }
-                  disabled={currentPage === Math.ceil(data.total / pageSize)}
+                  disabled={
+                    currentPage === Math.ceil((data as any).total / pageSize)
+                  }
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >
                   <ChevronRightIcon className="h-5 w-5" />

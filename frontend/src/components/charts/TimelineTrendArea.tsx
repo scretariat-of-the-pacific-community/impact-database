@@ -32,9 +32,9 @@ interface Props {
 export default function TimelineTrendArea({ data, className = '' }: Props) {
   // Calculate rolling 7-day average
   const enrichedData = useMemo(() => {
-    if (data.length < 7) return data;
+    if ((data as any).length < 7) return data;
 
-    return data.map((item, index) => {
+    return (data as any).map((item: any, index: number) => {
       if (index < 6) {
         return { ...item, rollingAvg: undefined };
       }
@@ -60,7 +60,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
     const peakDate = format(parseISO(peakDay.date), 'MMM d');
 
     // Check trend after peak
-    const peakIndex = data.findIndex((d) => d.date === peakDay.date);
+    const peakIndex = data.findIndex((d: any) => d.date === peakDay.date);
     const afterPeak = data.slice(peakIndex + 1);
 
     if (afterPeak.length >= 7) {
@@ -114,7 +114,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
   // Check if all data is zero
   const totalUploads = data.reduce((sum, d) => sum + d.count, 0);
 
-  if (data.length === 0) {
+  if ((data as any).length === 0) {
     return (
       <div
         className={`flex h-80 flex-col items-center justify-center ${className}`}
@@ -125,7 +125,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
   }
 
   // Determine Y-axis tick interval for integer values
-  const maxCount = Math.max(...data.map((d) => d.count));
+  const maxCount = Math.max(...(data as any).map((d: any) => d.count));
   const yAxisTicks =
     maxCount <= 5
       ? Array.from({ length: maxCount + 1 }, (_, i) => i)
@@ -179,7 +179,7 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
             fill="url(#colorUploads)"
             animationDuration={1000}
           />
-          {enrichedData.some((d) => d.rollingAvg !== undefined) && (
+          {enrichedData.some((d: any) => d.rollingAvg !== undefined) && (
             <Line
               type="monotone"
               dataKey="rollingAvg"

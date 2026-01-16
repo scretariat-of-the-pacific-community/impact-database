@@ -151,14 +151,14 @@ const UserManagement: React.FC = () => {
       }
       return response.json();
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data: any, variables: any) => {
       console.log(
         `User ${variables.lock ? 'locked' : 'unlocked'} successfully:`,
         data
       );
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Lock/unlock error:', error);
     },
   });
@@ -227,12 +227,12 @@ const UserManagement: React.FC = () => {
       }
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       console.log('Bulk action successful:', data);
       queryClient.invalidateQueries({ queryKey: ['admin-users'] });
       setSelectedUsers(new Set());
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Bulk action error:', error);
     },
   });
@@ -250,14 +250,16 @@ const UserManagement: React.FC = () => {
 
   // Select all users on current page
   const toggleSelectAll = () => {
-    if (!usersData?.users) return;
-    const allSelected = usersData.users.every((u: User) =>
+    if (!(usersData as any)?.users) return;
+    const allSelected = (usersData as any).users.every((u: User) =>
       selectedUsers.has(u.id)
     );
     if (allSelected) {
       setSelectedUsers(new Set());
     } else {
-      setSelectedUsers(new Set(usersData.users.map((u: User) => u.id)));
+      setSelectedUsers(
+        new Set((usersData as any).users.map((u: User) => u.id))
+      );
     }
   };
 
@@ -332,9 +334,9 @@ const UserManagement: React.FC = () => {
                   autoComplete="given-name"
                   required
                   value={formData.firstName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, firstName: e.target.value })
-                  }
+                  onChange={(
+                    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                  ) => setFormData({ ...formData, firstName: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -352,9 +354,9 @@ const UserManagement: React.FC = () => {
                   autoComplete="family-name"
                   required
                   value={formData.lastName}
-                  onChange={(e) =>
-                    setFormData({ ...formData, lastName: e.target.value })
-                  }
+                  onChange={(
+                    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                  ) => setFormData({ ...formData, lastName: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -374,9 +376,9 @@ const UserManagement: React.FC = () => {
                 autoComplete="email"
                 required
                 value={formData.email}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -388,15 +390,15 @@ const UserManagement: React.FC = () => {
                 label="Role *"
                 required
                 value={formData.role}
-                onChange={(e) =>
-                  setFormData({ ...formData, role: e.target.value })
-                }
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) => setFormData({ ...formData, role: e.target.value })}
                 variant="light"
                 size="md"
                 error={!formData.role ? undefined : undefined}
               >
                 <option value="">Select Role</option>
-                {roles?.map((role: any) => (
+                {(roles as any)?.map((role: any) => (
                   <option key={role.name} value={role.name}>
                     {role.displayName || role.name}
                   </option>
@@ -417,9 +419,9 @@ const UserManagement: React.FC = () => {
                 type="text"
                 autoComplete="organization"
                 value={formData.organization}
-                onChange={(e) =>
-                  setFormData({ ...formData, organization: e.target.value })
-                }
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) => setFormData({ ...formData, organization: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
@@ -429,8 +431,13 @@ const UserManagement: React.FC = () => {
                 type="checkbox"
                 id="sendInvite"
                 checked={formData.sendInvite}
-                onChange={(e) =>
-                  setFormData({ ...formData, sendInvite: e.target.checked })
+                onChange={(
+                  e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                ) =>
+                  setFormData({
+                    ...formData,
+                    sendInvite: (e.target as HTMLInputElement).checked,
+                  })
                 }
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
@@ -565,7 +572,7 @@ const UserManagement: React.FC = () => {
               Permissions
             </label>
             <div className="flex flex-wrap gap-2">
-              {user.permissions.map((permission) => (
+              {user.permissions.map((permission: any) => (
                 <span
                   key={permission}
                   className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
@@ -657,7 +664,7 @@ const UserManagement: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-500">Total Users</p>
               <p className="text-2xl font-bold text-gray-900">
-                {usersData?.total || 0}
+                {(usersData as any)?.total || 0}
               </p>
             </div>
             <UsersIcon className="h-8 w-8 text-blue-500" />
@@ -668,7 +675,9 @@ const UserManagement: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-500">Active Users</p>
               <p className="text-2xl font-bold text-gray-900">
-                {usersData?.active_count || usersData?.total || 0}
+                {(usersData as any)?.active_count ||
+                  (usersData as any)?.total ||
+                  0}
               </p>
             </div>
             <CheckIcon className="h-8 w-8 text-green-500" />
@@ -679,7 +688,7 @@ const UserManagement: React.FC = () => {
             <div>
               <p className="text-sm font-medium text-gray-500">Locked</p>
               <p className="text-2xl font-bold text-gray-900">
-                {usersData?.locked_count || 0}
+                {(usersData as any)?.locked_count || 0}
               </p>
             </div>
             <LockClosedIcon className="h-8 w-8 text-red-500" />
@@ -692,7 +701,7 @@ const UserManagement: React.FC = () => {
                 Pending Invites
               </p>
               <p className="text-2xl font-bold text-gray-900">
-                {usersData?.pending_count || 0}
+                {(usersData as any)?.pending_count || 0}
               </p>
             </div>
             <EnvelopeIcon className="h-8 w-8 text-purple-500" />
@@ -748,7 +757,9 @@ const UserManagement: React.FC = () => {
                   autoComplete="email"
                   placeholder="email@example.com"
                   value={quickInviteEmail}
-                  onChange={(e) => setQuickInviteEmail(e.target.value)}
+                  onChange={(
+                    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                  ) => setQuickInviteEmail(e.target.value)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
@@ -758,7 +769,9 @@ const UserManagement: React.FC = () => {
                   name="role"
                   aria-label="Select role for invite"
                   value={quickInviteRole}
-                  onChange={(e) => setQuickInviteRole(e.target.value)}
+                  onChange={(
+                    e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                  ) => setQuickInviteRole(e.target.value)}
                   variant="light"
                   size="md"
                 >
@@ -859,9 +872,9 @@ const UserManagement: React.FC = () => {
               type="text"
               placeholder="Search users..."
               value={filters.search}
-              onChange={(e) =>
-                setFilters({ ...filters, search: e.target.value })
-              }
+              onChange={(
+                e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+              ) => setFilters({ ...filters, search: e.target.value })}
               className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -871,13 +884,15 @@ const UserManagement: React.FC = () => {
             name="role"
             aria-label="Filter by role"
             value={filters.role}
-            onChange={(e) => setFilters({ ...filters, role: e.target.value })}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => setFilters({ ...filters, role: e.target.value })}
             variant="light"
             size="md"
             fullWidth={false}
           >
             <option value="">All Roles</option>
-            {roles?.map((role: any) => (
+            {(roles as any)?.map((role: any) => (
               <option key={role.name} value={role.name}>
                 {role.displayName || role.name}
               </option>
@@ -889,7 +904,9 @@ const UserManagement: React.FC = () => {
             name="status"
             aria-label="Filter by status"
             value={filters.status}
-            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => setFilters({ ...filters, status: e.target.value })}
             variant="light"
             size="md"
             fullWidth={false}
@@ -909,9 +926,9 @@ const UserManagement: React.FC = () => {
             type="text"
             placeholder="Organization"
             value={filters.organization}
-            onChange={(e) =>
-              setFilters({ ...filters, organization: e.target.value })
-            }
+            onChange={(
+              e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+            ) => setFilters({ ...filters, organization: e.target.value })}
             className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -927,8 +944,8 @@ const UserManagement: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={
-                      usersData?.users?.length > 0 &&
-                      selectedUsers.size === usersData.users.length
+                      (usersData as any)?.users?.length > 0 &&
+                      selectedUsers.size === (usersData as any).users.length
                     }
                     onChange={toggleSelectAll}
                     className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
@@ -953,7 +970,7 @@ const UserManagement: React.FC = () => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               <AnimatePresence>
-                {usersData?.users?.map((user: User) => (
+                {(usersData as any)?.users?.map((user: User) => (
                   <motion.tr
                     key={user.id}
                     initial={{ opacity: 0 }}
@@ -1061,13 +1078,13 @@ const UserManagement: React.FC = () => {
         </div>
 
         {/* Pagination */}
-        {usersData?.total > pageSize && (
+        {(usersData as any)?.total > pageSize && (
           <div className="px-6 py-4 border-t border-gray-200">
             <div className="flex items-center justify-between">
               <div className="text-sm text-gray-700">
                 Showing {(currentPage - 1) * pageSize + 1} to{' '}
-                {Math.min(currentPage * pageSize, usersData.total)} of{' '}
-                {usersData.total} results
+                {Math.min(currentPage * pageSize, (usersData as any).total)} of{' '}
+                {(usersData as any).total} results
               </div>
               <div className="flex items-center space-x-2">
                 <button
@@ -1078,19 +1095,21 @@ const UserManagement: React.FC = () => {
                   <ChevronLeftIcon className="h-5 w-5" />
                 </button>
                 <span className="text-sm text-gray-700">
-                  Page {currentPage} of {Math.ceil(usersData.total / pageSize)}
+                  Page {currentPage} of{' '}
+                  {Math.ceil((usersData as any).total / pageSize)}
                 </span>
                 <button
                   onClick={() =>
                     setCurrentPage(
                       Math.min(
-                        Math.ceil(usersData.total / pageSize),
+                        Math.ceil((usersData as any).total / pageSize),
                         currentPage + 1
                       )
                     )
                   }
                   disabled={
-                    currentPage === Math.ceil(usersData.total / pageSize)
+                    currentPage ===
+                    Math.ceil((usersData as any).total / pageSize)
                   }
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >

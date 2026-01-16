@@ -2,7 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
-import { ArrowLeft, BarChart3, MapPin, Calendar, TrendingUp, AlertTriangle } from 'lucide-react';
+import {
+  ArrowLeft,
+  BarChart3,
+  MapPin,
+  Calendar,
+  TrendingUp,
+  AlertTriangle,
+} from 'lucide-react';
 import Link from 'next/link';
 import React, { useMemo, useState } from 'react';
 import type { ImageMetadata as SharedImageMetadata } from '@/lib/types';
@@ -36,8 +43,8 @@ export default function HazardAnalysisPage() {
   });
 
   const images = useMemo(() => {
-    return (data?.images as ImageMetadata[]) || [];
-  }, [data?.images]);
+    return ((data as any)?.images as ImageMetadata[]) || [];
+  }, [(data as any)?.images]);
 
   const hazardStats = useMemo(() => {
     if (!images || images.length === 0) return [] as HazardStats[];
@@ -88,13 +95,16 @@ export default function HazardAnalysisPage() {
   const totalImages = images.length;
   const totalCountries = useMemo(() => {
     const countries = images
-      .map((img) => img.country)
+      .map((img: any) => img.country)
       .filter((country): country is string => Boolean(country));
     return new Set(countries).size;
   }, [images]);
 
   const geolocatedImages = useMemo(() => {
-    return images.filter((img) => typeof img.latitude === 'number' && typeof img.longitude === 'number').length;
+    return images.filter(
+      (img) =>
+        typeof img.latitude === 'number' && typeof img.longitude === 'number'
+    ).length;
   }, [images]);
 
   const selectedHazardImages = useMemo(() => {
@@ -136,7 +146,10 @@ export default function HazardAnalysisPage() {
     }
   };
 
-  const errorMessage = error instanceof Error ? error.message : 'Unknown error fetching hazard data';
+  const errorMessage =
+    error instanceof Error
+      ? error.message
+      : 'Unknown error fetching hazard data';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -147,8 +160,12 @@ export default function HazardAnalysisPage() {
               <ArrowLeft className="w-6 h-6 text-gray-600 hover:text-gray-900" />
             </Link>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Hazard Analysis</h1>
-              <p className="text-gray-600">Analyze disaster and hazard patterns by type and location</p>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Hazard Analysis
+              </h1>
+              <p className="text-gray-600">
+                Analyze disaster and hazard patterns by type and location
+              </p>
             </div>
           </div>
         </div>
@@ -162,11 +179,14 @@ export default function HazardAnalysisPage() {
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-md p-6 text-center">
-            <p className="text-red-800">Error loading hazard data: {errorMessage}</p>
+            <p className="text-red-800">
+              Error loading hazard data: {errorMessage}
+            </p>
           </div>
         ) : images.length === 0 ? (
           <div className="bg-white p-6 rounded-lg shadow text-center text-gray-600">
-            No hazard imagery available yet. Try uploading new imagery to see analytics here.
+            No hazard imagery available yet. Try uploading new imagery to see
+            analytics here.
           </div>
         ) : (
           <>
@@ -176,8 +196,12 @@ export default function HazardAnalysisPage() {
                 <div className="flex items-center">
                   <BarChart3 className="w-8 h-8 text-blue-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Total Images</p>
-                    <p className="text-2xl font-bold text-gray-900">{totalImages}</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Total Images
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {totalImages}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -186,8 +210,12 @@ export default function HazardAnalysisPage() {
                 <div className="flex items-center">
                   <AlertTriangle className="w-8 h-8 text-orange-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Hazard Types</p>
-                    <p className="text-2xl font-bold text-gray-900">{hazardStats.length}</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Hazard Types
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {hazardStats.length}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -196,8 +224,12 @@ export default function HazardAnalysisPage() {
                 <div className="flex items-center">
                   <MapPin className="w-8 h-8 text-green-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Countries Affected</p>
-                    <p className="text-2xl font-bold text-gray-900">{totalCountries}</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Countries Affected
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {totalCountries}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -206,8 +238,12 @@ export default function HazardAnalysisPage() {
                 <div className="flex items-center">
                   <TrendingUp className="w-8 h-8 text-purple-600" />
                   <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Geolocated</p>
-                    <p className="text-2xl font-bold text-gray-900">{geolocatedImages}</p>
+                    <p className="text-sm font-medium text-gray-600">
+                      Geolocated
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {geolocatedImages}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -215,26 +251,35 @@ export default function HazardAnalysisPage() {
 
             {/* Hazard Types Grid */}
             <div className="bg-white p-6 rounded-lg shadow mb-8">
-              <h2 className="text-xl font-semibold text-gray-900 mb-6">Hazard Types Overview</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-6">
+                Hazard Types Overview
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {hazardStats.map((hazard) => (
                   <div
                     key={hazard.hazard_type}
                     className={`p-4 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
                       selectedHazard === hazard.hazard_type
-                        ? 'ring-2 ring-blue-500 ' + getHazardColor(hazard.hazard_type)
+                        ? 'ring-2 ring-blue-500 ' +
+                          getHazardColor(hazard.hazard_type)
                         : getHazardColor(hazard.hazard_type)
                     }`}
                     onClick={() =>
                       setSelectedHazard(
-                        selectedHazard === hazard.hazard_type ? '' : hazard.hazard_type
+                        selectedHazard === hazard.hazard_type
+                          ? ''
+                          : hazard.hazard_type
                       )
                     }
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center">
-                        <span className="text-2xl mr-3">{getHazardIcon(hazard.hazard_type)}</span>
-                        <h3 className="font-semibold capitalize">{hazard.hazard_type}</h3>
+                        <span className="text-2xl mr-3">
+                          {getHazardIcon(hazard.hazard_type)}
+                        </span>
+                        <h3 className="font-semibold capitalize">
+                          {hazard.hazard_type}
+                        </h3>
                       </div>
                       <span className="text-2xl font-bold">{hazard.count}</span>
                     </div>
@@ -251,7 +296,9 @@ export default function HazardAnalysisPage() {
                       {hazard.latestDate && (
                         <div>
                           <span className="font-medium">Latest: </span>
-                          <span>{new Date(hazard.latestDate).toLocaleDateString()}</span>
+                          <span>
+                            {new Date(hazard.latestDate).toLocaleDateString()}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -274,41 +321,54 @@ export default function HazardAnalysisPage() {
             {selectedHazard && selectedHazardImages.length > 0 && (
               <div className="bg-white p-6 rounded-lg shadow">
                 <div className="flex items-center mb-6">
-                  <span className="text-3xl mr-3">{getHazardIcon(selectedHazard)}</span>
+                  <span className="text-3xl mr-3">
+                    {getHazardIcon(selectedHazard)}
+                  </span>
                   <div>
                     <h2 className="text-xl font-semibold text-gray-900 capitalize">
                       {selectedHazard} Events
                     </h2>
                     <p className="text-gray-600">
-                      {selectedHazardImages.length} images from {
+                      {selectedHazardImages.length} images from{' '}
+                      {
                         new Set(
                           selectedHazardImages
-                            .map((img) => img.location)
+                            .map((img: any) => img.location)
                             .filter((loc): loc is string => Boolean(loc))
                         ).size
-                      } locations
+                      }{' '}
+                      locations
                     </p>
                   </div>
                 </div>
 
                 {/* Location breakdown */}
                 <div className="mb-6">
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Affected Locations</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">
+                    Affected Locations
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {Object.entries(
-                      selectedHazardImages.reduce((acc: Record<string, number>, img) => {
-                        const key = img.country ? `${img.location}, ${img.country}` : img.location;
-                        const safeKey = key || 'Unknown location';
-                        acc[safeKey] = (acc[safeKey] || 0) + 1;
-                        return acc;
-                      }, {} as Record<string, number>)
+                      selectedHazardImages.reduce(
+                        (acc: Record<string, number>, img) => {
+                          const key = img.country
+                            ? `${img.location}, ${img.country}`
+                            : img.location;
+                          const safeKey = key || 'Unknown location';
+                          acc[safeKey] = (acc[safeKey] || 0) + 1;
+                          return acc;
+                        },
+                        {} as Record<string, number>
+                      )
                     ).map(([location, count]) => (
                       <div
                         key={location}
                         className="flex justify-between items-center p-3 bg-gray-50 rounded"
                       >
                         <span className="text-sm font-medium">{location}</span>
-                        <span className="text-sm text-gray-600">{count} images</span>
+                        <span className="text-sm text-gray-600">
+                          {count} images
+                        </span>
                       </div>
                     ))}
                   </div>
@@ -316,7 +376,9 @@ export default function HazardAnalysisPage() {
 
                 {/* Recent images */}
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-3">Recent Images</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">
+                    Recent Images
+                  </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {selectedHazardImages
                       .slice()
@@ -324,10 +386,13 @@ export default function HazardAnalysisPage() {
                         if (!a.timestamp && !b.timestamp) return 0;
                         if (!a.timestamp) return 1;
                         if (!b.timestamp) return -1;
-                        return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+                        return (
+                          new Date(b.timestamp).getTime() -
+                          new Date(a.timestamp).getTime()
+                        );
                       })
                       .slice(0, 6)
-                      .map((image) => (
+                      .map((image: any) => (
                         <div
                           key={image.filename}
                           className="border rounded-lg p-4 hover:shadow-md transition-shadow"
@@ -338,12 +403,18 @@ export default function HazardAnalysisPage() {
                           <div className="space-y-1 text-sm text-gray-600">
                             <div className="flex items-center">
                               <MapPin className="w-3 h-3 mr-1" />
-                              <span className="truncate">{image.location || 'Unknown location'}</span>
+                              <span className="truncate">
+                                {image.location || 'Unknown location'}
+                              </span>
                             </div>
                             {image.timestamp && (
                               <div className="flex items-center">
                                 <Calendar className="w-3 h-3 mr-1" />
-                                <span>{new Date(image.timestamp).toLocaleDateString()}</span>
+                                <span>
+                                  {new Date(
+                                    image.timestamp
+                                  ).toLocaleDateString()}
+                                </span>
                               </div>
                             )}
                           </div>
@@ -375,7 +446,9 @@ export default function HazardAnalysisPage() {
 
             {/* Quick Actions */}
             <div className="mt-8 bg-white p-6 rounded-lg shadow">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                Quick Actions
+              </h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Link
                   href="/images"

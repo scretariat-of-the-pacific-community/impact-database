@@ -73,7 +73,7 @@ export default function SmartSearch() {
         limit: 8,
         sort_by: 'relevance',
       });
-      setResults(data.images || []);
+      setResults((data as any).images || []);
     } catch (error: any) {
       // Don't show error for aborted requests
       if (error?.name !== 'AbortError') {

@@ -6,9 +6,20 @@ import { NextResponse } from 'next/server';
  */
 export async function POST(request: Request) {
   try {
+    // Parse body - sendBeacon sends as text/plain, fetch sends as JSON
+    const contentType = request.headers.get('content-type') || '';
+    let body;
+
+    if (contentType.includes('application/json')) {
+      body = await request.json();
+    } else {
+      // sendBeacon sends as text/plain
+      const text = await request.text();
+      body = JSON.parse(text);
+    }
+
     // In development, just accept and log the event
     if (process.env.NODE_ENV === 'development') {
-      const body = await request.json();
       console.log('[Analytics]', body.name, body.properties);
       return NextResponse.json({ success: true });
     }

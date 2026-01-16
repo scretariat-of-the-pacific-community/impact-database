@@ -26,6 +26,7 @@ import { exportCSV, exportJSON } from '@/lib/export-utils';
 import InsightsPanel from '@/components/InsightsPanel';
 import { Select } from '@/components/design-system';
 import { getCountryName } from '@/lib/countries';
+import { withBasePath } from '@/lib/auth-utils';
 import {
   ResponsiveContainer,
   AreaChart,
@@ -124,9 +125,12 @@ export default function EnhancedAnalytics() {
         if (filters.hazardType) params.append('hazardType', filters.hazardType);
         if (filters.country) params.append('country', filters.country);
 
-        const response = await fetch(`/api/analytics?${params.toString()}`, {
-          signal,
-        });
+        const response = await fetch(
+          withBasePath(`/api/analytics?${params.toString()}`),
+          {
+            signal,
+          }
+        );
 
         if (response.ok) {
           const data = await response.json();
@@ -389,9 +393,9 @@ export default function EnhancedAnalytics() {
                   <input
                     type="date"
                     value={filters.startDate}
-                    onChange={(e) =>
-                      setFilters({ ...filters, startDate: e.target.value })
-                    }
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setFilters({ ...filters, startDate: e.target.value })}
                     className="w-full rounded-lg border border-white/20 bg-deep-900/70 px-3 py-2 text-white placeholder:text-white/50 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                   />
                 </div>
@@ -403,9 +407,9 @@ export default function EnhancedAnalytics() {
                   <input
                     type="date"
                     value={filters.endDate}
-                    onChange={(e) =>
-                      setFilters({ ...filters, endDate: e.target.value })
-                    }
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setFilters({ ...filters, endDate: e.target.value })}
                     className="w-full rounded-lg border border-white/20 bg-deep-900/70 px-3 py-2 text-white placeholder:text-white/50 focus:border-pacific-300 focus:outline-none focus:ring-2 focus:ring-pacific-400/60"
                   />
                 </div>
@@ -414,9 +418,9 @@ export default function EnhancedAnalytics() {
                   <Select
                     label="Hazard Type"
                     value={filters.hazardType}
-                    onChange={(e) =>
-                      setFilters({ ...filters, hazardType: e.target.value })
-                    }
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setFilters({ ...filters, hazardType: e.target.value })}
                     variant="dark"
                     size="md"
                   >
@@ -433,9 +437,9 @@ export default function EnhancedAnalytics() {
                   <Select
                     label="Country"
                     value={filters.country}
-                    onChange={(e) =>
-                      setFilters({ ...filters, country: e.target.value })
-                    }
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setFilters({ ...filters, country: e.target.value })}
                     variant="dark"
                     size="md"
                   >
@@ -452,7 +456,9 @@ export default function EnhancedAnalytics() {
                   <Select
                     label="Time Range"
                     value={filters.timeRange}
-                    onChange={(e) =>
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) =>
                       setFilters({
                         ...filters,
                         timeRange: e.target.value as Filters['timeRange'],
@@ -622,7 +628,10 @@ export default function EnhancedAnalytics() {
                         borderRadius: 12,
                       }}
                       labelStyle={{ color: '#e2e8f0' }}
-                      formatter={(value: number) => [value, 'Uploads']}
+                      formatter={(value: number | undefined) => [
+                        value,
+                        'Uploads',
+                      ]}
                     />
                     <Area
                       type="monotone"
@@ -696,7 +705,7 @@ export default function EnhancedAnalytics() {
                           setFilters({ ...filters, hazardType: data.name })
                         }
                       >
-                        {hazardChartData.map((entry, index) => (
+                        {hazardChartData.map((entry, index: any) => (
                           <Cell
                             key={`cell-${entry.name}`}
                             fill={entry.color}
@@ -787,7 +796,7 @@ export default function EnhancedAnalytics() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {analyticsData.recentActivity
                   .slice(0, 10)
-                  .map((activity, index) => (
+                  .map((activity, index: any) => (
                     <div
                       key={`${activity.type}-${activity.country}-${activity.timestamp}-${index}`}
                       className="p-4 bg-gradient-to-br from-white/10 to-white/5 rounded-lg border border-white/15"

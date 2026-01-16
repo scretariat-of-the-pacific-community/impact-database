@@ -13,13 +13,13 @@ import { toast } from 'sonner';
 const DOMPurify = typeof window !== 'undefined' ? dompurify(window) : null;
 
 const INPUT_SANITIZE_CONFIG = {
-  ALLOWED_TAGS: [],
-  ALLOWED_ATTR: [],
+  ALLOWED_TAGS: [] as string[],
+  ALLOWED_ATTR: [] as string[],
   KEEP_CONTENT: true,
-} as const;
+};
 
 const sanitizeInputValue = (value: string) =>
-  DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG);
+  DOMPurify?.sanitize(value ?? '', INPUT_SANITIZE_CONFIG) ?? value;
 
 interface CapturedImage {
   file: File | null;
@@ -430,7 +430,9 @@ export default function MobileUploadPage() {
                   </label>
                   <select
                     value={formData.hazard_type}
-                    onChange={(e) =>
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) =>
                       setFormData({ ...formData, hazard_type: e.target.value })
                     }
                     className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-400 focus:outline-none focus:ring-2 focus:ring-pacific-400/50"

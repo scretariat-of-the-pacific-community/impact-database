@@ -75,6 +75,11 @@ interface UploadForm {
   title?: string;
   abstract?: string;
   keywords?: string;
+  hazardType?: string;
+  sourceType?: string;
+  eventId?: string;
+  titleTemplate?: string;
+  source_type?: string;
 }
 
 interface ApiUploadMetadata {
@@ -178,6 +183,8 @@ const buildApiMetadata = (
     datetime: metadata.datetime || new Date().toISOString(),
     hazard_type: metadata.hazard_type,
     event_id: metadata.event_id ?? null,
+    altitude: null,
+    altitude_ref: 0,
     geometry:
       metadata.geometry ?? buildGeometry(metadata.latitude, metadata.longitude),
     data_license:
@@ -229,7 +236,7 @@ export default function UploadPage() {
       return response.json();
     },
     enabled: !!activeBatchId && isAuthenticated,
-    refetchInterval: (data) => {
+    refetchInterval: (data: any) => {
       if (!data || data.is_complete) {
         return false;
       }
@@ -240,9 +247,9 @@ export default function UploadPage() {
 
   // Show completion notification when batch finishes
   React.useEffect(() => {
-    if (batchStatus?.is_complete && activeBatchId) {
+    if ((batchStatus as any)?.is_complete && activeBatchId) {
       const { status, successful_files, failed_files, total_files } =
-        batchStatus;
+        batchStatus as any;
 
       if (status === 'completed') {
         toast.success('Batch upload complete!', {
@@ -265,7 +272,12 @@ export default function UploadPage() {
       setActiveBatchId(null);
       queryClient.invalidateQueries({ queryKey: ['images'] });
     }
-  }, [batchStatus?.is_complete, activeBatchId, batchStatus, queryClient]);
+  }, [
+    (batchStatus as any)?.is_complete,
+    activeBatchId,
+    batchStatus,
+    queryClient,
+  ]);
 
   // Template queries
   const { data: templatesData } = useQuery({
@@ -358,7 +370,9 @@ export default function UploadPage() {
 
   const sanitizeInputValue = useCallback(
     (value: string | null | undefined) =>
-      DOMPurify.sanitize(value ?? '', INPUT_SANITIZE_CONFIG),
+      DOMPurify?.sanitize(value ?? '', INPUT_SANITIZE_CONFIG as any) ??
+      value ??
+      '',
     []
   );
 
@@ -369,13 +383,13 @@ export default function UploadPage() {
     ) =>
       register(name, {
         ...options,
-        onChange: (event) => {
+        onChange: (event: any) => {
           const inputValue = (event.target.value ?? '') as string;
           const sanitizedValue = sanitizeInputValue(inputValue);
           if (sanitizedValue !== inputValue) {
             event.target.value = sanitizedValue;
           }
-          setValue(name, sanitizedValue as UploadForm[TFieldName], {
+          setValue(name, sanitizedValue as any, {
             shouldDirty: true,
             shouldValidate: true,
           });
@@ -393,11 +407,7 @@ export default function UploadPage() {
       value: string | null | undefined,
       options?: SanitizeSetValueOptions
     ) => {
-      setValue(
-        name,
-        sanitizeInputValue(value) as UploadForm[TFieldName],
-        options
-      );
+      setValue(name, sanitizeInputValue(value) as any, options);
     },
     [sanitizeInputValue, setValue]
   );
@@ -716,7 +726,7 @@ export default function UploadPage() {
 
       return response.json();
     },
-    onSuccess: (response) => {
+    onSuccess: (response: any) => {
       toast.success('Batch upload started', {
         description: `Processing ${response.total_files} files in background`,
       });
@@ -728,7 +738,7 @@ export default function UploadPage() {
       queryClient.invalidateQueries({ queryKey: ['images'] });
       // Don't redirect - stay on page to show progress
     },
-    onError: (error) => {
+    onError: (error: any) => {
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Batch upload failed', { description: message });
     },
@@ -761,13 +771,13 @@ export default function UploadPage() {
 
       return response.json();
     },
-    onSuccess: (response) => {
+    onSuccess: (response: any) => {
       toast.success('Retry started', {
         description: `Retrying ${response.total_files} failed files`,
       });
       setActiveBatchId(response.id);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Retry failed', { description: message });
     },
@@ -796,7 +806,7 @@ export default function UploadPage() {
       setActiveBatchId(null);
       queryClient.invalidateQueries({ queryKey: ['images'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Cancel failed', { description: message });
     },
@@ -828,7 +838,7 @@ export default function UploadPage() {
       toast.success('Template saved successfully');
       queryClient.invalidateQueries({ queryKey: ['batch-templates'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Failed to save template', { description: message });
     },
@@ -853,7 +863,7 @@ export default function UploadPage() {
       toast.success('Template deleted');
       queryClient.invalidateQueries({ queryKey: ['batch-templates'] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Failed to delete template', { description: message });
     },
@@ -870,7 +880,7 @@ export default function UploadPage() {
       if (!response.ok) throw new Error('Failed to load template');
       return response.json();
     },
-    onSuccess: (template) => {
+    onSuccess: (template: any) => {
       // Apply template data to form
       const data = template.template_data;
       if (data.hazard_type) setValue('hazardType', data.hazard_type);
@@ -934,7 +944,7 @@ export default function UploadPage() {
       }
       setTimeout(() => router.push('/'), 1000); // Small delay to show completion
     },
-    onError: (error) => {
+    onError: (error: any) => {
       setUploadProgress(0);
       trackUploadEvent('failed');
       const message = error instanceof Error ? error.message : String(error);
@@ -1102,7 +1112,7 @@ export default function UploadPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Batch Progress Indicator */}
-        {batchStatus && !batchStatus.is_complete && (
+        {batchStatus && !(batchStatus as any)?.is_complete && (
           <div className="mb-6 rounded-3xl border border-pacific-500/30 bg-gradient-to-br from-pacific-900/40 to-deep-900/40 backdrop-blur p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">
@@ -1110,51 +1120,56 @@ export default function UploadPage() {
               </h3>
               <div className="flex items-center gap-3">
                 <span className="text-sm text-surface-soft">
-                  {batchStatus.status === 'processing'
+                  {(batchStatus as any)?.status === 'processing'
                     ? 'Processing...'
                     : 'Pending...'}
                 </span>
-                {batchStatus.status === 'processing' && activeBatchId && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => cancelBatchMutation.mutate(activeBatchId)}
-                    disabled={cancelBatchMutation.isPending}
-                  >
-                    {cancelBatchMutation.isPending ? 'Cancelling...' : 'Cancel'}
-                  </Button>
-                )}
+                {(batchStatus as any)?.status === 'processing' &&
+                  activeBatchId && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => cancelBatchMutation.mutate(activeBatchId)}
+                      disabled={cancelBatchMutation.isPending}
+                    >
+                      {cancelBatchMutation.isPending
+                        ? 'Cancelling...'
+                        : 'Cancel'}
+                    </Button>
+                  )}
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-surface-soft">
-                  {batchStatus.processed_files} of {batchStatus.total_files}{' '}
-                  files processed
+                  {(batchStatus as any)?.processed_files} of{' '}
+                  {(batchStatus as any)?.total_files} files processed
                 </span>
                 <span className="text-pacific-400 font-medium">
-                  {batchStatus.progress_percent.toFixed(1)}%
+                  {(batchStatus as any)?.progress_percent.toFixed(1)}%
                 </span>
               </div>
 
               <div className="w-full bg-deep-800 rounded-full h-2.5 overflow-hidden">
                 <div
                   className="bg-gradient-to-r from-pacific-500 to-pacific-400 h-2.5 rounded-full transition-all duration-500"
-                  style={{ width: `${batchStatus.progress_percent}%` }}
+                  style={{
+                    width: `${(batchStatus as any)?.progress_percent}%`,
+                  }}
                 />
               </div>
 
               <div className="flex gap-4 text-xs text-surface-soft">
                 <span className="flex items-center gap-1">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  {batchStatus.successful_files} succeeded
+                  {(batchStatus as any)?.successful_files} succeeded
                 </span>
-                {batchStatus.failed_files > 0 && (
+                {(batchStatus as any)?.failed_files > 0 && (
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                    {batchStatus.failed_files} failed
+                    {(batchStatus as any)?.failed_files} failed
                   </span>
                 )}
               </div>
@@ -1164,8 +1179,8 @@ export default function UploadPage() {
 
         {/* Completed Batch with Failed Files - Show Retry Option */}
         {batchStatus &&
-          batchStatus.is_complete &&
-          batchStatus.failed_files > 0 && (
+          (batchStatus as any)?.is_complete &&
+          (batchStatus as any)?.failed_files > 0 && (
             <div className="mb-6 rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-900/40 to-deep-900/40 backdrop-blur p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -1173,8 +1188,8 @@ export default function UploadPage() {
                     Batch Completed with Errors
                   </h3>
                   <p className="text-sm text-surface-soft">
-                    {batchStatus.successful_files} files succeeded,{' '}
-                    {batchStatus.failed_files} files failed
+                    {(batchStatus as any)?.successful_files} files succeeded,{' '}
+                    {(batchStatus as any)?.failed_files} files failed
                   </p>
                 </div>
                 <Button
@@ -1190,14 +1205,14 @@ export default function UploadPage() {
                     : 'Retry Failed Files'}
                 </Button>
               </div>
-              {batchStatus.failure_summary &&
-                batchStatus.failure_summary.length > 0 && (
+              {(batchStatus as any)?.failure_summary &&
+                (batchStatus as any)?.failure_summary.length > 0 && (
                   <details className="mt-4">
                     <summary className="text-sm text-surface-soft cursor-pointer hover:text-white">
                       View failure details
                     </summary>
                     <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
-                      {batchStatus.failure_summary.map(
+                      {(batchStatus as any)?.failure_summary.map(
                         (failure: any, idx: number) => (
                           <div
                             key={idx}
@@ -1391,7 +1406,7 @@ export default function UploadPage() {
                   </button>
                 </div>
                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {selectedFiles.map((file, index) => (
+                  {selectedFiles.map((file, index: any) => (
                     <div
                       key={index}
                       className="flex items-center gap-3 p-2 rounded-lg bg-deep-900/40"
@@ -1443,72 +1458,80 @@ export default function UploadPage() {
           </div>
 
           {/* Template Picker & Manager - Only for batch uploads */}
-          {selectedFiles.length > 0 && templatesData?.templates?.length > 0 && (
-            <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-900/20 to-deep-900/40 backdrop-blur p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  Batch Templates
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowTemplateManager(true)}
-                  className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
-                >
-                  Manage Templates
-                </button>
-              </div>
-              <div className="space-y-3">
-                <FormField label="Load Template" htmlFor="template-picker">
-                  <select
-                    id="template-picker"
-                    className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
-                    style={{
-                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                      backgroundPosition: 'right 0.5rem center',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundSize: '1.5em 1.5em',
-                    }}
-                    value={selectedTemplateId || ''}
-                    onChange={(e) => {
-                      const templateId = e.target.value;
-                      setSelectedTemplateId(templateId || null);
-                      if (templateId) {
-                        loadTemplateMutation.mutate(templateId);
-                      }
-                    }}
+          {selectedFiles.length > 0 &&
+            (templatesData as any)?.templates?.length > 0 && (
+              <div className="rounded-3xl border border-amber-500/30 bg-gradient-to-br from-amber-900/20 to-deep-900/40 backdrop-blur p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                    <FileText className="w-5 h-5" />
+                    Batch Templates
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplateManager(true)}
+                    className="text-sm text-amber-400 hover:text-amber-300 transition-colors"
                   >
-                    <option
-                      value=""
-                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    Manage Templates
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  <FormField label="Load Template" htmlFor="template-picker">
+                    <select
+                      id="template-picker"
+                      className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.5rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1.5em 1.5em',
+                      }}
+                      value={selectedTemplateId || ''}
+                      onChange={(
+                        e: React.ChangeEvent<
+                          HTMLSelectElement | HTMLInputElement
+                        >
+                      ) => {
+                        const templateId = e.target.value;
+                        setSelectedTemplateId(templateId || null);
+                        if (templateId) {
+                          loadTemplateMutation.mutate(templateId);
+                        }
+                      }}
                     >
-                      Select a template...
-                    </option>
-                    {templatesData.templates.map((template: any) => (
                       <option
-                        key={template.id}
-                        value={template.id}
+                        value=""
                         style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
                       >
-                        {template.name}{' '}
-                        {template.use_count > 0
-                          ? `(used ${template.use_count}×)`
-                          : ''}
+                        Select a template...
                       </option>
-                    ))}
-                  </select>
-                </FormField>
-                <button
-                  type="button"
-                  onClick={() => setShowTemplateManager(true)}
-                  className="w-full px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  Save Current Settings as Template
-                </button>
+                      {(templatesData as any).templates.map((template: any) => (
+                        <option
+                          key={template.id}
+                          value={template.id}
+                          style={{
+                            backgroundColor: '#0c1222',
+                            color: '#ffffff',
+                          }}
+                        >
+                          {template.name}{' '}
+                          {template.use_count > 0
+                            ? `(used ${template.use_count}×)`
+                            : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <button
+                    type="button"
+                    onClick={() => setShowTemplateManager(true)}
+                    className="w-full px-4 py-2 bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Save Current Settings as Template
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
           {/* Required Fields */}
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
@@ -1544,7 +1567,7 @@ export default function UploadPage() {
                       ? 'Loading hazard types...'
                       : 'Select hazard type'}
                   </option>
-                  {vocabData?.hazard_types?.map(
+                  {(vocabData as any)?.hazard_types?.map(
                     (type: {
                       id: string;
                       label: string;
@@ -1589,7 +1612,7 @@ export default function UploadPage() {
                   >
                     {isLoading ? 'Loading countries...' : 'Select country'}
                   </option>
-                  {vocabData?.countries?.map(
+                  {(vocabData as any)?.countries?.map(
                     (country: { id: string; label: string }) => (
                       <option
                         key={country.id}
@@ -2034,14 +2057,14 @@ export default function UploadPage() {
             <div className="bg-coral-900/30 border border-coral-500/30 rounded-xl p-4">
               <p className="text-coral-300">
                 Error uploading image:{' '}
-                {uploadMutation.error?.message || 'Unknown error'}
+                {(uploadMutation as any).error?.message || 'Unknown error'}
               </p>
             </div>
           )}
         </form>
 
         {/* Analytics Display */}
-        {analyticsData && analyticsData.total_batches > 0 && (
+        {analyticsData && (analyticsData as any).total_batches > 0 && (
           <div className="mt-8 rounded-3xl border border-pacific-500/30 bg-gradient-to-br from-pacific-900/40 to-deep-900/40 backdrop-blur p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -2052,7 +2075,7 @@ export default function UploadPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-deep-900/40 rounded-lg p-4">
                 <div className="text-2xl font-bold text-white">
-                  {analyticsData.total_batches}
+                  {(analyticsData as any).total_batches}
                 </div>
                 <div className="text-xs text-surface-soft mt-1">
                   Total Batches
@@ -2060,7 +2083,7 @@ export default function UploadPage() {
               </div>
               <div className="bg-deep-900/40 rounded-lg p-4">
                 <div className="text-2xl font-bold text-green-400">
-                  {analyticsData.success_rate.toFixed(1)}%
+                  {(analyticsData as any).success_rate.toFixed(1)}%
                 </div>
                 <div className="text-xs text-surface-soft mt-1">
                   Success Rate
@@ -2068,7 +2091,7 @@ export default function UploadPage() {
               </div>
               <div className="bg-deep-900/40 rounded-lg p-4">
                 <div className="text-2xl font-bold text-pacific-400">
-                  {analyticsData.total_files_processed}
+                  {(analyticsData as any).total_files_processed}
                 </div>
                 <div className="text-xs text-surface-soft mt-1">
                   Files Processed
@@ -2076,7 +2099,10 @@ export default function UploadPage() {
               </div>
               <div className="bg-deep-900/40 rounded-lg p-4">
                 <div className="text-2xl font-bold text-amber-400">
-                  {analyticsData.average_processing_time_seconds.toFixed(0)}s
+                  {(
+                    analyticsData as any
+                  ).average_processing_time_seconds.toFixed(0)}
+                  s
                 </div>
                 <div className="text-xs text-surface-soft mt-1">
                   Avg Processing Time
@@ -2087,19 +2113,19 @@ export default function UploadPage() {
               <div className="flex items-center gap-2 text-sm">
                 <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                 <span className="text-surface-soft">
-                  Completed: {analyticsData.completed_batches}
+                  Completed: {(analyticsData as any).completed_batches}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
                 <span className="text-surface-soft">
-                  Partial: {analyticsData.partial_batches}
+                  Partial: {(analyticsData as any).partial_batches}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <span className="w-2 h-2 bg-red-500 rounded-full"></span>
                 <span className="text-surface-soft">
-                  Failed: {analyticsData.failed_batches}
+                  Failed: {(analyticsData as any).failed_batches}
                 </span>
               </div>
             </div>
@@ -2161,9 +2187,9 @@ export default function UploadPage() {
                       description: description || '',
                       template_data: {
                         hazard_type: formData.hazard_type,
-                        source_type: formData.source_type,
-                        event_id: formData.eventId,
-                        title_template: formData.titleTemplate,
+                        source_type: (formData as any).source_type,
+                        event_id: (formData as any).eventId,
+                        title_template: (formData as any).titleTemplate,
                         abstract: formData.abstract,
                         location: formData.location,
                         country: formData.country,
@@ -2187,13 +2213,13 @@ export default function UploadPage() {
               <h3 className="text-sm font-medium text-white mb-3">
                 Saved Templates
               </h3>
-              {templatesData?.templates?.length === 0 ? (
+              {(templatesData as any)?.templates?.length === 0 ? (
                 <p className="text-sm text-surface-soft text-center py-8">
                   No templates saved yet. Create your first template above!
                 </p>
               ) : (
                 <div className="space-y-3">
-                  {templatesData?.templates?.map((template: any) => (
+                  {(templatesData as any)?.templates?.map((template: any) => (
                     <div
                       key={template.id}
                       className="bg-deep-900/40 rounded-lg p-4 flex items-start justify-between gap-4"

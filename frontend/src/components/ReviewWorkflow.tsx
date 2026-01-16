@@ -145,7 +145,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
       if (!response.ok) throw new Error('Failed to update status');
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['review-item', itemId] });
       queryClient.invalidateQueries({ queryKey: ['curation-queue'] });
       onStatusChange?.(data.status);
@@ -232,7 +232,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
   }, []);
 
   const handleAssignToSelf = useCallback(() => {
-    assignMutation.mutate();
+    assignMutation.mutate({} as any);
   }, [assignMutation]);
 
   const handleFlag = useCallback(() => {
@@ -300,7 +300,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
     if (!item) return;
     if (typeof window === 'undefined') return;
 
-    const handler = (event: KeyboardEvent) => {
+    const handler = (event: KeyboardEvent): any => {
       // Ignore shortcuts when typing in input fields
       if (
         ['INPUT', 'TEXTAREA', 'SELECT'].includes(
@@ -354,7 +354,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
 
   // Normalize display fields and image URLs
   const meta = item.image_metadata || {};
-  const filename = meta.filename || item.image_filename;
+  const filename = (meta as any).filename || item.image_filename;
 
   const buildAssetUrl = (
     path?: string | null,
@@ -422,18 +422,22 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
   const imageUrl =
     item.imageUrl ||
     buildAssetUrl(
-      meta.resource_locator || meta.thumbnail_url || meta.thumbnailUrl,
+      (meta as any).resource_locator ||
+        (meta as any).thumbnail_url ||
+        (meta as any).thumbnailUrl,
       filename
     ) ||
     thumbnailUrl;
 
-  const safeTitle = sanitizeText(item.title || meta.title || 'Untitled');
+  const safeTitle = sanitizeText(
+    item.title || (meta as any).title || 'Untitled'
+  );
   const safeDescription = sanitizeText(
-    item.description || meta.abstract || 'No description provided'
+    item.description || (meta as any).abstract || 'No description provided'
   );
   const safeSubmittedBy = sanitizeText(item.submitted_by || '');
   const safeImageId = sanitizeText(item.image_filename);
-  const safeHazardType = sanitizeText(meta.hazard_type || '');
+  const safeHazardType = sanitizeText((meta as any).hazard_type || '');
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -646,7 +650,9 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                   </label>
                   <textarea
                     value={reviewNotes}
-                    onChange={(e) => setReviewNotes(e.target.value)}
+                    onChange={(
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setReviewNotes(e.target.value)}
                     className="w-full border border-gray-300 rounded-md p-3 focus:ring-blue-500 focus:border-blue-500"
                     rows={4}
                     placeholder="Add notes about your review decision..."
@@ -809,7 +815,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
         >
           <div
             className="relative max-w-4xl max-h-full p-4 w-full"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e: any) => e.stopPropagation()}
           >
             <img
               src={imageUrl || thumbnailUrl || ''}

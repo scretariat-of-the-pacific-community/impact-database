@@ -257,7 +257,7 @@ const getColorForIntensity = (value: number) => {
 };
 
 const rollingAverage = (data: typeof timelineSeries, windowSize: number) =>
-  data.map((point, index) => {
+  (data as any).map((point: any, index: number) => {
     const windowStart = Math.max(0, index - windowSize + 1);
     const window = data.slice(windowStart, index + 1);
     const avgUploads =
@@ -526,7 +526,7 @@ export default function UserAnalytics() {
                         role="button"
                         tabIndex={0}
                         aria-label={`Select ${entry.name} hazard category`}
-                        onKeyDown={(event) => {
+                        onKeyDown={(event: any): any => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault();
                             setSelectedHazard(entry.name);
@@ -555,7 +555,7 @@ export default function UserAnalytics() {
                 </span>
               </div>
               <div className="space-y-2">
-                {hazardCategories[selectedHazard]?.map((item) => (
+                {hazardCategories[selectedHazard]?.map((item: any) => (
                   <div
                     key={item.id}
                     className="flex items-center justify-between rounded-lg border border-white/5 bg-slate-800/60 px-3 py-2 text-sm text-white"

@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef, useCallback, ComponentType } from 'react';
+// @ts-ignore - TanStack Query v5 exports useInfiniteQuery
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { MapPin, Loader2, CheckCircle, XCircle, Clock3 } from 'lucide-react';
 import { Card, Button } from '@/components/design-system';
 import { imageApi } from '@/lib/api';
-import { HAZARD_TYPE_LABELS } from '@/lib/types';
+import { HAZARD_TYPE_LABELS, HazardType } from '@/lib/types';
 
 const glassCard =
   'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
@@ -52,7 +53,7 @@ export default function InfiniteUploadList({
     queryKey: ['user-uploads-infinite'],
     queryFn: ({ pageParam = 1 }) =>
       imageApi.userUploads({ page: pageParam, limit: PAGE_SIZE }),
-    getNextPageParam: (lastPage, allPages) => {
+    getNextPageParam: (lastPage: any, allPages: any) => {
       if (!lastPage || lastPage.length < PAGE_SIZE) {
         return undefined;
       }
@@ -84,7 +85,7 @@ export default function InfiniteUploadList({
     return () => observer.disconnect();
   }, [handleObserver]);
 
-  const uploads = data?.pages.flatMap((page) => page) || [];
+  const uploads = data?.pages.flatMap((page: any) => page) || [];
 
   if (isLoading) {
     return (
@@ -162,7 +163,8 @@ export default function InfiniteUploadList({
                 {upload.title || upload.filename}
               </h4>
               <p className="text-sm text-white/60 truncate">
-                {HAZARD_TYPE_LABELS[upload.hazard_type] || upload.hazard_type}
+                {HAZARD_TYPE_LABELS[upload.hazard_type as HazardType] ||
+                  upload.hazard_type}
                 {upload.location ? ` • ${upload.location}` : ''}
               </p>
             </div>
@@ -200,7 +202,7 @@ export default function InfiniteUploadList({
     <div className="space-y-4">
       {/* Mobile: Simple list with infinite scroll */}
       <div className="md:hidden">
-        {uploads.map((upload) => (
+        {uploads.map((upload: any) => (
           <UploadRow
             key={upload.id}
             index={uploads.indexOf(upload)}

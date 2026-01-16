@@ -216,7 +216,8 @@ def log_curation_action(
         related_item_id=related_item_id,
     )
     db.add(action)
-    db.commit()
+    # Don't commit here - let the parent function commit the transaction
+    # db.commit()
     return action
 
 
