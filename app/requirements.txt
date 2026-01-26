@@ -5,7 +5,7 @@ asyncpg==0.30.0
 alembic==1.16.4
 pydantic[email]==2.11.7
 pydantic-settings==2.4.0
-python-multipart==0.0.20
+python-multipart==0.0.22
 geoalchemy2==0.18.0
 shapely==2.0.7
 psycopg2-binary==2.9.10
