@@ -122,6 +122,24 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
     is_locked = Column(Boolean, default=False)
 
+    # Admin-specific fields (Phase 1: Unified Auth Migration)
+    is_super_admin = Column(Boolean, default=False)
+    can_access_admin_panel = Column(Boolean, default=False)
+    organization = Column(String(255), nullable=True)
+    failed_login_attempts = Column(Integer, default=0)
+    lockout_until = Column(DateTime(timezone=True), nullable=True)
+    last_password_change = Column(DateTime(timezone=True), nullable=True)
+    email_verification_token = Column(String(255), nullable=True)
+    
+    # Password reset fields
+    password_reset_token = Column(String(255), nullable=True)
+    password_reset_expires = Column(DateTime(timezone=True), nullable=True)
+
+    # Migration tracking fields (Phase 1: Unified Auth Migration)
+    migrated_from_admin = Column(Boolean, default=False)
+    migration_date = Column(DateTime(timezone=True), nullable=True)
+    legacy_admin_id = Column(UUID(as_uuid=True), nullable=True)
+
     # Timestamps
     last_login = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

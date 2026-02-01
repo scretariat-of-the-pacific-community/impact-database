@@ -250,6 +250,106 @@ class MinIOSettings(BaseModel):
         return v
 
 
+class VideoSettings(BaseModel):
+    """Video upload and processing configuration"""
+
+    # File format validation
+    ALLOWED_VIDEO_FORMATS: List[str] = Field(
+        default=["mp4", "mov", "avi", "mkv", "webm", "m4v"],
+        description="Allowed video file extensions",
+    )
+    ALLOWED_VIDEO_MIME_TYPES: List[str] = Field(
+        default=[
+            "video/mp4",
+            "video/quicktime",
+            "video/x-msvideo",
+            "video/x-matroska",
+            "video/webm",
+        ],
+        description="Allowed video MIME types",
+    )
+    ALLOWED_VIDEO_CODECS: List[str] = Field(
+        default=["h264", "h265", "hevc", "vp8", "vp9", "av1"],
+        description="Allowed video codecs",
+    )
+
+    # File size limits (in bytes)
+    MAX_VIDEO_SIZE_FREE: int = Field(
+        default_factory=lambda: int(get_env("MAX_VIDEO_SIZE_FREE", str(2 * 1024**3))),
+        description="Max video size for free tier users",
+    )
+    MAX_VIDEO_SIZE_PREMIUM: int = Field(
+        default_factory=lambda: int(get_env("MAX_VIDEO_SIZE_PREMIUM", str(5 * 1024**3))),
+        description="Max video size for premium users",
+    )
+
+    # Duration limits (in seconds)
+    MAX_DURATION_FREE: int = Field(
+        default_factory=lambda: int(get_env("MAX_DURATION_FREE", "300")),
+        description="Max video duration for free tier",
+    )
+    MAX_DURATION_PREMIUM: int = Field(
+        default_factory=lambda: int(get_env("MAX_DURATION_PREMIUM", "1800")),
+        description="Max video duration for premium tier",
+    )
+
+    # User quotas
+    MAX_VIDEOS_PER_USER_FREE: int = Field(
+        default_factory=lambda: int(get_env("MAX_VIDEOS_PER_USER_FREE", "5")),
+        description="Max videos per free tier user",
+    )
+    MAX_VIDEOS_PER_USER_PREMIUM: int = Field(
+        default_factory=lambda: int(get_env("MAX_VIDEOS_PER_USER_PREMIUM", "100")),
+        description="Max videos per premium user",
+    )
+    VIDEO_STORAGE_QUOTA_FREE: int = Field(
+        default_factory=lambda: int(get_env("VIDEO_STORAGE_QUOTA_FREE", str(10 * 1024**3))),
+        description="Total storage quota for free tier",
+    )
+    VIDEO_STORAGE_QUOTA_PREMIUM: int = Field(
+        default_factory=lambda: int(get_env("VIDEO_STORAGE_QUOTA_PREMIUM", str(100 * 1024**3))),
+        description="Total storage quota for premium tier",
+    )
+
+    # Retention & storage lifecycle
+    RETENTION_DAYS: int = Field(
+        default_factory=lambda: int(get_env("RETENTION_DAYS", "730")),
+        description="How long to keep videos before deletion",
+    )
+    COLD_STORAGE_THRESHOLD_DAYS: int = Field(
+        default_factory=lambda: int(get_env("COLD_STORAGE_THRESHOLD_DAYS", "180")),
+        description="Move to cold storage after N days",
+    )
+    ARCHIVE_INACTIVE_AFTER_DAYS: int = Field(
+        default_factory=lambda: int(get_env("ARCHIVE_INACTIVE_AFTER_DAYS", "365")),
+        description="Archive videos with 0 views after N days",
+    )
+
+    # Processing & moderation
+    REQUIRE_MODERATION: bool = Field(
+        default=get_env("REQUIRE_MODERATION", "true").lower() == "true",
+        description="Require manual review before publishing",
+    )
+    AUTO_PROCESS_ON_UPLOAD: bool = Field(
+        default=get_env("AUTO_PROCESS_ON_UPLOAD", "true").lower() == "true",
+        description="Start transcoding immediately after upload",
+    )
+
+    # MinIO bucket configuration
+    MINIO_VIDEO_BUCKET: str = Field(
+        default=get_env("MINIO_VIDEO_BUCKET", "impact-videos"),
+        pattern=r"^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+        description="MinIO bucket for video storage",
+    )
+
+    @field_validator("MAX_VIDEO_SIZE_FREE", "MAX_VIDEO_SIZE_PREMIUM")
+    @classmethod
+    def validate_size_limits(cls, v):
+        if v > 10 * 1024**3:  # 10GB
+            raise ValueError("Video size limit cannot exceed 10GB")
+        return v
+
+
 class EmailSettings(BaseModel):
     """Email service configuration"""
 
@@ -346,6 +446,7 @@ class Settings(BaseSettings):
     database: DatabaseSettings = DatabaseSettings()
     redis: RedisSettings = RedisSettings()
     minio: MinIOSettings = MinIOSettings()
+    video: VideoSettings = VideoSettings()
     email: EmailSettings = EmailSettings()
 
     # File Upload Security

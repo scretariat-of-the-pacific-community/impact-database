@@ -50,6 +50,8 @@ interface CreateUserData {
   role: string;
   organization?: string;
   sendInvite: boolean;
+  username?: string;
+  password?: string;
 }
 
 const UserManagement: React.FC = () => {
@@ -113,11 +115,21 @@ const UserManagement: React.FC = () => {
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: CreateUserData) => {
-      const response = await authFetch('/api/admin/users', {
+      // Use invite endpoint when sendInvite is true
+      const endpoint = userData.sendInvite
+        ? '/api/admin/users/invite'
+        : '/api/admin/users';
+
+      const response = await authFetch(endpoint, {
         method: 'POST',
         body: JSON.stringify(userData),
       });
-      if (!response.ok) throw new Error('Failed to create user');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.detail || errorData.error || 'Failed to create user'
+        );
+      }
       return response.json();
     },
     onSuccess: () => {
@@ -300,10 +312,19 @@ const UserManagement: React.FC = () => {
       role: '',
       organization: '',
       sendInvite: true,
+      username: '',
+      password: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
+
+      // Validate required fields based on sendInvite flag
+      if (!formData.sendInvite && (!formData.username || !formData.password)) {
+        alert('Username and password are required when not sending an invite');
+        return;
+      }
+
       createUserMutation.mutate(formData);
     };
 
@@ -337,7 +358,7 @@ const UserManagement: React.FC = () => {
                   onChange={(
                     e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
                   ) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
               <div>
@@ -357,7 +378,7 @@ const UserManagement: React.FC = () => {
                   onChange={(
                     e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
                   ) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                 />
               </div>
             </div>
@@ -379,7 +400,7 @@ const UserManagement: React.FC = () => {
                 onChange={(
                   e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
                 ) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               />
             </div>
 
@@ -389,6 +410,7 @@ const UserManagement: React.FC = () => {
                 name="role"
                 label="Role *"
                 required
+                autoComplete="off"
                 value={formData.role}
                 onChange={(
                   e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
@@ -422,7 +444,7 @@ const UserManagement: React.FC = () => {
                 onChange={(
                   e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
                 ) => setFormData({ ...formData, organization: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
               />
             </div>
 
@@ -448,6 +470,63 @@ const UserManagement: React.FC = () => {
                 Send invitation email
               </label>
             </div>
+
+            {!formData.sendInvite && (
+              <>
+                <div>
+                  <label
+                    htmlFor="create-user-username"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Username *
+                  </label>
+                  <input
+                    id="create-user-username"
+                    name="username"
+                    type="text"
+                    autoComplete="username"
+                    required={!formData.sendInvite}
+                    value={formData.username || ''}
+                    onChange={(
+                      e: React.ChangeEvent<
+                        HTMLSelectElement | HTMLInputElement
+                      >
+                    ) =>
+                      setFormData({ ...formData, username: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="create-user-password"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Password *
+                  </label>
+                  <input
+                    id="create-user-password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required={!formData.sendInvite}
+                    value={formData.password || ''}
+                    onChange={(
+                      e: React.ChangeEvent<
+                        HTMLSelectElement | HTMLInputElement
+                      >
+                    ) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Minimum 8 characters
+                  </p>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end space-x-3 pt-4">
               <button
@@ -760,7 +839,7 @@ const UserManagement: React.FC = () => {
                   onChange={(
                     e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
                   ) => setQuickInviteEmail(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
                 />
               </div>
               <div className="w-full sm:w-48">
@@ -768,6 +847,7 @@ const UserManagement: React.FC = () => {
                   id="quick-invite-role"
                   name="role"
                   aria-label="Select role for invite"
+                  autoComplete="off"
                   value={quickInviteRole}
                   onChange={(
                     e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
@@ -875,7 +955,7 @@ const UserManagement: React.FC = () => {
               onChange={(
                 e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
               ) => setFilters({ ...filters, search: e.target.value })}
-              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
             />
           </div>
 
@@ -883,6 +963,7 @@ const UserManagement: React.FC = () => {
             id="filter-role"
             name="role"
             aria-label="Filter by role"
+            autoComplete="off"
             value={filters.role}
             onChange={(
               e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
@@ -903,6 +984,7 @@ const UserManagement: React.FC = () => {
             id="filter-status"
             name="status"
             aria-label="Filter by status"
+            autoComplete="off"
             value={filters.status}
             onChange={(
               e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
@@ -929,7 +1011,7 @@ const UserManagement: React.FC = () => {
             onChange={(
               e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
             ) => setFilters({ ...filters, organization: e.target.value })}
-            className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+            className="border border-gray-300 rounded-md px-3 py-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
           />
         </div>
       </div>

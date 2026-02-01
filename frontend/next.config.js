@@ -26,6 +26,7 @@ const createCSP = () => {
       'https://*.tile.openstreetmap.org',
       'https://*.abc-cdn.net.au',
       'https://live-production.wcms.abc-cdn.net.au',
+      'https://cdnjs.cloudflare.com',
     ],
     connectSrc: [
       "'self'",
@@ -158,8 +159,6 @@ const nextConfig = {
   },
   // Enable standalone output for Docker production builds
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
-  // Fix cross-origin warnings in development
-  allowedDevOrigins: ['127.0.0.1', 'opmthredds.gem.spc.int'],
   // Enable strict mode for better performance
   reactStrictMode: true,
   // Skip trailing slash redirects (moved from experimental)

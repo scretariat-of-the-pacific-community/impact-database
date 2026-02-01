@@ -441,7 +441,7 @@ def _get_user_weekly_stats(user_id: str, db_session: Session) -> Dict[str, Any]:
         # Count uploads this week
         total_uploads = (
             db_session.query(ImageMetadata)
-            .filter(ImageMetadata.uploaded_by == user_id, ImageMetadata.created_at >= week_ago)
+            .filter(ImageMetadata.uploader_id == user_id, ImageMetadata.datetime >= week_ago)
             .count()
         )
 
@@ -449,9 +449,9 @@ def _get_user_weekly_stats(user_id: str, db_session: Session) -> Dict[str, Any]:
         total_approvals = (
             db_session.query(ImageMetadata)
             .filter(
-                ImageMetadata.uploaded_by == user_id,
+                ImageMetadata.uploader_id == user_id,
                 ImageMetadata.status == "approved",
-                ImageMetadata.updated_at >= week_ago,
+                ImageMetadata.datetime >= week_ago,
             )
             .count()
         )

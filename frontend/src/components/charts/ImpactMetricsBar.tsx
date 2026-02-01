@@ -208,17 +208,18 @@ export default function ImpactMetricsBar({
         </div>
       )}
 
-      <ResponsiveContainer
-        width="100%"
-        height={Math.max(300, rankedData.length * 45)}
-        minWidth={100}
-        minHeight={300}
-      >
-        <BarChart
-          data={rankedData}
-          layout="vertical"
-          margin={{ top: 5, right: 60, left: 20, bottom: 5 }}
+      <div style={{ width: '100%', height: `${Math.max(300, rankedData.length * 45)}px` }}>
+        <ResponsiveContainer
+          width="100%"
+          height={Math.max(300, rankedData.length * 45)}
+          minWidth={100}
+          minHeight={300}
         >
+          <BarChart
+            data={rankedData}
+            layout="vertical"
+            margin={{ top: 5, right: 60, left: 20, bottom: 5 }}
+          >
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
           <XAxis
             type="number"
@@ -256,7 +257,8 @@ export default function ImpactMetricsBar({
             />
           </Bar>
         </BarChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
 
       {/* Insight Line */}
       <div className="mt-3 border-t border-white/5 pt-3">

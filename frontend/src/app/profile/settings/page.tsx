@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
+
+// Force dynamic rendering to support useSearchParams()
+export const dynamic = 'force-dynamic';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import {

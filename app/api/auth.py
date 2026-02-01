@@ -13,6 +13,7 @@ from models.database import get_db
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from services.unified_user_service import UnifiedUserService
 from workers.email_tasks import send_welcome_email
 
 logger = logging.getLogger(__name__)
@@ -227,6 +228,9 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def authenticate_user(username: str, password: str, db: Session) -> Optional[UserInDB]:
     """Authenticate user with username/email and password.
 
+    Uses UnifiedUserService for clean authentication across both admin_users 
+    and RBAC users tables during migration period.
+
     Args:
         username: Username or email to authenticate
         password: Plain text password
@@ -235,12 +239,24 @@ def authenticate_user(username: str, password: str, db: Session) -> Optional[Use
     Returns:
         UserInDB if authentication successful, None otherwise
     """
-    user = get_user_from_db(username, db)
-    if not user:
-        return None
-    if not verify_password(password, user.hashed_password):
-        return None
-    return user
+    try:
+        # Use UnifiedUserService for unified authentication
+        user_service = UnifiedUserService(db, prefer_rbac=True)
+        rbac_user = user_service.authenticate(username, password)
+        
+        if rbac_user:
+            return UserInDB(
+                username=rbac_user.username,
+                email=rbac_user.email,
+                full_name=rbac_user.full_name or rbac_user.username,
+                id=str(rbac_user.id),
+                disabled=not rbac_user.is_active,
+                hashed_password=rbac_user.hashed_password,
+            )
+    except Exception as e:
+        logger.error(f"Unified authentication failed: {e}")
+
+    return None
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -540,6 +556,22 @@ async def refresh_token(
         "email": current_user.email,
         "full_name": current_user.full_name,
     }
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Logout user by clearing the authentication cookie."""
+    # Clear the HttpOnly cookie
+    response.set_cookie(
+        key="ocean_portal_token",
+        value="",
+        max_age=0,
+        path="/",
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
+    return {"message": "Successfully logged out"}
 
 
 @router.get("/me", response_model=User)

@@ -146,30 +146,34 @@ async def get_push_subscription(
     Get all push notification subscriptions for current user
     """
     try:
-        subscriptions = (
-            db.query(PushSubscription)
-            .filter(PushSubscription.user_id == current_user.user_id)
-            .all()
-        )
+        # Check if PushSubscription table exists
+        try:
+            subscriptions = (
+                db.query(PushSubscription)
+                .filter(PushSubscription.user_id == current_user.user_id)
+                .all()
+            )
 
-        return {
-            "subscriptions": [
-                {
-                    "id": sub.id,
-                    "endpoint": sub.endpoint,
-                    "created_at": sub.created_at.isoformat(),
-                    "last_used": sub.last_used.isoformat(),
-                }
-                for sub in subscriptions
-            ]
-        }
+            return {
+                "subscriptions": [
+                    {
+                        "id": sub.id,
+                        "endpoint": sub.endpoint,
+                        "created_at": sub.created_at.isoformat(),
+                        "last_used": sub.last_used.isoformat() if sub.last_used else None,
+                    }
+                    for sub in subscriptions
+                ]
+            }
+        except Exception as db_error:
+            # If table doesn't exist or other DB error, return empty list
+            logger.warning(f"Push subscription query failed: {str(db_error)}")
+            return {"subscriptions": []}
 
     except Exception as e:
         logger.error(f"Error retrieving push subscriptions: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to retrieve push subscriptions",
-        )
+        # Return empty subscriptions instead of 500 error
+        return {"subscriptions": []}
 
 
 # Helper function to send push notifications (to be called from other parts of the app)

@@ -40,8 +40,15 @@ const config = {
     TIMEOUT: 30000,
   },
   UPLOAD: {
-    MAX_FILE_SIZE: 50 * 1024 * 1024, // 50MB
-    ALLOWED_EXTENSIONS: [
+    // Image limits
+    MAX_IMAGE_SIZE: 50 * 1024 * 1024, // 50MB
+
+    // Video limits (sync with backend VideoSettings)
+    MAX_VIDEO_SIZE_FREE: 2 * 1024 * 1024 * 1024, // 2GB
+    MAX_VIDEO_SIZE_PREMIUM: 5 * 1024 * 1024 * 1024, // 5GB
+
+    // Allowed file extensions
+    ALLOWED_IMAGE_EXTENSIONS: [
       '.jpg',
       '.jpeg',
       '.png',
@@ -54,11 +61,52 @@ const config = {
       '.heic',
       '.heif',
     ],
-    CHUNK_SIZE: 1024 * 1024, // 1MB chunks for large uploads
+    ALLOWED_VIDEO_EXTENSIONS: ['.mp4', '.mov', '.avi', '.mkv', '.webm', '.m4v'],
+
+    // Upload chunking (increased for videos)
+    CHUNK_SIZE: 5 * 1024 * 1024, // 5MB chunks for large files
+    MIN_CHUNK_SIZE: 1 * 1024 * 1024, // 1MB minimum
+    MAX_CHUNK_SIZE: 10 * 1024 * 1024, // 10MB maximum
+
+    // Upload behavior
+    ENABLE_RESUMABLE_UPLOADS: true,
+    AUTO_RETRY_FAILED_CHUNKS: true,
+    MAX_RETRY_ATTEMPTS: 3,
   },
 };
 
 export { config };
+
+/**
+ * Check if file is a video based on extension
+ */
+export const isVideoFile = (filename: string): boolean => {
+  const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0] || '';
+  return config.UPLOAD.ALLOWED_VIDEO_EXTENSIONS.includes(ext);
+};
+
+/**
+ * Check if file is an image based on extension
+ */
+export const isImageFile = (filename: string): boolean => {
+  const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0] || '';
+  return config.UPLOAD.ALLOWED_IMAGE_EXTENSIONS.includes(ext);
+};
+
+/**
+ * Get max file size based on file type and user tier
+ */
+export const getMaxFileSize = (
+  filename: string,
+  userTier: 'free' | 'premium' = 'free'
+): number => {
+  if (isVideoFile(filename)) {
+    return userTier === 'premium'
+      ? config.UPLOAD.MAX_VIDEO_SIZE_PREMIUM
+      : config.UPLOAD.MAX_VIDEO_SIZE_FREE;
+  }
+  return config.UPLOAD.MAX_IMAGE_SIZE;
+};
 
 export const getApiUrl = (path: string): string => {
   if (path.startsWith('http://') || path.startsWith('https://')) {

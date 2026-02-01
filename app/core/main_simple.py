@@ -51,9 +51,16 @@ app.add_middleware(
 allowed_origins = [
     "http://localhost:3000",
     "http://localhost:3001",
+    "http://localhost:3100",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:3001",
+    "http://127.0.0.1:3100",
 ]
+
+# Check for environment variable override first
+allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+if allowed_origins_env:
+    allowed_origins = [origin.strip() for origin in allowed_origins_env.split(",")]
 
 # Check for production environment and use production domain
 if environment == "production":
@@ -62,7 +69,7 @@ if environment == "production":
         allowed_origins = [
             f"https://{production_domain}",
             f"https://www.{production_domain}",
-        ]
+        ] + allowed_origins  # Keep existing allowed origins as fallback
 
 app.add_middleware(
     CORSMiddleware,
@@ -305,8 +312,10 @@ def _query_review_items(
 try:
     # Import auth API for authentication
     from api.auth import router as auth_router
+    from api.password_reset import router as password_reset_router
 
     app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
+    app.include_router(password_reset_router, prefix="/api/auth", tags=["password-reset"])
 
     # Import simplified images API
     from api.images_simple import router as images_router
@@ -348,6 +357,11 @@ try:
 
     app.include_router(push_router, prefix="/api", tags=["push-notifications"])
 
+    # Import Video Upload API
+    from api.video_upload import router as video_router
+
+    app.include_router(video_router, prefix="/api/video", tags=["video"])
+
     # Import Batch Upload API
     from api.batch_upload import router as batch_upload_router
 
@@ -362,6 +376,10 @@ try:
     from api.curation import router as curation_router
 
     app.include_router(curation_router, prefix="/api/admin/curation", tags=["admin", "curation"])
+    
+    # Import Upload Failures API for admin monitoring - TEMPORARILY DISABLED due to import issues
+    # from api.admin_failures import router as failures_router
+    # app.include_router(failures_router, prefix="/api/admin/failures", tags=["admin", "monitoring"])
 
     # Import Email API for Microsoft Graph email functionality
     from api.email import router as email_router
@@ -389,7 +407,7 @@ try:
         logger.warning(f"Failed to initialize Redis cache: {e}")
 
     logger.info(
-        "Auth API, Images API, Upload API, RBAC API, Review Workflow API, Curation API, Featured Stories API, User API, Avatar API, and Push Notifications API routers included"
+        "Auth API, Images API, Upload API, RBAC API, Review Workflow API, Curation API, Featured Stories API, User API, Avatar API, Push Notifications API, and Video API routers included"
     )
 except ImportError as e:
     logger.warning(f"Could not import routers: {e}")
@@ -653,7 +671,7 @@ async def api_search(
 
 
 @app.get("/api/user/stats")
-async def get_user_stats(
+async def get_current_user_stats(
     current_user: EnhancedUser = Depends(get_current_user_enhanced),
     db: Session = Depends(get_db),
 ):
@@ -773,7 +791,7 @@ async def get_image_metadata(image_id: str):
 
 
 @app.get("/api/user/activity")
-async def get_user_activity(
+async def get_current_user_activity(
     current_user: EnhancedUser = Depends(get_current_user_enhanced),
     db: Session = Depends(get_db),
 ):

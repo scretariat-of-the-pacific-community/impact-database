@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { config } from '@/lib/config';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   MapPin,
@@ -23,6 +24,7 @@ import {
   Clock,
   Database,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -68,6 +70,8 @@ export default function ImageDetailPage() {
   );
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const imageId = params.id as string;
 
@@ -103,10 +107,13 @@ export default function ImageDetailPage() {
   }
 
   // Construct the image URL
-  const imageUrl = image
-    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent((image as any).filename)}`
+  const imageFilename = (image as any)?.filename;
+  const hasValidFilename = imageFilename && imageFilename !== 'null';
+  const imageUrl = image && hasValidFilename
+    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(imageFilename)}`
     : '';
   const fileSizeLabel = formatFileSize((image as any)?.file_size);
+  const isImageMissing = image && !hasValidFilename;
 
   const handleDownload = async () => {
     if (!image || !imageUrl) return;
@@ -121,8 +128,8 @@ export default function ImageDetailPage() {
       // This allows the browser to handle the download natively
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.download =
-        (image as any).filename || `${(image as any).id || 'image'}.jpg`;
+      const downloadFilename = (image as any).filename || (image as any).original_filename || `${(image as any).id || 'image'}.jpg`;
+      link.download = downloadFilename;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -132,6 +139,64 @@ export default function ImageDetailPage() {
       setDownloadError(message);
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!image) return;
+    const shareUrl = window.location.href;
+    const shareTitle = (image as any).title || (image as any).filename || (image as any).id || 'Impact image';
+    const shareText =
+      (image as any).description || `View impact image: ${shareTitle}`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+        return;
+      }
+
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+        return;
+      }
+
+      window.prompt('Copy this link to share:', shareUrl);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Unable to share right now';
+      toast.error(message);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!image) return;
+    
+    try {
+      setIsDeleting(true);
+      // Delete requires the actual filename
+      const filename = (image as any).filename;
+      
+      if (!filename || filename === 'null') {
+        toast.error('Cannot delete: image file not found');
+        setShowDeleteConfirm(false);
+        return;
+      }
+      
+      await imageApi.deleteImage(filename);
+      
+      toast.success('Image deleted successfully');
+      router.push('/search');
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || err.message || 'Failed to delete image';
+      toast.error(errorMessage);
+      setShowDeleteConfirm(false);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -179,7 +244,7 @@ export default function ImageDetailPage() {
               </button>
               <div className="text-white/20">|</div>
               <h1 className="text-xl font-semibold text-white truncate">
-                {(image as any).title || (image as any).filename}
+                {(image as any).title || (image as any).filename || (image as any).id || 'Image'}
               </h1>
             </div>
 
@@ -191,7 +256,10 @@ export default function ImageDetailPage() {
                 <FileText className="w-4 h-4 mr-2" />
                 Edit
               </Link>
-              <button className="flex items-center px-3 py-2 text-surface-soft hover:text-white border border-white/20 rounded-lg hover:bg-white/5 transition-colors">
+              <button
+                onClick={handleShare}
+                className="flex items-center px-3 py-2 text-surface-soft hover:text-white border border-white/20 rounded-lg hover:bg-white/5 transition-colors"
+              >
                 <Share2 className="w-4 h-4 mr-2" />
                 Share
               </button>
@@ -203,6 +271,14 @@ export default function ImageDetailPage() {
                 <Download className="w-4 h-4 mr-2" />
                 {isDownloading ? 'Downloading…' : 'Download'}
               </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center px-3 py-2 text-rose-400 hover:text-rose-300 border border-rose-500/30 rounded-lg hover:bg-rose-900/20 transition-colors"
+                title="Delete image"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </button>
             </div>
           </div>
           {downloadError && (
@@ -213,17 +289,76 @@ export default function ImageDetailPage() {
         </div>
       </header>
 
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-deep-900 rounded-xl border border-rose-500/30 max-w-md w-full p-6 shadow-2xl">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-rose-500/20 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-rose-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">Delete Image</h3>
+            </div>
+            
+            <p className="text-surface-soft mb-6">
+              Are you sure you want to delete this image? This action cannot be undone.
+            </p>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 border border-white/20 rounded-lg text-white hover:bg-white/5 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-500 transition-colors disabled:opacity-50 flex items-center justify-center"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Warning message for missing image file */}
+        {isImageMissing && (
+          <div className="mb-6 rounded-lg border border-amber-500/40 bg-amber-900/30 px-4 py-3">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <Info className="h-5 w-5 text-amber-400" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-amber-200">Image File Not Found</h3>
+                <div className="mt-1 text-sm text-amber-300/80">
+                  The metadata for this image exists, but the actual image file is missing or was not properly uploaded.
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Image Viewer */}
             <div className="bg-deep-900/50 rounded-2xl border border-white/10 overflow-hidden backdrop-blur-sm">
               <div className="aspect-video relative bg-gradient-to-br from-deep-900 to-pacific-950">
-                {imageUrl && (
+                {imageUrl ? (
                   <Image
                     src={imageUrl}
-                    alt={(image as any).title || (image as any).filename}
+                    alt={(image as any).title || (image as any).filename || (image as any).id || 'Image'}
                     fill
                     className="object-contain"
                     unoptimized
@@ -232,6 +367,13 @@ export default function ImageDetailPage() {
                       target.style.display = 'none';
                     }}
                   />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="text-center text-surface-soft/50">
+                      <FileText className="w-16 h-16 mx-auto mb-2" />
+                      <p>Image file not available</p>
+                    </div>
+                  </div>
                 )}
                 <div className="absolute bottom-4 right-4 flex space-x-2">
                   <button
@@ -301,7 +443,13 @@ export default function ImageDetailPage() {
                   <OverviewTab image={image as any} />
                 )}
                 {activeTab === 'metadata' && (
-                  <MetadataTab image={image as any} />
+                  <MetadataTab 
+                    image={image as any}
+                    showDeleteConfirm={showDeleteConfirm}
+                    setShowDeleteConfirm={setShowDeleteConfirm}
+                    isDeleting={isDeleting}
+                    handleDelete={handleDelete}
+                  />
                 )}
                 {activeTab === 'map' && <LocationTab image={image as any} />}
               </div>
@@ -557,7 +705,19 @@ function OverviewTab({ image }: { image: ImageMetadata }) {
   );
 }
 
-function MetadataTab({ image }: { image: ImageMetadata }) {
+function MetadataTab({ 
+  image,
+  showDeleteConfirm,
+  setShowDeleteConfirm,
+  isDeleting,
+  handleDelete
+}: { 
+  image: ImageMetadata;
+  showDeleteConfirm: boolean;
+  setShowDeleteConfirm: (value: boolean) => void;
+  isDeleting: boolean;
+  handleDelete: () => void;
+}) {
   // Format date stamp safely
   const formatDateStamp = (dateStr: string) => {
     if (!dateStr) return null;
@@ -670,6 +830,63 @@ function MetadataTab({ image }: { image: ImageMetadata }) {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-deep-900 border border-white/20 rounded-xl shadow-2xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 rounded-full bg-rose-900/30 border border-rose-500/30 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-rose-400" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <h3 className="text-lg font-semibold text-white mb-1">
+                  Delete Image?
+                </h3>
+                <p className="text-sm text-surface-soft">
+                  This will permanently delete &quot;{(image as any).filename || 'this image'}&quot; from the database. This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Warning message */}
+            <div className="mb-6 p-3 bg-rose-900/20 border border-rose-500/30 rounded-lg">
+              <p className="text-xs text-rose-200">
+                <strong>Note:</strong> You can only delete images in &quot;pending review&quot; status. Approved images can only be deleted by administrators.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-surface-soft hover:text-white border border-white/20 rounded-lg hover:bg-white/5 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-500 transition-colors disabled:opacity-50 flex items-center"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete Image
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -768,7 +985,7 @@ function LocationTab({ image }: { image: ImageMetadata }) {
             }
             icon={createCustomIcon((image as any).hazard_type)}
           >
-            <Popup>{(image as any).title || (image as any).filename}</Popup>
+            <Popup>{(image as any).title || (image as any).filename || (image as any).id || 'Image'}</Popup>
           </Marker>
         </MapContainer>
       </div>

@@ -93,6 +93,85 @@ export interface CameraInfo {
   iso?: string;
 }
 
+// Video Metadata
+export interface VideoMetadata {
+  id: string;
+  filename: string;
+  original_filename: string;
+  title: string;
+  abstract: string;
+  upload_date: string;
+  file_size?: number;
+  thumbnail_url?: string;
+  uploader_id?: string;
+
+  // Geographic information
+  latitude?: number;
+  longitude?: number;
+  location?: string;
+  country?: string;
+
+  // Classification
+  hazard_type: HazardType;
+  keywords: string[];
+
+  // Video-specific metadata
+  duration?: number; // in seconds
+  width?: number;
+  height?: number;
+  fps?: number;
+  codec?: string;
+  bitrate?: number;
+  mime_type?: string;
+
+  // Processing
+  processing_state?: 'queued' | 'processing' | 'ready' | 'failed';
+  processing_error?: string;
+  status?: string;
+  poster_url?: string;
+  variants?: Record<string, any>;
+
+  // Timestamps
+  captured_at?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Unified Content Item (can be image or video)
+export interface ContentItem {
+  content_type: 'image' | 'video';
+  id: string;
+  filename: string;
+  title: string;
+  description?: string;
+  hazard_type: HazardType;
+  country?: string;
+  location?: string;
+  keywords: string[];
+  latitude?: number;
+  longitude?: number;
+  upload_date?: string;
+  captured_date?: string;
+  thumbnail_url: string;
+  url: string;
+
+  // Video-specific fields (present when content_type === 'video')
+  duration?: number;
+  width?: number;
+  height?: number;
+}
+
+export interface UnifiedSearchResponse {
+  total: number;
+  skip: number;
+  limit: number;
+  results: ContentItem[];
+  stats: {
+    images: number;
+    videos: number;
+  };
+}
+
 // Enums
 export type HazardType =
   | 'earthquake'

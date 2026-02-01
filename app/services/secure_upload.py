@@ -16,8 +16,10 @@ from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 import logging
+from minio.error import S3Error
 
-from .minio_robust import get_robust_minio_client, MinIOError, MinIOUploadError
+# from .minio_robust import get_robust_minio_client, MinIOError, MinIOUploadError  # Module doesn't exist
+from .minio_client import get_minio_client
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +32,8 @@ class UploadConfig:
     MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
     MIN_FILE_SIZE = 1024  # 1KB
 
-    # Allowed file extensions (case-insensitive)
-    ALLOWED_EXTENSIONS = {
+    # Image file extensions (case-insensitive)
+    ALLOWED_IMAGE_EXTENSIONS = {
         ".jpg",
         ".jpeg",
         ".png",
@@ -45,8 +47,21 @@ class UploadConfig:
         ".heif",
     }
 
-    # Allowed MIME types
-    ALLOWED_MIME_TYPES = {
+    # Video file extensions (case-insensitive)
+    ALLOWED_VIDEO_EXTENSIONS = {
+        ".mp4",
+        ".mov",
+        ".avi",
+        ".mkv",
+        ".webm",
+        ".m4v",
+    }
+
+    # Combined extensions for backward compatibility
+    ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS | ALLOWED_VIDEO_EXTENSIONS
+
+    # Image MIME types
+    ALLOWED_IMAGE_MIME_TYPES = {
         "image/jpeg",
         "image/jpg",
         "image/png",
@@ -59,8 +74,20 @@ class UploadConfig:
         "image/heif",
     }
 
-    # Magic bytes for content verification (first 4 bytes)
-    MAGIC_BYTES = {
+    # Video MIME types
+    ALLOWED_VIDEO_MIME_TYPES = {
+        "video/mp4",
+        "video/quicktime",
+        "video/x-msvideo",
+        "video/x-matroska",
+        "video/webm",
+    }
+
+    # Combined MIME types
+    ALLOWED_MIME_TYPES = ALLOWED_IMAGE_MIME_TYPES | ALLOWED_VIDEO_MIME_TYPES
+
+    # Image magic bytes for content verification
+    IMAGE_MAGIC_BYTES = {
         b"\xFF\xD8\xFF": "image/jpeg",  # JPEG
         b"\x89\x50\x4E\x47": "image/png",  # PNG
         b"\x47\x49\x46": "image/gif",  # GIF
@@ -69,6 +96,19 @@ class UploadConfig:
         b"\x4D\x4D\x00\x2A": "image/tiff",  # TIFF (big endian)
         b"\x52\x49\x46\x46": "image/webp",  # WebP (partial check)
     }
+
+    # Video magic bytes for content verification
+    VIDEO_MAGIC_BYTES = {
+        b"\x00\x00\x00\x18ftyp": "video/mp4",
+        b"\x00\x00\x00\x20ftyp": "video/mp4",
+        b"\x1a\x45\xdf\xa3": "video/x-matroska",  # MKV/WebM
+    }
+
+    # Combined magic bytes
+    MAGIC_BYTES = {**IMAGE_MAGIC_BYTES, **VIDEO_MAGIC_BYTES}
+
+    # Video size limits
+    MAX_VIDEO_SIZE = 5 * 1024 * 1024 * 1024  # 5GB
 
     # Dangerous filename patterns
     FORBIDDEN_PATTERNS = [
@@ -349,7 +389,7 @@ class SecureUploadService:
     def get_minio_client(self):
         """Get MinIO client with lazy initialization"""
         if self._minio_client is None:
-            self._minio_client = get_robust_minio_client()
+            self._minio_client = get_minio_client()
         return self._minio_client
 
     async def process_upload(self, file: UploadFile) -> Tuple[bytes, str, Dict[str, Any]]:
@@ -453,14 +493,11 @@ class SecureUploadService:
                 "storage_metadata": minio_metadata,
             }
 
-        except MinIOUploadError as e:
-            logger.error(f"MinIO upload failed for {filename}: {e}")
+        except S3Error as e:
+            logger.error(f"MinIO/S3 error for {filename}: {e}")
             raise HTTPException(
-                status_code=503, detail=f"Storage service temporarily unavailable: {str(e)}"
+                status_code=503, detail=f"Storage service error: {str(e)}"
             )
-        except MinIOError as e:
-            logger.error(f"MinIO error for {filename}: {e}")
-            raise HTTPException(status_code=502, detail=f"Storage service error: {str(e)}")
         except Exception as e:
             logger.error(f"Unexpected error uploading {filename}: {e}")
             raise HTTPException(
@@ -572,3 +609,186 @@ class SecureUploadService:
 
 # Global service instance
 secure_upload_service = SecureUploadService()
+
+
+# Video Validator (Ticket 1.4)
+class VideoValidator:
+    """Validates video files for security and compliance using FFprobe"""
+
+    @staticmethod
+    def detect_video_format(content: bytes) -> Optional[str]:
+        """
+        Detect video format from magic bytes
+
+        Args:
+            content: First 64 bytes of file
+
+        Returns:
+            Detected MIME type or None
+        """
+        for magic, mime in UploadConfig.VIDEO_MAGIC_BYTES.items():
+            if content.startswith(magic):
+                return mime
+        return None
+
+    @staticmethod
+    def validate_video_file(
+        file_path: str,
+        max_size: int = UploadConfig.MAX_VIDEO_SIZE,
+        max_duration: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validate video file format, size, and duration using FFprobe
+
+        Args:
+            file_path: Path to video file
+            max_size: Maximum allowed file size in bytes
+            max_duration: Maximum allowed duration in seconds (None = no limit)
+
+        Returns:
+            Dict with validation results and metadata
+
+        Raises:
+            HTTPException: If validation fails
+        """
+        import subprocess
+        import json
+
+        # Check file size
+        file_size = os.path.getsize(file_path)
+        if file_size > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Video file too large: {file_size} bytes (max {max_size})",
+            )
+
+        # Use FFprobe to extract metadata
+        try:
+            cmd = [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration,size,bit_rate:stream=codec_name,codec_type,width,height,r_frame_rate",
+                "-of",
+                "json",
+                file_path,
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=True)
+
+            metadata = json.loads(result.stdout)
+
+        except subprocess.TimeoutExpired:
+            raise HTTPException(
+                status_code=400, detail="Video validation timeout - file may be corrupted"
+            )
+        except subprocess.CalledProcessError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid video file: {e.stderr}")
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Could not parse video metadata")
+        except FileNotFoundError:
+            raise HTTPException(
+                status_code=500, detail="FFprobe not installed. Please install FFmpeg."
+            )
+
+        # Extract video stream info
+        video_streams = [
+            s for s in metadata.get("streams", []) if s.get("codec_type") == "video"
+        ]
+
+        if not video_streams:
+            raise HTTPException(status_code=400, detail="No video stream found in file")
+
+        video_stream = video_streams[0]
+        format_info = metadata.get("format", {})
+
+        # Validate duration
+        duration = float(format_info.get("duration", 0))
+        if max_duration and duration > max_duration:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Video too long: {duration:.1f}s (max {max_duration}s)",
+            )
+
+        # Validate codec
+        codec = video_stream.get("codec_name", "").lower()
+        allowed_codecs = ["h264", "h265", "hevc", "vp8", "vp9", "av1"]
+        if codec not in allowed_codecs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported codec: {codec}. Allowed: {', '.join(allowed_codecs)}",
+            )
+
+        # Extract frame rate
+        fps_str = video_stream.get("r_frame_rate", "0/1")
+        try:
+            num, den = map(int, fps_str.split("/"))
+            fps = num / den if den != 0 else 0
+        except:
+            fps = 0
+
+        return {
+            "valid": True,
+            "duration": duration,
+            "width": video_stream.get("width"),
+            "height": video_stream.get("height"),
+            "codec": codec,
+            "fps": fps,
+            "bitrate": int(format_info.get("bit_rate", 0)),
+            "size_bytes": file_size,
+            "format": format_info.get("format_name", "unknown"),
+        }
+
+    @staticmethod
+    async def validate_video_upload(
+        file: UploadFile,
+        max_size: int = UploadConfig.MAX_VIDEO_SIZE,
+        max_duration: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Validate uploaded video file (async wrapper)
+
+        Args:
+            file: FastAPI UploadFile object
+            max_size: Maximum file size in bytes
+            max_duration: Maximum duration in seconds
+
+        Returns:
+            Validation results with metadata
+        """
+        import tempfile
+
+        # Save to temp file for FFprobe validation
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tmp") as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            # Validate magic bytes
+            detected_mime = VideoValidator.detect_video_format(content[:64])
+            if not detected_mime:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid video file format (magic byte check failed)",
+                )
+
+            # Validate with FFprobe
+            validation_result = VideoValidator.validate_video_file(
+                tmp_path,
+                max_size=max_size,
+                max_duration=max_duration,
+            )
+
+            validation_result["detected_mime"] = detected_mime
+            return validation_result
+
+        finally:
+            # Cleanup temp file
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+
+
+# Export for use in API endpoints
+video_validator = VideoValidator()

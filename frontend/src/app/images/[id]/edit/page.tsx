@@ -472,8 +472,13 @@ export default function EditImagePage() {
   }
 
   // Construct URLs - use thumbnail for preview, full image for download
-  const thumbnailUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent((image as any).filename)}/thumbnail`;
-  const imageUrl = `${config.API.BASE_URL}/upload/images/${encodeURIComponent((image as any).filename)}`;
+  const filename = (image as any)?.filename;
+  const thumbnailUrl = filename && filename !== 'None' 
+    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(filename)}/thumbnail`
+    : null;
+  const imageUrl = filename && filename !== 'None'
+    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(filename)}`
+    : null;
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -548,20 +553,30 @@ export default function EditImagePage() {
                 Image Preview
               </h2>
               <div className="relative aspect-video rounded-2xl overflow-hidden bg-gradient-to-br from-deep-900 to-deep-950">
-                <Image
-                  src={thumbnailUrl}
-                  alt={(image as any).title || (image as any).filename}
-                  fill
-                  className="object-contain bg-deep-900"
-                  sizes="(max-width: 768px) 100vw, 50vw"
-                  priority
-                  unoptimized
-                  onError={(e: any) => {
-                    // Fallback to full image if thumbnail fails
-                    const target = e.target as HTMLImageElement;
-                    target.src = imageUrl;
-                  }}
-                />
+                {thumbnailUrl ? (
+                  <Image
+                    src={thumbnailUrl}
+                    alt={(image as any).title || (image as any).filename}
+                    fill
+                    className="object-contain bg-deep-900"
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    priority
+                    unoptimized
+                    onError={(e: any) => {
+                      // Fallback to full image if thumbnail fails
+                      const target = e.target as HTMLImageElement;
+                      if (imageUrl) {
+                        target.src = imageUrl;
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center h-full bg-deep-950 text-white/60">
+                    <div className="text-center">
+                      <p className="text-sm">No image available</p>
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="mt-4 space-y-2 text-sm text-white/70">
                 <div className="flex items-center gap-2">

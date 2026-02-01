@@ -2,6 +2,7 @@ import axios, { AxiosInstance, AxiosResponse, isAxiosError } from 'axios';
 import {
   SearchFilters,
   SearchResponse,
+  UnifiedSearchResponse,
   ImageMetadata,
   User,
   UserRole,
@@ -203,6 +204,53 @@ class APIClient {
     return response.data;
   }
 
+  async searchContent(filters: SearchFilters = {}): Promise<UnifiedSearchResponse> {
+    // Unified search that returns both images AND videos
+    const params = new URLSearchParams();
+
+    // Map frontend filter keys to backend API keys
+    const paramMap: Record<string, string> = {
+      q: 'q',
+      hazardType: 'hazard_type',
+      sourceAgency: 'source_agency',
+      dateFrom: 'date_from',
+      dateTo: 'date_to',
+      uploadDateFrom: 'upload_date_from',
+      uploadDateTo: 'upload_date_to',
+      page: 'skip',
+      limit: 'limit',
+      sortBy: 'sort_by',
+      sortOrder: 'sort_order',
+      location: 'location',
+      country: 'country',
+    };
+
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        const backendKey = paramMap[key] || key;
+        if (Array.isArray(value)) {
+          value.forEach((v) => params.append(backendKey, v.toString()));
+        } else if (key === 'page' && typeof value === 'number') {
+          // Convert page number to skip value
+          const skip = (value - 1) * (filters.limit || 20);
+          params.append('skip', skip.toString());
+        } else if (typeof value === 'object' && 'west' in value) {
+          params.append(
+            'bbox',
+            `${value.west},${value.south},${value.east},${value.north}`
+          );
+        } else {
+          params.append(backendKey, value.toString());
+        }
+      }
+    });
+
+    const response: AxiosResponse<UnifiedSearchResponse> = await this.client.get(
+      `/api/images/content/search?${params.toString()}`
+    );
+    return response.data;
+  }
+
   async getImage(id: string): Promise<ImageMetadata> {
     // Use dedicated endpoint for efficient single image lookup
     const response: AxiosResponse<ImageMetadata> = await this.client.get(
@@ -354,6 +402,20 @@ class APIClient {
 
   async updateImage(imageId: string, data: any): Promise<any> {
     const response = await this.client.put(`/api/images/${imageId}`, data);
+    return response.data;
+  }
+
+  async deleteImage(filename: string): Promise<any> {
+    const response = await this.client.delete(
+      `/api/images/${encodeURIComponent(filename)}`
+    );
+    return response.data;
+  }
+
+  async deleteVideo(videoId: string): Promise<any> {
+    const response = await this.client.delete(
+      `/api/video/videos/${videoId}`
+    );
     return response.data;
   }
 
@@ -709,10 +771,13 @@ export const imageApi = {
   exportData: () => oceanPortalApi.exportUserData(),
   deleteAccount: () => oceanPortalApi.deleteAccount(),
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
+  searchContent: (filters: SearchFilters) => oceanPortalApi.searchContent(filters),
   updateImage: async (imageId: string, data: any) => {
     const response = await apiClient.put(`/api/images/${imageId}`, data);
     return response.data;
   },
+  deleteImage: (filename: string) => oceanPortalApi.deleteImage(filename),
+  deleteVideo: (videoId: string) => oceanPortalApi.deleteVideo(videoId),
   // Featured stories API disabled - using static curated content only
   getFeaturedStories: async () => {
     // Return empty array - featured stories are now static only (Tonga, Fiji)

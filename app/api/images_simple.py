@@ -10,7 +10,7 @@ from uuid import UUID
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced, get_current_user_optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from geoalchemy2 import WKTElement
-from models.database import ImageMetadata, get_db
+from models.database import ImageMetadata, VideoMetadata, get_db
 from models.review_workflow import ReviewItem, ReviewStatus
 from pydantic import BaseModel
 from sqlalchemy import asc, case, desc, func, or_
@@ -321,6 +321,114 @@ async def get_images_list(
         raise HTTPException(status_code=500, detail=f"Failed to fetch images: {str(e)}")
 
 
+# IMPORTANT: Specific routes must come BEFORE the /{image_id} catch-all route
+@router.get("/hazards", response_model=Dict[str, Any])
+async def get_hazard_types(db: Session = Depends(get_db)):
+    """Get available hazard types."""
+    try:
+        hazards = (
+            db.query(ImageMetadata.hazard_type)
+            .distinct()
+            .filter(ImageMetadata.hazard_type.isnot(None))
+            .all()
+        )
+        hazard_list = [hazard[0] for hazard in hazards if hazard[0]]
+        return {"hazards": sorted(hazard_list), "count": len(hazard_list)}
+    except Exception as e:
+        logger.error(f"Error fetching hazard types: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch hazard types: {str(e)}")
+
+
+@router.get("/countries", response_model=Dict[str, Any])
+async def get_countries(db: Session = Depends(get_db)):
+    """Get available countries."""
+    try:
+        countries = (
+            db.query(ImageMetadata.country)
+            .distinct()
+            .filter(ImageMetadata.country.isnot(None))
+            .all()
+        )
+        country_list = [country[0] for country in countries if country[0]]
+        return {"countries": sorted(country_list), "count": len(country_list)}
+    except Exception as e:
+        logger.error(f"Error fetching countries: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch countries: {str(e)}")
+
+
+@router.get("/stats", response_model=Dict[str, Any])
+async def get_stats(db: Session = Depends(get_db)):
+    """Get basic statistics about the image database."""
+    try:
+        total_images = db.query(ImageMetadata).count()
+        hazard_counts = {}
+        hazards = (
+            db.query(ImageMetadata.hazard_type).filter(ImageMetadata.hazard_type.isnot(None)).all()
+        )
+        for hazard in hazards:
+            if hazard[0]:
+                hazard_counts[hazard[0]] = hazard_counts.get(hazard[0], 0) + 1
+        country_counts = {}
+        countries = db.query(ImageMetadata.country).filter(ImageMetadata.country.isnot(None)).all()
+        for country in countries:
+            if country[0]:
+                country_counts[country[0]] = country_counts.get(country[0], 0) + 1
+        return {
+            "total_images": total_images,
+            "hazard_types": hazard_counts,
+            "countries": country_counts,
+            "unique_hazards": len(hazard_counts),
+            "unique_countries": len(country_counts),
+        }
+    except Exception as e:
+        logger.error(f"Error fetching stats: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
+
+
+@router.get("/search", response_model=Dict[str, Any])
+async def image_search_compat(
+    q: Optional[str] = Query(None, description="Search query"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Compatibility endpoint - image search."""
+    try:
+        query = db.query(ImageMetadata)
+        if q:
+            search_term = f"%{q}%"
+            query = query.filter(
+                or_(
+                    ImageMetadata.filename.ilike(search_term),
+                    ImageMetadata.caption.ilike(search_term),
+                    ImageMetadata.event_name.ilike(search_term),
+                )
+            )
+        total = query.count()
+        offset = (page - 1) * page_size
+        results = query.offset(offset).limit(page_size).all()
+        return {
+            "results": [
+                {
+                    "id": str(img.id),
+                    "filename": img.filename,
+                    "caption": img.caption,
+                    "hazard_type": img.hazard_type,
+                    "country": img.country,
+                    "created_at": img.created_at.isoformat() if img.created_at else None,
+                }
+                for img in results
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
+    except Exception as e:
+        logger.error(f"Error in search: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Generic routes AFTER specific routes
 @router.get("/{image_id}", response_model=Dict[str, Any])
 async def get_image_by_id(image_id: str, db: Session = Depends(get_db)):
     """Get single image by ID or filename."""
@@ -630,77 +738,8 @@ async def search_images(
         raise HTTPException(status_code=500, detail=f"Failed to search images: {str(e)}")
 
 
-@router.get("/hazards", response_model=Dict[str, Any])
-async def get_hazard_types(db: Session = Depends(get_db)):
-    """Get available hazard types."""
-    try:
-        hazards = (
-            db.query(ImageMetadata.hazard_type)
-            .distinct()
-            .filter(ImageMetadata.hazard_type.isnot(None))
-            .all()
-        )
-
-        hazard_list = [hazard[0] for hazard in hazards if hazard[0]]
-
-        return {"hazards": sorted(hazard_list), "count": len(hazard_list)}
-
-    except Exception as e:
-        logger.error(f"Error fetching hazard types: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch hazard types: {str(e)}")
-
-
-@router.get("/countries", response_model=Dict[str, Any])
-async def get_countries(db: Session = Depends(get_db)):
-    """Get available countries."""
-    try:
-        countries = (
-            db.query(ImageMetadata.country)
-            .distinct()
-            .filter(ImageMetadata.country.isnot(None))
-            .all()
-        )
-
-        country_list = [country[0] for country in countries if country[0]]
-
-        return {"countries": sorted(country_list), "count": len(country_list)}
-
-    except Exception as e:
-        logger.error(f"Error fetching countries: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch countries: {str(e)}")
-
-
-@router.get("/stats", response_model=Dict[str, Any])
-async def get_stats(db: Session = Depends(get_db)):
-    """Get basic statistics about the image database."""
-    try:
-        total_images = db.query(ImageMetadata).count()
-
-        hazard_counts = {}
-        hazards = (
-            db.query(ImageMetadata.hazard_type).filter(ImageMetadata.hazard_type.isnot(None)).all()
-        )
-        for hazard in hazards:
-            if hazard[0]:
-                hazard_counts[hazard[0]] = hazard_counts.get(hazard[0], 0) + 1
-
-        country_counts = {}
-        countries = db.query(ImageMetadata.country).filter(ImageMetadata.country.isnot(None)).all()
-        for country in countries:
-            if country[0]:
-                country_counts[country[0]] = country_counts.get(country[0], 0) + 1
-
-        return {
-            "total_images": total_images,
-            "hazard_types": hazard_counts,
-            "countries": country_counts,
-            "unique_hazards": len(hazard_counts),
-            "unique_countries": len(country_counts),
-        }
-
-    except Exception as e:
-        logger.error(f"Error fetching stats: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch stats: {str(e)}")
+# Note: hazards, countries, stats, and search routes have been moved earlier in the file
+# to avoid being caught by the /{image_id} catch-all route
 
 
 @router.get("/images/{image_id}/history")
@@ -752,10 +791,10 @@ async def get_image_history(
 
 
 @router.get("/user/uploads", response_model=List[Dict[str, Any]])
-async def get_user_uploads(
+async def get_user_uploads_list(
     db: Session = Depends(get_db), current_user: EnhancedUser = Depends(get_current_user_enhanced)
 ):
-    """Get all uploads for the current authenticated user."""
+    """Get all uploads for the current authenticated user (images + videos)."""
     try:
         # Query images uploaded by current user (support legacy username identifiers)
         user_identifiers = {current_user.username}
@@ -768,9 +807,19 @@ async def get_user_uploads(
             .order_by(desc(ImageMetadata.datetime))
             .all()
         )
+        
+        # Query videos uploaded by current user
+        videos = (
+            db.query(VideoMetadata)
+            .filter(VideoMetadata.uploader_id.in_(user_identifiers))
+            .order_by(desc(VideoMetadata.created_at))
+            .all()
+        )
 
         # Serialize to match frontend UserUpload type
         uploads = []
+        
+        # Add images
         for img in images:
             uploads.append(
                 {
@@ -784,10 +833,205 @@ async def get_user_uploads(
                     "views": getattr(img, "views", 0),
                     "latitude": float(img.latitude) if img.latitude else None,
                     "longitude": float(img.longitude) if img.longitude else None,
+                    "thumbnail_url": f"/upload/images/{img.filename}/thumbnail",
+                    "content_type": "image",
                 }
             )
+        
+        # Add videos
+        for video in videos:
+            uploads.append(
+                {
+                    "id": str(video.id),
+                    "filename": video.filename,
+                    "title": video.title or video.original_filename or video.filename,
+                    "hazard_type": video.hazard_type,
+                    "location": "",  # Videos don't have location field yet
+                    "uploaded_at": video.created_at.isoformat() if video.created_at else None,
+                    "approval_status": video.status,
+                    "views": video.view_count if hasattr(video, "view_count") else 0,
+                    "latitude": float(video.latitude) if hasattr(video, "latitude") and video.latitude else None,
+                    "longitude": float(video.longitude) if hasattr(video, "longitude") and video.longitude else None,
+                    "thumbnail_url": f"/api/video/thumbnail/{video.id}",
+                    "content_type": "video",
+                    "duration": video.duration,
+                }
+            )
+        
+        # Sort by upload date (newest first)
+        uploads.sort(key=lambda x: x["uploaded_at"] or "", reverse=True)
 
         return uploads
     except Exception as e:
         logger.error(f"Error fetching user uploads: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch user uploads: {str(e)}")
+
+
+@router.get("/content/search")
+async def search_all_content(
+    q: Optional[str] = Query(None, max_length=500, description="Search query"),
+    hazard_type: Optional[List[str]] = Query(None, description="Filter by hazard type"),
+    country: Optional[str] = Query(None, max_length=100, description="Filter by country"),
+    date_from: Optional[str] = Query(None, description="Filter results captured on/after this date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="Filter results captured on/before this date (YYYY-MM-DD)"),
+    skip: int = Query(0, ge=0, le=10000, description="Number of records to skip"),
+    limit: int = Query(20, ge=1, le=100, description="Number of records to return"),
+    sort_by: Optional[str] = Query("upload_date", description="Sort field: date, upload_date, title"),
+    sort_order: Optional[str] = Query("desc", description="Sort order: asc or desc"),
+    db: Session = Depends(get_db),
+    current_user: Optional[EnhancedUser] = Depends(get_current_user_optional),
+):
+    """
+    Search ALL content (images + videos) with unified results.
+    
+    Returns combined list with 'content_type' field to distinguish between 'image' and 'video'.
+    """
+    from models.database import VideoMetadata
+    
+    try:
+        # Build image query
+        image_query = db.query(ImageMetadata)
+        
+        # PUBLIC VISIBILITY: Only show approved images unless user is authenticated
+        if not current_user:
+            image_query = image_query.outerjoin(ReviewItem, ReviewItem.image_id == ImageMetadata.id).filter(
+                or_(
+                    ReviewItem.status == ReviewStatus.APPROVED.value,
+                    ReviewItem.id == None,
+                )
+            )
+        
+        # Build video query (videos are always visible if uploaded successfully)
+        video_query = db.query(VideoMetadata).filter(VideoMetadata.status == "ready")
+        
+        # Apply filters to both queries
+        date_field_image = ImageMetadata.date_stamp if hasattr(ImageMetadata, "date_stamp") else ImageMetadata.datetime
+        date_field_video = VideoMetadata.created_at
+        
+        # Hazard type filter
+        if hazard_type:
+            hazard_filters = []
+            for h in hazard_type:
+                if h:
+                    hazard_filters.extend([hz.strip().lower() for hz in h.split(",") if hz.strip()])
+            if hazard_filters:
+                image_query = image_query.filter(func.lower(ImageMetadata.hazard_type).in_(hazard_filters))
+                video_query = video_query.filter(func.lower(VideoMetadata.hazard_type).in_(hazard_filters))
+        
+        # Country filter (only applies to images - videos don't have country field yet)
+        if country:
+            safe_country = _escape_ilike(country)
+            image_query = image_query.filter(ImageMetadata.country.ilike(f"%{safe_country}%", escape="\\"))
+            # TODO: Add country field to VideoMetadata or derive from coordinates
+        
+        # Date filters
+        captured_from = _parse_date_param(date_from, "start")
+        captured_to = _parse_date_param(date_to, "end")
+        if captured_from:
+            image_query = image_query.filter(date_field_image >= captured_from)
+            video_query = video_query.filter(date_field_video >= captured_from)
+        if captured_to:
+            image_query = image_query.filter(date_field_image <= captured_to)
+            video_query = video_query.filter(date_field_video <= captured_to)
+        
+        # Text search
+        if q:
+            safe_q = _escape_ilike(q)
+            search_pattern = f"%{safe_q}%"
+            image_query = image_query.filter(
+                or_(
+                    ImageMetadata.title.ilike(search_pattern, escape="\\"),
+                    ImageMetadata.abstract.ilike(search_pattern, escape="\\"),
+                    ImageMetadata.location.ilike(search_pattern, escape="\\"),
+                    ImageMetadata.hazard_type.ilike(search_pattern, escape="\\"),
+                )
+            )
+            video_query = video_query.filter(
+                or_(
+                    VideoMetadata.title.ilike(search_pattern, escape="\\"),
+                    VideoMetadata.abstract.ilike(search_pattern, escape="\\"),
+                    VideoMetadata.hazard_type.ilike(search_pattern, escape="\\"),
+                )
+            )
+        
+        # Execute queries
+        images = image_query.all()
+        videos = video_query.all()
+        
+        # Combine and serialize results
+        combined_results = []
+        
+        for img in images:
+            combined_results.append({
+                "content_type": "image",
+                "id": str(img.id),
+                "filename": img.filename,
+                "title": img.title,
+                "description": img.abstract if hasattr(img, "abstract") else None,
+                "hazard_type": img.hazard_type,
+                "country": img.country,
+                "location": img.location,
+                "keywords": img.keywords if hasattr(img, "keywords") else [],
+                "latitude": float(img.latitude) if hasattr(img, "latitude") and img.latitude else None,
+                "longitude": float(img.longitude) if hasattr(img, "longitude") and img.longitude else None,
+                "upload_date": img.datetime.isoformat() if img.datetime else None,
+                "captured_date": img.date_stamp.isoformat() if hasattr(img, "date_stamp") and img.date_stamp else None,
+                "thumbnail_url": f"/upload/images/{img.filename}/thumbnail",
+                "url": f"/upload/images/{img.filename}",
+            })
+        
+        for video in videos:
+            combined_results.append({
+                "content_type": "video",
+                "id": str(video.id),
+                "filename": video.filename,
+                "title": video.title or "",
+                "description": video.abstract or "",
+                "hazard_type": video.hazard_type,
+                "country": "",  # TODO: Add country field to VideoMetadata
+                "location": "",  # TODO: Add location field to VideoMetadata
+                "keywords": video.keywords if video.keywords else [],
+                "latitude": float(video.latitude) if video.latitude else None,
+                "longitude": float(video.longitude) if video.longitude else None,
+                "upload_date": video.created_at.isoformat() if video.created_at else None,
+                "captured_date": video.created_at.isoformat() if video.created_at else None,  # Use created_at as proxy
+                "duration": video.duration,
+                "width": video.width,
+                "height": video.height,
+                "resolution": f"{video.width}x{video.height}" if video.width and video.height else None,
+                "thumbnail_url": f"/api/video/thumbnail/{video.id}",
+                "url": f"/api/video/file/{video.id}",
+            })
+        
+        # Sort combined results
+        sort_key = "upload_date"
+        if sort_by == "title":
+            sort_key = "title"
+        elif sort_by == "date":
+            sort_key = "captured_date"
+        
+        combined_results.sort(
+            key=lambda x: x.get(sort_key) or "",
+            reverse=(sort_order == "desc")
+        )
+        
+        # Apply pagination
+        total = len(combined_results)
+        paginated_results = combined_results[skip:skip + limit]
+        
+        logger.info(f"Content search returned {total} total items ({len(images)} images, {len(videos)} videos), fetched {len(paginated_results)}")
+        
+        return {
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "results": paginated_results,
+            "stats": {
+                "images": len(images),
+                "videos": len(videos)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in unified content search: {e}")
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")

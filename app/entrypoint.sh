@@ -140,9 +140,8 @@ except Exception as e:
     print(f'MinIO initialization error (continuing anyway): {e}')
 "
 
-    # Populate curation queue if needed
-    echo "Checking curation queue..."
-    python /app/populate_curation_queue.py 2>&1 || echo "Note: Curation queue population encountered an issue (continuing anyway)"
+    # Populate curation queue if needed (disabled - using manual SQL population)
+    # python /app/populate_curation_queue.py 2>&1 || echo "Note: Curation queue population encountered an issue (continuing anyway)"
 
     # Start FastAPI server
     echo "Starting FastAPI app..."

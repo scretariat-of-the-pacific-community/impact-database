@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 from models.database import get_db
 from models.rbac import User as DBUser
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced
+from services.unified_user_service import UnifiedUserService
 
 logger = logging.getLogger(__name__)
 
@@ -161,3 +162,21 @@ def build_user_upload_filter(user: UserDetails):
         return ImageMetadata.uploader_id == user.identifier
 
     return or_(*[ImageMetadata.uploader_id == id for id in user.user_identifiers])
+
+
+def get_unified_user_service(db: Session = Depends(get_db)) -> UnifiedUserService:
+    """
+    Dependency to get UnifiedUserService instance.
+    
+    This service provides unified authentication across admin_users and RBAC users tables
+    during the migration phase. Once migration is complete, this can be simplified.
+    
+    Usage:
+        @router.post("/login")
+        def login(
+            credentials: OAuth2PasswordRequestForm = Depends(),
+            user_service: UnifiedUserService = Depends(get_unified_user_service)
+        ):
+            user = user_service.authenticate(credentials.username, credentials.password)
+    """
+    return UnifiedUserService(db, prefer_rbac=True)

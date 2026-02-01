@@ -43,7 +43,6 @@ def configure_structlog(log_level: int = logging.INFO, force: bool = False) -> N
     shared_processors = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
-        structlog.processors.add_logger_name,
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
     ]

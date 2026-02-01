@@ -80,10 +80,19 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY package*.json ./
+# Create user with host UID/GID to avoid permission issues
+ARG USER_ID=1001
+ARG GROUP_ID=1001
+RUN groupadd -g ${GROUP_ID} nodeuser || true && \
+    useradd -u ${USER_ID} -g ${GROUP_ID} -m -s /bin/bash nodeuser || true && \
+    chown -R ${USER_ID}:${GROUP_ID} /app
+
+USER nodeuser
+
+COPY --chown=${USER_ID}:${GROUP_ID} package*.json ./
 RUN npm install --legacy-peer-deps
 
-COPY . .
+COPY --chown=${USER_ID}:${GROUP_ID} . .
 
 EXPOSE 3000
 

@@ -81,9 +81,16 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let errorDetail = 'Failed to create user';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.detail || errorJson.error || errorDetail;
+      } catch {
+        errorDetail = errorText || errorDetail;
+      }
       console.error('Backend error:', response.status, errorText);
       return NextResponse.json(
-        { error: 'Failed to create user' },
+        { error: errorDetail, detail: errorDetail },
         { status: response.status }
       );
     }

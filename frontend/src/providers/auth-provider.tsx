@@ -27,6 +27,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 interface CachedSessionMetadata {
   user: User;
   expires_at: number;
+  cached_at?: number;
 }
 
 const SESSION_STORAGE_KEY = 'ocean_portal_session';
@@ -213,21 +214,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
+      // Call backend logout endpoint to clear HttpOnly cookie
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch (logoutError) {
+        console.error('Backend logout failed:', logoutError);
+        // Continue with client-side cleanup even if API call fails
+      }
+
       // Clear local state
       setUser(null);
       setSession(null);
       setAuthError(null);
       clearCachedSession();
 
-      // Redirect to home
-      window.location.href = '/';
+      // Redirect to login page
+      window.location.href = '/auth/login';
     } catch (error) {
       console.error('Sign out failed:', error);
       setAuthError(
         'We were unable to sign you out completely. Please close the tab or try again.'
       );
       // Still clear local state even if remote logout fails
-      window.location.href = '/';
+      window.location.href = '/auth/login';
     }
   };
 

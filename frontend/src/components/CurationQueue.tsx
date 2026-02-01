@@ -31,6 +31,8 @@ import { sanitizeText } from '@/lib/sanitize';
 
 export interface CurationItem {
   id: string;
+  content_type?: string;  // 'image' or 'video'
+  content_id?: string;
   image_filename: string;
   status:
     | 'pending'
@@ -58,6 +60,10 @@ export interface CurationItem {
     datetime?: string;
     latitude?: number;
     longitude?: number;
+    content_type?: string;  // For video metadata
+    duration?: number;
+    poster_url?: string;
+    title?: string;
     [key: string]: any;
   };
   metadata?: {
@@ -150,6 +156,10 @@ const normalizeItem = (item: any): CurationItem => {
   const filename = (meta as any).filename || item.image_filename;
   const existingMetadata =
     item?.metadata && typeof item.metadata === 'object' ? item.metadata : {};
+  
+  // Handle both images and videos
+  const contentType = item.content_type || 'image';
+  const isVideo = contentType === 'video';
 
   const thumbnailCandidate =
     (meta as any).thumbnail_url ||
@@ -159,10 +169,31 @@ const normalizeItem = (item: any): CurationItem => {
     item.thumbnailUrl ||
     item.thumbnail_url;
 
-  const thumbnailUrl =
-    thumbnailCandidate || filename
+  // For videos, use the video thumbnail path directly (already includes /api/video/thumbnail/)
+  let thumbnailUrl: string | undefined;
+  if (isVideo) {
+    if (thumbnailCandidate) {
+      // If it already starts with /api or http, use as-is
+      if (thumbnailCandidate.startsWith('/api') || thumbnailCandidate.startsWith('http')) {
+        thumbnailUrl = thumbnailCandidate.startsWith('http') 
+          ? thumbnailCandidate 
+          : getApiUrl(thumbnailCandidate);
+      } else {
+        // Otherwise assume it's a video ID and construct the thumbnail URL
+        const videoId = item.content_id || item.imageId || meta.id;
+        thumbnailUrl = videoId ? getApiUrl(`/api/video/thumbnail/${videoId}`) : undefined;
+      }
+    } else {
+      // No thumbnail candidate, try to construct from video ID
+      const videoId = item.content_id || item.imageId || meta.id;
+      thumbnailUrl = videoId ? getApiUrl(`/api/video/thumbnail/${videoId}`) : undefined;
+    }
+  } else {
+    // Images use the existing logic
+    thumbnailUrl = thumbnailCandidate || filename
       ? buildThumbnailUrl({ thumbnail_url: thumbnailCandidate }, filename)
       : undefined;
+  }
 
   const imageCandidate =
     (meta as any).resource_locator ||
@@ -174,16 +205,37 @@ const normalizeItem = (item: any): CurationItem => {
     (meta as any).thumbnail_url ||
     (meta as any).thumbnailUrl;
 
-  const imageUrl =
-    imageCandidate || filename
+  // For videos, use the video resource locator directly
+  let imageUrl: string | undefined;
+  if (isVideo) {
+    if (imageCandidate) {
+      // If it already starts with /api or http, use as-is
+      if (imageCandidate.startsWith('/api') || imageCandidate.startsWith('http')) {
+        imageUrl = imageCandidate.startsWith('http')
+          ? imageCandidate
+          : getApiUrl(imageCandidate);
+      } else {
+        // Otherwise construct video stream URL
+        const videoId = item.content_id || item.imageId || meta.id;
+        imageUrl = videoId ? getApiUrl(`/api/video/stream/${videoId}`) : undefined;
+      }
+    } else {
+      const videoId = item.content_id || item.imageId || meta.id;
+      imageUrl = videoId ? getApiUrl(`/api/video/stream/${videoId}`) : undefined;
+    }
+  } else {
+    // Images use the existing logic
+    imageUrl = imageCandidate || filename
       ? buildAssetUrl(imageCandidate, filename)
       : undefined;
+  }
 
   return {
     ...item,
+    content_type: contentType,
     thumbnailUrl,
     imageUrl,
-    imageId: item.imageId || item.image_id || meta.id || filename,
+    imageId: item.imageId || item.image_id || item.content_id || meta.id || filename,
     title:
       item.title ||
       (meta as any).title ||
@@ -304,25 +356,37 @@ const CurationQueueItem = memo(function CurationQueueItem({
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-start space-x-4">
-        {/* Thumbnail with fast native lazy loading */}
-        <div className="flex-shrink-0 h-16 w-16 rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden">
+        {/* Thumbnail with fast native lazy loading - with play button for videos */}
+        <div className="flex-shrink-0 h-16 w-16 rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden relative">
           {item.thumbnailUrl || item.imageUrl ? (
-            <img
-              src={item.thumbnailUrl || item.imageUrl || ''}
-              alt={
-                item.title ||
-                item.image_metadata?.title ||
-                'Submission thumbnail'
-              }
-              className="h-full w-full object-cover"
-              width={64}
-              height={64}
-              loading="lazy"
-              decoding="async"
-            />
+            <>
+              <img
+                src={item.thumbnailUrl || item.imageUrl || ''}
+                alt={
+                  item.title ||
+                  item.image_metadata?.title ||
+                  'Submission thumbnail'
+                }
+                className="h-full w-full object-cover"
+                width={64}
+                height={64}
+                loading="lazy"
+                decoding="async"
+              />
+              {/* Play button for videos */}
+              {item.content_type === 'video' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/90">
+                    <svg className="h-5 w-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+            </>
           ) : (
             <span className="text-gray-400 text-xs text-center px-2">
-              No image
+              {item.content_type === 'video' ? '🎬' : 'No image'}
             </span>
           )}
         </div>
@@ -331,11 +395,18 @@ const CurationQueueItem = memo(function CurationQueueItem({
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between">
             <div>
-              <h3 className="text-lg font-medium text-gray-900 truncate">
-                {sanitizeText(
-                  item.title || item.image_metadata?.title || 'Untitled'
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-medium text-gray-900 truncate">
+                  {sanitizeText(
+                    item.title || item.image_metadata?.title || 'Untitled'
+                  )}
+                </h3>
+                {item.content_type === 'video' && (
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    Video
+                  </span>
                 )}
-              </h3>
+              </div>
               <p className="text-sm text-gray-600 mt-1 line-clamp-2">
                 {sanitizeText(
                   item.description ||
@@ -343,8 +414,11 @@ const CurationQueueItem = memo(function CurationQueueItem({
                     'No description'
                 )}
               </p>
-              <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+              <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500 flex-wrap">
                 <span>File: {sanitizeText(item.image_filename)}</span>
+                {item.image_metadata?.duration && (
+                  <span>⏱️ {Math.round(item.image_metadata.duration)}s</span>
+                )}
                 {(item.metadata?.hazardType ||
                   item.image_metadata?.hazard_type) && (
                   <span>
@@ -781,12 +855,13 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
               id="curation-search"
               name="search"
               type="text"
+              autoComplete="off"
               placeholder="Search items..."
               value={filters.search}
               onChange={(
                 e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
               ) => setFilters({ ...filters, search: e.target.value })}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900 placeholder:text-gray-400"
             />
           </div>
         </div>
@@ -800,6 +875,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
             <select
               id="filter-status"
               name="status"
+              autoComplete="off"
               value={filters.status}
               onChange={(
                 e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
@@ -823,6 +899,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
             <select
               id="filter-priority"
               name="priority"
+              autoComplete="off"
               value={filters.priority}
               onChange={(
                 e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
@@ -844,6 +921,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
             <select
               id="filter-assigned"
               name="assignedTo"
+              autoComplete="off"
               value={filters.assignedTo}
               onChange={(
                 e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
@@ -894,11 +972,12 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
               <select
                 id="sort-by"
                 name="sortBy"
+                autoComplete="off"
                 value={sortBy}
                 onChange={(
                   e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
                 ) => setSortBy(e.target.value)}
-                className="text-sm border border-gray-300 rounded px-2 py-1"
+                className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900"
               >
                 <option value="submittedAt">Submitted Date</option>
               </select>

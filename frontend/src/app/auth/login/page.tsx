@@ -8,11 +8,17 @@ import { Waves, Users, CheckCircle, Mail } from 'lucide-react';
 import { sanitizeReturnUrl } from '@/lib/security';
 import { oceanPortalApi } from '@/lib/api';
 import { config } from '@/lib/config';
+import { withBasePath } from '@/lib/auth-utils';
+
+// Force dynamic rendering to support useSearchParams()
+export const dynamic = 'force-dynamic';
 
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, isLoading } = useAuth();
+  const supportEmail =
+    process.env.NEXT_PUBLIC_EMAIL_FROM_ADDRESS || 'noreply@oceanportal.io';
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -191,7 +197,7 @@ function LoginPageContent() {
                         const secureFlag = isSecure ? '; Secure' : '';
                         document.cookie = `ocean_portal_token=${encodeURIComponent(data.access_token)}; Max-Age=${7 * 24 * 60 * 60}; path=/; HttpOnly; SameSite=Strict${secureFlag}`; // 7 days
 
-                        let currentUser = null;
+                        let currentUser: any = null;
                         try {
                           currentUser = await oceanPortalApi.getCurrentUser();
                         } catch (err) {
@@ -218,7 +224,7 @@ function LoginPageContent() {
                         // so that the entire app (including AuthProvider and any top-level state)
                         // is reinitialized based on the newly set auth cookie and cached session.
                         // This bypasses Next.js's client-side router by design.
-                        window.location.href = returnUrl;
+                        window.location.href = withBasePath(returnUrl);
                       } else {
                         // Generic error message to prevent username enumeration
                         const statusCode = response.status;
@@ -388,6 +394,17 @@ function LoginPageContent() {
                     )}
                   </div>
 
+                  {!isRegistering && (
+                    <div className="flex justify-end">
+                      <a
+                        href={withBasePath('/auth/forgot-password')}
+                        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      >
+                        Forgot your password?
+                      </a>
+                    </div>
+                  )}
+
                   <button
                     type="submit"
                     disabled={isSigningIn}
@@ -444,10 +461,10 @@ function LoginPageContent() {
                 <p className="text-sm text-gray-600">
                   <strong>Need help?</strong> Email us at{' '}
                   <a
-                    href="mailto:support@pacific-impact-atlas.org"
+                    href={`mailto:${supportEmail}`}
                     className="text-blue-600 hover:text-blue-700 font-medium"
                   >
-                    support@pacific-impact-atlas.org
+                    {supportEmail}
                   </a>
                 </p>
                 <p className="text-xs text-gray-500 mt-2">

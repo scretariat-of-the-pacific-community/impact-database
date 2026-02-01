@@ -89,7 +89,7 @@ async def validate_and_process_avatar(file: UploadFile) -> tuple[bytes, str]:
 
 
 @router.post("/user/avatar")
-async def upload_avatar(
+async def upload_user_avatar(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(get_current_user_enhanced),

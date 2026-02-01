@@ -478,7 +478,13 @@ const resolveImagePath = (image: ImageRecord) => {
     return directUrl;
   }
 
-  // Fallback: construct thumbnail URL from filename
+  // For videos without thumbnail_url, construct video thumbnail URL
+  const contentType = (image as { content_type?: string }).content_type;
+  if (contentType === 'video' && (image as { id?: string }).id) {
+    return `/api/video/thumbnail/${(image as { id: string }).id}`;
+  }
+
+  // Fallback: construct thumbnail URL from filename for images
   if (image.filename) {
     return `/upload/images/${encodeURIComponent(image.filename)}/thumbnail`;
   }
@@ -499,9 +505,9 @@ export default function PacificImpactAtlasDashboard() {
   const { isAuthenticated, hasRole } = useAuth();
 
   const { data, isLoading } = useQuery({
-    queryKey: ['dashboard-images'],
+    queryKey: ['dashboard-content'],
     queryFn: () =>
-      imageApi.search({
+      imageApi.searchContent({
         limit: RECENT_LIMIT,
         sort_by: 'upload_date',
         sort_order: 'desc',
@@ -509,7 +515,16 @@ export default function PacificImpactAtlasDashboard() {
     staleTime: 1000 * 60 * 5,
   });
 
-  const images = (data as any)?.images ?? [];
+  const images = (data as any)?.results ?? [];
+  
+  // Debug logging
+  if (data && typeof window !== 'undefined') {
+    console.log('Dashboard data received:', { 
+      total: (data as any)?.total, 
+      resultsCount: images.length,
+      stats: (data as any)?.stats 
+    });
+  }
 
   // Handle pull-to-refresh
   const handleRefresh = useCallback(async () => {
@@ -1091,7 +1106,7 @@ export default function PacificImpactAtlasDashboard() {
 
                   return (
                     <motion.div
-                      key={image.filename}
+                      key={image.filename || `${image.title}-${index}` || `recent-${index}`}
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
@@ -1099,24 +1114,28 @@ export default function PacificImpactAtlasDashboard() {
                     >
                       {/* Thumbnail */}
                       <div className="relative w-20 h-20 rounded-lg overflow-hidden flex-shrink-0 bg-deep-900">
-                        {image.filename ? (
+                        {resolveImagePath(image) ? (
                           <NextImage
-                            src={getApiUrl(
-                              `/upload/images/${encodeURIComponent(image.filename)}/thumbnail`
-                            )}
+                            src={getApiUrl(resolveImagePath(image)!)}
                             alt={sanitizeText(image.title || image.filename)}
                             fill
                             sizes="80px"
                             className="object-cover"
                             unoptimized
                             onError={(e: any) => {
-                              // Fallback to full image if thumbnail fails
+                              // Fallback: try using the url field or construct from filename
                               const target = e.target as HTMLImageElement;
-                              const fullImageUrl = getApiUrl(
-                                `/upload/images/${encodeURIComponent(image.filename)}`
-                              );
-                              if (target.src !== fullImageUrl) {
-                                target.src = fullImageUrl;
+                              const contentType = (image as { content_type?: string }).content_type;
+                              let fallbackUrl = '';
+                              
+                              if (contentType === 'video' && (image as { url?: string }).url) {
+                                fallbackUrl = getApiUrl((image as { url: string }).url);
+                              } else if (image.filename) {
+                                fallbackUrl = getApiUrl(`/upload/images/${encodeURIComponent(image.filename)}`);
+                              }
+                              
+                              if (fallbackUrl && target.src !== fallbackUrl) {
+                                target.src = fallbackUrl;
                               } else {
                                 // Both failed, hide image
                                 target.style.display = 'none';

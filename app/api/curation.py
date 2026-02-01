@@ -4,6 +4,7 @@ import csv
 import io
 import json
 import logging
+import uuid
 import xml.etree.ElementTree as ET
 import zipfile
 from datetime import datetime, timedelta
@@ -33,7 +34,7 @@ from models.curation import (
     ExportRequest,
     Priority,
 )
-from models.database import ImageMetadata, get_db
+from models.database import ImageMetadata, VideoMetadata, get_db
 from models.rbac import Role as DBRole
 from models.rbac import User
 from models.review_workflow import (
@@ -65,12 +66,15 @@ router = APIRouter()
 # Pydantic models for request/response
 class CurationItemResponse(BaseModel):
     id: str
-    image_filename: str
+    content_type: str = "image"  # 'image' or 'video'
+    content_id: Optional[str] = None
+    image_id: Optional[str] = None  # For backwards compatibility
+    image_filename: Optional[str] = None
     status: str
     priority: str
     assigned_to: Optional[str] = None
-    created_at: str
-    updated_at: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     due_date: Optional[str] = None
     submitted_by: Optional[str] = None
     submission_notes: Optional[str] = None
@@ -200,15 +204,10 @@ def log_curation_action(
     related_item_id: str = None,
 ):
     """Log a curation action."""
-    # Ensure action_type is the enum value, not the enum member
-    if isinstance(action_type, ActionType):
-        action_type_value = action_type.value
-    else:
-        action_type_value = action_type
-
+    # Pass the enum directly - SQLAlchemy will handle the conversion
     action = CurationAction(
         queue_item_id=queue_item_id,
-        action_type=action_type_value,
+        action_type=action_type,
         performed_by=performed_by,
         description=description,
         metadata_changes=metadata_changes,
@@ -252,111 +251,190 @@ async def get_curation_queue(
 
     Returns paginated response with { items: [...], total: N } shape.
     """
-    # Get user's role from database for permission checking
-    db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
-    if not db_user:
-        raise HTTPException(status_code=401, detail="User not found")
+    try:
+        # Get user's role from database for permission checking
+        db_user = db.query(DBUser).filter(DBUser.id == current_user.id).first()
+        if not db_user:
+            raise HTTPException(status_code=401, detail="User not found")
 
-    user_role = db_user.role.name if db_user.role else None
+        user_role = db_user.role.name if db_user.role else None
 
-    query = db.query(CurationQueue)
-
-    if user_role == "contributor":
-        # Contributors see only their submissions
-        query = query.filter(CurationQueue.submitted_by == current_user.id)
-    elif user_role == "curator":
-        # Curators see: unassigned items OR items assigned to them
-        if not show_all:  # Respect show_all flag for curators with admin override
-            query = query.filter(
-                or_(
-                    CurationQueue.assigned_to == None,
-                    CurationQueue.assigned_to == str(current_user.id),
-                )
+        # Use text() for raw SQL to avoid SQLAlchemy trying to reflect missing columns
+        from sqlalchemy import text as sql_text
+        
+        # Build base query using raw SQL - select only columns we care about
+        base_query = """
+        SELECT 
+            id, content_type, content_id, image_id, status, priority, assigned_to, 
+            created_at, updated_at, due_date, submitted_by, submission_notes, 
+            reviewed_by, reviewed_at, review_notes, is_flagged, flag_reason, 
+            is_duplicate, duplicate_of, is_deleted, deleted_by, deleted_at
+        FROM curation_queue
+        WHERE 1=1
+        """
+        
+        # Build filters
+        filters = []
+        params = {}
+        
+        if user_role == "contributor":
+            filters.append("submitted_by = :user_id")
+            params["user_id"] = str(current_user.id)
+        elif user_role == "curator" and not show_all:
+            filters.append("(assigned_to IS NULL OR assigned_to = :user_id)")
+            params["user_id"] = str(current_user.id)
+        
+        if status:
+            filters.append("status = :status")
+            params["status"] = status
+        if priority:
+            filters.append("priority = :priority")
+            params["priority"] = priority
+        if assigned_to:
+            filters.append("assigned_to = :assigned_to")
+            params["assigned_to"] = assigned_to
+        if is_flagged is not None:
+            filters.append("is_flagged = :is_flagged")
+            params["is_flagged"] = is_flagged
+        if is_duplicate is not None:
+            filters.append("is_duplicate = :is_duplicate")
+            params["is_duplicate"] = is_duplicate
+        if not show_deleted:
+            filters.append("is_deleted = false")
+        
+        # Add filters to query
+        if filters:
+            base_query += " AND " + " AND ".join(filters)
+        
+        # Get total count
+        count_query = "SELECT COUNT(*) FROM curation_queue WHERE 1=1"
+        if filters:
+            count_query += " AND " + " AND ".join(filters)
+        
+        total_count = db.execute(sql_text(count_query), params).scalar()
+        
+        # Apply sorting
+        sort_field = sort_by
+        if sort_by == "submittedAt":
+            sort_field = "created_at"
+        # Validate sort field to prevent SQL injection
+        valid_sort_fields = {'id', 'created_at', 'status', 'priority', 'updated_at', 'reviewed_at'}
+        if sort_field not in valid_sort_fields:
+            sort_field = "created_at"
+        
+        sort_direction = "DESC" if sort_order == "desc" else "ASC"
+        base_query += f" ORDER BY {sort_field} {sort_direction}"
+        
+        # Apply pagination
+        if limit is not None or offset is not None:
+            actual_limit = limit or 50
+            actual_offset = offset or 0
+            page_size = actual_limit
+            page = (actual_offset // actual_limit) + 1
+        else:
+            actual_offset = (page - 1) * page_size
+            actual_limit = page_size
+        
+        base_query += f" OFFSET {actual_offset} LIMIT {actual_limit}"
+        
+        # Execute query and map results
+        result = db.execute(sql_text(base_query), params)
+        rows = result.fetchall()
+        
+        # Convert rows to response items
+        response_items = []
+        for row in rows:
+            row_dict = dict(row._mapping) if hasattr(row, '_mapping') else dict(zip(result.keys(), row))
+            
+            # Get content metadata based on content_type
+            content_type = row_dict.get('content_type', 'image')
+            content_id = row_dict.get('content_id') or row_dict.get('image_id')
+            image_metadata = None
+            image_filename = None
+            
+            if content_type == 'image' and content_id:
+                image = db.query(ImageMetadata).filter(ImageMetadata.id == content_id).first()
+                if image:
+                    image_metadata = image.to_dict()
+                    image_metadata['content_type'] = 'image'
+                    image_filename = image.filename
+            elif content_type == 'video' and content_id:
+                video = db.query(VideoMetadata).filter(VideoMetadata.id == content_id).first()
+                if video:
+                    image_metadata = video.to_dict()
+                    image_metadata['content_type'] = 'video'
+                    image_filename = video.filename
+            
+            # Get counts
+            queue_id = row_dict.get('id')
+            comments_count = (
+                db.query(func.count(CurationComment.id))
+                .filter(CurationComment.queue_item_id == queue_id, CurationComment.is_deleted == False)
+                .scalar()
             )
-    # Admin sees everything by default (no additional filter)
 
-    # Apply user-specified filters
-    if status:
-        query = query.filter(CurationQueue.status == status)
-    if priority:
-        query = query.filter(CurationQueue.priority == priority)
-    if assigned_to:
-        query = query.filter(CurationQueue.assigned_to == assigned_to)
-    if is_flagged is not None:
-        query = query.filter(CurationQueue.is_flagged == is_flagged)
-    if is_duplicate is not None:
-        query = query.filter(CurationQueue.is_duplicate == is_duplicate)
-    if not show_deleted:
-        query = query.filter(CurationQueue.is_deleted == False)
+            actions_count = (
+                db.query(func.count(CurationAction.id))
+                .filter(CurationAction.queue_item_id == queue_id)
+                .scalar()
+            )
 
-    # Get total count before pagination
-    total_count = query.count()
+            response_item = CurationItemResponse(
+                id=str(row_dict.get('id')),
+                content_type=content_type,
+                content_id=str(content_id) if content_id else None,
+                image_id=str(row_dict.get('image_id')) if row_dict.get('image_id') else None,
+                image_filename=image_filename,
+                status=row_dict.get('status'),
+                priority=row_dict.get('priority'),
+                assigned_to=row_dict.get('assigned_to'),
+                created_at=row_dict.get('created_at').isoformat() if row_dict.get('created_at') else None,
+                updated_at=row_dict.get('updated_at').isoformat() if row_dict.get('updated_at') else None,
+                due_date=row_dict.get('due_date').isoformat() if row_dict.get('due_date') else None,
+                submitted_by=row_dict.get('submitted_by'),
+                submission_notes=row_dict.get('submission_notes'),
+                reviewed_by=row_dict.get('reviewed_by'),
+                reviewed_at=row_dict.get('reviewed_at').isoformat() if row_dict.get('reviewed_at') else None,
+                review_notes=row_dict.get('review_notes'),
+                is_flagged=row_dict.get('is_flagged', False),
+                flag_reason=row_dict.get('flag_reason'),
+                is_duplicate=row_dict.get('is_duplicate', False),
+                duplicate_of=row_dict.get('duplicate_of'),
+                is_deleted=row_dict.get('is_deleted', False),
+                deleted_by=row_dict.get('deleted_by'),
+                deleted_at=row_dict.get('deleted_at').isoformat() if row_dict.get('deleted_at') else None,
+                image_metadata=image_metadata,
+                comments_count=comments_count,
+                actions_count=actions_count,
+            )
+            response_items.append(response_item)
 
-    # Apply sorting - map submittedAt to created_at for frontend compatibility
-    sort_field = sort_by
-    if sort_by == "submittedAt":
-        sort_field = "created_at"
+        # Calculate total pages
+        total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 0
 
-    sort_column = getattr(CurationQueue, sort_field, CurationQueue.created_at)
-    if sort_order == "desc":
-        query = query.order_by(desc(sort_column))
-    else:
-        query = query.order_by(asc(sort_column))
-
-    # Calculate pagination - prefer page/page_size, fall back to limit/offset
-    if limit is not None or offset is not None:
-        # Legacy pagination
-        actual_limit = limit or 50
-        actual_offset = offset or 0
-        page_size = actual_limit
-        page = (actual_offset // actual_limit) + 1
-    else:
-        # Modern pagination
-        actual_offset = (page - 1) * page_size
-        actual_limit = page_size
-
-    # Apply pagination
-    queue_items = query.offset(actual_offset).limit(actual_limit).all()
-
-    # Build response with additional data
-    response_items = []
-    for item in queue_items:
-        # Get image metadata
-        image_metadata = None
-        if item.image:
-            image_metadata = item.image.to_dict()
-
-        # Get counts
-        comments_count = (
-            db.query(func.count(CurationComment.id))
-            .filter(CurationComment.queue_item_id == item.id, CurationComment.is_deleted == False)
-            .scalar()
+        return PaginatedCurationResponse(
+            items=response_items,
+            total=total_count,
+            page=page,
+            page_size=page_size,
+            total_pages=total_pages,
         )
-
-        actions_count = (
-            db.query(func.count(CurationAction.id))
-            .filter(CurationAction.queue_item_id == item.id)
-            .scalar()
+    except Exception as e:
+        # Log error and return empty response rather than 500
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in get_curation_queue: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        
+        # Return empty queue instead of error
+        return PaginatedCurationResponse(
+            items=[],
+            total=0,
+            page=page,
+            page_size=page_size,
+            total_pages=0,
         )
-
-        response_item = CurationItemResponse(
-            **item.to_dict(),
-            image_metadata=image_metadata,
-            comments_count=comments_count,
-            actions_count=actions_count,
-        )
-        response_items.append(response_item)
-
-    # Calculate total pages
-    total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 0
-
-    return PaginatedCurationResponse(
-        items=response_items,
-        total=total_count,
-        page=page,
-        page_size=page_size,
-        total_pages=total_pages,
-    )
 
 
 @router.get("/queue/{item_id}", response_model=CurationItemResponse)
@@ -394,6 +472,106 @@ async def get_curation_item(
         comments_count=comments_count,
         actions_count=actions_count,
     )
+
+
+@router.post("/queue/videos/add-all")
+async def add_all_videos_to_queue(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Add all videos to the curation queue. 
+    
+    This endpoint adds all videos that are not yet in the curation queue, 
+    giving priority to videos with 'pending' status.
+    """
+    check_admin_permission(current_user)
+
+    # Get all videos not yet in curation queue
+    existing_video_ids = db.query(CurationQueue.content_id).filter(
+        CurationQueue.content_type == "video"
+    ).all()
+    existing_ids = {item[0] for item in existing_video_ids}
+
+    # Get all videos that aren't already in queue
+    videos = db.query(VideoMetadata).filter(
+        ~VideoMetadata.id.in_(existing_ids)
+    ).all()
+
+    added_count = 0
+    for video in videos:
+        # Determine priority based on status
+        if video.status == "pending":
+            priority = Priority.HIGH
+        else:
+            priority = Priority.MEDIUM
+            
+        queue_item = CurationQueue(
+            id=uuid.uuid4(),
+            content_type="video",
+            content_id=video.id,
+            status=CurationStatus.PENDING,
+            priority=priority,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            submitted_by=video.uploader_id,
+            submission_notes=f"Video: {video.title or video.original_filename}"
+        )
+        db.add(queue_item)
+        added_count += 1
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Added {added_count} videos to curation queue",
+        "count": added_count
+    }
+
+
+@router.post("/queue/video/{video_id}")
+async def add_video_to_queue(
+    video_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Add a specific video to the curation queue."""
+    check_admin_permission(current_user)
+
+    # Check if video exists
+    video = db.query(VideoMetadata).filter(VideoMetadata.id == video_id).first()
+    if not video:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    # Check if already in queue
+    existing = db.query(CurationQueue).filter(
+        CurationQueue.content_type == "video",
+        CurationQueue.content_id == video_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Video already in curation queue")
+
+    # Add to queue
+    queue_item = CurationQueue(
+        id=uuid.uuid4(),
+        content_type="video",
+        content_id=video.id,
+        status=CurationStatus.PENDING,
+        priority=Priority.MEDIUM,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+        submitted_by=video.uploader_id,
+        submission_notes=f"Video: {video.title or video.original_filename}"
+    )
+    db.add(queue_item)
+    db.commit()
+    db.refresh(queue_item)
+
+    return {
+        "success": True,
+        "message": "Video added to curation queue",
+        "queue_item_id": str(queue_item.id)
+    }
 
 
 @router.put("/queue/{item_id}", response_model=CurationItemResponse)

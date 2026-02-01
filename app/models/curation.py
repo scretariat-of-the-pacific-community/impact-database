@@ -9,6 +9,7 @@ from sqlalchemy import Enum as SQLEnum
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from enum import Enum as PyEnum
 
 from .database import Base
 
@@ -37,28 +38,36 @@ class Priority(enum.Enum):
 class ActionType(enum.Enum):
     """Types of actions in curation workflow."""
 
-    UPLOADED = "uploaded"
-    REVIEWED = "reviewed"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    FLAGGED = "flagged"
-    UNFLAGGED = "unflagged"
-    EDITED = "edited"
-    MERGED = "merged"
-    MARKED_DUPLICATE = "marked_duplicate"
-    RESTORED = "restored"
-    DELETED = "deleted"
-    COMMENTED = "commented"
-    BULK_IMPORTED = "bulk_imported"
+    UPLOADED = "UPLOADED"
+    REVIEWED = "REVIEWED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    FLAGGED = "FLAGGED"
+    UNFLAGGED = "UNFLAGGED"
+    EDITED = "EDITED"
+    MERGED = "MERGED"
+    MARKED_DUPLICATE = "MARKED_DUPLICATE"
+    RESTORED = "RESTORED"
+    DELETED = "DELETED"
+    COMMENTED = "COMMENTED"
+    BULK_IMPORTED = "BULK_IMPORTED"
 
 
 class CurationQueue(Base):
-    """Queue for items requiring curation review."""
+    """Queue for items requiring curation review - polymorphic for images and videos."""
 
     __tablename__ = "curation_queue"
+    __table_args__ = {"keep_existing": True}  # Don't try to reflect columns from DB
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    image_id = Column(UUID(as_uuid=True), ForeignKey("image_metadata.id"), nullable=False, index=True)
+    
+    # Polymorphic content support
+    content_type = Column(String(20), nullable=True, default="image", index=True)  # 'image' or 'video'
+    content_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # References either ImageMetadata or VideoMetadata
+    
+    # Keep image_id for backwards compatibility
+    image_id = Column(UUID(as_uuid=True), ForeignKey("image_metadata.id"), nullable=True, index=True)
+    
     status = Column(
         SQLEnum(
             CurationStatus,
@@ -115,11 +124,33 @@ class CurationQueue(Base):
         "CurationAction", back_populates="queue_item", cascade="all, delete-orphan"
     )
 
+    def get_content(self, db=None):
+        """Get the actual content object (ImageMetadata or VideoMetadata) based on content_type."""
+        if self.content_type == "image":
+            if self.image:
+                return self.image
+            if db:
+                from .database import ImageMetadata
+                return db.query(ImageMetadata).filter(ImageMetadata.id == self.content_id).first()
+        elif self.content_type == "video":
+            if db:
+                from .database import VideoMetadata
+                return db.query(VideoMetadata).filter(VideoMetadata.id == self.content_id).first()
+        return None
+
     def to_dict(self):
+        # Get content filename based on type
+        content_filename = None
+        if self.content_type == "image" and self.image:
+            content_filename = self.image.filename
+        # For videos, will be fetched by the endpoint when needed
+        
         return {
             "id": str(self.id),
-            "image_id": str(self.image_id),
-            "image_filename": self.image.filename if self.image else None,
+            "content_type": self.content_type,
+            "content_id": str(self.content_id),
+            "image_id": str(self.image_id) if self.image_id else str(self.content_id) if self.content_type == "image" else None,
+            "image_filename": content_filename,
             "status": self.status.value,
             "priority": self.priority.value,
             "assigned_to": self.assigned_to,
@@ -199,7 +230,15 @@ class CurationAction(Base):
     queue_item_id = Column(UUID(as_uuid=True), ForeignKey("curation_queue.id"), nullable=False)
 
     # Action details
-    action_type = Column(SQLEnum(ActionType), nullable=False)
+    action_type = Column(
+        SQLEnum(
+            ActionType,
+            native_enum=True,
+            create_constraint=True,
+            name="actiontype",
+        ),
+        nullable=False,
+    )
     performed_by = Column(String, nullable=False)  # User ID/email
     performed_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 

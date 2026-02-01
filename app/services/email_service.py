@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 class EmailBackend(Enum):
     SMTP = "smtp"
     SENDGRID = "sendgrid"
+    MSGRAPH = "msgraph"
     CONSOLE = "console"  # For development - just logs emails
 
 
@@ -63,6 +64,11 @@ class EmailConfig:
         self.sendgrid_api_key = email_settings.SENDGRID_API_KEY or ""
         self.from_email = email_settings.EMAIL_FROM_ADDRESS
         self.from_name = email_settings.EMAIL_FROM_NAME
+        
+        # Microsoft Graph settings
+        self.msgraph_tenant_id = getattr(email_settings, 'MSGRAPH_TENANT_ID', '') or ""
+        self.msgraph_client_id = getattr(email_settings, 'MSGRAPH_CLIENT_ID', '') or ""
+        self.msgraph_client_secret = getattr(email_settings, 'MSGRAPH_CLIENT_SECRET', '') or ""
 
     def is_configured(self) -> bool:
         """Check if email is properly configured."""
@@ -72,6 +78,8 @@ class EmailConfig:
             return bool(self.smtp_host and self.smtp_user and self.smtp_password)
         elif self.backend == EmailBackend.SENDGRID:
             return bool(self.sendgrid_api_key)
+        elif self.backend == EmailBackend.MSGRAPH:
+            return bool(self.msgraph_tenant_id and self.msgraph_client_id and self.msgraph_client_secret)
         return False
 
 
@@ -113,6 +121,8 @@ class EmailService:
                 return self._send_smtp(message)
             elif self.config.backend == EmailBackend.SENDGRID:
                 return self._send_sendgrid(message)
+            elif self.config.backend == EmailBackend.MSGRAPH:
+                return self._send_msgraph(message)
             else:
                 logger.error(f"Unknown email backend: {self.config.backend}")
                 return False
@@ -214,6 +224,77 @@ Subject: {message.subject}
             return True
         else:
             logger.error(f"SendGrid error {response.status_code}: {response.text}")
+            return False
+
+    def _send_msgraph(self, message: EmailMessage) -> bool:
+        """Send email via Microsoft Graph API."""
+        try:
+            import httpx
+        except ImportError:
+            logger.error("httpx not installed. Install with: pip install httpx")
+            return False
+
+        try:
+            # Get access token
+            token_url = f"https://login.microsoftonline.com/{self.config.msgraph_tenant_id}/oauth2/v2.0/token"
+            token_data = {
+                "client_id": self.config.msgraph_client_id,
+                "client_secret": self.config.msgraph_client_secret,
+                "scope": "https://graph.microsoft.com/.default",
+                "grant_type": "client_credentials",
+            }
+            
+            token_response = httpx.post(token_url, data=token_data, timeout=30.0)
+            if token_response.status_code != 200:
+                logger.error(f"Failed to get Microsoft Graph token: {token_response.text}")
+                return False
+                
+            access_token = token_response.json()["access_token"]
+            
+            # Prepare email message
+            to_recipient = {"emailAddress": {"address": message.to_email}}
+            if message.to_name:
+                to_recipient["emailAddress"]["name"] = message.to_name
+            
+            email_payload = {
+                "message": {
+                    "subject": message.subject,
+                    "body": {
+                        "contentType": "HTML" if message.body_html else "Text",
+                        "content": message.body_html or message.body_text,
+                    },
+                    "toRecipients": [to_recipient],
+                    "from": {
+                        "emailAddress": {
+                            "address": message.from_email,
+                            "name": message.from_name,
+                        }
+                    },
+                },
+                "saveToSentItems": "true",
+            }
+            
+            # Send email
+            send_url = f"https://graph.microsoft.com/v1.0/users/{message.from_email}/sendMail"
+            send_response = httpx.post(
+                send_url,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Content-Type": "application/json",
+                },
+                json=email_payload,
+                timeout=30.0,
+            )
+            
+            if send_response.status_code in (200, 202):
+                logger.info(f"Email sent via Microsoft Graph to {message.to_email}: {message.subject}")
+                return True
+            else:
+                logger.error(f"Microsoft Graph send error {send_response.status_code}: {send_response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Microsoft Graph exception: {e}")
             return False
 
 

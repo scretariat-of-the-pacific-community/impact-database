@@ -10,6 +10,9 @@ import {
 } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, useRouter } from 'next/navigation';
+
+// Force dynamic rendering to support useSearchParams()
+export const dynamic = 'force-dynamic';
 import { config } from '@/lib/config';
 import {
   Search,
@@ -27,18 +30,22 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
+import NextDynamic from 'next/dynamic';
 
 import { imageApi } from '@/lib/api';
 import { Select } from '@/components/design-system';
 import {
   SearchFilters,
   ImageMetadata,
+  ContentItem,
+  UnifiedSearchResponse,
   HazardType,
   SourceAgency,
   HAZARD_TYPE_LABELS,
   SOURCE_AGENCY_LABELS,
 } from '@/lib/types';
+import ContentGrid from '@/components/ContentGrid';
+import ContentModal from '@/components/ContentModal';
 import ErrorBanner from '@/components/ErrorBanner';
 import { sanitizeText } from '@/lib/sanitize';
 import {
@@ -46,18 +53,18 @@ import {
   ImageListCardSkeleton,
 } from '@/components/ImageCardSkeleton';
 
-const MapContainer = dynamic(
+const MapContainer = NextDynamic(
   () => import('react-leaflet').then((m) => m.MapContainer),
   { ssr: false }
 );
-const TileLayer = dynamic(
+const TileLayer = NextDynamic(
   () => import('react-leaflet').then((m) => m.TileLayer),
   { ssr: false }
 );
-const Marker = dynamic(() => import('react-leaflet').then((m) => m.Marker), {
+const Marker = NextDynamic(() => import('react-leaflet').then((m) => m.Marker), {
   ssr: false,
 });
-const Popup = dynamic(() => import('react-leaflet').then((m) => m.Popup), {
+const Popup = NextDynamic(() => import('react-leaflet').then((m) => m.Popup), {
   ssr: false,
 });
 
@@ -229,8 +236,8 @@ function SearchPageContent() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['search', filters],
-    queryFn: () => imageApi.search(filters),
+    queryKey: ['content-search', filters],
+    queryFn: () => imageApi.searchContent(filters),
   });
 
   // Reset filtering state when data loads
@@ -239,17 +246,29 @@ function SearchPageContent() {
       setIsFiltering(false);
     }
   }, [isLoading, searchResults]);
-  const images = useMemo(
-    () => (searchResults as any)?.images || [],
+  
+  const items = useMemo(
+    () => (searchResults as UnifiedSearchResponse)?.results || [],
     [searchResults]
   );
-  const totalResults = (searchResults as any)?.total || 0;
-  const totalPages =
-    (searchResults as any)?.total_pages ||
-    Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
+  const totalResults = (searchResults as UnifiedSearchResponse)?.total || 0;
+  const contentStats = (searchResults as UnifiedSearchResponse)?.stats || { images: 0, videos: 0 };
+  const totalPages = Math.max(1, Math.ceil(totalResults / RESULTS_PER_PAGE));
   const showingFrom =
     totalResults === 0 ? 0 : (currentPage - 1) * RESULTS_PER_PAGE + 1;
   const showingTo = Math.min(currentPage * RESULTS_PER_PAGE, totalResults);
+  
+  // Modal state for viewing content
+  const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const handleItemClick = useCallback((item: ContentItem) => {
+    // Only open modal for videos; images navigate via ContentGrid
+    if (item.content_type === 'video') {
+      setSelectedItem(item);
+      setIsModalOpen(true);
+    }
+  }, []);
 
   const handleSearch = useCallback(
     (newQuery: string) => {
@@ -776,7 +795,7 @@ function SearchPageContent() {
                 retryLabel="Retry search"
               />
             </div>
-          ) : images.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="text-center py-12">
               <Search className="w-12 h-12 text-white/40 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-white mb-2">
@@ -798,6 +817,9 @@ function SearchPageContent() {
                 <span>
                   Showing {showingFrom}-{showingTo} of{' '}
                   {totalResults.toLocaleString()} results
+                  <span className="ml-2 text-xs text-white/50">
+                    ({contentStats.images} images, {contentStats.videos} videos)
+                  </span>
                 </span>
                 {totalPages > 1 && (
                   <div className="flex items-center space-x-2">
@@ -825,18 +847,12 @@ function SearchPageContent() {
                   </div>
                 )}
               </div>
-              {state.viewMode === 'grid' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {images.map((image: ImageMetadata) => (
-                    <MemoizedImageGridCard key={image.id} image={image} />
-                  ))}
-                </div>
-              ) : state.viewMode === 'list' ? (
-                <div className="space-y-4">
-                  {images.map((image: ImageMetadata) => (
-                    <MemoizedImageListCard key={image.id} image={image} />
-                  ))}
-                </div>
+              {state.viewMode === 'grid' || state.viewMode === 'list' ? (
+                <ContentGrid 
+                  items={items} 
+                  loading={false}
+                  onItemClick={handleItemClick}
+                />
               ) : (
                 <div className="h-96">
                   <MapContainer
@@ -848,29 +864,38 @@ function SearchPageContent() {
                       url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                       attribution="&copy; OpenStreetMap contributors"
                     />
-                    {images
+                    {items
                       .filter(
-                        (img: ImageMetadata) => img.latitude && img.longitude
+                        (item: ContentItem) => item.latitude && item.longitude
                       )
-                      .map((image: ImageMetadata) => (
+                      .map((item: ContentItem) => (
                         <Marker
-                          key={image.id}
+                          key={item.id}
                           position={
-                            [image.latitude, image.longitude] as [
+                            [item.latitude!, item.longitude!] as [
                               number,
                               number,
                             ]
                           }
-                          icon={createSimpleIcon(image.hazard_type)}
+                          icon={createSimpleIcon(item.hazard_type)}
                         >
                           <Popup>
                             <div className="text-sm">
-                              <Link
-                                href={`/images/${image.id}`}
-                                className="text-blue-600 hover:underline"
+                              <div className="font-semibold text-blue-600 mb-1">
+                                {item.content_type === 'video' ? '🎥 ' : '📷 '}
+                                {item.title || item.filename}
+                              </div>
+                              {item.description && (
+                                <p className="text-xs text-gray-600 line-clamp-2 mb-2">
+                                  {item.description}
+                                </p>
+                              )}
+                              <button
+                                onClick={() => handleItemClick(item)}
+                                className="text-xs text-pacific-600 hover:underline"
                               >
-                                {image.title || image.filename}
-                              </Link>
+                                View details
+                              </button>
                             </div>
                           </Popup>
                         </Marker>
@@ -907,6 +932,19 @@ function SearchPageContent() {
           )}
         </div>
       </div>
+      
+      {/* Content Modal */}
+      <ContentModal
+        item={selectedItem}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedItem(null);
+        }}
+        onDelete={() => {
+          refetch(); // Refresh search results after deletion
+        }}
+      />
     </div>
   );
 }

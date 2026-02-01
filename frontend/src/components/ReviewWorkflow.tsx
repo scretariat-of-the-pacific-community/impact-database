@@ -28,6 +28,7 @@ import ErrorBanner from './ErrorBanner';
 
 interface ReviewItem {
   id: string;
+  content_type?: string;  // 'image' or 'video'
   image_filename: string;
   status:
     | 'pending'
@@ -55,8 +56,11 @@ interface ReviewItem {
     severity?: string;
     filename?: string;
     thumbnail_url?: string;
+    resource_locator?: string;  // Video stream URL
+    duration?: number;  // Video duration in seconds
     latitude?: number;
     longitude?: number;
+    content_type?: string;  // For video metadata
     [key: string]: any;
   };
   // Legacy fields for backwards compatibility
@@ -479,31 +483,51 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
 
         {/* Item Info */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Image */}
+          {/* Image/Video */}
           <div className="lg:col-span-1">
             <div className="relative">
-              {thumbnailUrl || imageUrl ? (
-                <div className="relative w-full h-48 bg-gray-200 rounded-lg overflow-hidden">
-                  <img
-                    src={thumbnailUrl || imageUrl || ''}
-                    alt={safeTitle}
-                    className="w-full h-full object-cover cursor-pointer"
-                    onClick={() => setShowImageModal(true)}
-                    loading="lazy"
-                    decoding="async"
+              {item.content_type === 'video' ? (
+                // Video Player
+                <div className="relative w-full bg-black rounded-lg overflow-hidden">
+                  <video
+                    src={imageUrl}
+                    controls
+                    className="w-full h-full"
+                    style={{ aspectRatio: '16 / 9', maxHeight: '300px' }}
                   />
+                  {item.image_metadata?.duration && (
+                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                      ⏱️ {Math.floor(item.image_metadata.duration)}s
+                    </div>
+                  )}
                 </div>
               ) : (
-                <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <PhotoIcon className="h-12 w-12 text-gray-400" />
-                </div>
+                // Image Display
+                <>
+                  {thumbnailUrl || imageUrl ? (
+                    <div className="relative w-full h-48 bg-gray-200 rounded-lg overflow-hidden">
+                      <img
+                        src={thumbnailUrl || imageUrl || ''}
+                        alt={safeTitle}
+                        className="w-full h-full object-cover cursor-pointer"
+                        onClick={() => setShowImageModal(true)}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <PhotoIcon className="h-12 w-12 text-gray-400" />
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setShowImageModal(true)}
+                    className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 text-white rounded"
+                  >
+                    <EyeIcon className="h-4 w-4" />
+                  </button>
+                </>
               )}
-              <button
-                onClick={() => setShowImageModal(true)}
-                className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 text-white rounded"
-              >
-                <EyeIcon className="h-4 w-4" />
-              </button>
             </div>
           </div>
 
@@ -516,8 +540,10 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <label className="font-medium text-gray-700">Image ID:</label>
-                <p className="text-gray-900">{safeImageId}</p>
+                <label className="font-medium text-gray-700">
+                  {item.content_type === 'video' ? 'Video' : 'Image'} ID:
+                </label>
+                <p className="text-gray-900 text-xs break-all">{safeImageId}</p>
               </div>
               <div>
                 <label className="font-medium text-gray-700">
@@ -525,6 +551,12 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                 </label>
                 <p className="text-gray-900 capitalize">{safeHazardType}</p>
               </div>
+              {item.content_type === 'video' && item.image_metadata?.duration && (
+                <div>
+                  <label className="font-medium text-gray-700">Duration:</label>
+                  <p className="text-gray-900">{Math.floor(item.image_metadata.duration)}s</p>
+                </div>
+              )}
               <div>
                 <label className="font-medium text-gray-700">
                   Submitted By:

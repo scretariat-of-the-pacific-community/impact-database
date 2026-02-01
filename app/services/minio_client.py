@@ -14,6 +14,7 @@ MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
 MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 MINIO_SECURE = os.getenv("MINIO_SECURE", "false").lower() == "true"
 MINIO_BUCKET_NAME = os.getenv("MINIO_BUCKET_NAME") or os.getenv("MINIO_BUCKET") or "impact-images"
+MINIO_VIDEO_BUCKET = os.getenv("MINIO_VIDEO_BUCKET", "impact-videos")
 
 
 def get_minio_client():
@@ -32,6 +33,10 @@ class MinIOStorage:
     def __init__(self):
         self.client = None
         self.bucket_name = MINIO_BUCKET_NAME
+        self.video_bucket_name = MINIO_VIDEO_BUCKET
+        logger.info(
+            f"MinIO storage initialized - Images: {self.bucket_name}, Videos: {self.video_bucket_name}"
+        )
 
     def _get_client(self):
         """Get MinIO client instance, creating it if needed."""
@@ -41,13 +46,51 @@ class MinIOStorage:
         return self.client
 
     def _ensure_bucket_exists(self):
-        """Ensure the bucket exists, create if it doesn't."""
+        """Ensure both image and video buckets exist, create if they don't."""
         try:
+            # Ensure image bucket exists
             if not self.client.bucket_exists(self.bucket_name):
                 self.client.make_bucket(self.bucket_name)
                 logger.info(f"Created bucket: {self.bucket_name}")
+
+            # Ensure video bucket exists
+            if not self.client.bucket_exists(self.video_bucket_name):
+                self.client.make_bucket(self.video_bucket_name)
+                logger.info(f"Created video bucket: {self.video_bucket_name}")
+                self._set_video_lifecycle_policy()
+
         except S3Error as e:
-            logger.error(f"Error ensuring bucket exists: {e}")
+            logger.error(f"Error ensuring buckets exist: {e}")
+
+    def _set_video_lifecycle_policy(self):
+        """Configure lifecycle rules for video storage (Ticket 1.8)"""
+        try:
+            from datetime import timedelta
+            from minio.lifecycleconfig import Expiration, LifecycleConfig, Rule, Transition
+
+            lifecycle_config = LifecycleConfig(
+                [
+                    # Delete temp/failed uploads after 7 days
+                    Rule(
+                        "delete-temp-uploads",
+                        status="Enabled",
+                        expiration=Expiration(days=7),
+                        rule_filter={"prefix": "videos/temp/"},
+                    ),
+                    # Move originals to cold storage after 30 days
+                    Rule(
+                        "archive-originals",
+                        status="Enabled",
+                        transition=Transition(days=30, storage_class="STANDARD_IA"),
+                        rule_filter={"prefix": "videos/uploads/"},
+                    ),
+                ]
+            )
+
+            self.client.set_bucket_lifecycle(self.video_bucket_name, lifecycle_config)
+            logger.info(f"Set lifecycle policy for {self.video_bucket_name}")
+        except Exception as e:
+            logger.warning(f"Could not set lifecycle policy (MinIO may not support it): {e}")
             # Don't raise the error to allow the app to start
 
     def upload_file(self, file_path: str, object_name: str, content_type: str = None):

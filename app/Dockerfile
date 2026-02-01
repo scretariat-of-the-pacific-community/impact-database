@@ -30,12 +30,21 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
+ARG FFMPEG_VERSION=7:5.1.4-0+deb12u1
+
 # Install runtime dependencies only
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     postgresql-client \
     curl \
+    ffmpeg=${FFMPEG_VERSION} \
+    libavcodec-extra \
+    libx264-dev \
+    libvpx-dev \
+    libopus-dev \
     && rm -rf /var/lib/apt/lists/*
+
+RUN ffmpeg -version && ffprobe -version
 
 # Create non-root user
 RUN groupadd -r appuser && useradd -r -g appuser appuser
@@ -75,6 +84,8 @@ WORKDIR /app
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
+ARG FFMPEG_VERSION=7:5.1.4-0+deb12u1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
@@ -82,7 +93,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     curl \
     git \
+    ffmpeg=${FFMPEG_VERSION} \
+    libavcodec-extra \
+    libx264-dev \
+    libvpx-dev \
+    libopus-dev \
     && rm -rf /var/lib/apt/lists/*
+
+RUN ffmpeg -version && ffprobe -version
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \

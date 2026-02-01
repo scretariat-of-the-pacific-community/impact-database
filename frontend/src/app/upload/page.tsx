@@ -38,7 +38,7 @@ const MapPicker = dynamic(() => import('@/components/MapPicker'), {
     </div>
   ),
 });
-import { config } from '@/lib/config';
+import { config, getMaxFileSize, isVideoFile } from '@/lib/config';
 import { Button, FormField } from '@/components/design-system';
 import ErrorBanner from '@/components/ErrorBanner';
 import { trackUploadEvent } from '@/lib/analytics';
@@ -118,10 +118,19 @@ interface MetadataLike {
 }
 
 // File size constants (synchronized with backend and config)
-const MAX_FILE_SIZE = config.UPLOAD.MAX_FILE_SIZE;
 const MAX_BATCH_FILES = 10; // Maximum files per batch upload
 const MAX_BATCH_SIZE = 500 * 1024 * 1024; // 500MB total batch size
-const ALLOWED_EXTENSIONS = config.UPLOAD.ALLOWED_EXTENSIONS;
+const ALLOWED_EXTENSIONS = [
+  ...config.UPLOAD.ALLOWED_IMAGE_EXTENSIONS,
+  ...config.UPLOAD.ALLOWED_VIDEO_EXTENSIONS,
+];
+
+const formatBytes = (bytes: number) => {
+  if (bytes >= 1024 ** 3) {
+    return `${(bytes / 1024 ** 3).toFixed(1)}GB`;
+  }
+  return `${Math.round(bytes / 1024 ** 2)}MB`;
+};
 
 const humanizeFilename = (filename: string) => {
   const base = filename.replace(/\.[^/.]+$/, '');
@@ -426,8 +435,9 @@ export default function UploadPage() {
     }
 
     // Check file size maximum
-    if (file.size > MAX_FILE_SIZE) {
-      return `File size exceeds ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB limit`;
+    const maxFileSize = getMaxFileSize(file.name);
+    if (file.size > maxFileSize) {
+      return `File size exceeds ${formatBytes(maxFileSize)} limit`;
     }
 
     // Check file extension
@@ -921,6 +931,118 @@ export default function UploadPage() {
     mutationFn: async (formData: FormData) => {
       setUploadProgress(0);
 
+      // Check if the uploaded file is a video
+      const file = formData.get('file') as File;
+      if (file && isVideoFile(file.name)) {
+        // Use video upload API
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+
+          // Setup progress tracking
+          xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+              const percentComplete = (e.loaded / e.total) * 100;
+              setUploadProgress(Math.round(percentComplete));
+            }
+          });
+
+          // Setup response handlers
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                resolve(JSON.parse(xhr.responseText));
+              } catch (e) {
+                resolve(xhr.responseText);
+              }
+            } else {
+              let errorMessage = xhr.statusText;
+              try {
+                const errorData = JSON.parse(xhr.responseText);
+                if (errorData.detail) {
+                  errorMessage =
+                    typeof errorData.detail === 'string'
+                      ? errorData.detail
+                      : JSON.stringify(errorData.detail);
+                }
+              } catch (e) {
+                // Use status text if can't parse JSON
+              }
+              reject(new Error(`Upload failed: ${errorMessage}`));
+            }
+          };
+
+          xhr.onerror = () => reject(new Error('Upload failed: Network error'));
+          xhr.withCredentials = true;
+
+          // Get auth token from cookie or localStorage
+          const getAuthToken = () => {
+            const cookieToken = document.cookie
+              ?.split('; ')
+              .find((row) => row.startsWith('ocean_portal_token='))
+              ?.split('=')[1];
+            if (cookieToken) {
+              return decodeURIComponent(cookieToken);
+            }
+            return localStorage.getItem('authToken');
+          };
+
+          // Get CSRF token
+          const getCsrfToken = () => {
+            const cookie = document.cookie
+              ?.split('; ')
+              .find((row) => row.startsWith('csrf_token='))
+              ?.split('=')[1];
+            return cookie ? decodeURIComponent(cookie) : null;
+          };
+
+          // Extract metadata from formData and convert to video upload format
+          const metadataJson = formData.get('metadata_json');
+          let metadata: any = {};
+          if (metadataJson && typeof metadataJson === 'string') {
+            try {
+              metadata = JSON.parse(metadataJson);
+            } catch (e) {
+              console.error('Failed to parse metadata:', e);
+            }
+          }
+
+          // Create new FormData for video endpoint
+          const videoFormData = new FormData();
+          videoFormData.append('file', file);
+          videoFormData.append('hazard_type', metadata.hazard_type || 'other');
+          if (metadata.title) videoFormData.append('title', metadata.title);
+          if (metadata.abstract) videoFormData.append('abstract', metadata.abstract);
+          if (metadata.location) videoFormData.append('location', metadata.location);
+          if (metadata.country) videoFormData.append('country', metadata.country);
+          if (metadata.geometry?.coordinates) {
+            videoFormData.append('latitude', metadata.geometry.coordinates[1].toString());
+            videoFormData.append('longitude', metadata.geometry.coordinates[0].toString());
+          }
+          if (metadata.altitude !== null && metadata.altitude !== undefined) {
+            videoFormData.append('altitude', metadata.altitude.toString());
+          }
+          if (metadata.keywords && Array.isArray(metadata.keywords)) {
+            videoFormData.append('tags', metadata.keywords.join(','));
+          }
+
+          // Send to video upload endpoint
+          xhr.open('POST', `${config.API.BASE_URL}/api/video/upload/simple`);
+          
+          // Add authentication headers
+          const token = getAuthToken();
+          if (token) {
+            xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+          }
+          const csrfToken = getCsrfToken();
+          if (csrfToken) {
+            xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+          }
+          
+          xhr.send(videoFormData);
+        });
+      }
+
+      // Use image upload API for images
       return imageApi.upload(formData, (progress) => {
         setUploadProgress(progress);
       });
@@ -1283,13 +1405,13 @@ export default function UploadPage() {
                 <div className="mt-4">
                   <label htmlFor="file-upload" className="cursor-pointer">
                     <span className="mt-2 block text-sm font-medium text-white">
-                      Drop files here or click to select an image
+                      Drop files here or click to select an image or video
                     </span>
                     <input
                       id="file-upload"
                       type="file"
                       className="sr-only"
-                      accept="image/*"
+                      accept="image/*,video/*"
                       multiple
                       ref={fileInputRef}
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1304,7 +1426,8 @@ export default function UploadPage() {
                   </label>
                   <p className="mt-1 text-xs text-surface-soft/70">
                     {ALLOWED_EXTENSIONS.join(', ').toUpperCase()} up to{' '}
-                    {Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB per file
+                    {formatBytes(config.UPLOAD.MAX_IMAGE_SIZE)} for images and{' '}
+                    {formatBytes(config.UPLOAD.MAX_VIDEO_SIZE_FREE)} for videos
                     {/* Batch limits: max {MAX_BATCH_FILES} files, {Math.round(MAX_BATCH_SIZE / 1024 / 1024)}MB total */}
                   </p>
                   <p className="mt-1 text-xs text-surface-soft/50">
@@ -1317,7 +1440,7 @@ export default function UploadPage() {
                       variant="secondary"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      Choose Image
+                      Choose File
                     </Button>
                   </div>
                 </div>
@@ -1330,13 +1453,21 @@ export default function UploadPage() {
                   <div className="flex-shrink-0">
                     {previewUrl ? (
                       <div className="relative">
-                        <Image
-                          src={previewUrl}
-                          alt="Preview"
-                          width={100}
-                          height={100}
-                          className="rounded-xl object-cover"
-                        />
+                        {isVideoFile(selectedFile.name) ? (
+                          <video
+                            className="h-[100px] w-[100px] rounded-xl object-cover"
+                            controls
+                            src={previewUrl}
+                          />
+                        ) : (
+                          <Image
+                            src={previewUrl}
+                            alt="Preview"
+                            width={100}
+                            height={100}
+                            className="rounded-xl object-cover"
+                          />
+                        )}
                       </div>
                     ) : (
                       <div className="w-20 h-20 bg-deep-900/40 rounded-xl flex items-center justify-center">

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import config from '@/lib/config';
 
+// Proxy for /api/admin/imports -> /api/admin/curation/bulk-import
+
 export async function GET(request: NextRequest) {
   try {
     const cookieHeader = request.headers.get('cookie') || '';
@@ -18,7 +20,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const backendUrl = `${config.API.BASE_URL}/api/admin/imports`;
+    const searchParams = request.nextUrl.searchParams.toString();
+    const backendUrl = `${config.API.BASE_URL}/api/admin/curation/bulk-import${searchParams ? `?${searchParams}` : ''}`;
 
     const response = await fetch(backendUrl, {
       method: 'GET',
@@ -29,14 +32,10 @@ export async function GET(request: NextRequest) {
     });
 
     if (!response.ok) {
-      // Return empty array for not implemented endpoints
-      if (response.status === 404) {
-        return NextResponse.json({ jobs: [] });
-      }
       const errorText = await response.text();
-      console.error('Backend error:', response.status, errorText);
+      console.error('Backend bulk-import list error:', response.status, errorText);
       return NextResponse.json(
-        { error: 'Failed to fetch import jobs' },
+        { error: 'Failed to fetch imports' },
         { status: response.status }
       );
     }
@@ -44,9 +43,11 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
     return NextResponse.json(data);
   } catch (error) {
-    console.error('Imports API error:', error);
-    // Return empty array on error for graceful degradation
-    return NextResponse.json({ jobs: [] });
+    console.error('Imports list API error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     const formData = await request.formData();
-    const backendUrl = `${config.API.BASE_URL}/api/admin/imports`;
+    const backendUrl = `${config.API.BASE_URL}/api/admin/curation/bulk-import`;
 
     const response = await fetch(backendUrl, {
       method: 'POST',
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Backend error:', response.status, errorText);
+      console.error('Backend bulk-import create error:', response.status, errorText);
       return NextResponse.json(
         { error: 'Failed to create import job' },
         { status: response.status }

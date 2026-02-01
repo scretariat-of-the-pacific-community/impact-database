@@ -167,18 +167,16 @@ class UserSession(Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), ForeignKey("admin_users.id"), nullable=False)
-    session_token = Column(String, unique=True, nullable=False)
+    token = Column(String(500), unique=True, nullable=False)
 
     # Session info
     created_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)
-    last_activity = Column(DateTime, default=datetime.utcnow)
-    is_active = Column(Boolean, default=True)
+    is_revoked = Column(Boolean, default=False)
 
     # Client info
-    ip_address = Column(String, nullable=True)
+    ip_address = Column(String(45), nullable=True)
     user_agent = Column(String, nullable=True)
-    device_info = Column(JSON, nullable=True)
 
     # Relationships
     user = relationship("AdminUser", back_populates="sessions")
@@ -254,6 +252,7 @@ class AdminService:
             full_name=full_name,
             organization=organization,
             email_verification_token=secrets.token_urlsafe(32),
+            is_active=True,  # Explicitly set active status
         )
 
         self.db.add(user)
@@ -343,7 +342,7 @@ class AdminService:
         """Create a new user session."""
         session = UserSession(
             user_id=user.id,
-            session_token=secrets.token_urlsafe(32),
+            token=secrets.token_urlsafe(32),
             expires_at=datetime.utcnow() + timedelta(hours=24),
             ip_address=ip_address,
             user_agent=user_agent,
@@ -359,27 +358,24 @@ class AdminService:
         session = (
             self.db.query(UserSession)
             .filter(
-                UserSession.session_token == token,
-                UserSession.is_active == True,
+                UserSession.token == token,
+                UserSession.is_revoked == False,
                 UserSession.expires_at > datetime.utcnow(),
             )
             .first()
         )
 
         if session:
-            # Update last activity
-            session.last_activity = datetime.utcnow()
-            self.db.commit()
             return session.user
 
         return None
 
     def revoke_session(self, token: str):
         """Revoke a user session."""
-        session = self.db.query(UserSession).filter(UserSession.session_token == token).first()
+        session = self.db.query(UserSession).filter(UserSession.token == token).first()
 
         if session:
-            session.is_active = False
+            session.is_revoked = True
             self.db.commit()
 
     def update_user_role(self, user_id: str, new_role: UserRole, updated_by: str):

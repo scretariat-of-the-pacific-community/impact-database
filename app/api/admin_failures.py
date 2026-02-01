@@ -9,7 +9,8 @@ from pydantic import BaseModel
 
 from models.database import get_db
 from models.upload_failures import UploadFailureLog, FailureReason
-from api.auth import get_current_user, User, require_admin
+from api.auth_rbac import check_permission
+from services.admin_service import AdminUser, Permission
 
 router = APIRouter(prefix="/admin/upload-failures", tags=["admin", "monitoring"])
 
@@ -51,7 +52,7 @@ class FailurePattern(BaseModel):
 @router.get("/stats", response_model=FailureStats)
 async def get_failure_stats(
     days: int = Query(default=7, ge=1, le=90, description="Number of days to analyze"),
-    current_user: User = Depends(require_admin),
+    current_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)),
     db: Session = Depends(get_db),
 ):
     """
@@ -140,7 +141,7 @@ async def get_failure_stats(
 @router.get("/patterns", response_model=List[FailurePattern])
 async def analyze_failure_patterns(
     days: int = Query(default=7, ge=1, le=90),
-    current_user: User = Depends(require_admin),
+    current_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)),
     db: Session = Depends(get_db),
 ):
     """
@@ -275,7 +276,7 @@ async def analyze_failure_patterns(
 
 @router.get("/details/{failure_id}", response_model=FailureDetail)
 async def get_failure_details(
-    failure_id: int, current_user: User = Depends(require_admin), db: Session = Depends(get_db)
+    failure_id: int, current_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)), db: Session = Depends(get_db)
 ):
     """
     Get detailed information about a specific failure.
@@ -308,7 +309,7 @@ async def list_failures(
     days: int = Query(default=7, ge=1, le=90),
     limit: int = Query(default=50, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
-    current_user: User = Depends(require_admin),
+    current_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)),
     db: Session = Depends(get_db),
 ):
     """
@@ -348,7 +349,7 @@ async def list_failures(
 @router.delete("/cleanup")
 async def cleanup_old_failures(
     days: int = Query(default=90, ge=30, le=365, description="Delete failures older than N days"),
-    current_user: User = Depends(require_admin),
+    current_user: AdminUser = Depends(check_permission(Permission.MANAGE_USERS)),
     db: Session = Depends(get_db),
 ):
     """

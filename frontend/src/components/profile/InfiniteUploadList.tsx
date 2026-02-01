@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback, ComponentType } from 'react';
+import React, { useEffect, useRef, useCallback, ComponentType, useState } from 'react';
 // @ts-ignore - TanStack Query v5 exports useInfiniteQuery
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { VariableSizeList as List } from 'react-window';
@@ -9,6 +9,8 @@ import { MapPin, Loader2, CheckCircle, XCircle, Clock3 } from 'lucide-react';
 import { Card, Button } from '@/components/design-system';
 import { imageApi } from '@/lib/api';
 import { HAZARD_TYPE_LABELS, HazardType } from '@/lib/types';
+import { withBasePath } from '@/lib/navigation';
+import ContentModal from '@/components/ContentModal';
 
 const glassCard =
   'rounded-3xl border border-white/10 bg-white/5 backdrop-blur shadow-xl';
@@ -25,6 +27,9 @@ interface Upload {
   views: number;
   latitude: number;
   longitude: number;
+  content_type?: string;
+  thumbnail_url?: string;
+  duration?: number;
 }
 
 interface InfiniteUploadListProps {
@@ -38,6 +43,8 @@ export default function InfiniteUploadList({
   isActive = true,
 }: InfiniteUploadListProps) {
   const observerTarget = useRef<HTMLDivElement>(null);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Only fetch when enabled AND tab is active
   const shouldFetch = enabled && isActive;
@@ -188,7 +195,28 @@ export default function InfiniteUploadList({
               variant="secondary"
               size="sm"
               className="bg-white/10 text-white hover:bg-white/20 min-w-[44px] min-h-[44px] ml-2 flex-shrink-0"
-              onClick={() => window.open(`/images/${upload.id}`, '_blank')}
+              onClick={() => {
+                const isVideo = upload.content_type === 'video';
+                if (isVideo) {
+                  // Open modal for videos
+                  setSelectedItem({
+                    id: upload.id,
+                    title: upload.title || upload.filename,
+                    hazard_type: upload.hazard_type,
+                    location: upload.location,
+                    uploaded_at: upload.uploaded_at,
+                    latitude: upload.latitude,
+                    longitude: upload.longitude,
+                    content_type: 'video',
+                    thumbnail_url: upload.thumbnail_url,
+                    duration: upload.duration,
+                  });
+                  setIsModalOpen(true);
+                } else {
+                  // Navigate to detail page for images
+                  window.open(withBasePath(`/images/${upload.id}`), '_blank');
+                }
+              }}
             >
               View
             </Button>
@@ -199,9 +227,18 @@ export default function InfiniteUploadList({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Mobile: Simple list with infinite scroll */}
-      <div className="md:hidden">
+    <>
+      <ContentModal
+        item={selectedItem}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedItem(null);
+        }}
+      />
+      <div className="space-y-4">
+        {/* Mobile: Simple list with infinite scroll */}
+        <div className="md:hidden">
         {uploads.map((upload: any) => (
           <UploadRow
             key={upload.id}
@@ -253,6 +290,7 @@ export default function InfiniteUploadList({
           }}
         </AutoSizer>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

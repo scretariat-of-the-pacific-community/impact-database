@@ -5,6 +5,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/providers/auth-provider';
+
+// Force dynamic rendering to support useSearchParams()
+export const dynamic = 'force-dynamic';
 import { useQuery } from '@tanstack/react-query';
 import {
   Loader2,
@@ -40,10 +43,10 @@ import SwipeableTabs from '@/components/profile/SwipeableTabs';
 import InfiniteUploadList from '@/components/profile/InfiniteUploadList';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ErrorBanner from '@/components/ErrorBanner';
-import dynamic from 'next/dynamic';
+import NextDynamic from 'next/dynamic';
 
 // Dynamically import UserAnalyticsReal to prevent SSR (Leaflet requires window object)
-const UserAnalyticsReal = dynamic(
+const UserAnalyticsReal = NextDynamic(
   () =>
     import('@/components/profile/UserAnalyticsReal').then((mod) => mod.default),
   {

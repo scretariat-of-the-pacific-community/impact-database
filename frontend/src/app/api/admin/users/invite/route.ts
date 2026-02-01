@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { config } from '@/lib/config';
+import config from '@/lib/config';
 
 /**
  * POST /api/admin/users/invite
@@ -7,33 +7,55 @@ import { config } from '@/lib/config';
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const apiUrl = config.API.BASE_URL;
+    const cookieHeader = request.headers.get('cookie') || '';
+    const cookies = Object.fromEntries(
+      cookieHeader.split(';').map((c) => {
+        const [key, ...val] = c.trim().split('=');
+        return [key, val.join('=')];
+      })
+    );
 
-    // Forward the request to the backend
-    const response = await fetch(`${apiUrl}/api/admin/users/invite`, {
+    const rawToken = cookies['ocean_portal_token'];
+    const token = rawToken ? decodeURIComponent(rawToken) : null;
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const backendUrl = `${config.API.BASE_URL}/api/admin/users/invite`;
+
+    const response = await fetch(backendUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Forward the authorization header
-        ...(request.headers.get('Authorization')
-          ? { Authorization: request.headers.get('Authorization')! }
-          : {}),
-        // Forward cookies for session-based auth
-        ...(request.headers.get('Cookie')
-          ? { Cookie: request.headers.get('Cookie')! }
-          : {}),
+        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(body),
     });
 
-    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorDetail = 'Failed to send invitation';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.detail || errorJson.error || errorDetail;
+      } catch {
+        errorDetail = errorText || errorDetail;
+      }
+      console.error('Backend invite error:', response.status, errorText);
+      return NextResponse.json(
+        { error: errorDetail, detail: errorDetail },
+        { status: response.status }
+      );
+    }
 
-    return NextResponse.json(data, { status: response.status });
+    const data = await response.json();
+    return NextResponse.json(data);
   } catch (error) {
-    console.error('[Admin Invite] Error:', error);
+    console.error('Invite API error:', error);
     return NextResponse.json(
-      { detail: 'Failed to process invite request' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

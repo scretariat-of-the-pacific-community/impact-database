@@ -137,13 +137,15 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
+      style={{ width: '100%' }}
     >
-      <ResponsiveContainer
-        width="100%"
-        height={300}
-        minWidth={100}
-        minHeight={300}
-      >
+      <div style={{ width: '100%', height: '300px' }}>
+        <ResponsiveContainer
+          width="100%"
+          height={300}
+          minWidth={100}
+          minHeight={300}
+        >
         <AreaChart
           data={enrichedData}
           margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
@@ -191,7 +193,8 @@ export default function TimelineTrendArea({ data, className = '' }: Props) {
             />
           )}
         </AreaChart>
-      </ResponsiveContainer>
+        </ResponsiveContainer>
+      </div>
 
       {/* Insight Line */}
       <div className="mt-3 border-t border-white/5 pt-3">

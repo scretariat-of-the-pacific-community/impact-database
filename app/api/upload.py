@@ -681,14 +681,12 @@ async def delete_image(
             str(image.uploader_id) == user_identifier or image.uploader_id == current_user.username
         )
 
+        # Permission check: Allow if user is admin OR owner
         if not user_is_admin and not user_is_owner:
             raise HTTPException(status_code=403, detail="You can only delete your own images")
 
-        # Only allow deletion of pending_review images by non-admins
-        if not user_is_admin and image.status not in ["pending_review", None]:
-            raise HTTPException(
-                status_code=403, detail="You can only delete images that are pending review"
-            )
+        # Admins can delete any image; owners can delete their own images
+        # This allows users to clean up their uploads and admins to manage content
 
         # Create audit log before deletion
         record_id = str(image.id) if hasattr(image, "id") else image.filename

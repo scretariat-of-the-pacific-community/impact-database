@@ -310,7 +310,7 @@ export default function Collaboration({
         description: ws.description || 'Workspace',
       }));
     }
-    const fallback = [];
+    const fallback: any = [];
     if (stats) {
       fallback.push({
         id: 'workspace-primary',

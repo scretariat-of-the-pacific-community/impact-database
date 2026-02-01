@@ -60,7 +60,7 @@ def test_model_definitions():
         # Test enums
         assert CurationStatus.PENDING.value == "pending"
         assert Priority.HIGH.value == "high"
-        assert ActionType.REVIEWED.value == "reviewed"
+        assert ActionType.REVIEWED.value == "REVIEWED"
         print("✅ Enums defined correctly")
 
         from services.admin_service import UserRole, Permission

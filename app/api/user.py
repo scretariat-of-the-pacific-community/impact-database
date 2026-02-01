@@ -11,8 +11,8 @@ import logging
 import json
 import io
 
-from models.database import get_db, ImageMetadata
-from models.rbac import User as DBUser
+from models.database import get_db, ImageMetadata, VideoMetadata
+from models.rbac import User as DBUser, Role as DBRole
 from models.audit_log import AuditLog
 from api.auth_rbac import EnhancedUser, get_current_user_enhanced
 from api.dependencies import UserDetails, get_user_details, build_user_upload_filter
@@ -317,25 +317,25 @@ async def get_user_uploads(
     db: Session = Depends(get_db),
     current_user: EnhancedUser = Depends(get_current_user_enhanced),
 ):
-    """Get paginated list of user's uploads."""
+    """Get paginated list of user's uploads (images + videos)."""
     try:
-        query = db.query(ImageMetadata).filter(ImageMetadata.uploader_id == current_user.username)
-
-        # Filter by status if provided
+        # Query images
+        image_query = db.query(ImageMetadata).filter(ImageMetadata.uploader_id == current_user.username)
         if status:
-            query = query.filter(ImageMetadata.status == status)
+            image_query = image_query.filter(ImageMetadata.status == status)
+        images = image_query.order_by(desc(ImageMetadata.datetime)).all()
+        
+        # Query videos
+        video_query = db.query(VideoMetadata).filter(VideoMetadata.uploader_id == current_user.username)
+        if status:
+            video_query = video_query.filter(VideoMetadata.status == status)
+        videos = video_query.order_by(desc(VideoMetadata.created_at)).all()
 
-        # Order by upload date (newest first)
-        query = query.order_by(desc(ImageMetadata.datetime))
-
-        # Calculate pagination
-        offset = (page - 1) * limit
-
-        uploads = query.offset(offset).limit(limit).all()
-
-        # Format response
+        # Combine and format response
         results = []
-        for upload in uploads:
+        
+        # Add images
+        for upload in images:
             results.append(
                 {
                     "id": str(upload.id),
@@ -345,13 +345,42 @@ async def get_user_uploads(
                     "location": upload.location or upload.geographic_identifier,
                     "uploaded_at": upload.datetime.isoformat() if upload.datetime else None,
                     "approval_status": upload.status,
-                    "views": 0,  # Field doesn't exist in model
+                    "views": 0,
                     "latitude": upload.latitude,
                     "longitude": upload.longitude,
+                    "thumbnail_url": f"/upload/images/{upload.filename}/thumbnail",
+                    "content_type": "image",
                 }
             )
+        
+        # Add videos
+        for video in videos:
+            results.append(
+                {
+                    "id": str(video.id),
+                    "filename": video.filename,
+                    "title": video.title or video.original_filename or video.filename,
+                    "hazard_type": video.hazard_type,
+                    "location": "",
+                    "uploaded_at": video.created_at.isoformat() if video.created_at else None,
+                    "approval_status": video.status,
+                    "views": video.view_count if hasattr(video, "view_count") else 0,
+                    "latitude": float(video.latitude) if hasattr(video, "latitude") and video.latitude else None,
+                    "longitude": float(video.longitude) if hasattr(video, "longitude") and video.longitude else None,
+                    "thumbnail_url": f"/api/video/thumbnail/{video.id}",
+                    "content_type": "video",
+                    "duration": video.duration if hasattr(video, "duration") else None,
+                }
+            )
+        
+        # Sort by upload date (newest first)
+        results.sort(key=lambda x: x["uploaded_at"] or "", reverse=True)
+        
+        # Apply pagination after sorting
+        offset = (page - 1) * limit
+        paginated_results = results[offset:offset + limit]
 
-        return results
+        return paginated_results
 
     except Exception as e:
         logger.error(f"Error fetching user uploads: {e}")
@@ -841,12 +870,19 @@ async def export_user_data(
             db.query(ImageMetadata).filter(ImageMetadata.uploader_id == current_user.username).all()
         )
 
+        role_name = None
+        if user and user.role:
+            role_name = user.role.name
+        elif user and user.role_id is not None:
+            role = db.query(DBRole).filter(DBRole.id == user.role_id).first()
+            role_name = role.name if role else None
+
         export_data = {
             "user": {
                 "username": current_user.username,
                 "email": user.email if user else None,
                 "full_name": user.full_name if user and user.full_name else None,
-                "roles": [role.name for role in current_user.roles],
+                "roles": [role_name] if role_name else [],
             },
             "uploads": [
                 {
