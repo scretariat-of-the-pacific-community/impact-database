@@ -5,7 +5,7 @@ asyncpg==0.30.0
 alembic==1.16.4
 pydantic[email]==2.11.7
 pydantic-settings==2.4.0
-python-multipart==0.0.20
+python-multipart==0.0.22
 geoalchemy2==0.18.0
 shapely==2.0.7
 psycopg2-binary==2.9.10
@@ -13,7 +13,7 @@ boto3==1.40.12
 celery==5.5.3
 flower==2.0.1
 redis==6.4.0
-Pillow==11.3.0
+Pillow==12.1.1
 python-dateutil==2.9.0.post0
 jinja2==3.1.6
 # Enhanced EXIF, XMP, and HEIF support
@@ -25,7 +25,7 @@ pytest-asyncio==1.1.0
 httpx==0.28.1
 pytest-cov==6.2.1
 jsonschema==4.25.1
-strawberry-graphql==0.278.1
+strawberry-graphql==0.312.3
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 bcrypt>=3.2.0,<4.0.0
