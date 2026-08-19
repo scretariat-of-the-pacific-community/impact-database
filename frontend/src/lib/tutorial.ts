@@ -106,16 +106,6 @@ export const tutorialSteps = {
         align: 'start',
       },
     },
-    {
-      element: '#collaboration-link',
-      popover: {
-        title: 'Collaborate Live',
-        description:
-          'Invite teammates, follow hazards/regions, and get notified when you’re @mentioned.',
-        side: 'bottom',
-        align: 'start',
-      },
-    },
   ] as DriveStep[],
 
   // Upload page tour

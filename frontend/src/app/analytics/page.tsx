@@ -387,10 +387,15 @@ export default function EnhancedAnalytics() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
+                  <label
+                    htmlFor="analytics-start-date"
+                    className="block text-sm font-medium text-white/80 mb-2"
+                  >
                     Start Date
                   </label>
                   <input
+                    id="analytics-start-date"
+                    name="startDate"
                     type="date"
                     value={filters.startDate}
                     onChange={(
@@ -401,10 +406,15 @@ export default function EnhancedAnalytics() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-white/80 mb-2">
+                  <label
+                    htmlFor="analytics-end-date"
+                    className="block text-sm font-medium text-white/80 mb-2"
+                  >
                     End Date
                   </label>
                   <input
+                    id="analytics-end-date"
+                    name="endDate"
                     type="date"
                     value={filters.endDate}
                     onChange={(

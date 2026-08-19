@@ -71,11 +71,6 @@ const FeaturedStories = nextDynamic(
   }
 );
 
-const SocialProof = nextDynamic(() => import('@/components/SocialProof'), {
-  ssr: false,
-  loading: () => null,
-});
-
 const GamificationBadges = nextDynamic(
   () => import('@/components/GamificationBadges'),
   {
@@ -516,13 +511,13 @@ export default function PacificImpactAtlasDashboard() {
   });
 
   const images = (data as any)?.results ?? [];
-  
+
   // Debug logging
   if (data && typeof window !== 'undefined') {
-    console.log('Dashboard data received:', { 
-      total: (data as any)?.total, 
+    console.log('Dashboard data received:', {
+      total: (data as any)?.total,
       resultsCount: images.length,
-      stats: (data as any)?.stats 
+      stats: (data as any)?.stats,
     });
   }
 
@@ -1106,7 +1101,11 @@ export default function PacificImpactAtlasDashboard() {
 
                   return (
                     <motion.div
-                      key={image.filename || `${image.title}-${index}` || `recent-${index}`}
+                      key={
+                        image.filename ||
+                        `${image.title}-${index}` ||
+                        `recent-${index}`
+                      }
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
@@ -1125,15 +1124,24 @@ export default function PacificImpactAtlasDashboard() {
                             onError={(e: any) => {
                               // Fallback: try using the url field or construct from filename
                               const target = e.target as HTMLImageElement;
-                              const contentType = (image as { content_type?: string }).content_type;
+                              const contentType = (
+                                image as { content_type?: string }
+                              ).content_type;
                               let fallbackUrl = '';
-                              
-                              if (contentType === 'video' && (image as { url?: string }).url) {
-                                fallbackUrl = getApiUrl((image as { url: string }).url);
+
+                              if (
+                                contentType === 'video' &&
+                                (image as { url?: string }).url
+                              ) {
+                                fallbackUrl = getApiUrl(
+                                  (image as { url: string }).url
+                                );
                               } else if (image.filename) {
-                                fallbackUrl = getApiUrl(`/upload/images/${encodeURIComponent(image.filename)}`);
+                                fallbackUrl = getApiUrl(
+                                  `/upload/images/${encodeURIComponent(image.filename)}`
+                                );
                               }
-                              
+
                               if (fallbackUrl && target.src !== fallbackUrl) {
                                 target.src = fallbackUrl;
                               } else {
@@ -1210,9 +1218,6 @@ export default function PacificImpactAtlasDashboard() {
               </div>
             )}
           </section>
-
-          {/* Week 3: Social Proof Section */}
-          <SocialProof />
 
           {/* Week 3: Video Explainer */}
           <VideoExplainer />

@@ -163,6 +163,12 @@ const nextConfig = {
   reactStrictMode: true,
   // Skip trailing slash redirects (moved from experimental)
   skipTrailingSlashRedirect: true,
+  // Allow cross-origin requests from the development server
+  allowedDevOrigins: [
+    'opmthredds.gem.spc.int',
+    'http://opmthredds.gem.spc.int',
+    'https://opmthredds.gem.spc.int',
+  ],
   // Improve Fast Refresh performance
   experimental: {
     optimizeCss: false, // Disable CSS optimization in development

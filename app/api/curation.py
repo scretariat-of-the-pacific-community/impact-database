@@ -265,10 +265,19 @@ async def get_curation_queue(
         # Build base query using raw SQL - select only columns we care about
         base_query = """
         SELECT 
-            id, content_type, content_id, image_id, status, priority, assigned_to, 
-            created_at, updated_at, due_date, submitted_by, submission_notes, 
-            reviewed_by, reviewed_at, review_notes, is_flagged, flag_reason, 
-            is_duplicate, duplicate_of, is_deleted, deleted_by, deleted_at
+            CAST(id AS TEXT) as id, 
+            content_type, 
+            CAST(content_id AS TEXT) as content_id, 
+            CAST(image_id AS TEXT) as image_id,
+            status, priority, CAST(assigned_to AS TEXT) as assigned_to, 
+            created_at, updated_at, due_date, 
+            CAST(submitted_by AS TEXT) as submitted_by, 
+            submission_notes, 
+            CAST(reviewed_by AS TEXT) as reviewed_by, 
+            reviewed_at, review_notes, is_flagged, flag_reason, 
+            is_duplicate, CAST(duplicate_of AS TEXT) as duplicate_of, 
+            is_deleted, CAST(deleted_by AS TEXT) as deleted_by, 
+            deleted_at
         FROM curation_queue
         WHERE 1=1
         """
@@ -277,12 +286,22 @@ async def get_curation_queue(
         filters = []
         params = {}
         
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Building curation queue query for user {current_user.id} with role: {user_role}")
+        
         if user_role == "contributor":
             filters.append("submitted_by = :user_id")
             params["user_id"] = str(current_user.id)
+            logger.debug(f"Applied contributor filter: only own submissions")
         elif user_role == "curator" and not show_all:
             filters.append("(assigned_to IS NULL OR assigned_to = :user_id)")
             params["user_id"] = str(current_user.id)
+            logger.debug(f"Applied curator filter: unassigned or assigned to self")
+        elif user_role == "admin":
+            logger.debug(f"Admin user: no role-based restrictions")
+        else:
+            logger.debug(f"Unknown role '{user_role}': applying no role restrictions")
         
         if status:
             filters.append("status = :status")
@@ -300,7 +319,7 @@ async def get_curation_queue(
             filters.append("is_duplicate = :is_duplicate")
             params["is_duplicate"] = is_duplicate
         if not show_deleted:
-            filters.append("is_deleted = false")
+            filters.append("COALESCE(is_deleted, false) = false")
         
         # Add filters to query
         if filters:
@@ -311,7 +330,9 @@ async def get_curation_queue(
         if filters:
             count_query += " AND " + " AND ".join(filters)
         
+        logger.debug(f"Count query: {count_query} with params: {params}")
         total_count = db.execute(sql_text(count_query), params).scalar()
+        logger.debug(f"Queue returned {total_count} total items")
         
         # Apply sorting
         sort_field = sort_by
@@ -343,6 +364,8 @@ async def get_curation_queue(
         
         # Convert rows to response items
         response_items = []
+        from uuid import UUID as UUIDType
+        
         for row in rows:
             row_dict = dict(row._mapping) if hasattr(row, '_mapping') else dict(zip(result.keys(), row))
             
@@ -353,61 +376,85 @@ async def get_curation_queue(
             image_filename = None
             
             if content_type == 'image' and content_id:
-                image = db.query(ImageMetadata).filter(ImageMetadata.id == content_id).first()
-                if image:
-                    image_metadata = image.to_dict()
-                    image_metadata['content_type'] = 'image'
-                    image_filename = image.filename
+                try:
+                    from uuid import UUID
+                    content_uuid = UUID(content_id) if isinstance(content_id, str) else content_id
+                    image = db.query(ImageMetadata).filter(ImageMetadata.id == content_uuid).first()
+                    if image:
+                        image_metadata = image.to_dict()
+                        image_metadata['content_type'] = 'image'
+                        image_filename = image.filename
+                except Exception as e:
+                    logger.debug(f"Error fetching image metadata for {content_id}: {e}")
             elif content_type == 'video' and content_id:
-                video = db.query(VideoMetadata).filter(VideoMetadata.id == content_id).first()
-                if video:
-                    image_metadata = video.to_dict()
-                    image_metadata['content_type'] = 'video'
-                    image_filename = video.filename
+                try:
+                    from uuid import UUID
+                    content_uuid = UUID(content_id) if isinstance(content_id, str) else content_id
+                    video = db.query(VideoMetadata).filter(VideoMetadata.id == content_uuid).first()
+                    if video:
+                        image_metadata = video.to_dict()
+                        image_metadata['content_type'] = 'video'
+                        image_filename = video.filename
+                except Exception as e:
+                    logger.debug(f"Error fetching video metadata for {content_id}: {e}")
             
             # Get counts
             queue_id = row_dict.get('id')
-            comments_count = (
-                db.query(func.count(CurationComment.id))
-                .filter(CurationComment.queue_item_id == queue_id, CurationComment.is_deleted == False)
-                .scalar()
-            )
+            try:
+                comments_count = (
+                    db.query(func.count(CurationComment.id))
+                    .filter(CurationComment.queue_item_id == queue_id, CurationComment.is_deleted == False)
+                    .scalar()
+                ) or 0
+            except Exception as e:
+                logger.debug(f"Error counting comments: {e}")
+                comments_count = 0
 
-            actions_count = (
-                db.query(func.count(CurationAction.id))
-                .filter(CurationAction.queue_item_id == queue_id)
-                .scalar()
-            )
+            try:
+                actions_count = (
+                    db.query(func.count(CurationAction.id))
+                    .filter(CurationAction.queue_item_id == queue_id)
+                    .scalar()
+                ) or 0
+            except Exception as e:
+                logger.debug(f"Error counting actions: {e}")
+                actions_count = 0
 
-            response_item = CurationItemResponse(
-                id=str(row_dict.get('id')),
-                content_type=content_type,
-                content_id=str(content_id) if content_id else None,
-                image_id=str(row_dict.get('image_id')) if row_dict.get('image_id') else None,
-                image_filename=image_filename,
-                status=row_dict.get('status'),
-                priority=row_dict.get('priority'),
-                assigned_to=row_dict.get('assigned_to'),
-                created_at=row_dict.get('created_at').isoformat() if row_dict.get('created_at') else None,
-                updated_at=row_dict.get('updated_at').isoformat() if row_dict.get('updated_at') else None,
-                due_date=row_dict.get('due_date').isoformat() if row_dict.get('due_date') else None,
-                submitted_by=row_dict.get('submitted_by'),
-                submission_notes=row_dict.get('submission_notes'),
-                reviewed_by=row_dict.get('reviewed_by'),
-                reviewed_at=row_dict.get('reviewed_at').isoformat() if row_dict.get('reviewed_at') else None,
-                review_notes=row_dict.get('review_notes'),
-                is_flagged=row_dict.get('is_flagged', False),
-                flag_reason=row_dict.get('flag_reason'),
-                is_duplicate=row_dict.get('is_duplicate', False),
-                duplicate_of=row_dict.get('duplicate_of'),
-                is_deleted=row_dict.get('is_deleted', False),
-                deleted_by=row_dict.get('deleted_by'),
-                deleted_at=row_dict.get('deleted_at').isoformat() if row_dict.get('deleted_at') else None,
-                image_metadata=image_metadata,
-                comments_count=comments_count,
-                actions_count=actions_count,
-            )
-            response_items.append(response_item)
+            try:
+                response_item = CurationItemResponse(
+                    id=row_dict.get('id'),
+                    content_type=content_type,
+                    content_id=content_id,
+                    image_id=row_dict.get('image_id'),
+                    image_filename=image_filename if image_filename else None,
+                    status=row_dict.get('status'),
+                    priority=row_dict.get('priority') or 'medium',
+                    assigned_to=row_dict.get('assigned_to'),
+                    created_at=row_dict.get('created_at').isoformat() if row_dict.get('created_at') else None,
+                    updated_at=row_dict.get('updated_at').isoformat() if row_dict.get('updated_at') else None,
+                    due_date=row_dict.get('due_date').isoformat() if row_dict.get('due_date') else None,
+                    submitted_by=row_dict.get('submitted_by'),
+                    submission_notes=row_dict.get('submission_notes'),
+                    reviewed_by=row_dict.get('reviewed_by'),
+                    reviewed_at=row_dict.get('reviewed_at').isoformat() if row_dict.get('reviewed_at') else None,
+                    review_notes=row_dict.get('review_notes'),
+                    is_flagged=row_dict.get('is_flagged') if row_dict.get('is_flagged') is not None else False,
+                    flag_reason=row_dict.get('flag_reason'),
+                    is_duplicate=row_dict.get('is_duplicate') if row_dict.get('is_duplicate') is not None else False,
+                    duplicate_of=row_dict.get('duplicate_of'),
+                    is_deleted=row_dict.get('is_deleted') if row_dict.get('is_deleted') is not None else False,
+                    deleted_by=row_dict.get('deleted_by'),
+                    deleted_at=row_dict.get('deleted_at').isoformat() if row_dict.get('deleted_at') else None,
+                    image_metadata=image_metadata,
+                    comments_count=comments_count,
+                    actions_count=actions_count,
+                )
+                response_items.append(response_item)
+            except Exception as e:
+                logger.error(f"Error creating CurationItemResponse for id {row_dict.get('id')}: {e}")
+                logger.error(f"row_dict keys: {list(row_dict.keys())}")
+                logger.error(f"row_dict['id'] type: {type(row_dict.get('id'))}, value: {row_dict.get('id')}")
+                raise
 
         # Calculate total pages
         total_pages = (total_count + page_size - 1) // page_size if page_size > 0 else 0
@@ -423,11 +470,16 @@ async def get_curation_queue(
         # Log error and return empty response rather than 500
         import logging
         logger = logging.getLogger(__name__)
-        logger.error(f"Error in get_curation_queue: {e}")
-        import traceback
-        logger.error(traceback.format_exc())
+        logger.error(f"Error in get_curation_queue: {str(e)}", exc_info=True)
+        logger.error(f"User role: {user_role}, Show deleted: {show_deleted}, Show all: {show_all}")
+        logger.error(f"Filters applied: {filters}")
         
-        # Return empty queue instead of error
+        # In development, raise the error; in production, return empty queue
+        import os
+        if os.getenv("ENVIRONMENT") == "development":
+            raise HTTPException(status_code=500, detail=f"Curation queue error: {str(e)}")
+        
+        # Return empty queue instead of error (production fallback)
         return PaginatedCurationResponse(
             items=[],
             total=0,
@@ -450,8 +502,33 @@ async def get_curation_item(
 
     # Get image metadata
     image_metadata = None
-    if item.image:
-        image_metadata = item.image.to_dict()
+    content_id = str(item.content_id) if item.content_id else None
+    
+    # Get content based on type
+    if item.content_type == "image":
+        if item.image:
+            image_metadata = item.image.to_dict()
+        elif content_id:
+            try:
+                from models.database import ImageMetadata
+                from uuid import UUID
+
+                content_uuid = UUID(content_id) if isinstance(content_id, str) else content_id
+                image = db.query(ImageMetadata).filter(ImageMetadata.id == content_uuid).first()
+                if image:
+                    image_metadata = image.to_dict()
+            except Exception as e:
+                logger.debug(f"Error fetching image metadata for {content_id}: {e}")
+    elif item.content_type == "video" and content_id:
+        try:
+            from uuid import UUID
+            content_uuid = UUID(content_id) if isinstance(content_id, str) else content_id
+            video = db.query(VideoMetadata).filter(VideoMetadata.id == content_uuid).first()
+            if video:
+                image_metadata = video.to_dict()
+                image_metadata["content_type"] = "video"
+        except Exception as e:
+            logger.debug(f"Error fetching video metadata for {content_id}: {e}")
 
     # Get counts
     comments_count = (
@@ -466,8 +543,17 @@ async def get_curation_item(
         .scalar()
     )
 
+    # Prepare response data, ensuring boolean fields default to False if NULL
+    item_data = item.to_dict()
+    item_data["is_flagged"] = item_data.get("is_flagged") or False
+    item_data["is_duplicate"] = item_data.get("is_duplicate") or False
+    item_data["is_deleted"] = item_data.get("is_deleted") or False
+
+    if image_metadata and not item_data.get("image_filename"):
+        item_data["image_filename"] = image_metadata.get("filename")
+
     return CurationItemResponse(
-        **item.to_dict(),
+        **item_data,
         image_metadata=image_metadata,
         comments_count=comments_count,
         actions_count=actions_count,

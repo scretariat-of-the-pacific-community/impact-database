@@ -171,6 +171,13 @@ class HazardType(str, Enum):
     wildfire = "wildfire"
     volcanic = "volcanic"
     coastal_erosion = "coastal_erosion"
+    sea_level_rise = "sea_level_rise"
+    storm_surge = "storm_surge"
+    ocean_acidification = "ocean_acidification"
+    coral_bleaching = "coral_bleaching"
+    marine_heatwave = "marine_heatwave"
+    king_tide = "king_tide"
+    rogue_wave = "rogue_wave"
     other = "other"
 
 
@@ -1089,6 +1096,35 @@ async def upload_image(
             except Exception as review_error:
                 logger.error(f"Failed to create review item for {unique_filename}: {review_error}")
                 # Don't fail the upload if review item creation fails
+
+            # AUTO-ADD TO CURATION QUEUE: Add uploaded image to curation queue for admin portal
+            try:
+                from models.curation import CurationQueue, CurationStatus, Priority
+
+                # Check if already in queue
+                existing_queue_item = db.query(CurationQueue).filter(
+                    CurationQueue.content_type == "image",
+                    CurationQueue.content_id == image_metadata.id
+                ).first()
+
+                if not existing_queue_item:
+                    queue_item = CurationQueue(
+                        content_type="image",
+                        content_id=image_metadata.id,
+                        image_id=image_metadata.id,
+                        status=CurationStatus.PENDING.value,
+                        priority=Priority.HIGH.value if duplicate_flagged_for_review else Priority.MEDIUM.value,
+                        submitted_by=str(current_user.id),
+                        is_flagged=duplicate_flagged_for_review,
+                        is_duplicate=duplicate_flagged_for_review,
+                        created_at=datetime.utcnow()
+                    )
+                    db.add(queue_item)
+                    db.commit()
+                    logger.info(f"Added image {image_metadata.id} to curation queue")
+            except Exception as curation_error:
+                logger.error(f"Failed to add image to curation queue: {curation_error}")
+                # Don't fail the upload if curation queue creation fails
 
             # Trigger achievement checks immediately after a successful upload
             try:

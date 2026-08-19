@@ -438,6 +438,17 @@ async def get_video_file(
         raise HTTPException(status_code=404, detail="Video file not found")
 
 
+@router.get("/stream/{video_id}")
+async def stream_video(
+    video_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Stream video file (alias for /file/{video_id} to match resource_locator)
+    """
+    return await get_video_file(video_id=video_id, db=db)
+
+
 @router.get("/thumbnail/{video_id}")
 async def get_video_thumbnail(
     video_id: str,

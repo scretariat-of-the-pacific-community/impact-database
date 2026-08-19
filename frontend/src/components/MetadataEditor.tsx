@@ -104,6 +104,13 @@ const METADATA_FIELDS: MetadataField[] = [
       'wildfire',
       'volcanic',
       'coastal_erosion',
+      'sea_level_rise',
+      'storm_surge',
+      'ocean_acidification',
+      'coral_bleaching',
+      'marine_heatwave',
+      'king_tide',
+      'rogue_wave',
     ],
     description: 'Primary type of natural hazard depicted',
   },
@@ -362,6 +369,8 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
               <input
+                id={fieldId}
+                name={`${field.key}-latitude`}
                 type="number"
                 step="any"
                 placeholder="Latitude"
@@ -378,6 +387,8 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
                 className={baseInputClasses}
               />
               <input
+                id={`${fieldId}-longitude`}
+                name={`${field.key}-longitude`}
                 type="number"
                 step="any"
                 placeholder="Longitude"

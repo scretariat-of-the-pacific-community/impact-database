@@ -33,16 +33,25 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ARG FFMPEG_VERSION=7:5.1.4-0+deb12u1
 
 # Install runtime dependencies only
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
-    postgresql-client \
-    curl \
-    ffmpeg=${FFMPEG_VERSION} \
-    libavcodec-extra \
-    libx264-dev \
-    libvpx-dev \
-    libopus-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        postgresql-client \
+        curl \
+        libmagic1; \
+    if [ -n "${FFMPEG_VERSION}" ]; then \
+        apt-get install -y --no-install-recommends "ffmpeg=${FFMPEG_VERSION}" \
+        || apt-get install -y --no-install-recommends ffmpeg; \
+    else \
+        apt-get install -y --no-install-recommends ffmpeg; \
+    fi; \
+    apt-get install -y --no-install-recommends \
+        libavcodec-extra \
+        libx264-dev \
+        libvpx-dev \
+        libopus-dev; \
+    rm -rf /var/lib/apt/lists/*
 
 RUN ffmpeg -version && ffprobe -version
 
@@ -86,19 +95,28 @@ ENV PYTHONUNBUFFERED=1
 
 ARG FFMPEG_VERSION=7:5.1.4-0+deb12u1
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
-    libpq-dev \
-    postgresql-client \
-    curl \
-    git \
-    ffmpeg=${FFMPEG_VERSION} \
-    libavcodec-extra \
-    libx264-dev \
-    libvpx-dev \
-    libopus-dev \
-    && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        build-essential \
+        gcc \
+        libpq-dev \
+        postgresql-client \
+        curl \
+        git \
+        libmagic1; \
+    if [ -n "${FFMPEG_VERSION}" ]; then \
+        apt-get install -y --no-install-recommends "ffmpeg=${FFMPEG_VERSION}" \
+        || apt-get install -y --no-install-recommends ffmpeg; \
+    else \
+        apt-get install -y --no-install-recommends ffmpeg; \
+    fi; \
+    apt-get install -y --no-install-recommends \
+        libavcodec-extra \
+        libx264-dev \
+        libvpx-dev \
+        libopus-dev; \
+    rm -rf /var/lib/apt/lists/*
 
 RUN ffmpeg -version && ffprobe -version
 

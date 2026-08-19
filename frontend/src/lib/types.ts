@@ -183,6 +183,13 @@ export type HazardType =
   | 'wildfire'
   | 'volcanic'
   | 'coastal_erosion'
+  | 'sea_level_rise'
+  | 'storm_surge'
+  | 'ocean_acidification'
+  | 'coral_bleaching'
+  | 'marine_heatwave'
+  | 'king_tide'
+  | 'rogue_wave'
   | 'other';
 
 export type SourceAgency =
@@ -294,7 +301,13 @@ export interface User {
   last_login?: string;
 }
 
-export type UserRole = 'viewer' | 'contributor' | 'editor' | 'admin';
+export type UserRole =
+  | 'viewer'
+  | 'contributor'
+  | 'reviewer'
+  | 'senior_reviewer'
+  | 'curator'
+  | 'admin';
 
 export interface AuthSession {
   user: User;
@@ -337,6 +350,13 @@ export const HAZARD_TYPE_LABELS: Record<HazardType, string> = {
   wildfire: 'Wildfire',
   volcanic: 'Volcanic Activity',
   coastal_erosion: 'Coastal Erosion',
+  sea_level_rise: 'Sea Level Rise',
+  storm_surge: 'Storm Surge',
+  ocean_acidification: 'Ocean Acidification',
+  coral_bleaching: 'Coral Bleaching',
+  marine_heatwave: 'Marine Heatwave',
+  king_tide: 'King Tide',
+  rogue_wave: 'Rogue Wave',
   other: 'Other',
 };
 
@@ -350,6 +370,13 @@ export const HAZARD_TYPES = [
   { value: 'wildfire', label: 'Wildfire' },
   { value: 'volcanic', label: 'Volcanic Activity' },
   { value: 'coastal_erosion', label: 'Coastal Erosion' },
+  { value: 'sea_level_rise', label: 'Sea Level Rise' },
+  { value: 'storm_surge', label: 'Storm Surge' },
+  { value: 'ocean_acidification', label: 'Ocean Acidification' },
+  { value: 'coral_bleaching', label: 'Coral Bleaching' },
+  { value: 'marine_heatwave', label: 'Marine Heatwave' },
+  { value: 'king_tide', label: 'King Tide' },
+  { value: 'rogue_wave', label: 'Rogue Wave' },
   { value: 'other', label: 'Other' },
 ] as const;
 

@@ -317,7 +317,7 @@ def send_weekly_digest_all_users(self):
                     continue
 
                 # Get user's activity for the week
-                stats = _get_user_weekly_stats(user.id, db_session)
+                stats = _get_user_weekly_stats(user.id, user.username, db_session)
 
                 if stats.get("total_uploads", 0) > 0 or stats.get("total_approvals", 0) > 0:
                     # Only send if there's activity to report
@@ -424,7 +424,9 @@ def _check_user_email_preference(user_email: str, db_session: Session = None) ->
             db_session.close()
 
 
-def _get_user_weekly_stats(user_id: str, db_session: Session) -> Dict[str, Any]:
+def _get_user_weekly_stats(
+    user_id: str, username: Optional[str], db_session: Session
+) -> Dict[str, Any]:
     """
     Get user's weekly activity statistics.
 
@@ -438,10 +440,27 @@ def _get_user_weekly_stats(user_id: str, db_session: Session) -> Dict[str, Any]:
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
 
     try:
+        user_id_str = str(user_id) if user_id is not None else None
+        identifiers = {user_id_str} if user_id_str else set()
+        if username:
+            identifiers.add(username)
+
+        if not identifiers:
+            return {
+                "total_uploads": 0,
+                "total_approvals": 0,
+                "new_achievements": 0,
+                "total_views": 0,
+                "leaderboard_position": None,
+            }
+
         # Count uploads this week
         total_uploads = (
             db_session.query(ImageMetadata)
-            .filter(ImageMetadata.uploader_id == user_id, ImageMetadata.datetime >= week_ago)
+            .filter(
+                ImageMetadata.uploader_id.in_(identifiers),
+                ImageMetadata.datetime >= week_ago,
+            )
             .count()
         )
 
@@ -449,7 +468,7 @@ def _get_user_weekly_stats(user_id: str, db_session: Session) -> Dict[str, Any]:
         total_approvals = (
             db_session.query(ImageMetadata)
             .filter(
-                ImageMetadata.uploader_id == user_id,
+                ImageMetadata.uploader_id.in_(identifiers),
                 ImageMetadata.status == "approved",
                 ImageMetadata.datetime >= week_ago,
             )

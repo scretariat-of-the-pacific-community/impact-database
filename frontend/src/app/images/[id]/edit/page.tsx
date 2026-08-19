@@ -473,12 +473,14 @@ export default function EditImagePage() {
 
   // Construct URLs - use thumbnail for preview, full image for download
   const filename = (image as any)?.filename;
-  const thumbnailUrl = filename && filename !== 'None' 
-    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(filename)}/thumbnail`
-    : null;
-  const imageUrl = filename && filename !== 'None'
-    ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(filename)}`
-    : null;
+  const thumbnailUrl =
+    filename && filename !== 'None'
+      ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(filename)}/thumbnail`
+      : null;
+  const imageUrl =
+    filename && filename !== 'None'
+      ? `${config.API.BASE_URL}/upload/images/${encodeURIComponent(filename)}`
+      : null;
 
   // Show loading while checking authentication
   if (authLoading) {
@@ -763,6 +765,54 @@ export default function EditImagePage() {
                       style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
                     >
                       Volcanic Eruption
+                    </option>
+                    <option
+                      value="coastal_erosion"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Coastal Erosion
+                    </option>
+                    <option
+                      value="sea_level_rise"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Sea Level Rise
+                    </option>
+                    <option
+                      value="storm_surge"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Storm Surge
+                    </option>
+                    <option
+                      value="ocean_acidification"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Ocean Acidification
+                    </option>
+                    <option
+                      value="coral_bleaching"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Coral Bleaching
+                    </option>
+                    <option
+                      value="marine_heatwave"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Marine Heatwave
+                    </option>
+                    <option
+                      value="king_tide"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      King Tide
+                    </option>
+                    <option
+                      value="rogue_wave"
+                      style={{ backgroundColor: '#0c1222', color: '#ffffff' }}
+                    >
+                      Rogue Wave
                     </option>
                     <option
                       value="storm"

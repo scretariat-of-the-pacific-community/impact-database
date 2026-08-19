@@ -1,17 +1,17 @@
-"use client";
+'use client';
 
-import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { Loader2, AlertCircle, Plus, BookOpen } from "lucide-react";
-import { scientificReportsApi } from "@/lib/scientific-reports-api";
-import { ScientificReport } from "@/lib/scientific-report-types";
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Loader2, AlertCircle, Plus, BookOpen } from 'lucide-react';
+import { scientificReportsApi } from '@/lib/scientific-reports-api';
+import { ScientificReport } from '@/lib/scientific-report-types';
 
 export default function ScientificReportsPage() {
   const [reports, setReports] = useState<ScientificReport[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedType, setSelectedType] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedType, setSelectedType] = useState('');
   const [skip, setSkip] = useState(0);
   const [total, setTotal] = useState(0);
   const limit = 10;
@@ -29,7 +29,9 @@ export default function ScientificReportsPage() {
         setReports(data.reports);
         setTotal(data.total);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to fetch reports");
+        setError(
+          err instanceof Error ? err.message : 'Failed to fetch reports'
+        );
       } finally {
         setIsLoading(false);
       }
@@ -40,11 +42,14 @@ export default function ScientificReportsPage() {
 
   // Client-side search filtering
   const filteredReports = reports.filter((report) =>
-    searchQuery === ""
+    searchQuery === ''
       ? true
       : report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         report.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (report.authorOrganization?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
+        (report.authorOrganization
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase()) ??
+          false)
   );
 
   const currentPage = Math.floor(skip / limit) + 1;
@@ -56,9 +61,12 @@ export default function ScientificReportsPage() {
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900">Scientific Reports</h1>
+            <h1 className="text-4xl font-bold text-gray-900">
+              Scientific Reports
+            </h1>
             <p className="text-gray-600 mt-2">
-              Explore research and assessments linked to citizen-contributed data
+              Explore research and assessments linked to citizen-contributed
+              data
             </p>
           </div>
           <Link
@@ -80,7 +88,12 @@ export default function ScientificReportsPage() {
         {/* Search and Filters */}
         <div className="mb-8 space-y-4">
           <div className="relative">
+            <label htmlFor="reports-search" className="sr-only">
+              Search scientific reports
+            </label>
             <input
+              id="reports-search"
+              name="search"
               type="text"
               placeholder="Search by title, description, or organization..."
               value={searchQuery}
@@ -90,7 +103,12 @@ export default function ScientificReportsPage() {
           </div>
 
           <div className="flex gap-3">
+            <label htmlFor="reports-type-filter" className="sr-only">
+              Filter by report type
+            </label>
             <select
+              id="reports-type-filter"
+              name="reportType"
               value={selectedType}
               onChange={(e: any) => {
                 setSelectedType(e.target.value);
@@ -107,7 +125,8 @@ export default function ScientificReportsPage() {
           </div>
 
           <p className="text-sm text-gray-600">
-            Showing {Math.min(skip + 1, total)}-{Math.min(skip + limit, total)} of {total} reports
+            Showing {Math.min(skip + 1, total)}-{Math.min(skip + limit, total)}{' '}
+            of {total} reports
           </p>
         </div>
 
@@ -127,10 +146,7 @@ export default function ScientificReportsPage() {
         ) : (
           <div className="space-y-4">
             {filteredReports.map((report) => (
-              <Link
-                key={report.id}
-                href={`/scientific-reports/${report.id}`}
-              >
+              <Link key={report.id} href={`/scientific-reports/${report.id}`}>
                 <div className="p-6 bg-white border rounded-lg hover:shadow-lg hover:border-blue-300 transition cursor-pointer">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
@@ -140,11 +156,15 @@ export default function ScientificReportsPage() {
                       <p className="text-sm text-gray-600 mt-1">
                         {report.authorOrganization && (
                           <>
-                            <span className="font-medium">{report.authorOrganization}</span>
+                            <span className="font-medium">
+                              {report.authorOrganization}
+                            </span>
                             <span className="mx-2">•</span>
                           </>
                         )}
-                        <span>{new Date(report.datePublished).toLocaleDateString()}</span>
+                        <span>
+                          {new Date(report.datePublished).toLocaleDateString()}
+                        </span>
                       </p>
                     </div>
 
@@ -156,29 +176,36 @@ export default function ScientificReportsPage() {
                       )}
                       <span
                         className={`px-3 py-1 text-xs font-medium rounded-full ${
-                          report.reportType === "scientific"
-                            ? "bg-blue-100 text-blue-800"
-                            : report.reportType === "assessment"
-                            ? "bg-orange-100 text-orange-800"
-                            : report.reportType === "policy"
-                            ? "bg-purple-100 text-purple-800"
-                            : "bg-gray-100 text-gray-800"
+                          report.reportType === 'scientific'
+                            ? 'bg-blue-100 text-blue-800'
+                            : report.reportType === 'assessment'
+                              ? 'bg-orange-100 text-orange-800'
+                              : report.reportType === 'policy'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {report.reportType.charAt(0).toUpperCase() + report.reportType.slice(1)}
+                        {report.reportType.charAt(0).toUpperCase() +
+                          report.reportType.slice(1)}
                       </span>
                     </div>
                   </div>
 
-                  <p className="text-gray-700 mb-4 line-clamp-3">{report.description}</p>
+                  <p className="text-gray-700 mb-4 line-clamp-3">
+                    {report.description}
+                  </p>
 
                   <div className="flex items-center justify-between">
                     <div className="flex gap-4 text-sm text-gray-500">
-                      <span>📎 {report.linkedDataCount} citizen upload{report.linkedDataCount !== 1 ? "s" : ""}</span>
                       <span>
-                        Confidence:{" "}
+                        📎 {report.linkedDataCount} citizen upload
+                        {report.linkedDataCount !== 1 ? 's' : ''}
+                      </span>
+                      <span>
+                        Confidence:{' '}
                         <span className="font-medium text-gray-700">
-                          {report.confidenceLevel.charAt(0).toUpperCase() + report.confidenceLevel.slice(1)}
+                          {report.confidenceLevel.charAt(0).toUpperCase() +
+                            report.confidenceLevel.slice(1)}
                         </span>
                       </span>
                     </div>

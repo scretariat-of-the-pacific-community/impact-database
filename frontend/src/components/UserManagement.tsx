@@ -488,12 +488,8 @@ const UserManagement: React.FC = () => {
                     required={!formData.sendInvite}
                     value={formData.username || ''}
                     onChange={(
-                      e: React.ChangeEvent<
-                        HTMLSelectElement | HTMLInputElement
-                      >
-                    ) =>
-                      setFormData({ ...formData, username: e.target.value })
-                    }
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setFormData({ ...formData, username: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                 </div>
@@ -513,12 +509,8 @@ const UserManagement: React.FC = () => {
                     required={!formData.sendInvite}
                     value={formData.password || ''}
                     onChange={(
-                      e: React.ChangeEvent<
-                        HTMLSelectElement | HTMLInputElement
-                      >
-                    ) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
+                      e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>
+                    ) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-gray-900"
                   />
                   <p className="text-xs text-gray-500 mt-1">
@@ -1023,7 +1015,12 @@ const UserManagement: React.FC = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left">
+                  <label htmlFor="select-all-users" className="sr-only">
+                    Select all users
+                  </label>
                   <input
+                    id="select-all-users"
+                    name="selectAllUsers"
                     type="checkbox"
                     checked={
                       (usersData as any)?.users?.length > 0 &&
@@ -1061,7 +1058,15 @@ const UserManagement: React.FC = () => {
                     className={`hover:bg-gray-50 ${selectedUsers.has(user.id) ? 'bg-blue-50' : ''}`}
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
+                      <label
+                        htmlFor={`select-user-${user.id}`}
+                        className="sr-only"
+                      >
+                        Select user {user.firstName} {user.lastName}
+                      </label>
                       <input
+                        id={`select-user-${user.id}`}
+                        name="selectedUsers"
                         type="checkbox"
                         checked={selectedUsers.has(user.id)}
                         onChange={() => toggleUserSelection(user.id)}

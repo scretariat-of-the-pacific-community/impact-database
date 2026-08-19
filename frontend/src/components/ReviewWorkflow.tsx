@@ -28,7 +28,8 @@ import ErrorBanner from './ErrorBanner';
 
 interface ReviewItem {
   id: string;
-  content_type?: string;  // 'image' or 'video'
+  content_type?: string; // 'image' or 'video'
+  content_id?: string;
   image_filename: string;
   status:
     | 'pending'
@@ -56,11 +57,11 @@ interface ReviewItem {
     severity?: string;
     filename?: string;
     thumbnail_url?: string;
-    resource_locator?: string;  // Video stream URL
-    duration?: number;  // Video duration in seconds
+    resource_locator?: string; // Video stream URL
+    duration?: number; // Video duration in seconds
     latitude?: number;
     longitude?: number;
-    content_type?: string;  // For video metadata
+    content_type?: string; // For video metadata
     [key: string]: any;
   };
   // Legacy fields for backwards compatibility
@@ -359,6 +360,9 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
   // Normalize display fields and image URLs
   const meta = item.image_metadata || {};
   const filename = (meta as any).filename || item.image_filename;
+  const resolvedContentType =
+    item.content_type || (meta as any).content_type || 'image';
+  const isVideo = resolvedContentType === 'video';
 
   const buildAssetUrl = (
     path?: string | null,
@@ -372,8 +376,11 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
       // Remove leading slash if present for easier manipulation
       const cleanPath = path.startsWith('/') ? path.slice(1) : path;
 
-      // If path starts with images/, replace with upload/images/
-      if (cleanPath.startsWith('images/')) {
+      // Allow direct API paths (e.g., /api/video/stream/...)
+      if (cleanPath.startsWith('api/')) {
+        candidate = `/${cleanPath}`;
+      } else if (cleanPath.startsWith('images/')) {
+        // If path starts with images/, replace with upload/images/
         candidate = `/upload/${cleanPath}`;
       } else if (cleanPath.startsWith('upload/images/')) {
         // Already correct, just ensure leading slash
@@ -400,7 +407,9 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
 
   const buildThumbnailUrl = (
     metaObj: any,
-    fallbackFilename?: string | null
+    fallbackFilename?: string | null,
+    contentType?: string,
+    contentId?: string | null
   ) => {
     // Prefer explicit thumbnail; otherwise derive a lightweight thumbnail path
     if (metaObj?.thumbnail_url || metaObj?.thumbnailUrl) {
@@ -409,10 +418,13 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
         fallbackFilename
       );
     }
+    if (contentType === 'video' && contentId) {
+      return buildAssetUrl(`/api/video/thumbnail/${contentId}`);
+    }
     if (fallbackFilename) {
       // Use the upload/images endpoint for serving files from storage
       return buildAssetUrl(
-        `/upload/images/${encodeURIComponent(fallbackFilename)}`
+        `/upload/images/${encodeURIComponent(fallbackFilename)}/thumbnail`
       );
     }
     // Last resort: if only a resource locator exists, use it (may be full size)
@@ -422,16 +434,56 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
     return undefined;
   };
 
-  const thumbnailUrl = item.thumbnailUrl || buildThumbnailUrl(meta, filename);
-  const imageUrl =
-    item.imageUrl ||
-    buildAssetUrl(
-      (meta as any).resource_locator ||
-        (meta as any).thumbnail_url ||
-        (meta as any).thumbnailUrl,
-      filename
-    ) ||
-    thumbnailUrl;
+  // Build URLs with proper fallback chain
+  let thumbnailUrl: string | undefined;
+  let imageUrl: string | undefined;
+
+  // For images: try thumbnail first, then fall back to full image
+  if (!isVideo) {
+    // Try thumbnail endpoint first
+    if (filename) {
+      thumbnailUrl = buildAssetUrl(
+        `/upload/images/${encodeURIComponent(filename)}/thumbnail`
+      );
+    }
+    // Full image URL
+    if (filename) {
+      imageUrl = buildAssetUrl(
+        `/upload/images/${encodeURIComponent(filename)}`
+      );
+    }
+    // If no filename but has resource locator, use that
+    if (!imageUrl && (meta as any).resource_locator) {
+      imageUrl = buildAssetUrl((meta as any).resource_locator);
+    }
+    console.log('[ReviewWorkflow] Image URLs:', {
+      filename,
+      thumbnailUrl,
+      imageUrl,
+      hasResourceLocator: !!(meta as any).resource_locator,
+      hasMetadata: !!meta,
+      metaKeys: Object.keys(meta),
+    });
+    // Debug: warn if no URLs could be built
+    if (!imageUrl && !filename) {
+      console.warn('[ReviewWorkflow] No image URL available:', {
+        id: item.id,
+        meta: Object.keys(meta),
+        image_filename: item.image_filename,
+      });
+    }
+  } else if (isVideo) {
+    // For videos: use video thumbnail endpoint
+    if (item.content_id) {
+      thumbnailUrl = buildAssetUrl(`/api/video/thumbnail/${item.content_id}`);
+      imageUrl = buildAssetUrl(`/api/video/stream/${item.content_id}`);
+    }
+    console.log('[ReviewWorkflow] Video URLs:', {
+      videoId: item.content_id,
+      thumbnailUrl,
+      imageUrl,
+    });
+  }
 
   const safeTitle = sanitizeText(
     item.title || (meta as any).title || 'Untitled'
@@ -440,7 +492,9 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
     item.description || (meta as any).abstract || 'No description provided'
   );
   const safeSubmittedBy = sanitizeText(item.submitted_by || '');
-  const safeImageId = sanitizeText(item.image_filename);
+  const safeImageId = sanitizeText(
+    item.content_id || item.image_metadata?.id || item.image_filename || ''
+  );
   const safeHazardType = sanitizeText((meta as any).hazard_type || '');
 
   return (
@@ -486,11 +540,12 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
           {/* Image/Video */}
           <div className="lg:col-span-1">
             <div className="relative">
-              {item.content_type === 'video' ? (
+              {isVideo ? (
                 // Video Player
                 <div className="relative w-full bg-black rounded-lg overflow-hidden">
                   <video
                     src={imageUrl}
+                    poster={thumbnailUrl}
                     controls
                     className="w-full h-full"
                     style={{ aspectRatio: '16 / 9', maxHeight: '300px' }}
@@ -504,28 +559,39 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
               ) : (
                 // Image Display
                 <>
-                  {thumbnailUrl || imageUrl ? (
-                    <div className="relative w-full h-48 bg-gray-200 rounded-lg overflow-hidden">
+                  {imageUrl ? (
+                    <div className="relative w-full h-48 bg-gray-200 rounded-lg overflow-hidden group">
                       <img
                         src={thumbnailUrl || imageUrl || ''}
                         alt={safeTitle}
-                        className="w-full h-full object-cover cursor-pointer"
+                        className="w-full h-full object-cover cursor-pointer transition-opacity group-hover:opacity-75"
                         onClick={() => setShowImageModal(true)}
                         loading="lazy"
                         decoding="async"
+                        onError={(e) => {
+                          // If thumbnail fails to load, try full image
+                          if (
+                            e.currentTarget.src !== imageUrl &&
+                            thumbnailUrl &&
+                            imageUrl
+                          ) {
+                            e.currentTarget.src = imageUrl;
+                          }
+                        }}
                       />
+                      <button
+                        onClick={() => setShowImageModal(true)}
+                        className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 text-white rounded hover:bg-opacity-75 transition"
+                        title="View full image"
+                      >
+                        <EyeIcon className="h-4 w-4" />
+                      </button>
                     </div>
                   ) : (
                     <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                      <PhotoIcon className="h-12 w-12 text-gray-400" />
+                      <PhotoIcon className="h-12 w-12 text-gray-900" />
                     </div>
                   )}
-                  <button
-                    onClick={() => setShowImageModal(true)}
-                    className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 text-white rounded"
-                  >
-                    <EyeIcon className="h-4 w-4" />
-                  </button>
                 </>
               )}
             </div>
@@ -540,41 +606,39 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
 
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <label className="font-medium text-gray-700">
-                  {item.content_type === 'video' ? 'Video' : 'Image'} ID:
-                </label>
+                <span className="font-medium text-gray-700">
+                  {isVideo ? 'Video' : 'Image'} ID:
+                </span>
                 <p className="text-gray-900 text-xs break-all">{safeImageId}</p>
               </div>
               <div>
-                <label className="font-medium text-gray-700">
-                  Hazard Type:
-                </label>
+                <span className="font-medium text-gray-700">Hazard Type:</span>
                 <p className="text-gray-900 capitalize">{safeHazardType}</p>
               </div>
-              {item.content_type === 'video' && item.image_metadata?.duration && (
+              {isVideo && item.image_metadata?.duration && (
                 <div>
-                  <label className="font-medium text-gray-700">Duration:</label>
-                  <p className="text-gray-900">{Math.floor(item.image_metadata.duration)}s</p>
+                  <span className="font-medium text-gray-700">Duration:</span>
+                  <p className="text-gray-900">
+                    {Math.floor(item.image_metadata.duration)}s
+                  </p>
                 </div>
               )}
               <div>
-                <label className="font-medium text-gray-700">
-                  Submitted By:
-                </label>
+                <span className="font-medium text-gray-700">Submitted By:</span>
                 <p className="text-gray-900">{safeSubmittedBy}</p>
               </div>
               <div>
-                <label className="font-medium text-gray-700">Submitted:</label>
+                <span className="font-medium text-gray-700">Submitted:</span>
                 <p className="text-gray-900">
                   {new Date(item.created_at).toLocaleString()}
                 </p>
               </div>
               {item.location && (
                 <div className="col-span-2">
-                  <label className="font-medium text-gray-700 flex items-center">
+                  <span className="font-medium text-gray-700 flex items-center">
                     <MapPinIcon className="h-4 w-4 mr-1" />
                     Location:
-                  </label>
+                  </span>
                   <p className="text-gray-900">{item.location.address}</p>
                   <p className="text-xs text-gray-500">
                     {item.location.latitude}, {item.location.longitude}
@@ -583,10 +647,10 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
               )}
               {item.image_metadata?.datetime && (
                 <div>
-                  <label className="font-medium text-gray-700 flex items-center">
+                  <span className="font-medium text-gray-700 flex items-center">
                     <CalendarIcon className="h-4 w-4 mr-1" />
                     Capture Date:
-                  </label>
+                  </span>
                   <p className="text-gray-900">
                     {new Date(
                       item.image_metadata.datetime
@@ -677,10 +741,16 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
 
                 {/* Review Notes */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="review-notes"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Review Notes
                   </label>
                   <textarea
+                    id="review-notes"
+                    name="reviewNotes"
+                    autoComplete="off"
                     value={reviewNotes}
                     onChange={(
                       e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>

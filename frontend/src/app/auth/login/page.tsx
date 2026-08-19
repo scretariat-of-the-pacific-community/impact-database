@@ -184,6 +184,7 @@ function LoginPageContent() {
                       const response = await fetch(`${apiUrl}${endpoint}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(body),
                       });
 
@@ -219,6 +220,7 @@ function LoginPageContent() {
                           'ocean_portal_session',
                           JSON.stringify(cachedSession)
                         );
+                        localStorage.setItem('authToken', data.access_token);
 
                         // Intentionally use a full page reload instead of router.push(returnUrl)
                         // so that the entire app (including AuthProvider and any top-level state)

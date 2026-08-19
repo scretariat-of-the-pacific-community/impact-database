@@ -205,7 +205,7 @@ app.include_router(featured.router, prefix="/api", tags=["featured"])
 # Video upload API (Ticket 1.6 - Phase 1)
 from api import video_upload
 
-app.include_router(video_upload.router, tags=["video-upload"])
+app.include_router(video_upload.router, prefix="/api/video", tags=["video-upload"])
 
 # Setup monitoring with Prometheus metrics
 setup_monitoring(app)

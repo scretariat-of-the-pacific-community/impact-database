@@ -1,7 +1,13 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { Buffer } from 'node:buffer';
 
-type UserRole = 'viewer' | 'contributor' | 'editor' | 'admin';
+type UserRole =
+  | 'viewer'
+  | 'contributor'
+  | 'reviewer'
+  | 'senior_reviewer'
+  | 'curator'
+  | 'admin';
 
 const respondJson = (route: Route, data: unknown, status = 200) =>
   route.fulfill({
@@ -83,34 +89,52 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Core citizen-science flows (Playwright smoke suite)', () => {
-  test('Login page shows guest fallback and redirects authenticated visitors', async ({ page }) => {
+  test('Login page shows guest fallback and redirects authenticated visitors', async ({
+    page,
+  }) => {
     await page.goto('/auth/login');
-    await expect(page.getByRole('heading', { name: 'Welcome Back' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Sign In with SPC SSO/i })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Welcome Back' })
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Sign In with SPC SSO/i })
+    ).toBeVisible();
 
     const guestNavigation = page.waitForURL('**/');
     await page.getByRole('button', { name: /Continue as Guest/i }).click();
     await guestNavigation;
 
     await page.goto('/auth/login');
-    await page.evaluate((sessionData) => {
-      localStorage.setItem('ocean_portal_session', JSON.stringify(sessionData));
-      localStorage.setItem('authToken', sessionData.access_token);
-      localStorage.setItem('token', sessionData.access_token);
-    }, buildSession(['viewer']));
+    await page.evaluate(
+      (sessionData) => {
+        localStorage.setItem(
+          'ocean_portal_session',
+          JSON.stringify(sessionData)
+        );
+        localStorage.setItem('authToken', sessionData.access_token);
+        localStorage.setItem('token', sessionData.access_token);
+      },
+      buildSession(['viewer'])
+    );
     await page.reload();
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test('Contributors can upload imagery with metadata and see the success state', async ({ page }) => {
-    await page.route('**/api/vocabularies', (route) => respondJson(route, vocabulariesResponse));
+  test('Contributors can upload imagery with metadata and see the success state', async ({
+    page,
+  }) => {
+    await page.route('**/api/vocabularies', (route) =>
+      respondJson(route, vocabulariesResponse)
+    );
     await page.route('**/upload/upload', async (route) => {
       respondJson(route, { id: 'img-playwright', status: 'received' });
     });
     await enableSession(page, ['contributor']);
 
     await page.goto('/upload');
-    await expect(page.getByRole('heading', { name: 'Upload Image' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Upload Image' })
+    ).toBeVisible();
 
     const filePayload = {
       name: 'impact.jpg',
@@ -122,10 +146,14 @@ test.describe('Core citizen-science flows (Playwright smoke suite)', () => {
     await page.fill('input[name="location"]', 'Port Vila, Vanuatu');
 
     await page.getByRole('button', { name: /Upload Image/i }).click();
-    await expect(page.getByText(/Upload completed successfully/i)).toBeVisible();
+    await expect(
+      page.getByText(/Upload completed successfully/i)
+    ).toBeVisible();
   });
 
-  test('Admins can open the curation queue and approve a submission', async ({ page }) => {
+  test('Admins can open the curation queue and approve a submission', async ({
+    page,
+  }) => {
     await enableSession(page, ['admin']);
 
     await page.route('**/api/admin/dashboard**', (route) =>
@@ -155,13 +183,17 @@ test.describe('Core citizen-science flows (Playwright smoke suite)', () => {
 
     await expect(page.getByText('Flooded Coastal Road')).toBeVisible();
     await page.getByText('Flooded Coastal Road').click();
-    await expect(page.getByRole('heading', { name: 'Review Item' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Review Item' })
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Approve' }).click();
     await expect(page.getByText('APPROVED')).toBeVisible();
   });
 
-  test('Search map view reflects hazard filters on the marker layer', async ({ page }) => {
+  test('Search map view reflects hazard filters on the marker layer', async ({
+    page,
+  }) => {
     const allImages = [
       {
         id: 'img-1',
@@ -200,6 +232,8 @@ test.describe('Core citizen-science flows (Playwright smoke suite)', () => {
     await expect(markers).toHaveCount(1);
 
     await markers.first().click();
-    await expect(page.getByRole('link', { name: /Flood marker/i })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: /Flood marker/i })
+    ).toBeVisible();
   });
 });

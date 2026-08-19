@@ -26,7 +26,7 @@ import { HAZARD_TYPE_LABELS } from '@/lib/types';
 import { USER_ACTIVITY_QUERY_KEY, fetchUserActivity } from './ActivityTimeline';
 import { authFetch } from '@/lib/auth-utils';
 
-type Role = 'admin' | 'editor' | 'viewer';
+type Role = 'admin' | 'senior_reviewer' | 'reviewer' | 'contributor' | 'viewer';
 
 interface Followable {
   id: string;
@@ -113,7 +113,9 @@ interface NotificationEntry {
 
 const rolePalette: Record<Role, string> = {
   admin: 'bg-pacific-400/20 text-pacific-100',
-  editor: 'bg-coral-400/20 text-coral-100',
+  senior_reviewer: 'bg-amber-400/20 text-amber-100',
+  reviewer: 'bg-coral-400/20 text-coral-100',
+  contributor: 'bg-emerald-400/20 text-emerald-100',
   viewer: 'bg-white/10 text-white/70',
 };
 
@@ -514,7 +516,7 @@ export default function Collaboration({
     workspaceId: string;
   }>({
     email: '',
-    role: 'editor',
+    role: 'viewer',
     workspaceId:
       (collaborationState as any).workspaces[0]?.id || 'workspace-fallback',
   });
@@ -1096,7 +1098,9 @@ export default function Collaboration({
                 size="md"
               >
                 <option value="admin">Admin</option>
-                <option value="editor">Editor</option>
+                <option value="senior_reviewer">Senior reviewer</option>
+                <option value="reviewer">Reviewer</option>
+                <option value="contributor">Contributor</option>
                 <option value="viewer">Viewer</option>
               </Select>
               <Select

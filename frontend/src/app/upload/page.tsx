@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useRef,
+  useEffect,
+  useMemo,
+} from 'react';
 import { useForm, RegisterOptions } from 'react-hook-form';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { imageApi } from '@/lib/api';
@@ -15,6 +21,8 @@ import {
   Plus,
   Trash2,
   BarChart3,
+  Sparkles,
+  Tag,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
@@ -330,6 +338,7 @@ export default function UploadPage() {
     null
   );
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [selectedKeywords, setSelectedKeywords] = useState<string[]>([]);
   const [isChrome, setIsChrome] = useState(false);
   const [exifMetadata, setExifMetadata] = useState<{
     camera?: string;
@@ -426,6 +435,128 @@ export default function UploadPage() {
   const longitude = watch('longitude');
   const location = watch('location');
   const country = watch('country');
+  const hazardType = watch('hazard_type');
+
+  const keywordSuggestions = useMemo(() => {
+    const suggestions: {
+      keyword: string;
+      relevance: number;
+      source: string;
+    }[] = [];
+
+    const hazardKeywords: Record<string, string[]> = {
+      cyclone: [
+        'wind damage',
+        'storm surge',
+        'flooding',
+        'coastal erosion',
+        'debris',
+      ],
+      flood: [
+        'water damage',
+        'inundation',
+        'infrastructure',
+        'displacement',
+        'sanitation',
+      ],
+      tsunami: [
+        'coastal damage',
+        'wave impact',
+        'evacuation',
+        'warning system',
+        'reconstruction',
+      ],
+      earthquake: [
+        'structural damage',
+        'collapse',
+        'aftershock',
+        'rubble',
+        'rescue operations',
+      ],
+      drought: [
+        'water scarcity',
+        'crop failure',
+        'desertification',
+        'livestock',
+        'food security',
+      ],
+      wildfire: [
+        'fire damage',
+        'smoke',
+        'vegetation loss',
+        'evacuation',
+        'air quality',
+      ],
+      landslide: [
+        'slope failure',
+        'debris flow',
+        'road blockage',
+        'erosion',
+        'displacement',
+      ],
+      volcano: [
+        'ash fall',
+        'lava flow',
+        'pyroclastic',
+        'evacuation',
+        'air quality',
+      ],
+    };
+
+    const hazardKey = hazardType?.toLowerCase?.() ?? '';
+    if (hazardKey && hazardKeywords[hazardKey]) {
+      hazardKeywords[hazardKey].forEach((keyword) => {
+        if (!selectedKeywords.includes(keyword)) {
+          suggestions.push({ keyword, relevance: 0.9, source: 'hazard' });
+        }
+      });
+    }
+
+    if (location) {
+      const locationKeywords = [
+        'coastal',
+        'urban',
+        'rural',
+        'infrastructure',
+        'community',
+      ];
+      locationKeywords.forEach((keyword) => {
+        if (!selectedKeywords.includes(keyword)) {
+          suggestions.push({ keyword, relevance: 0.7, source: 'location' });
+        }
+      });
+    }
+
+    const commonKeywords = [
+      'damage assessment',
+      'humanitarian',
+      'emergency response',
+      'recovery',
+      'resilience',
+      'climate change',
+    ];
+    commonKeywords.forEach((keyword) => {
+      if (!selectedKeywords.includes(keyword)) {
+        suggestions.push({ keyword, relevance: 0.6, source: 'ai' });
+      }
+    });
+
+    return suggestions.sort((a, b) => b.relevance - a.relevance).slice(0, 8);
+  }, [hazardType, location, selectedKeywords]);
+
+  const addKeyword = (keyword: string) => {
+    const sanitizedKeyword = sanitizeInputValue(keyword).trim();
+    if (!sanitizedKeyword) {
+      return;
+    }
+    if (!selectedKeywords.includes(sanitizedKeyword)) {
+      setSelectedKeywords([...selectedKeywords, sanitizedKeyword]);
+    }
+  };
+
+  const removeKeyword = (keyword: string) => {
+    setSelectedKeywords(selectedKeywords.filter((item) => item !== keyword));
+  };
 
   // File validation function
   const validateFile = useCallback((file: File): string | null => {
@@ -901,6 +1032,10 @@ export default function UploadPage() {
       if (data.location) setValue('location', data.location);
       if (data.country) setValue('country', data.country);
       if (data.keywords) setValue('keywords', data.keywords);
+      const templateKeywords = extractKeywords(data.keywords);
+      setSelectedKeywords(
+        templateKeywords.map((keyword) => sanitizeInputValue(keyword))
+      );
       toast.success(`Template "${template.name}" loaded`);
     },
     onError: () => {
@@ -1011,12 +1146,21 @@ export default function UploadPage() {
           videoFormData.append('file', file);
           videoFormData.append('hazard_type', metadata.hazard_type || 'other');
           if (metadata.title) videoFormData.append('title', metadata.title);
-          if (metadata.abstract) videoFormData.append('abstract', metadata.abstract);
-          if (metadata.location) videoFormData.append('location', metadata.location);
-          if (metadata.country) videoFormData.append('country', metadata.country);
+          if (metadata.abstract)
+            videoFormData.append('abstract', metadata.abstract);
+          if (metadata.location)
+            videoFormData.append('location', metadata.location);
+          if (metadata.country)
+            videoFormData.append('country', metadata.country);
           if (metadata.geometry?.coordinates) {
-            videoFormData.append('latitude', metadata.geometry.coordinates[1].toString());
-            videoFormData.append('longitude', metadata.geometry.coordinates[0].toString());
+            videoFormData.append(
+              'latitude',
+              metadata.geometry.coordinates[1].toString()
+            );
+            videoFormData.append(
+              'longitude',
+              metadata.geometry.coordinates[0].toString()
+            );
           }
           if (metadata.altitude !== null && metadata.altitude !== undefined) {
             videoFormData.append('altitude', metadata.altitude.toString());
@@ -1027,7 +1171,7 @@ export default function UploadPage() {
 
           // Send to video upload endpoint
           xhr.open('POST', `${config.API.BASE_URL}/api/video/upload/simple`);
-          
+
           // Add authentication headers
           const token = getAuthToken();
           if (token) {
@@ -1037,7 +1181,7 @@ export default function UploadPage() {
           if (csrfToken) {
             xhr.setRequestHeader('X-CSRF-Token', csrfToken);
           }
-          
+
           xhr.send(videoFormData);
         });
       }
@@ -1103,6 +1247,9 @@ export default function UploadPage() {
       return;
     }
 
+    // Sync selectedKeywords to keywords field
+    const keywords = selectedKeywords.join(', ');
+
     // Handle batch upload
     if (batchMode && selectedFiles.length > 0) {
       const metadata = {
@@ -1114,7 +1261,7 @@ export default function UploadPage() {
         abstract: data.abstract,
         location: data.location,
         country: data.country,
-        keywords: data.keywords,
+        keywords: keywords,
       };
 
       batchUploadMutation.mutate({ files: selectedFiles, metadata });
@@ -1129,7 +1276,13 @@ export default function UploadPage() {
     // Clear validation errors before upload
     setValidationError(null);
     trackUploadEvent('started', data.hazard_type);
-    const apiMetadata = buildApiMetadata(data, selectedFile.name);
+    const apiMetadata = buildApiMetadata(
+      {
+        ...data,
+        keywords: keywords,
+      },
+      selectedFile.name
+    );
 
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       try {
@@ -1227,7 +1380,14 @@ export default function UploadPage() {
             <Link href="/" className="mr-4 hover:opacity-80 transition-opacity">
               <ArrowLeft className="w-6 h-6 text-surface-soft" />
             </Link>
-            <h1 className="text-3xl font-bold text-white">Upload Image</h1>
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/40">
+                Report
+              </p>
+              <h1 className="text-3xl font-bold text-white">
+                Report Hazard Incident
+              </h1>
+            </div>
           </div>
         </div>
       </header>
@@ -1664,11 +1824,16 @@ export default function UploadPage() {
               </div>
             )}
 
-          {/* Required Fields */}
+          {/* Required Information */}
           <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
-            <h3 className="text-lg font-medium text-white mb-4">
-              Required Information
-            </h3>
+            <div className="mb-4">
+              <p className="text-xs uppercase tracking-[0.25em] text-white/40">
+                Required Information
+              </p>
+              <h3 className="text-lg font-semibold text-white">
+                Required Information
+              </h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 label="Hazard Type"
@@ -1678,10 +1843,10 @@ export default function UploadPage() {
               >
                 <select
                   id="upload-hazard-type"
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
                   style={{
                     backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.5rem center',
+                    backgroundPosition: 'right 0.75rem center',
                     backgroundRepeat: 'no-repeat',
                     backgroundSize: '1.5em 1.5em',
                   }}
@@ -1725,10 +1890,10 @@ export default function UploadPage() {
               >
                 <select
                   id="upload-country"
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white appearance-none backdrop-blur"
                   style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.5rem center',
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23a1a1aa' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3csvg%3e")`,
+                    backgroundPosition: 'right 0.75rem center',
                     backgroundRepeat: 'no-repeat',
                     backgroundSize: '1.5em 1.5em',
                   }}
@@ -1756,344 +1921,384 @@ export default function UploadPage() {
                   )}
                 </select>
               </FormField>
-
-              <FormField
-                label="Location"
-                htmlFor="upload-location"
-                required
-                error={errors.location?.message}
-              >
-                <input
-                  id="upload-location"
-                  type="text"
-                  autoComplete="off"
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
-                  placeholder="e.g., Port Vila, Vanuatu"
-                  {...registerSanitizedField('location', {
-                    required: 'Location is required',
-                  })}
-                />
-              </FormField>
             </div>
-          </div>
 
-          {/* Optional Fields */}
-          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
-            <h3 className="text-lg font-medium text-white mb-4">
-              Additional Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                label="Title"
-                htmlFor="upload-title"
-                hint="Optional - we'll fill this from the filename if you leave it blank"
-              >
-                <input
-                  id="upload-title"
-                  type="text"
-                  autoComplete="off"
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
-                  placeholder="Descriptive title for the image"
-                  {...registerSanitizedField('title')}
-                />
-              </FormField>
-
-              <div className="md:col-span-2">
-                <FormField
-                  label="Coordinates"
-                  hint="Optional - helps locate incident on map"
-                >
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label
-                        htmlFor="upload-latitude"
-                        className="block text-xs text-surface-soft mb-1"
-                      >
-                        Latitude
-                      </label>
-                      <input
-                        id="upload-latitude"
-                        type="number"
-                        step="any"
-                        className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
-                        placeholder="e.g., -17.7334"
-                        {...register('latitude', { valueAsNumber: true })}
-                      />
-                    </div>
-                    <div>
-                      <label
-                        htmlFor="upload-longitude"
-                        className="block text-xs text-surface-soft mb-1"
-                      >
-                        Longitude
-                      </label>
-                      <input
-                        id="upload-longitude"
-                        type="number"
-                        step="any"
-                        className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
-                        placeholder="e.g., 168.3273"
-                        {...register('longitude', { valueAsNumber: true })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Altitude field (optional) */}
-                  <div className="mt-3">
-                    <label
-                      htmlFor="upload-altitude"
-                      className="block text-xs text-surface-soft mb-1"
-                    >
-                      Altitude (meters){' '}
-                      <span className="text-surface-soft/50">• Optional</span>
-                    </label>
-                    <input
-                      id="upload-altitude"
-                      type="number"
-                      step="0.1"
-                      className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
-                      placeholder="e.g., 15.5 (positive=above sea level, negative=below)"
-                      {...register('altitude', { valueAsNumber: true })}
-                    />
-                  </div>
-
-                  {/* Display extracted EXIF metadata */}
-                  {exifMetadata &&
-                    (exifMetadata.camera ||
-                      exifMetadata.orientation ||
-                      exifMetadata.altitude) && (
-                      <div className="mt-3 p-3 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
-                        <p className="text-xs font-medium text-pacific-300 mb-2">
-                          📷 Camera Metadata
-                        </p>
-                        <div className="space-y-1">
-                          {exifMetadata.camera && (
-                            <p className="text-xs text-surface-soft">
-                              <span className="text-white">Camera:</span>{' '}
-                              {exifMetadata.camera}
-                            </p>
-                          )}
-                          {exifMetadata.orientation && (
-                            <p className="text-xs text-surface-soft">
-                              <span className="text-white">Orientation:</span>{' '}
-                              {exifMetadata.orientation}
-                            </p>
-                          )}
-                          {exifMetadata.altitude && (
-                            <p className="text-xs text-surface-soft">
-                              <span className="text-white">Altitude:</span>{' '}
-                              {exifMetadata.altitude.toFixed(1)}m
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                  {/* Chrome Location Permission Hint */}
-                  {isChrome && (
-                    <div className="mt-2 p-2 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
-                      <p className="text-xs text-pacific-300">
-                        💡 <strong>Chrome users:</strong> If &quot;Use My
-                        Location&quot; doesn&apos;t work, click the lock icon in
-                        your address bar → Site settings → Allow Location
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Quick Action Buttons */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        // Detect Chrome browser
-                        const isChrome =
-                          typeof window !== 'undefined' &&
-                          /Chrome/.test(navigator.userAgent) &&
-                          /Google Inc/.test(navigator.vendor);
-
-                        const isSecureContext =
-                          typeof window !== 'undefined' &&
-                          (window.isSecureContext ||
-                            ['localhost', '127.0.0.1', '::1'].includes(
-                              window.location.hostname
-                            ));
-
-                        if (!isSecureContext) {
-                          toast.error('Secure connection required', {
-                            description:
-                              'Location access only works over HTTPS or localhost. Please switch to a secure connection or pick a location on the map.',
-                          });
-                          return;
-                        }
-
-                        if (!navigator.geolocation) {
-                          toast.error('Geolocation not supported', {
-                            description:
-                              'Your browser does not support location services.',
-                          });
-                          return;
-                        }
-
-                        // Check permissions API (Chrome-specific)
-                        if (isChrome && 'permissions' in navigator) {
-                          try {
-                            const permissionStatus =
-                              await navigator.permissions.query({
-                                name: 'geolocation' as PermissionName,
-                              });
-
-                            if (permissionStatus.state === 'denied') {
-                              toast.error('Location permission blocked', {
-                                description:
-                                  'Chrome has blocked location access. Click the lock icon in the address bar, go to Site Settings, and allow Location. Or use "Select on Map" instead.',
-                              });
-                              return;
-                            }
-
-                            // Permission state checked
-                          } catch (e) {
-                            // Could not check permissions API
-                          }
-                        }
-
-                        toast.loading('Getting your location...');
-                        navigator.geolocation.getCurrentPosition(
-                          (position) => {
-                            setValue('latitude', position.coords.latitude);
-                            setValue('longitude', position.coords.longitude);
-                            toast.dismiss();
-                            toast.success('Location detected', {
-                              description: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`,
-                            });
-                          },
-                          (error) => {
-                            const errorCode = error?.code;
-                            const errorMessage = error?.message;
-                            toast.dismiss();
-
-                            // Provide specific error messages based on error code
-                            const PERMISSION_DENIED = 1;
-                            const POSITION_UNAVAILABLE = 2;
-                            const TIMEOUT = 3;
-                            const BLOCKED_ERROR_NAMES = [
-                              'SecurityError',
-                              'NotAllowedError',
-                              'PermissionDeniedError',
-                            ];
-
-                            let userMessage = 'Could not get your location';
-                            let userDescription = '';
-
-                            // Detect Chrome browser
-                            const isChrome =
-                              typeof window !== 'undefined' &&
-                              /Chrome/.test(navigator.userAgent) &&
-                              /Google Inc/.test(navigator.vendor);
-
-                            // Handle case where error object is null, undefined, or empty
-                            const hasValidError =
-                              error &&
-                              (errorCode !== undefined || errorMessage);
-
-                            if (!hasValidError) {
-                              // Empty or invalid error object - common in Chrome with blocked permissions
-                              if (isChrome) {
-                                userDescription =
-                                  'Chrome blocked location access. To fix: Click the lock icon in the address bar → Site settings → Allow Location. Or use "Select on Map" instead.';
-                              } else {
-                                userDescription =
-                                  'Unable to access location. This may be due to browser settings, extensions, or security policies. Please use the "Select on Map" option instead.';
-                              }
-                            } else if (errorCode !== undefined) {
-                              // Standard GeolocationPositionError with code
-                              switch (errorCode) {
-                                case PERMISSION_DENIED:
-                                  userDescription =
-                                    'Location permission denied. Please enable location access in your browser settings.';
-                                  break;
-                                case POSITION_UNAVAILABLE:
-                                  userDescription =
-                                    'Location information unavailable. Please try selecting location on map instead.';
-                                  break;
-                                case TIMEOUT:
-                                  userDescription =
-                                    'Location request timed out after 30 seconds. This can happen indoors or in areas with poor GPS signal. Try moving closer to a window or use "Select on Map" instead.';
-                                  break;
-                                default:
-                                  userDescription =
-                                    errorMessage ||
-                                    'Please check your browser permissions or select location on map.';
-                              }
-                            } else {
-                              // Other error type (e.g., network issues)
-                              userDescription =
-                                errorMessage ||
-                                'Please check your browser permissions or select location on map.';
-                            }
-
-                            toast.error(userMessage, {
-                              description: userDescription,
-                            });
-                          },
-                          {
-                            enableHighAccuracy: true,
-                            timeout: 30000, // 30 seconds - GPS can be slow indoors
-                            maximumAge: 0,
-                          }
-                        );
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 text-sm bg-pacific-600/20 hover:bg-pacific-600/30 text-pacific-300 rounded-lg transition-colors border border-pacific-500/30"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      Use My Location
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowMapPicker(true)}
-                      className="flex items-center gap-2 px-3 py-2 text-sm bg-palm-600/20 hover:bg-palm-600/30 text-palm-300 rounded-lg transition-colors border border-palm-500/30"
-                    >
-                      <MapPin className="w-4 h-4" />
-                      Select on Map
-                    </button>
-                  </div>
-                </FormField>
-              </div>
-
-              <FormField
-                label="Abstract"
-                htmlFor="upload-abstract"
-                className="md:col-span-2"
-              >
+            <div className="mt-4 space-y-4">
+              <FormField label="What is happening?" htmlFor="upload-abstract">
                 <textarea
                   id="upload-abstract"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
-                  placeholder="Brief description of the image content"
+                  rows={4}
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
+                  placeholder="Describe damage, impacts, blocked access, risks, and what you see."
                   {...registerSanitizedField('abstract')}
                 />
+                <p className="mt-1 text-xs text-surface-soft/70">
+                  Describe damage, impacts, blocked access, risks, and what you
+                  see in the image.
+                </p>
               </FormField>
 
               <FormField
                 label="Keywords"
                 htmlFor="upload-keywords"
-                hint="Comma-separated terms"
-                className="md:col-span-2"
+                hint="Tags to improve searchability"
               >
-                <input
-                  id="upload-keywords"
-                  type="text"
-                  autoComplete="off"
-                  className="w-full px-3 py-2 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
-                  placeholder="Comma-separated keywords (e.g., flooding, damage, infrastructure)"
-                  {...registerSanitizedField('keywords')}
-                />
-                <p className="mt-1 text-xs text-surface-soft/70">
-                  Add descriptive keywords separated by commas to help others
-                  find your image.
-                </p>
+                <div className="space-y-3">
+                  {/* Selected Keywords */}
+                  {selectedKeywords.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedKeywords.map((keyword) => (
+                        <button
+                          key={keyword}
+                          type="button"
+                          onClick={() => removeKeyword(keyword)}
+                          className="inline-flex items-center gap-1 rounded-full bg-pacific-500/20 px-3 py-1 text-sm text-pacific-300 border border-pacific-500/30 hover:bg-pacific-500/30 transition"
+                        >
+                          {keyword}
+                          <X className="h-3 w-3" />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Keyword Suggestions */}
+                  {keywordSuggestions.length > 0 && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Sparkles className="h-4 w-4 text-palm-400" />
+                        <span className="text-sm text-white/70">
+                          Suggested Keywords
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {keywordSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.keyword}
+                            type="button"
+                            onClick={() => addKeyword(suggestion.keyword)}
+                            className="inline-flex items-center gap-1 rounded-full bg-palm-500/10 px-3 py-1 text-sm text-palm-300 border border-palm-500/20 hover:bg-palm-500/20 transition"
+                          >
+                            <Tag className="h-3 w-3" />
+                            {suggestion.keyword}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual Keyword Input */}
+                  <input
+                    id="custom-keyword"
+                    name="custom-keyword"
+                    type="text"
+                    autoComplete="off"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-white/40 focus:border-pacific-500 focus:ring-1 focus:ring-pacific-500 transition"
+                    placeholder="Type and press Enter to add custom keywords"
+                    onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const input = e.currentTarget;
+                        if (input.value.trim()) {
+                          addKeyword(input.value.trim());
+                          input.value = '';
+                        }
+                      }
+                    }}
+                  />
+                </div>
               </FormField>
             </div>
+          </div>
+
+          {/* Location (Required) */}
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
+            <div className="mb-4">
+              <p className="text-xs uppercase tracking-[0.25em] text-white/40">
+                Location (Required)
+              </p>
+              <h3 className="text-lg font-semibold text-white">Location</h3>
+              <p className="text-xs text-white/60 mt-1">
+                Select a location method or paste coordinates manually.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <button
+                type="button"
+                onClick={() => setShowMapPicker(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-pacific-500/20 text-pacific-200 border border-pacific-400/40 hover:bg-pacific-500/30 transition-colors"
+              >
+                <MapPin className="w-4 h-4" />
+                Select on Map
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const isChrome =
+                    typeof window !== 'undefined' &&
+                    /Chrome/.test(navigator.userAgent) &&
+                    /Google Inc/.test(navigator.vendor);
+
+                  const isSecureContext =
+                    typeof window !== 'undefined' &&
+                    (window.isSecureContext ||
+                      ['localhost', '127.0.0.1', '::1'].includes(
+                        window.location.hostname
+                      ));
+
+                  if (!isSecureContext) {
+                    toast.error('Secure connection required', {
+                      description:
+                        'Location access only works over HTTPS or localhost. Please switch to a secure connection or pick a location on the map.',
+                    });
+                    return;
+                  }
+
+                  if (!navigator.geolocation) {
+                    toast.error('Geolocation not supported', {
+                      description:
+                        'Your browser does not support location services.',
+                    });
+                    return;
+                  }
+
+                  if (isChrome && 'permissions' in navigator) {
+                    try {
+                      const permissionStatus =
+                        await navigator.permissions.query({
+                          name: 'geolocation' as PermissionName,
+                        });
+
+                      if (permissionStatus.state === 'denied') {
+                        toast.error('Location permission blocked', {
+                          description:
+                            'Chrome has blocked location access. Click the lock icon in the address bar, go to Site Settings, and allow Location. Or use "Select on Map" instead.',
+                        });
+                        return;
+                      }
+                    } catch (e) {
+                      // Could not check permissions API
+                    }
+                  }
+
+                  toast.loading('Getting your location...');
+                  navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                      setValue('latitude', position.coords.latitude);
+                      setValue('longitude', position.coords.longitude);
+                      toast.dismiss();
+                      toast.success('Location detected', {
+                        description: `${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`,
+                      });
+                    },
+                    (error) => {
+                      const errorCode = error?.code;
+                      const errorMessage = error?.message;
+                      toast.dismiss();
+
+                      const PERMISSION_DENIED = 1;
+                      const POSITION_UNAVAILABLE = 2;
+                      const TIMEOUT = 3;
+
+                      let userMessage = 'Could not get your location';
+                      let userDescription = '';
+
+                      const isChrome =
+                        typeof window !== 'undefined' &&
+                        /Chrome/.test(navigator.userAgent) &&
+                        /Google Inc/.test(navigator.vendor);
+
+                      const hasValidError =
+                        error && (errorCode !== undefined || errorMessage);
+
+                      if (!hasValidError) {
+                        if (isChrome) {
+                          userDescription =
+                            'Chrome blocked location access. To fix: Click the lock icon in the address bar → Site settings → Allow Location. Or use "Select on Map" instead.';
+                        } else {
+                          userDescription =
+                            'Unable to access location. This may be due to browser settings, extensions, or security policies. Please use the "Select on Map" option instead.';
+                        }
+                      } else if (errorCode !== undefined) {
+                        switch (errorCode) {
+                          case PERMISSION_DENIED:
+                            userDescription =
+                              'Location permission denied. Please enable location access in your browser settings.';
+                            break;
+                          case POSITION_UNAVAILABLE:
+                            userDescription =
+                              'Location information unavailable. Please try selecting location on map instead.';
+                            break;
+                          case TIMEOUT:
+                            userDescription =
+                              'Location request timed out after 30 seconds. This can happen indoors or in areas with poor GPS signal. Try moving closer to a window or use "Select on Map" instead.';
+                            break;
+                          default:
+                            userDescription =
+                              errorMessage ||
+                              'Please check your browser permissions or select location on map.';
+                        }
+                      } else {
+                        userDescription =
+                          errorMessage ||
+                          'Please check your browser permissions or select location on map.';
+                      }
+
+                      toast.error(userMessage, {
+                        description: userDescription,
+                      });
+                    },
+                    {
+                      enableHighAccuracy: true,
+                      timeout: 30000,
+                      maximumAge: 0,
+                    }
+                  );
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/15 text-white/80 hover:text-white hover:border-white/30 transition-colors"
+              >
+                <MapPin className="w-4 h-4" />
+                Use My Location
+              </button>
+            </div>
+
+            <FormField
+              label="Location"
+              htmlFor="upload-location"
+              required
+              error={errors.location?.message}
+            >
+              <input
+                id="upload-location"
+                type="text"
+                autoComplete="off"
+                className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
+                placeholder="e.g., Port Vila, Vanuatu"
+                {...registerSanitizedField('location', {
+                  required: 'Location is required',
+                })}
+              />
+            </FormField>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="upload-latitude"
+                  className="block text-xs text-surface-soft mb-1"
+                >
+                  Latitude
+                </label>
+                <input
+                  id="upload-latitude"
+                  type="number"
+                  step="any"
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
+                  placeholder="e.g., -17.7334"
+                  {...register('latitude', { valueAsNumber: true })}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="upload-longitude"
+                  className="block text-xs text-surface-soft mb-1"
+                >
+                  Longitude
+                </label>
+                <input
+                  id="upload-longitude"
+                  type="number"
+                  step="any"
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
+                  placeholder="e.g., 168.3273"
+                  {...register('longitude', { valueAsNumber: true })}
+                />
+              </div>
+            </div>
+
+            {isChrome && (
+              <div className="mt-3 p-2 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
+                <p className="text-xs text-pacific-300">
+                  💡 <strong>Chrome users:</strong> If &quot;Use My
+                  Location&quot; doesn&apos;t work, click the lock icon in your
+                  address bar → Site settings → Allow Location
+                </p>
+              </div>
+            )}
+
+            <p className="mt-3 text-xs text-white/50">
+              Trouble using location? Use &quot;Select on Map&quot; or paste
+              coordinates manually.
+            </p>
+          </div>
+
+          {/* Additional Details */}
+          <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-deep-900/40 to-pacific-900/30 backdrop-blur p-6">
+            <div className="mb-4">
+              <p className="text-xs uppercase tracking-[0.25em] text-white/40">
+                Additional Details
+              </p>
+              <h3 className="text-lg font-semibold text-white">
+                Additional Details
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                label="Title"
+                htmlFor="upload-title"
+                hint="Auto-filled from the filename if you leave it blank"
+              >
+                <input
+                  id="upload-title"
+                  type="text"
+                  autoComplete="off"
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
+                  placeholder="Recording 2026_01_27_122625"
+                  {...registerSanitizedField('title')}
+                />
+              </FormField>
+
+              <FormField label="Altitude (meters)" htmlFor="upload-altitude">
+                <input
+                  id="upload-altitude"
+                  type="number"
+                  step="0.1"
+                  className="w-full px-3 py-2 border border-white/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-pacific-500 bg-deep-900/40 text-white placeholder-surface-soft/50 backdrop-blur"
+                  placeholder="15.0"
+                  {...register('altitude', { valueAsNumber: true })}
+                />
+              </FormField>
+            </div>
+
+            {exifMetadata &&
+              (exifMetadata.camera ||
+                exifMetadata.orientation ||
+                exifMetadata.altitude) && (
+                <div className="mt-4 p-3 bg-pacific-900/20 border border-pacific-500/30 rounded-lg">
+                  <p className="text-xs font-medium text-pacific-300 mb-2">
+                    📷 Camera Metadata
+                  </p>
+                  <div className="space-y-1">
+                    {exifMetadata.camera && (
+                      <p className="text-xs text-surface-soft">
+                        <span className="text-white">Camera:</span>{' '}
+                        {exifMetadata.camera}
+                      </p>
+                    )}
+                    {exifMetadata.orientation && (
+                      <p className="text-xs text-surface-soft">
+                        <span className="text-white">Orientation:</span>{' '}
+                        {exifMetadata.orientation}
+                      </p>
+                    )}
+                    {exifMetadata.altitude && (
+                      <p className="text-xs text-surface-soft">
+                        <span className="text-white">Altitude:</span>{' '}
+                        {exifMetadata.altitude.toFixed(1)}m
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
           </div>
 
           {/* Map Picker Modal */}
@@ -2130,8 +2335,16 @@ export default function UploadPage() {
             />
           )}
 
-          {/* Submit Button */}
-          <div className="flex justify-end">
+          {/* Actions */}
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <Button
+              type="button"
+              variant="secondary"
+              size="lg"
+              onClick={() => router.back()}
+            >
+              Cancel
+            </Button>
             <Button
               type="submit"
               variant="primary"
@@ -2148,10 +2361,10 @@ export default function UploadPage() {
               {batchUploadMutation.isPending
                 ? 'Starting batch...'
                 : uploadMutation.isPending
-                  ? 'Uploading...'
+                  ? 'Submitting...'
                   : batchMode && selectedFiles.length > 0
-                    ? `Upload ${selectedFiles.length} Images`
-                    : 'Upload Image'}
+                    ? `Submit ${selectedFiles.length} Reports`
+                    : 'Submit Report'}
             </Button>
           </div>
 

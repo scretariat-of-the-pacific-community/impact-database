@@ -459,7 +459,9 @@ const BulkImportExport: React.FC = () => {
                               {job.filename}
                             </h4>
                             <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
-                              <span>Type: {job.type.toUpperCase()}</span>
+                              <span>
+                                Type: {(job.type || 'unknown').toUpperCase()}
+                              </span>
                               <span>Items: {job.totalItems}</span>
                               <span>
                                 Started:{' '}
@@ -670,6 +672,17 @@ const BulkImportExport: React.FC = () => {
                       <option value="cyclone">Cyclone</option>
                       <option value="drought">Drought</option>
                       <option value="wildfire">Wildfire</option>
+                      <option value="volcanic">Volcanic</option>
+                      <option value="coastal_erosion">Coastal Erosion</option>
+                      <option value="sea_level_rise">Sea Level Rise</option>
+                      <option value="storm_surge">Storm Surge</option>
+                      <option value="ocean_acidification">
+                        Ocean Acidification
+                      </option>
+                      <option value="coral_bleaching">Coral Bleaching</option>
+                      <option value="marine_heatwave">Marine Heatwave</option>
+                      <option value="king_tide">King Tide</option>
+                      <option value="rogue_wave">Rogue Wave</option>
                     </Select>
                   </div>
 
@@ -685,6 +698,7 @@ const BulkImportExport: React.FC = () => {
                         type="date"
                         id="export-date-from"
                         name="dateFrom"
+                        autoComplete="off"
                         value={exportFilters.dateFrom}
                         onChange={(
                           e: React.ChangeEvent<
@@ -710,6 +724,7 @@ const BulkImportExport: React.FC = () => {
                         type="date"
                         id="export-date-to"
                         name="dateTo"
+                        autoComplete="off"
                         value={exportFilters.dateTo}
                         onChange={(
                           e: React.ChangeEvent<
@@ -786,7 +801,7 @@ const BulkImportExport: React.FC = () => {
                           {getStatusIcon(job.status)}
                           <div>
                             <h4 className="text-sm font-medium text-gray-900">
-                              {job.format.toUpperCase()} Export
+                              {(job.format || 'unknown').toUpperCase()} Export
                             </h4>
                             <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
                               <span>Items: {job.totalItems}</span>

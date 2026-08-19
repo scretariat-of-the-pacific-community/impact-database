@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { Upload, X, Tag, Plus } from "lucide-react";
+import { useState } from 'react';
+import { Upload, X, Tag, Plus } from 'lucide-react';
 
 interface ImageUploadWithTagsProps {
   onUploadComplete?: (imageData: {
@@ -16,31 +16,31 @@ interface ImageUploadWithTagsProps {
 
 export function ImageUploadWithTags({
   onUploadComplete,
-  allowedFormats = ["image/jpeg", "image/png", "image/webp"],
+  allowedFormats = ['image/jpeg', 'image/png', 'image/webp'],
   maxFileSize = 50,
 }: ImageUploadWithTagsProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [newTag, setNewTag] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isDragActive, setIsDragActive] = useState(false);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setIsDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setIsDragActive(false);
     }
   };
 
   const validateFile = (f: File): boolean => {
     if (!allowedFormats.includes(f.type)) {
-      setError(`Invalid format. Allowed: ${allowedFormats.join(", ")}`);
+      setError(`Invalid format. Allowed: ${allowedFormats.join(', ')}`);
       return false;
     }
     if (f.size > maxFileSize * 1024 * 1024) {
@@ -84,7 +84,7 @@ export function ImageUploadWithTags({
   const addTag = (tag: string) => {
     if (tag.trim() && !tags.includes(tag.trim())) {
       setTags([...tags, tag.trim()]);
-      setNewTag("");
+      setNewTag('');
     }
   };
 
@@ -95,11 +95,11 @@ export function ImageUploadWithTags({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) {
-      setError("Please select a file");
+      setError('Please select a file');
       return;
     }
     if (!title.trim()) {
-      setError("Please enter a title");
+      setError('Please enter a title');
       return;
     }
 
@@ -114,13 +114,16 @@ export function ImageUploadWithTags({
     setFile(null);
     setPreview(null);
     setTags([]);
-    setTitle("");
-    setDescription("");
-    setNewTag("");
+    setTitle('');
+    setDescription('');
+    setNewTag('');
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 bg-gray-50 rounded-lg p-6 border border-gray-200">
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 bg-gray-50 rounded-lg p-6 border border-gray-200"
+    >
       <h3 className="text-lg font-semibold flex items-center gap-2">
         <Upload className="w-5 h-5" />
         Upload Image with Tags
@@ -133,23 +136,32 @@ export function ImageUploadWithTags({
         onDragOver={handleDrag}
         onDrop={handleDrop}
         className={`border-2 border-dashed rounded-lg p-8 text-center transition ${
-          isDragActive ? "border-blue-500 bg-blue-50" : "border-gray-300 bg-white"
-        } ${file ? "hidden" : ""}`}
+          isDragActive
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-300 bg-white'
+        } ${file ? 'hidden' : ''}`}
       >
         <Upload className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-        <p className="text-gray-700 font-medium mb-2">Drag and drop your image here</p>
+        <p className="text-gray-700 font-medium mb-2">
+          Drag and drop your image here
+        </p>
         <p className="text-sm text-gray-600 mb-4">or</p>
-        <label className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition">
+        <label
+          htmlFor="image-upload-file"
+          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer transition"
+        >
           Browse Files
           <input
+            id="image-upload-file"
+            name="imageFile"
             type="file"
             onChange={handleFileInput}
-            accept={allowedFormats.join(",")}
+            accept={allowedFormats.join(',')}
             className="hidden"
           />
         </label>
         <p className="text-xs text-gray-500 mt-4">
-          {allowedFormats.join(", ")} • Max {maxFileSize}MB
+          {allowedFormats.join(', ')} • Max {maxFileSize}MB
         </p>
       </div>
 
@@ -177,10 +189,15 @@ export function ImageUploadWithTags({
           {/* Image Metadata */}
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="image-upload-title"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Image Title *
               </label>
               <input
+                id="image-upload-title"
+                name="title"
                 type="text"
                 value={title}
                 onChange={(e: any) => setTitle(e.target.value)}
@@ -190,10 +207,15 @@ export function ImageUploadWithTags({
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="image-upload-description"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Description
               </label>
               <textarea
+                id="image-upload-description"
+                name="description"
                 value={description}
                 onChange={(e: any) => setDescription(e.target.value)}
                 placeholder="Additional details about this image..."
@@ -204,17 +226,22 @@ export function ImageUploadWithTags({
 
             {/* Tags Input */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1">
+              <label
+                htmlFor="image-upload-tag-input"
+                className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-1"
+              >
                 <Tag className="w-4 h-4" />
                 Tags (Optional)
               </label>
               <div className="flex gap-2 mb-2">
                 <input
+                  id="image-upload-tag-input"
+                  name="tagInput"
                   type="text"
                   value={newTag}
                   onChange={(e: any) => setNewTag(e.target.value)}
                   onKeyDown={(e: any) => {
-                    if (e.key === "Enter") {
+                    if (e.key === 'Enter') {
                       e.preventDefault();
                       addTag(newTag);
                     }

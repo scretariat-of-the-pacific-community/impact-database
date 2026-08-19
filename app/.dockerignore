@@ -1,33 +1,56 @@
-# Node
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# VCS
+.git
+.gitignore
+.github
+.gitattributes
 
-# Next.js
-.next/
-out/
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache
+.venv
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
 build/
-
-# Testing
-tests/
-test/
-*.test.*
-*.spec.*
-coverage/
+.tox/
+.coverage
+.coverage.*
+*.cover
+.hypothesis/
 
 # IDE
 .vscode/
 .idea/
-
-# OS
+*.swp
+*.swo
+*~
 .DS_Store
 
-# Git
-.git
-.gitignore
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build outputs
+*.log
+.cache/
+
+# Tests
+test.db
+test_*.py
+
+# Uploads (large files - sync separately)
+uploads/
 
 # Documentation
+*.md
+!README.md
 *.md
 
 # Environment (passed via build args)

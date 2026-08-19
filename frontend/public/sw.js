@@ -100,8 +100,11 @@ self.addEventListener('fetch', (event) => {
 async function handlePageRequest(request) {
   try {
     const response = await fetch(request);
-    const cache = await caches.open(SHELL_CACHE);
-    cache.put(request, response.clone());
+    // Only cache successful responses (200-299 status codes)
+    if (response.ok) {
+      const cache = await caches.open(SHELL_CACHE);
+      cache.put(request, response.clone());
+    }
     return response;
   } catch (error) {
     const cache = await caches.open(SHELL_CACHE);
@@ -118,7 +121,12 @@ async function networkFirst(request) {
   const cache = await caches.open(DATA_CACHE);
   try {
     const response = await fetch(request);
-    cache.put(request, response.clone());
+    // Only cache successful responses (200-299 status codes)
+    if (response.ok) {
+      cache.put(request, response.clone()).catch(() => {
+        // Silently ignore cache errors
+      });
+    }
     return response;
   } catch (error) {
     const cached = await cache.match(request);

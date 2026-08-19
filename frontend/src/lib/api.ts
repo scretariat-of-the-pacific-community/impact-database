@@ -204,7 +204,9 @@ class APIClient {
     return response.data;
   }
 
-  async searchContent(filters: SearchFilters = {}): Promise<UnifiedSearchResponse> {
+  async searchContent(
+    filters: SearchFilters = {}
+  ): Promise<UnifiedSearchResponse> {
     // Unified search that returns both images AND videos
     const params = new URLSearchParams();
 
@@ -245,9 +247,8 @@ class APIClient {
       }
     });
 
-    const response: AxiosResponse<UnifiedSearchResponse> = await this.client.get(
-      `/api/images/content/search?${params.toString()}`
-    );
+    const response: AxiosResponse<UnifiedSearchResponse> =
+      await this.client.get(`/api/images/content/search?${params.toString()}`);
     return response.data;
   }
 
@@ -407,15 +408,13 @@ class APIClient {
 
   async deleteImage(filename: string): Promise<any> {
     const response = await this.client.delete(
-      `/api/images/${encodeURIComponent(filename)}`
+      `/upload/images/${encodeURIComponent(filename)}`
     );
     return response.data;
   }
 
   async deleteVideo(videoId: string): Promise<any> {
-    const response = await this.client.delete(
-      `/api/video/videos/${videoId}`
-    );
+    const response = await this.client.delete(`/api/video/videos/${videoId}`);
     return response.data;
   }
 
@@ -771,7 +770,8 @@ export const imageApi = {
   exportData: () => oceanPortalApi.exportUserData(),
   deleteAccount: () => oceanPortalApi.deleteAccount(),
   search: (filters: SearchFilters) => oceanPortalApi.searchImages(filters),
-  searchContent: (filters: SearchFilters) => oceanPortalApi.searchContent(filters),
+  searchContent: (filters: SearchFilters) =>
+    oceanPortalApi.searchContent(filters),
   updateImage: async (imageId: string, data: any) => {
     const response = await apiClient.put(`/api/images/${imageId}`, data);
     return response.data;

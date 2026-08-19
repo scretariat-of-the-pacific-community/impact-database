@@ -645,22 +645,22 @@ async def invite_user(
 
     # Map frontend role to RBAC role
     # Frontend sends: SUPER_ADMIN, ADMIN, VIEWER, etc (uppercase)
-    # RBAC uses: admin, viewer, contributor, moderator, reviewer (lowercase)
+    # RBAC uses: admin, viewer, contributor, reviewer, senior_reviewer (lowercase)
     role_mapping = {
         "SUPER_ADMIN": "admin",  # Super admin maps to admin role with is_super_admin flag
         "ADMIN": "admin",
         "VIEWER": "viewer",
         "CONTRIBUTOR": "contributor",
-        "CURATOR": "moderator",  # Map curator to moderator role
-        "MODERATOR": "moderator",
+        "CURATOR": "reviewer",  # Map curator to reviewer role
         "REVIEWER": "reviewer",
+        "SENIOR_REVIEWER": "senior_reviewer",
         "super_admin": "admin",  # Also handle lowercase
         "admin": "admin",
         "viewer": "viewer",
         "contributor": "contributor",
-        "curator": "moderator",  # Map curator to moderator role
-        "moderator": "moderator",
+        "curator": "reviewer",  # Map curator to reviewer role
         "reviewer": "reviewer",
+        "senior_reviewer": "senior_reviewer",
     }
     
     rbac_role_name = role_mapping.get(invite_data.role, invite_data.role.lower())

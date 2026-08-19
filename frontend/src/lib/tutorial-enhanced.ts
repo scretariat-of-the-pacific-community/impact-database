@@ -64,7 +64,6 @@ export const tutorialSteps = {
 **What you'll master in 90 seconds:**
 - Lightning-fast search for hazard evidence
 - Upload with auto-extracted metadata
-- Real-time collaboration with your team
 - Analytics to spot patterns and gaps
 
 Ready to become a power user? Let's go! 🚀`,
@@ -167,24 +166,6 @@ Ready to become a power user? Let's go! 🚀`,
       ariaLabel: 'Apply search filters',
     },
     {
-      element: '#collaboration-link',
-      popover: {
-        title: '🤝 Collaborate Without Friction',
-        description: `Your team's evidence, unified:
-
-✨ **Invite teammates** with role-based permissions
-⚡ **Get @mentioned** in comments and reviews
-🔔 **Real-time notifications** for critical updates
-👀 **Follow hazards/regions** for auto-alerts
-
-**Result:** Everyone stays aligned, zero email chaos.`,
-        side: 'bottom',
-        align: 'start',
-      },
-      analyticsTag: 'collab_intro',
-      ariaLabel: 'Access collaboration features',
-    },
-    {
       popover: {
         title: "🎉 You're Ready to Make Impact!",
         description: `**🏆 Tutorial complete!** You now know how to:
@@ -192,7 +173,6 @@ Ready to become a power user? Let's go! 🚀`,
 ✓ Search for evidence instantly
 ✓ Upload high-quality documentation
 ✓ Analyze patterns with data
-✓ Collaborate with your team
 
 **🎁 Pro tip:** Press **?** anytime to restart this tour or access help.
 
@@ -707,139 +687,6 @@ Let's explore! 🎯`,
 Keep discovering! Every search drives impact. 🔍`,
       },
       analyticsTag: 'gallery_tour_complete',
-    },
-  ] as InteractiveStep[],
-
-  // Collaboration tour
-  collaborationTour: [
-    {
-      popover: {
-        title: '🤝 Team Collaboration Hub',
-        description: `Work together seamlessly, no matter where your team is.
-
-**Features:**
-- Invite & manage teammates
-- Role-based permissions
-- @mentions and notifications
-- Follow regions/hazards
-
-Let's build your team! 🌟`,
-      },
-      analyticsTag: 'collab_welcome',
-    },
-    {
-      element: '#invite-button',
-      popover: {
-        title: '✉️ Invite Your Team',
-        description: `Add teammates in seconds:
-
-**Roles available:**
-- **Admin:** Full access + user management
-- **Curator:** Review and approve uploads
-- **Contributor:** Upload evidence
-- **Viewer:** Read-only access
-
-**Process:**
-1. Enter email address
-2. Select role
-3. Send invitation
-4. They receive setup link
-
-**Tip:** Start with 2-3 key people, scale later.`,
-        side: 'bottom',
-      },
-      requiresInteraction: true,
-      analyticsTag: 'invite',
-      ariaLabel: 'Invite team members',
-    },
-    {
-      element: '#workspaces',
-      popover: {
-        title: '📁 Organize with Workspaces',
-        description: `Group related work:
-
-**Use cases:**
-- **Project-based:** "Fiji Flood 2024"
-- **Region-based:** "Vanuatu Operations"
-- **Theme-based:** "Coastal Infrastructure"
-
-**Benefits:**
-- Focused collaboration
-- Easier file management
-- Custom permissions per workspace
-
-**Create:** Click "New Workspace" to start.`,
-        side: 'left',
-      },
-      analyticsTag: 'workspaces',
-      ariaLabel: 'Manage workspaces',
-    },
-    {
-      element: '#notifications',
-      popover: {
-        title: '🔔 Stay In The Loop',
-        description: `Never miss critical updates:
-
-**Notifications for:**
-- @mentions in comments
-- Upload approvals/rejections
-- Team member activity
-- Followed hazard alerts
-- Review assignments
-
-**Control:**
-- Set frequency (instant, daily digest)
-- Choose channels (email, in-app, SMS)
-- Mute specific types
-
-**Smart:** We only notify what matters to you.`,
-        side: 'right',
-      },
-      analyticsTag: 'notifications',
-      ariaLabel: 'Manage notifications',
-    },
-    {
-      element: '#follows',
-      popover: {
-        title: '👀 Follow Regions & Hazards',
-        description: `Auto-track what matters:
-
-**Follow:**
-- Specific countries (e.g., "Fiji")
-- Hazard types (e.g., "Cyclones")
-- Custom combinations
-
-**Get alerted when:**
-- New evidence uploaded
-- Emerging patterns detected
-- Coverage gaps identified
-
-**Example:** Follow "Vanuatu + Tsunamis" to monitor that risk.`,
-        side: 'bottom',
-      },
-      analyticsTag: 'follows',
-      ariaLabel: 'Follow regions and hazards',
-    },
-    {
-      popover: {
-        title: '🎉 Collaboration Master!',
-        description: `**Your team is now unstoppable!**
-
-**Setup complete:**
-✓ Team members invited
-✓ Workspaces organized
-✓ Notifications configured
-✓ Follow rules active
-
-**Best practices:**
-- Weekly team check-ins
-- Shared workspace for active incidents
-- Use @mentions liberally
-- Review notification settings monthly
-
-**Result:** Coordinated response, no dropped balls. 💪`,
-      },
-      analyticsTag: 'collab_tour_complete',
     },
   ] as InteractiveStep[],
 };

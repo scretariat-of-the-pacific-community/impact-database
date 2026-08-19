@@ -16,7 +16,6 @@ import {
   Activity,
   Settings,
   ShieldCheck,
-  Users,
   Home,
 } from 'lucide-react';
 import { imageApi } from '@/lib/api';
@@ -35,7 +34,6 @@ import {
   Tooltip as RechartsTooltip,
 } from 'recharts';
 import ActivityTimeline from '@/components/profile/ActivityTimeline';
-import Collaboration from '@/components/profile/Collaboration';
 import MobileBottomNav, {
   PROFILE_NAV_ITEMS,
 } from '@/components/profile/MobileBottomNav';
@@ -73,7 +71,6 @@ const TABS = [
   { id: 'activity', label: 'Activity', icon: Activity },
   { id: 'achievements', label: 'Achievements', icon: Award },
   { id: 'analytics', label: 'Analytics', icon: Activity },
-  { id: 'collaboration', label: 'Collaboration', icon: Users },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -388,15 +385,6 @@ export default function ProfilePage() {
           <UserAnalyticsReal isActive={activeTab === 'analytics'} />
         )}
       </div>
-      <div className={activeTab === 'collaboration' ? 'block' : 'hidden'}>
-        {visitedTabs.has('collaboration') && (
-          <Collaboration
-            uploads={uploads || []}
-            stats={stats}
-            isActive={activeTab === 'collaboration'}
-          />
-        )}
-      </div>
       <div className={activeTab === 'settings' ? 'block' : 'hidden'}>
         {visitedTabs.has('settings') && renderSettingsContent()}
       </div>
@@ -567,7 +555,11 @@ export default function ProfilePage() {
                     </h3>
                     <div className="flex items-center gap-4">
                       <div className="w-24 h-24">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ResponsiveContainer
+                          width="100%"
+                          height="100%"
+                          minHeight={96}
+                        >
                           <PieChart>
                             <Pie
                               data={pieData}

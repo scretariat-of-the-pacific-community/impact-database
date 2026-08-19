@@ -31,7 +31,7 @@ import { sanitizeText } from '@/lib/sanitize';
 
 export interface CurationItem {
   id: string;
-  content_type?: string;  // 'image' or 'video'
+  content_type?: string; // 'image' or 'video'
   content_id?: string;
   image_filename: string;
   status:
@@ -60,7 +60,7 @@ export interface CurationItem {
     datetime?: string;
     latitude?: number;
     longitude?: number;
-    content_type?: string;  // For video metadata
+    content_type?: string; // For video metadata
     duration?: number;
     poster_url?: string;
     title?: string;
@@ -156,7 +156,7 @@ const normalizeItem = (item: any): CurationItem => {
   const filename = (meta as any).filename || item.image_filename;
   const existingMetadata =
     item?.metadata && typeof item.metadata === 'object' ? item.metadata : {};
-  
+
   // Handle both images and videos
   const contentType = item.content_type || 'image';
   const isVideo = contentType === 'video';
@@ -174,25 +174,33 @@ const normalizeItem = (item: any): CurationItem => {
   if (isVideo) {
     if (thumbnailCandidate) {
       // If it already starts with /api or http, use as-is
-      if (thumbnailCandidate.startsWith('/api') || thumbnailCandidate.startsWith('http')) {
-        thumbnailUrl = thumbnailCandidate.startsWith('http') 
-          ? thumbnailCandidate 
+      if (
+        thumbnailCandidate.startsWith('/api') ||
+        thumbnailCandidate.startsWith('http')
+      ) {
+        thumbnailUrl = thumbnailCandidate.startsWith('http')
+          ? thumbnailCandidate
           : getApiUrl(thumbnailCandidate);
       } else {
         // Otherwise assume it's a video ID and construct the thumbnail URL
         const videoId = item.content_id || item.imageId || meta.id;
-        thumbnailUrl = videoId ? getApiUrl(`/api/video/thumbnail/${videoId}`) : undefined;
+        thumbnailUrl = videoId
+          ? getApiUrl(`/api/video/thumbnail/${videoId}`)
+          : undefined;
       }
     } else {
       // No thumbnail candidate, try to construct from video ID
       const videoId = item.content_id || item.imageId || meta.id;
-      thumbnailUrl = videoId ? getApiUrl(`/api/video/thumbnail/${videoId}`) : undefined;
+      thumbnailUrl = videoId
+        ? getApiUrl(`/api/video/thumbnail/${videoId}`)
+        : undefined;
     }
   } else {
     // Images use the existing logic
-    thumbnailUrl = thumbnailCandidate || filename
-      ? buildThumbnailUrl({ thumbnail_url: thumbnailCandidate }, filename)
-      : undefined;
+    thumbnailUrl =
+      thumbnailCandidate || filename
+        ? buildThumbnailUrl({ thumbnail_url: thumbnailCandidate }, filename)
+        : undefined;
   }
 
   const imageCandidate =
@@ -210,24 +218,41 @@ const normalizeItem = (item: any): CurationItem => {
   if (isVideo) {
     if (imageCandidate) {
       // If it already starts with /api or http, use as-is
-      if (imageCandidate.startsWith('/api') || imageCandidate.startsWith('http')) {
+      if (
+        imageCandidate.startsWith('/api') ||
+        imageCandidate.startsWith('http')
+      ) {
         imageUrl = imageCandidate.startsWith('http')
           ? imageCandidate
           : getApiUrl(imageCandidate);
       } else {
         // Otherwise construct video stream URL
         const videoId = item.content_id || item.imageId || meta.id;
-        imageUrl = videoId ? getApiUrl(`/api/video/stream/${videoId}`) : undefined;
+        imageUrl = videoId
+          ? getApiUrl(`/api/video/stream/${videoId}`)
+          : undefined;
       }
     } else {
       const videoId = item.content_id || item.imageId || meta.id;
-      imageUrl = videoId ? getApiUrl(`/api/video/stream/${videoId}`) : undefined;
+      imageUrl = videoId
+        ? getApiUrl(`/api/video/stream/${videoId}`)
+        : undefined;
     }
   } else {
     // Images use the existing logic
-    imageUrl = imageCandidate || filename
-      ? buildAssetUrl(imageCandidate, filename)
-      : undefined;
+    // Always try to build URL if we have either imageCandidate or filename
+    if (imageCandidate || filename) {
+      imageUrl = buildAssetUrl(imageCandidate, filename);
+    }
+    // Debug logging for missing images
+    if (!imageUrl && filename) {
+      console.warn('[CurationQueue] Image URL not built:', {
+        id: item.id,
+        filename,
+        imageCandidate,
+        meta: Object.keys(meta),
+      });
+    }
   }
 
   return {
@@ -235,7 +260,8 @@ const normalizeItem = (item: any): CurationItem => {
     content_type: contentType,
     thumbnailUrl,
     imageUrl,
-    imageId: item.imageId || item.image_id || item.content_id || meta.id || filename,
+    imageId:
+      item.imageId || item.image_id || item.content_id || meta.id || filename,
     title:
       item.title ||
       (meta as any).title ||
@@ -372,12 +398,26 @@ const CurationQueueItem = memo(function CurationQueueItem({
                 height={64}
                 loading="lazy"
                 decoding="async"
+                onError={(e) => {
+                  const img = e.currentTarget;
+                  console.error('[CurationQueue] Image load failed:', {
+                    src: img.src,
+                    itemId: item.id,
+                    filename: item.image_filename,
+                    thumbnailUrl: item.thumbnailUrl,
+                    imageUrl: item.imageUrl,
+                  });
+                }}
               />
               {/* Play button for videos */}
               {item.content_type === 'video' && (
                 <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-lg">
                   <div className="flex items-center justify-center h-8 w-8 rounded-full bg-white/90">
-                    <svg className="h-5 w-5 text-black ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="h-5 w-5 text-black ml-0.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                     </svg>
                   </div>

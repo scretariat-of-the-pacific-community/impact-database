@@ -40,12 +40,20 @@ export function getAuthToken(): string | null {
  * @returns Fetch options with authentication configured
  */
 export function createAuthFetchOptions(options: RequestInit = {}): RequestInit {
+  const token = getAuthToken();
+  const existingHeaders = options.headers || {};
+  const hasAuthHeader =
+    typeof existingHeaders === 'object' &&
+    'Authorization' in existingHeaders &&
+    Boolean((existingHeaders as Record<string, string>).Authorization);
+
   return {
     ...options,
     credentials: 'include', // Automatically sends httpOnly cookies
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
+      ...(token && !hasAuthHeader ? { Authorization: `Bearer ${token}` } : {}),
     },
   };
 }
