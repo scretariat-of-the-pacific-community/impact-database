@@ -4,14 +4,14 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ChartBarIcon,
-  QueueListIcon,
-  UserGroupIcon,
-  CloudArrowUpIcon,
-  CloudArrowDownIcon,
-  Cog6ToothIcon,
-  UserCircleIcon,
-} from '@heroicons/react/24/outline';
+  BarChart3,
+  ListChecks,
+  Users,
+  CloudUpload,
+  CloudDownload,
+  Settings,
+  UserCircle,
+} from 'lucide-react';
 
 // Import components
 import CurationDashboard from '../../components/CurationDashboard';
@@ -33,25 +33,25 @@ const AdminCurationPage: React.FC = () => {
     {
       id: 'dashboard',
       label: 'Dashboard',
-      icon: ChartBarIcon,
+      icon: BarChart3,
       description: 'Overview and statistics',
     },
     {
       id: 'queue',
       label: 'Curation Queue',
-      icon: QueueListIcon,
+      icon: ListChecks,
       description: 'Review and manage submissions',
     },
     {
       id: 'users',
       label: 'User Management',
-      icon: UserGroupIcon,
+      icon: Users,
       description: 'Manage users and permissions',
     },
     {
       id: 'import-export',
       label: 'Import/Export',
-      icon: CloudArrowUpIcon,
+      icon: CloudUpload,
       description: 'Bulk operations and data management',
     },
   ];
@@ -97,11 +97,11 @@ const AdminCurationPage: React.FC = () => {
                   onClick={() => router.push('/profile')}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                 >
-                  <UserCircleIcon className="h-5 w-5 mr-2" />
+                  <UserCircle className="h-5 w-5 mr-2" />
                   Back to Profile
                 </button>
                 <div className="text-sm text-gray-500">
-                  <Cog6ToothIcon className="h-4 w-4 inline mr-1" />
+                  <Settings className="h-4 w-4 inline mr-1" />
                   System: Online
                 </div>
               </div>
@@ -198,7 +198,7 @@ const AdminCurationPage: React.FC = () => {
                 className="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-colors"
                 title="Quick Import"
               >
-                <CloudArrowUpIcon className="h-6 w-6" />
+                <CloudUpload className="h-6 w-6" />
               </motion.button>
 
               <motion.button
@@ -208,7 +208,7 @@ const AdminCurationPage: React.FC = () => {
                 className="p-3 bg-green-600 text-white rounded-full shadow-lg hover:bg-green-700 transition-colors"
                 title="Review Queue"
               >
-                <QueueListIcon className="h-6 w-6" />
+                <ListChecks className="h-6 w-6" />
               </motion.button>
             </div>
           </div>

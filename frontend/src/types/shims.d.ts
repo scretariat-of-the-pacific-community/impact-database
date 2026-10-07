@@ -41,22 +41,6 @@ declare module '@tanstack/react-query' {
   export const QueryClientProvider: React.ComponentType<any>;
 }
 
-declare module '@heroicons/react/24/outline' {
-  export const CloudArrowUpIcon: any;
-  export const CloudArrowDownIcon: any;
-  export const DocumentArrowUpIcon: any;
-  export const DocumentArrowDownIcon: any;
-  export const PlayIcon: any;
-  export const EyeIcon: any;
-  export const CheckCircleIcon: any;
-  export const ExclamationTriangleIcon: any;
-  export const ClockIcon: any;
-  export const XCircleIcon: any;
-  export const ArrowPathIcon: any;
-  export const FolderOpenIcon: any;
-  export const TableCellsIcon: any;
-}
-
 declare module '@/components/design-system' {
   export const Button: any;
   export const Card: any;

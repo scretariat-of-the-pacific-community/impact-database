@@ -3,3 +3,8 @@ services:
   frontend:
     healthcheck:
       disable: true
+    ports: !override
+      - "3102:3000"
+  postgis_db:
+    ports: !override
+      - "5435:5432"

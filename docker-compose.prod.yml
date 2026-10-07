@@ -3,7 +3,7 @@
 # Generated: January 4, 2026
 #
 # NOTE: This file adds production settings without changing ports from base compose.
-# Ports from docker-compose.yml: API=8000, Frontend=3000, PostgreSQL=5434, Redis=6380, MinIO=9020/9021
+# Ports from docker-compose.yml: API=8000, Frontend=3103, PostgreSQL=5436, Redis=6380, MinIO=9020/9021
 
 services:
   postgis_db:

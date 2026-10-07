@@ -4,18 +4,18 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendFetch } from '@/lib/auth-utils';
 import {
-  PencilIcon,
-  CheckIcon,
-  XMarkIcon,
-  ExclamationTriangleIcon,
-  ClockIcon,
-  MapPinIcon,
-  CalendarIcon,
-  TagIcon,
-  DocumentTextIcon,
-  PhotoIcon,
-  GlobeAltIcon,
-} from '@heroicons/react/24/outline';
+  Pencil,
+  Check,
+  X,
+  AlertTriangle,
+  Clock,
+  MapPin,
+  Calendar,
+  Tag,
+  FileText,
+  Image,
+  Globe,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Select } from '@/components/design-system';
 import dompurify from 'dompurify';
@@ -470,15 +470,15 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
   const getFieldIcon = (type: string) => {
     switch (type) {
       case 'coordinates':
-        return MapPinIcon;
+        return MapPin;
       case 'date':
-        return CalendarIcon;
+        return Calendar;
       case 'tags':
-        return TagIcon;
+        return Tag;
       case 'textarea':
-        return DocumentTextIcon;
+        return FileText;
       default:
-        return DocumentTextIcon;
+        return FileText;
     }
   };
 
@@ -496,13 +496,13 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
       <div className="px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <PhotoIcon className="h-6 w-6 text-gray-400" />
+            <Image className="h-6 w-6 text-gray-400" />
             <h3 className="text-lg font-medium text-gray-900">
               {readOnly ? 'View Metadata' : 'Edit Metadata'}
             </h3>
             {hasChanges && (
               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                <ClockIcon className="h-3 w-3 mr-1" />
+                <Clock className="h-3 w-3 mr-1" />
                 Unsaved changes
               </span>
             )}
@@ -515,7 +515,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
                 disabled={!hasChanges}
                 className="px-3 py-1 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                <XMarkIcon className="h-4 w-4 inline mr-1" />
+                <X className="h-4 w-4 inline mr-1" />
                 Cancel
               </button>
               <button
@@ -523,7 +523,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
                 disabled={!hasChanges || saveMutation.isPending}
                 className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
               >
-                <CheckIcon className="h-4 w-4 inline mr-1" />
+                <Check className="h-4 w-4 inline mr-1" />
                 {saveMutation.isPending ? 'Saving...' : 'Save'}
               </button>
             </div>
@@ -566,7 +566,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
 
                 {error && (
                   <p className="mt-1 text-xs text-red-600 flex items-center">
-                    <ExclamationTriangleIcon className="h-3 w-3 mr-1" />
+                    <AlertTriangle className="h-3 w-3 mr-1" />
                     {error}
                   </p>
                 )}
@@ -612,7 +612,7 @@ const MetadataEditor: React.FC<MetadataEditorProps> = ({
         {showValidation && Object.keys(validationErrors).length > 0 && (
           <div className="mt-6 p-4 bg-red-50 rounded-lg border border-red-200">
             <div className="flex items-center">
-              <ExclamationTriangleIcon className="h-5 w-5 text-red-400 mr-2" />
+              <AlertTriangle className="h-5 w-5 text-red-400 mr-2" />
               <h4 className="text-sm font-medium text-red-900">
                 Please fix the following errors:
               </h4>

@@ -4,7 +4,6 @@
  */
 
 import { getCLS, getFID, getFCP, getLCP, getTTFB } from 'web-vitals';
-import * as Sentry from '@sentry/nextjs';
 
 export function initWebVitals() {
   // Cumulative Layout Shift
@@ -39,19 +38,6 @@ export function initWebVitals() {
 }
 
 function captureMetric(name: string, metric: any) {
-  // Send to Sentry
-  if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
-    Sentry.captureMessage(`Web Vital: ${name}`, 'info', {
-      tags: {
-        metric_name: name,
-        rating: metric.rating,
-      },
-      measurements: {
-        [name]: { value: metric.value, unit: 'ms' },
-      },
-    });
-  }
-
   // Send to analytics endpoint
   if (typeof window !== 'undefined') {
     try {

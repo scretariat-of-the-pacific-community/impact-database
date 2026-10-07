@@ -6,24 +6,24 @@ import { backendFetch, authFetch } from '@/lib/auth-utils';
 import Image from 'next/image';
 import { sanitizeText } from '@/lib/sanitize';
 import {
-  UserPlusIcon,
-  UserIcon,
-  PencilIcon,
-  TrashIcon,
-  LockClosedIcon,
-  LockOpenIcon,
-  ShieldCheckIcon,
-  ExclamationTriangleIcon,
-  MagnifyingGlassIcon,
-  FunnelIcon,
-  EyeIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  EnvelopeIcon,
-  ArrowPathIcon,
-  UsersIcon,
-  CheckIcon,
-} from '@heroicons/react/24/outline';
+  UserPlus,
+  User,
+  Pencil,
+  Trash2,
+  Lock,
+  Unlock,
+  ShieldCheck,
+  AlertTriangle,
+  Search,
+  Filter,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  Mail,
+  RefreshCw,
+  Users,
+  Check,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Select } from '@/components/design-system';
 
@@ -575,7 +575,7 @@ const UserManagement: React.FC = () => {
                   />
                 </div>
               ) : (
-                <UserIcon className="h-8 w-8 text-gray-400" />
+                <User className="h-8 w-8 text-gray-400" />
               )}
             </div>
             <div>
@@ -671,12 +671,12 @@ const UserManagement: React.FC = () => {
             >
               {user.isLocked ? (
                 <>
-                  <LockOpenIcon className="h-4 w-4 inline mr-1" />
+                  <Unlock className="h-4 w-4 inline mr-1" />
                   Unlock User
                 </>
               ) : (
                 <>
-                  <LockClosedIcon className="h-4 w-4 inline mr-1" />
+                  <Lock className="h-4 w-4 inline mr-1" />
                   Lock User
                 </>
               )}
@@ -691,7 +691,7 @@ const UserManagement: React.FC = () => {
               }}
               className="px-4 py-2 text-sm font-medium text-red-600 bg-red-100 rounded-md hover:bg-red-200"
             >
-              <TrashIcon className="h-4 w-4 inline mr-1" />
+              <Trash2 className="h-4 w-4 inline mr-1" />
               Delete User
             </button>
           </div>
@@ -712,7 +712,7 @@ const UserManagement: React.FC = () => {
     return (
       <div className="bg-red-50 border border-red-200 rounded-md p-4">
         <div className="flex">
-          <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+          <AlertTriangle className="h-5 w-5 text-red-400" />
           <div className="ml-3">
             <h3 className="text-sm font-medium text-red-800">
               Error loading users
@@ -738,7 +738,7 @@ const UserManagement: React.FC = () => {
                 {(usersData as any)?.total || 0}
               </p>
             </div>
-            <UsersIcon className="h-8 w-8 text-blue-500" />
+            <Users className="h-8 w-8 text-blue-500" />
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-green-500">
@@ -751,7 +751,7 @@ const UserManagement: React.FC = () => {
                   0}
               </p>
             </div>
-            <CheckIcon className="h-8 w-8 text-green-500" />
+            <Check className="h-8 w-8 text-green-500" />
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-red-500">
@@ -762,7 +762,7 @@ const UserManagement: React.FC = () => {
                 {(usersData as any)?.locked_count || 0}
               </p>
             </div>
-            <LockClosedIcon className="h-8 w-8 text-red-500" />
+            <Lock className="h-8 w-8 text-red-500" />
           </div>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4 border-l-4 border-purple-500">
@@ -775,7 +775,7 @@ const UserManagement: React.FC = () => {
                 {(usersData as any)?.pending_count || 0}
               </p>
             </div>
-            <EnvelopeIcon className="h-8 w-8 text-purple-500" />
+            <Mail className="h-8 w-8 text-purple-500" />
           </div>
         </div>
       </div>
@@ -789,7 +789,7 @@ const UserManagement: React.FC = () => {
             onClick={() => setShowQuickInvite(!showQuickInvite)}
             className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
           >
-            <EnvelopeIcon className="h-4 w-4 mr-2" />
+            <Mail className="h-4 w-4 mr-2" />
             Quick Invite
           </button>
           {/* Add User */}
@@ -797,7 +797,7 @@ const UserManagement: React.FC = () => {
             onClick={() => setShowCreateModal(true)}
             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
           >
-            <UserPlusIcon className="h-4 w-4 mr-2" />
+            <UserPlus className="h-4 w-4 mr-2" />
             Add User
           </button>
         </div>
@@ -813,7 +813,7 @@ const UserManagement: React.FC = () => {
             className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg shadow-md p-6 border border-blue-200"
           >
             <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-              <EnvelopeIcon className="h-5 w-5 mr-2 text-blue-600" />
+              <Mail className="h-5 w-5 mr-2 text-blue-600" />
               Send Quick Invitation
             </h3>
             <div className="flex flex-col sm:flex-row gap-4">
@@ -864,9 +864,9 @@ const UserManagement: React.FC = () => {
                 className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 {quickInviteMutation.isPending ? (
-                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
-                  <EnvelopeIcon className="h-4 w-4 mr-2" />
+                  <Mail className="h-4 w-4 mr-2" />
                 )}
                 Send Invite
               </button>
@@ -903,7 +903,7 @@ const UserManagement: React.FC = () => {
                 disabled={bulkLockMutation.isPending}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200"
               >
-                <LockClosedIcon className="h-4 w-4 mr-1" />
+                <Lock className="h-4 w-4 mr-1" />
                 Lock Selected
               </button>
               <button
@@ -916,7 +916,7 @@ const UserManagement: React.FC = () => {
                 disabled={bulkLockMutation.isPending}
                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-green-700 bg-green-100 rounded-md hover:bg-green-200"
               >
-                <LockOpenIcon className="h-4 w-4 mr-1" />
+                <Unlock className="h-4 w-4 mr-1" />
                 Unlock Selected
               </button>
               <button
@@ -937,7 +937,7 @@ const UserManagement: React.FC = () => {
             <label htmlFor="user-search" className="sr-only">
               Search users
             </label>
-            <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               id="user-search"
               name="search"
@@ -1088,7 +1088,7 @@ const UserManagement: React.FC = () => {
                               />
                             </div>
                           ) : (
-                            <UserIcon className="h-5 w-5 text-gray-400" />
+                            <User className="h-5 w-5 text-gray-400" />
                           )}
                         </div>
                         <div className="ml-4">
@@ -1111,7 +1111,7 @@ const UserManagement: React.FC = () => {
                       <span
                         className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}
                       >
-                        <ShieldCheckIcon className="h-3 w-3 mr-1" />
+                        <ShieldCheck className="h-3 w-3 mr-1" />
                         {user.role}
                       </span>
                     </td>
@@ -1135,7 +1135,7 @@ const UserManagement: React.FC = () => {
                         }}
                         className="text-blue-600 hover:text-blue-900"
                       >
-                        <EyeIcon className="h-4 w-4" />
+                        <Eye className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() =>
@@ -1151,9 +1151,9 @@ const UserManagement: React.FC = () => {
                         }
                       >
                         {user.isLocked ? (
-                          <LockOpenIcon className="h-4 w-4" />
+                          <Unlock className="h-4 w-4" />
                         ) : (
-                          <LockClosedIcon className="h-4 w-4" />
+                          <Lock className="h-4 w-4" />
                         )}
                       </button>
                     </td>
@@ -1179,7 +1179,7 @@ const UserManagement: React.FC = () => {
                   disabled={currentPage === 1}
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >
-                  <ChevronLeftIcon className="h-5 w-5" />
+                  <ChevronLeft className="h-5 w-5" />
                 </button>
                 <span className="text-sm text-gray-700">
                   Page {currentPage} of{' '}
@@ -1200,7 +1200,7 @@ const UserManagement: React.FC = () => {
                   }
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >
-                  <ChevronRightIcon className="h-5 w-5" />
+                  <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
             </div>

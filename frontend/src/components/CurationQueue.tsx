@@ -13,19 +13,19 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { backendFetch } from '@/lib/auth-utils';
 import { getApiUrl } from '@/lib/config';
 import {
-  MagnifyingGlassIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  EyeIcon,
-  PencilIcon,
-  FlagIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
-  ChatBubbleLeftIcon,
-  ArrowsRightLeftIcon,
-  QueueListIcon,
-} from '@heroicons/react/24/outline';
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  Pencil,
+  Flag,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  MessageSquare,
+  ArrowLeftRight,
+  ListChecks,
+} from 'lucide-react';
 import ErrorBanner from './ErrorBanner';
 import { sanitizeText } from '@/lib/sanitize';
 
@@ -289,19 +289,19 @@ const normalizeItem = (item: any): CurationItem => {
 const getStatusIcon = (status: string) => {
   switch (status) {
     case 'pending':
-      return <ClockIcon className="h-4 w-4 text-yellow-500" />;
+      return <Clock className="h-4 w-4 text-yellow-500" />;
     case 'under_review':
-      return <EyeIcon className="h-4 w-4 text-blue-500" />;
+      return <Eye className="h-4 w-4 text-blue-500" />;
     case 'approved':
-      return <CheckCircleIcon className="h-4 w-4 text-green-500" />;
+      return <CheckCircle2 className="h-4 w-4 text-green-500" />;
     case 'rejected':
-      return <XCircleIcon className="h-4 w-4 text-red-500" />;
+      return <XCircle className="h-4 w-4 text-red-500" />;
     case 'needs_changes':
-      return <PencilIcon className="h-4 w-4 text-orange-500" />;
+      return <Pencil className="h-4 w-4 text-orange-500" />;
     case 'duplicate':
-      return <ArrowsRightLeftIcon className="h-4 w-4 text-purple-500" />;
+      return <ArrowLeftRight className="h-4 w-4 text-purple-500" />;
     default:
-      return <ClockIcon className="h-4 w-4 text-gray-500" />;
+      return <Clock className="h-4 w-4 text-gray-500" />;
   }
 };
 
@@ -483,14 +483,14 @@ const CurationQueueItem = memo(function CurationQueueItem({
             <div className="flex flex-col items-end space-y-2">
               <div className="flex items-center space-x-2">
                 {item.is_flagged && (
-                  <FlagIcon
+                  <Flag
                     className="h-4 w-4 text-red-500"
                     aria-label={sanitizeText(item.flag_reason || 'Flagged')}
                   />
                 )}
                 {item.comments_count > 0 && (
                   <div className="flex items-center text-gray-500">
-                    <ChatBubbleLeftIcon className="h-4 w-4 mr-1" />
+                    <MessageSquare className="h-4 w-4 mr-1" />
                     <span className="text-xs">{item.comments_count}</span>
                   </div>
                 )}
@@ -516,7 +516,7 @@ const CurationQueueItem = memo(function CurationQueueItem({
                   title="Approve"
                   aria-label="Approve submission"
                 >
-                  <CheckCircleIcon className="h-4 w-4" />
+                  <CheckCircle2 className="h-4 w-4" />
                 </button>
                 <button
                   onClick={handleReject}
@@ -524,7 +524,7 @@ const CurationQueueItem = memo(function CurationQueueItem({
                   title="Reject"
                   aria-label="Reject submission"
                 >
-                  <XCircleIcon className="h-4 w-4" />
+                  <XCircle className="h-4 w-4" />
                 </button>
                 <button
                   onClick={handleFlag}
@@ -532,7 +532,7 @@ const CurationQueueItem = memo(function CurationQueueItem({
                   title="Flag"
                   aria-label="Flag submission for review"
                 >
-                  <FlagIcon className="h-4 w-4" />
+                  <Flag className="h-4 w-4" />
                 </button>
               </div>
 
@@ -890,7 +890,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
             <label htmlFor="curation-search" className="sr-only">
               Search curation items
             </label>
-            <MagnifyingGlassIcon className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <Search className="h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               id="curation-search"
               name="search"
@@ -1041,7 +1041,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
 
         {items.length === 0 && (
           <div className="text-center py-12">
-            <QueueListIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <ListChecks className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               The queue is empty
             </h3>
@@ -1105,7 +1105,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
                   disabled={currentPage === 1}
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >
-                  <ChevronLeftIcon className="h-5 w-5" />
+                  <ChevronLeft className="h-5 w-5" />
                 </button>
                 <span className="text-sm text-gray-700">
                   Page {currentPage} of{' '}
@@ -1125,7 +1125,7 @@ const CurationQueue: React.FC<CurationQueueProps> = ({
                   }
                   className="p-2 text-gray-400 hover:text-gray-600 disabled:opacity-50"
                 >
-                  <ChevronRightIcon className="h-5 w-5" />
+                  <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
             </div>

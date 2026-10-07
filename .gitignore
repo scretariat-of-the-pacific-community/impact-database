@@ -1,6 +1,17 @@
 frontend/node_modules
 node_modules
 .venv
+frontend/.next-root-old/
+
+# SQLite dev/test databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime/process artifacts
+*.pid
+*.log
+celerybeat-schedule
 
 # SECURITY: Never commit environment files with secrets
 .env

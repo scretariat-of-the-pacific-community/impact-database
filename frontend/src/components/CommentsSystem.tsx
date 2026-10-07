@@ -4,17 +4,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendFetch } from '@/lib/auth-utils';
 import {
-  ChatBubbleLeftIcon,
-  PaperAirplaneIcon,
-  EllipsisVerticalIcon,
-  TrashIcon,
-  PencilIcon,
-  FlagIcon,
-  EyeIcon,
-  EyeSlashIcon,
-  UserIcon,
-  ClockIcon,
-} from '@heroicons/react/24/outline';
+  MessageSquare,
+  Send,
+  MoreVertical,
+  Trash2,
+  Pencil,
+  Flag,
+  Eye,
+  EyeOff,
+  User,
+  Clock,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Comment {
@@ -320,7 +320,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <UserIcon className="h-4 w-4 text-gray-500" />
+                  <User className="h-4 w-4 text-gray-500" />
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
@@ -339,7 +339,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                     )}
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    <ClockIcon className="h-3 w-3" />
+                    <Clock className="h-3 w-3" />
                     <span>{formatTimeAgo(comment.createdAt)}</span>
                   </div>
                 </div>
@@ -351,7 +351,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                     onClick={() => setShowMenu(!showMenu)}
                     className="p-1 text-gray-400 hover:text-gray-600 rounded"
                   >
-                    <EllipsisVerticalIcon className="h-4 w-4" />
+                    <MoreVertical className="h-4 w-4" />
                   </button>
 
                   {showMenu && (
@@ -372,7 +372,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                         }}
                         className="block w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
                       >
-                        <PencilIcon className="h-3 w-3 inline mr-2" />
+                        <Pencil className="h-3 w-3 inline mr-2" />
                         Edit
                       </button>
                       <button
@@ -382,7 +382,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                         }}
                         className="block w-full px-3 py-2 text-left text-sm text-orange-600 hover:bg-orange-50"
                       >
-                        <FlagIcon className="h-3 w-3 inline mr-2" />
+                        <Flag className="h-3 w-3 inline mr-2" />
                         Flag
                       </button>
                       <button
@@ -392,7 +392,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                         }}
                         className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                       >
-                        <TrashIcon className="h-3 w-3 inline mr-2" />
+                        <Trash2 className="h-3 w-3 inline mr-2" />
                         Delete
                       </button>
                     </div>
@@ -480,7 +480,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-medium text-gray-900 flex items-center">
-          <ChatBubbleLeftIcon className="h-5 w-5 mr-2" />
+          <MessageSquare className="h-5 w-5 mr-2" />
           Comments ({(comments as any)?.length || 0})
         </h3>
 
@@ -491,12 +491,12 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
           >
             {showDeletedComments ? (
               <>
-                <EyeSlashIcon className="h-4 w-4 mr-1" />
+                <EyeOff className="h-4 w-4 mr-1" />
                 Hide deleted
               </>
             ) : (
               <>
-                <EyeIcon className="h-4 w-4 mr-1" />
+                <Eye className="h-4 w-4 mr-1" />
                 Show deleted
               </>
             )}
@@ -569,7 +569,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
                 disabled={!newComment.trim() || createCommentMutation.isPending}
                 className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
-                <PaperAirplaneIcon className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 mr-2" />
                 {createCommentMutation.isPending
                   ? 'Posting...'
                   : 'Post Comment'}
@@ -591,7 +591,7 @@ const CommentsSystem: React.FC<CommentsSystemProps> = ({
 
         {(!comments || (comments as any)?.length === 0) && (
           <div className="text-center text-gray-500 py-8">
-            <ChatBubbleLeftIcon className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+            <MessageSquare className="h-12 w-12 mx-auto text-gray-300 mb-3" />
             <p>No comments yet. Be the first to comment!</p>
           </div>
         )}

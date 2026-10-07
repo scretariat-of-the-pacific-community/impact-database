@@ -5,7 +5,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { MapPinIcon, PhotoIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { MapPin, Image, Filter } from 'lucide-react';
 
 import { imageApi } from '@/lib/api';
 import { configureLeafletIcons } from '@/lib/leaflet-config';
@@ -224,19 +224,19 @@ function MapInsights({
       label: 'Geocoded submissions',
       value: geocodedCount,
       sublabel: 'Ready to visualize',
-      icon: MapPinIcon,
+      icon: MapPin,
     },
     {
       label: 'Needs location',
       value: missingCoordinates,
       sublabel: 'Follow up with field teams',
-      icon: PhotoIcon,
+      icon: Image,
     },
     {
       label: 'Hazard types',
       value: hazardTypeCount,
       sublabel: 'Filters applied on the map',
-      icon: FunnelIcon,
+      icon: Filter,
     },
   ];
 

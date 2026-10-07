@@ -4,15 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { backendFetch } from '@/lib/auth-utils';
 import {
-  ChartBarIcon,
-  ClockIcon,
-  ExclamationTriangleIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  UserGroupIcon,
-  DocumentTextIcon,
-  FlagIcon,
-} from '@heroicons/react/24/outline';
+  BarChart3,
+  Clock,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  Users,
+  FileText,
+  Flag,
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface DashboardStats {
@@ -136,7 +136,7 @@ const CurationDashboard: React.FC = () => {
     return (
       <div className="bg-red-50 border border-red-200 rounded-md p-4">
         <div className="flex">
-          <ExclamationTriangleIcon className="h-5 w-5 text-red-400" />
+          <AlertTriangle className="h-5 w-5 text-red-400" />
           <div className="ml-3">
             <h3 className="text-sm font-medium text-red-800">
               Error loading dashboard
@@ -179,25 +179,25 @@ const CurationDashboard: React.FC = () => {
         <StatCard
           title="Total Items"
           value={stats?.totalItems || 0}
-          icon={DocumentTextIcon}
+          icon={FileText}
           color="blue"
         />
         <StatCard
           title="Pending Review"
           value={stats?.pendingReview || 0}
-          icon={ClockIcon}
+          icon={Clock}
           color="yellow"
         />
         <StatCard
           title="Under Review"
           value={stats?.underReview || 0}
-          icon={UserGroupIcon}
+          icon={Users}
           color="orange"
         />
         <StatCard
           title="Flagged Items"
           value={stats?.flagged || 0}
-          icon={FlagIcon}
+          icon={Flag}
           color="red"
         />
       </div>
@@ -298,7 +298,7 @@ const CurationDashboard: React.FC = () => {
                   <div className="relative flex space-x-3">
                     <div>
                       <span className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center ring-8 ring-white">
-                        <DocumentTextIcon className="h-4 w-4 text-white" />
+                        <FileText className="h-4 w-4 text-white" />
                       </span>
                     </div>
                     <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">

@@ -4,20 +4,20 @@ import React, { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendFetch } from '@/lib/auth-utils';
 import {
-  CloudArrowUpIcon,
-  CloudArrowDownIcon,
-  DocumentArrowUpIcon,
-  DocumentArrowDownIcon,
-  PlayIcon,
-  EyeIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
-  ClockIcon,
-  XCircleIcon,
-  ArrowPathIcon,
-  FolderOpenIcon,
-  TableCellsIcon,
-} from '@heroicons/react/24/outline';
+  CloudUpload,
+  CloudDownload,
+  FileUp,
+  FileDown,
+  Play,
+  Eye,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  XCircle,
+  RefreshCw,
+  FolderOpen,
+  Table,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Select } from '@/components/design-system';
 
@@ -215,16 +215,16 @@ const BulkImportExport: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-        return <ClockIcon className="h-5 w-5 text-yellow-500" />;
+        return <Clock className="h-5 w-5 text-yellow-500" />;
       case 'validating':
       case 'processing':
-        return <ArrowPathIcon className="h-5 w-5 text-blue-500 animate-spin" />;
+        return <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />;
       case 'completed':
-        return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
       case 'failed':
-        return <XCircleIcon className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-5 w-5 text-red-500" />;
       default:
-        return <ClockIcon className="h-5 w-5 text-gray-500" />;
+        return <Clock className="h-5 w-5 text-gray-500" />;
     }
   };
 
@@ -268,7 +268,7 @@ const BulkImportExport: React.FC = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <CloudArrowUpIcon className="h-4 w-4 inline mr-2" />
+            <CloudUpload className="h-4 w-4 inline mr-2" />
             Import
           </button>
           <button
@@ -279,7 +279,7 @@ const BulkImportExport: React.FC = () => {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            <CloudArrowDownIcon className="h-4 w-4 inline mr-2" />
+            <CloudDownload className="h-4 w-4 inline mr-2" />
             Export
           </button>
         </div>
@@ -315,7 +315,7 @@ const BulkImportExport: React.FC = () => {
                 {selectedFile ? (
                   <div className="space-y-4">
                     <div className="flex items-center justify-center space-x-3">
-                      <FolderOpenIcon className="h-12 w-12 text-blue-500" />
+                      <FolderOpen className="h-12 w-12 text-blue-500" />
                       <div className="text-left">
                         <p className="text-sm font-medium text-gray-900">
                           {selectedFile.name}
@@ -334,7 +334,7 @@ const BulkImportExport: React.FC = () => {
                   </div>
                 ) : (
                   <div className="space-y-4">
-                    <DocumentArrowUpIcon className="mx-auto h-12 w-12 text-gray-400" />
+                    <FileUp className="mx-auto h-12 w-12 text-gray-400" />
                     <div>
                       <p className="text-lg font-medium text-gray-900">
                         Drop files here or click to browse
@@ -408,7 +408,7 @@ const BulkImportExport: React.FC = () => {
                     disabled={!selectedFile || importMutation.isPending}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                   >
-                    <PlayIcon className="h-4 w-4 mr-2" />
+                    <Play className="h-4 w-4 mr-2" />
                     {dryRun ? 'Validate' : 'Import'}
                   </button>
                 </div>
@@ -774,7 +774,7 @@ const BulkImportExport: React.FC = () => {
                   disabled={exportMutation.isPending}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
                 >
-                  <DocumentArrowDownIcon className="h-4 w-4 mr-2" />
+                  <FileDown className="h-4 w-4 mr-2" />
                   Start Export
                 </button>
               </div>
@@ -832,7 +832,7 @@ const BulkImportExport: React.FC = () => {
                               download
                               className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200"
                             >
-                              <CloudArrowDownIcon className="h-3 w-3 mr-1" />
+                              <CloudDownload className="h-3 w-3 mr-1" />
                               Download
                             </a>
                           )}
@@ -858,7 +858,7 @@ const BulkImportExport: React.FC = () => {
                       {/* Expiry Warning */}
                       {job.downloadUrl && job.expiresAt && (
                         <div className="mt-2 text-xs text-orange-600">
-                          <ExclamationTriangleIcon className="h-3 w-3 inline mr-1" />
+                          <AlertTriangle className="h-3 w-3 inline mr-1" />
                           Download expires:{' '}
                           {new Date(job.expiresAt).toLocaleString()}
                         </div>

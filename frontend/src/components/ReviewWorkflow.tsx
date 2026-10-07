@@ -5,20 +5,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendFetch } from '@/lib/auth-utils';
 import { getApiUrl } from '@/lib/config';
 import {
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
-  PencilIcon,
-  ArrowsRightLeftIcon,
-  FlagIcon,
-  EyeIcon,
-  UserIcon,
-  MapPinIcon,
-  CalendarIcon,
-  ExclamationTriangleIcon,
-  DocumentTextIcon,
-  PhotoIcon,
-} from '@heroicons/react/24/outline';
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Pencil,
+  ArrowLeftRight,
+  Flag,
+  Eye,
+  User,
+  MapPin,
+  Calendar,
+  AlertTriangle,
+  FileText,
+  ImageIcon,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import MetadataEditor from './MetadataEditor';
 import CommentsSystem from './CommentsSystem';
@@ -250,19 +250,19 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-        return <ClockIcon className="h-5 w-5 text-yellow-500" />;
+        return <Clock className="h-5 w-5 text-yellow-500" />;
       case 'under_review':
-        return <EyeIcon className="h-5 w-5 text-blue-500" />;
+        return <Eye className="h-5 w-5 text-blue-500" />;
       case 'approved':
-        return <CheckCircleIcon className="h-5 w-5 text-green-500" />;
+        return <CheckCircle2 className="h-5 w-5 text-green-500" />;
       case 'rejected':
-        return <XCircleIcon className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-5 w-5 text-red-500" />;
       case 'needs_changes':
-        return <PencilIcon className="h-5 w-5 text-orange-500" />;
+        return <Pencil className="h-5 w-5 text-orange-500" />;
       case 'duplicate':
-        return <ArrowsRightLeftIcon className="h-5 w-5 text-purple-500" />;
+        return <ArrowLeftRight className="h-5 w-5 text-purple-500" />;
       default:
-        return <ClockIcon className="h-5 w-5 text-gray-500" />;
+        return <Clock className="h-5 w-5 text-gray-500" />;
     }
   };
 
@@ -518,7 +518,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
               </span>
               {item.is_flagged && (
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                  <FlagIcon className="h-3 w-3 mr-1" />
+                  <Flag className="h-3 w-3 mr-1" />
                   Flagged
                 </span>
               )}
@@ -584,12 +584,12 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                         className="absolute top-2 right-2 p-1 bg-black bg-opacity-50 text-white rounded hover:bg-opacity-75 transition"
                         title="View full image"
                       >
-                        <EyeIcon className="h-4 w-4" />
+                        <Eye className="h-4 w-4" />
                       </button>
                     </div>
                   ) : (
                     <div className="w-full h-48 bg-gray-200 rounded-lg flex items-center justify-center">
-                      <PhotoIcon className="h-12 w-12 text-gray-900" />
+                      <ImageIcon className="h-12 w-12 text-gray-900" />
                     </div>
                   )}
                 </>
@@ -636,7 +636,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
               {item.location && (
                 <div className="col-span-2">
                   <span className="font-medium text-gray-700 flex items-center">
-                    <MapPinIcon className="h-4 w-4 mr-1" />
+                    <MapPin className="h-4 w-4 mr-1" />
                     Location:
                   </span>
                   <p className="text-gray-900">{item.location.address}</p>
@@ -648,7 +648,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
               {item.image_metadata?.datetime && (
                 <div>
                   <span className="font-medium text-gray-700 flex items-center">
-                    <CalendarIcon className="h-4 w-4 mr-1" />
+                    <Calendar className="h-4 w-4 mr-1" />
                     Capture Date:
                   </span>
                   <p className="text-gray-900">
@@ -672,13 +672,13 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
             aria-label="Review workflow tabs"
           >
             {[
-              { id: 'review', label: 'Review', icon: CheckCircleIcon },
-              { id: 'metadata', label: 'Metadata', icon: DocumentTextIcon },
-              { id: 'comments', label: 'Comments', icon: DocumentTextIcon },
+              { id: 'review', label: 'Review', icon: CheckCircle2 },
+              { id: 'metadata', label: 'Metadata', icon: FileText },
+              { id: 'comments', label: 'Comments', icon: FileText },
               {
                 id: 'duplicates',
                 label: 'Duplicates',
-                icon: ArrowsRightLeftIcon,
+                icon: ArrowLeftRight,
               },
             ].map((tab) => {
               const Icon = tab.icon;
@@ -778,7 +778,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                     disabled={updateStatusMutation.isPending}
                     className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
                   >
-                    <CheckCircleIcon className="h-4 w-4 mr-2" />
+                    <CheckCircle2 className="h-4 w-4 mr-2" />
                     Approve
                   </button>
 
@@ -787,7 +787,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                     disabled={updateStatusMutation.isPending}
                     className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
                   >
-                    <XCircleIcon className="h-4 w-4 mr-2" />
+                    <XCircle className="h-4 w-4 mr-2" />
                     Reject
                   </button>
 
@@ -796,7 +796,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                     disabled={updateStatusMutation.isPending}
                     className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
                   >
-                    <PencilIcon className="h-4 w-4 mr-2" />
+                    <Pencil className="h-4 w-4 mr-2" />
                     Needs Changes
                   </button>
 
@@ -805,7 +805,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                     disabled={flagMutation.isPending}
                     className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                   >
-                    <FlagIcon className="h-4 w-4 mr-2" />
+                    <Flag className="h-4 w-4 mr-2" />
                     Flag
                   </button>
                 </div>
@@ -814,7 +814,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                 {item.is_flagged && item.flag_reason && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                     <h4 className="text-sm font-medium text-red-900 flex items-center">
-                      <FlagIcon className="h-4 w-4 mr-2" />
+                      <Flag className="h-4 w-4 mr-2" />
                       Flagged Item
                     </h4>
                     <p className="text-sm text-red-700 mt-1">
@@ -899,7 +899,7 @@ const ReviewWorkflow: React.FC<ReviewWorkflowProps> = ({
                   </div>
                 ) : (
                   <div className="text-center text-gray-500 py-8">
-                    <ArrowsRightLeftIcon className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+                    <ArrowLeftRight className="h-12 w-12 mx-auto text-gray-300 mb-3" />
                     <p>No potential duplicates found.</p>
                   </div>
                 )}
